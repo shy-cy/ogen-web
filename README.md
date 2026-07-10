@@ -62,13 +62,14 @@ can redirect to `/confirmation` (or `/en/confirmation`).
 ID (the part after `/f/` in its endpoint). Change the destination email in
 the Formspree dashboard, not in code.
 
-## ⚠️ Before going live — replace placeholders
+## ⚠️ Before going live
 
-- **Domain:** every canonical/OG/sitemap URL uses `https://www.ogen.cy` as a
-  placeholder. Find-and-replace it with the real domain across
-  `index.html`, `en/index.html`, the confirmation pages, `sitemap.xml`,
-  and `robots.txt`.
-- **Formspree `FORM_ID`** in `js/contact-form.js` (see above).
+- **Domain:** all canonical/OG/sitemap URLs use `https://www.ogen.org.cy`
+  (domain purchase pending). If the final domain differs, find-and-replace
+  it across `index.html`, `en/index.html`, the confirmation pages,
+  `sitemap.xml`, and `robots.txt`.
+- **Formspree:** wired to form `xpqgvple` → michal.shin@gmail.com. The form
+  activates on its first submission (one-time confirmation email).
 - **About section** still contains `[placeholder]` copy in both languages.
 
 ## Local preview
