@@ -9,7 +9,7 @@
 
 (function() {
   const ITI = 'https://cdn.jsdelivr.net/npm/intl-tel-input@23.8.0';
-  const FORM_ID = 'YOUR_FORM_ID'; // <-- replace with your Formspree form ID
+  const FORM_ID = 'xpqgvple'; // Formspree form → michal.shin@gmail.com
   const FORMSPREE_URL = `https://formspree.io/f/${FORM_ID}`;
 
   const mount = document.getElementById('contact-form-mount');
