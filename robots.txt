@@ -3,4 +3,4 @@ Allow: /
 Disallow: /confirmation
 Disallow: /en/confirmation
 
-Sitemap: https://www.ogen.org.cy/sitemap.xml
+Sitemap: https://www.ogen.cy/sitemap.xml

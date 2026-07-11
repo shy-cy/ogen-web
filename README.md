@@ -64,7 +64,7 @@ the Formspree dashboard, not in code.
 
 ## ⚠️ Before going live
 
-- **Domain:** all canonical/OG/sitemap URLs use `https://www.ogen.org.cy`
+- **Domain:** all canonical/OG/sitemap URLs use `https://www.ogen.cy`
   (domain purchase pending). If the final domain differs, find-and-replace
   it across `index.html`, `en/index.html`, the confirmation pages,
   `sitemap.xml`, and `robots.txt`.
