@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html lang="he">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,23 +12,40 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;700;800&family=Heebo:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/shared.css">
+<script>
+  // Match the page language to whichever tree the unknown URL was under.
+  (function(){
+    var p = location.pathname;
+    var lang = (p === '/en' || p.indexOf('/en/') === 0) ? 'en'
+             : (p === '/ru' || p.indexOf('/ru/') === 0) ? 'ru' : 'he';
+    document.documentElement.lang = lang;
+    document.addEventListener('DOMContentLoaded', function(){
+      document.getElementById('page').setAttribute('dir', lang === 'he' ? 'rtl' : 'ltr');
+    });
+  })();
+</script>
 </head>
 <body>
+<div id="page" dir="rtl">
 
 <section class="thankyou">
   <div class="thankyou-inner">
     <h1>404</h1>
     <p>
-      <span class="he-only">הדף שחיפשתם לא נמצא.</span>
-      <span class="en-only">The page you were looking for wasn't found.</span>
+      <span data-lang="he">הדף שחיפשתם לא נמצא.</span>
+      <span data-lang="en">The page you were looking for wasn't found.</span>
+      <span data-lang="ru">Запрашиваемая страница не найдена.</span>
     </p>
     <a href="/" class="btn-primary">
-      <span class="he-only">חזרה לדף הבית</span><span class="en-only">Back to home</span>
+      <span data-lang="he">חזרה לדף הבית</span>
+      <span data-lang="en">Back to home</span>
+      <span data-lang="ru">На главную</span>
     </a>
   </div>
 </section>
 
 <script src="/js/nav.js"></script>
 <script src="/js/footer.js"></script>
+</div>
 </body>
 </html>

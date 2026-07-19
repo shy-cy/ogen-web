@@ -2,5 +2,6 @@ User-agent: *
 Allow: /
 Disallow: /confirmation
 Disallow: /en/confirmation
+Disallow: /ru/confirmation
 
 Sitemap: https://www.ogen.cy/sitemap.xml

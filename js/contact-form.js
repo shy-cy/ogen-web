@@ -15,24 +15,35 @@
   const mount = document.getElementById('contact-form-mount');
   if (!mount) return;
 
-  const isEn = (document.documentElement.lang || '').toLowerCase().startsWith('en');
-  const nextUrl = isEn ? '/en/confirmation' : '/confirmation';
+  const lang = (document.documentElement.lang || 'he').toLowerCase().slice(0, 2);
+  const nextUrl = lang === 'en' ? '/en/confirmation'
+               : lang === 'ru' ? '/ru/confirmation'
+               : '/confirmation';
 
-  const t = isEn
-    ? {
-        firstName: 'First name', lastName: 'Last name',
-        email: 'Email *', phone: 'Phone', message: 'Message *',
-        submit: 'Send',
-        success: '✓ Message sent successfully! We\'ll be in touch soon.',
-        error: 'Something went wrong. Please try again.'
-      }
-    : {
-        firstName: 'שם פרטי', lastName: 'שם משפחה',
-        email: 'אימייל *', phone: 'טלפון', message: 'הודעה *',
-        submit: 'שלחו',
-        success: '✓ ההודעה נשלחה בהצלחה! נחזור אליכם בקרוב.',
-        error: 'שגיאה בשליחה. אנא נסו שוב.'
-      };
+  const strings = {
+    he: {
+      firstName: 'שם פרטי', lastName: 'שם משפחה',
+      email: 'אימייל *', phone: 'טלפון', message: 'הודעה *',
+      submit: 'שלחו',
+      success: '✓ ההודעה נשלחה בהצלחה! נחזור אליכם בקרוב.',
+      error: 'שגיאה בשליחה. אנא נסו שוב.'
+    },
+    en: {
+      firstName: 'First name', lastName: 'Last name',
+      email: 'Email *', phone: 'Phone', message: 'Message *',
+      submit: 'Send',
+      success: '✓ Message sent successfully! We\'ll be in touch soon.',
+      error: 'Something went wrong. Please try again.'
+    },
+    ru: {
+      firstName: 'Имя', lastName: 'Фамилия',
+      email: 'Email *', phone: 'Телефон', message: 'Сообщение *',
+      submit: 'Отправить',
+      success: '✓ Сообщение успешно отправлено! Мы скоро свяжемся с вами.',
+      error: 'Что-то пошло не так. Пожалуйста, попробуйте ещё раз.'
+    }
+  };
+  const t = strings[lang] || strings.he;
 
   // Append intl-tel-input CSS once.
   if (!document.querySelector('link[data-iti]')) {

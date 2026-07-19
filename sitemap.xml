@@ -5,12 +5,21 @@
     <loc>https://www.ogen.cy/</loc>
     <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/"/>
   </url>
   <url>
     <loc>https://www.ogen.cy/en</loc>
     <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/"/>
+  </url>
+  <url>
+    <loc>https://www.ogen.cy/ru</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/"/>
   </url>
 </urlset>
