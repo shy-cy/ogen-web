@@ -22,10 +22,18 @@ Three parallel language trees. Hebrew is the default and lives at the root.
 | `/` | `index.html` | `he` | `rtl` |
 | `/en` | `en/index.html` | `en` | `ltr` |
 | `/ru` | `ru/index.html` | `ru` | `ltr` |
+| `/about` | `about.html` | `he` | `rtl` |
+| `/en/about` | `en/about.html` | `en` | `ltr` |
+| `/ru/about` | `ru/about.html` | `ru` | `ltr` |
+| `/activities/<slug>` | `activities/<slug>.html` | `he` | `rtl` |
+| `/en/activities/<slug>` | `en/activities/<slug>.html` | `en` | `ltr` |
+| `/ru/activities/<slug>` | `ru/activities/<slug>.html` | `ru` | `ltr` |
 | `/confirmation` | `confirmation.html` | `he` | `rtl` |
 | `/en/confirmation` | `en/confirmation.html` | `en` | `ltr` |
 | `/ru/confirmation` | `ru/confirmation.html` | `ru` | `ltr` |
 | any unknown path | `404.html` | set by JS from URL | set by JS |
+
+`hebrew-for-kids` is currently the only activity slug.
 
 Confirmation pages are the contact form's redirect targets. `404.html` is the
 one page that inlines all three languages at once (via `data-lang` spans, shown
@@ -36,6 +44,8 @@ shared.css        all styles: tokens, nav, every section, form, footer
 js/nav.js         injects <nav> + mobile menu into #page
 js/footer.js      injects <footer> into #page
 js/contact-form.js  renders the form into #contact-form-mount
+js/motifs.js      draws any [data-motif] element; holds the canonical SVGs
+js/activity.js    activity-page status badge + CTA, credits, optional fields
 images/
   hp-bg.jpg, kids.jpg          hero background + hero photo
   og-image.jpg                 1200×630 branded share image
@@ -64,6 +74,9 @@ form are injected at runtime into `<div id="page">`:
 - **`js/contact-form.js`** — builds the form, lazy-loads `intl-tel-input` from
   CDN (Cyprus default country), and AJAX-POSTs to Formspree. Language comes from
   `document.documentElement.lang`, not the path.
+- **`js/motifs.js`** — draws the decorative accents. Load it **after**
+  `footer.js`, so it also dresses the motifs the footer just injected.
+- **`js/activity.js`** — activity pages only. Load it last.
 
 Each of these three carries its own `{ he, en, ru }` string table. **A copy
 change in the nav, footer, or form means editing that table, not the HTML.**
@@ -94,17 +107,22 @@ Then:
 Heading margins are explicitly reset (`margin-top:0`) in `shared.css`, so
 changing a tag doesn't shift spacing. Keep it that way.
 
-**4. Decorative motifs: inline SVG/CSS only, one per section.** No image files,
-and don't reuse the same motif twice.
+**4. Decorative motifs are a shared system.** Six of them — `ring`, `scatter`,
+`hatch`, `leaf`, `wave`, `book` — drawn with inline SVG or pure CSS, never image
+files. Each shape is defined **once**: geometry/colour in the MOTIFS block of
+`shared.css`, SVG path data in `js/motifs.js`. Never paste motif SVG into a
+page; declare it and let the injector draw it:
 
-| Motif | Where |
-|---|---|
-| Ring / arc outline | About, top-inline-end corner |
-| Scattered dots | Offer, top-inline-start corner |
-| Diagonal hatch | Why Ogen, bottom-inline-end |
-| Ring (camel) | Vision, top-inline-start |
-| Leaf sprig ×2 | Contact (hidden under 640px) |
-| Wave line + book watermark | Footer |
+```html
+<span class="motif offer-corner" data-motif="scatter" data-corner="tl"></span>
+<div class="page-header" data-motif="leaf" data-corner="tl">   <!-- slot is built for you -->
+```
+
+`data-corner` is `tl` / `tr` / `bl` / `br`, meaning top|bottom plus inline
+**start|end** — so a corner mirrors between Hebrew and EN/RU rather than
+staying physically put. Homepage sections keep their own placement classes
+(`about-corner`, `why-corner`, `contact-leaf-top`, …) which only override
+inset, size and tone. Use each motif once per page; don't repeat one.
 
 **5. Icons are Lucide**, always white inside a 56px solid-color circle — never a
 colored icon on a transparent background. The anchor icon is the eyebrow marker
@@ -118,6 +136,46 @@ terracotta / navy / gold in that order.
 **7. Design tokens** live in `:root` in `shared.css` — olive, camel, terracotta,
 gold, navy, paper, stone, ink. Hebrew uses Heebo, EN/RU use Mulish, switched via
 `html[lang="…"]` selectors. Use the tokens; don't hardcode hexes.
+
+## Page templates
+
+Two shells for pages beyond the homepage. Both open with the shared
+`.page-header` (breadcrumb + the page's single `<h1>` + optional corner motif).
+
+**Inner page** — `.inner-body` holding h2s, paragraphs, `.pullquote`,
+`.placeholder-img` / `.inner-image`, and `.team-grid` of `.team-card`
+(photo, name, role). `/about` is the worked example; its body is still
+`[content needed]` placeholder copy, so it carries `noindex` and is
+deliberately **absent from `sitemap.xml`**. Flip both once real copy lands.
+
+**Activity page** — `.activity-layout`: `.activity-main` beside a sticky
+`.activity-sidebar` of facts. Driven by three markup contracts:
+
+1. **Status.** `<article class="activity" data-status="open">` is the only
+   place status is declared. `js/activity.js` renders the badge *and* the
+   sidebar CTA from that one value, so they cannot disagree. The seven
+   statuses are `draft`, `announcement`, `open`, `waitlist`, `closed`,
+   `cancelled`, `completed`; badge/CTA/banner copy for all three languages
+   lives in the `STATUS` table in that file. `data-spots` feeds the "places
+   left" note (`open` only) and `data-cta-url` the button target.
+2. **Teachers and sponsors are arrays**, in the page's
+   `<script type="application/json" id="activity-credits">` block —
+   `{ teachers: [{name, photo}], sponsors: [{name, logo}] }`. Any count
+   renders; a group with no entries gets no heading, and if both are empty
+   the whole credit block is removed.
+3. **Optional fields.** Wrap each in `<div data-optional>`. The rule is to
+   **delete the block** when an activity has nothing to say there. As a
+   safety net `js/activity.js` removes any `[data-optional]` that ends up
+   with only a heading in it, so no orphaned label survives. Optional blocks
+   are: program length, language of instruction, prerequisites, what to
+   bring, FAQ.
+
+`draft` deserves a warning: `js/activity.js` redirects a draft page to
+`/404.html` (bypass with `?preview=1`), but the site is static with no auth,
+so **that is a courtesy, not access control** — the HTML is still served to
+anyone who asks for it. Until an admin backend exists, a genuinely
+unpublished activity should not be committed or deployed at all, and must
+stay out of `sitemap.xml`.
 
 ## Local preview
 
@@ -137,7 +195,17 @@ into one, and converts the phone to full international format before sending.
 
 ## Current status
 
-Site is live and launched. **One open item:** the Russian copy has never been
-reviewed by a native speaker — including the `/ru/` `<title>` and meta
-description. Flagged inline at `ru/index.html:7`. Everything else that was once
-a pre-launch blocker (OG share image, Formspree wiring, domain) is done.
+Site is live and launched. Everything that was once a pre-launch blocker (OG
+share image, Formspree wiring, domain) is done. Open items:
+
+- **Russian copy has never been reviewed by a native speaker** — the homepage,
+  and now the About and activity pages too. Flagged inline at the top of each
+  `/ru/` file.
+- **English activity copy** is a first-pass translation of the approved Hebrew
+  and has not been proofread, including the status strings in `js/activity.js`.
+- **`/about` is placeholder copy** (`[content needed]`), hence `noindex` and no
+  sitemap entry.
+- **No activities index page** exists yet, so activity breadcrumbs point at the
+  homepage `#offer` section. Nothing in the nav links to `/about` or to any
+  activity page yet either.
+- **Registration is not built.** The `open` CTA points at the contact section.

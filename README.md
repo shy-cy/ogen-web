@@ -21,13 +21,16 @@ them automatically.
 index.html              — Hebrew homepage
 confirmation.html       — Hebrew thank-you page (form redirect target)
 404.html                — not-found page (trilingual, language from URL)
-en/index.html, en/confirmation.html   — English
-ru/index.html, ru/confirmation.html   — Russian
-shared.css              — all styles: tokens, nav, sections, form, footer
+about.html              — Hebrew About page (inner-page template)
+activities/             — one file per activity (activity-page template)
+en/…, ru/…              — English and Russian mirrors of all of the above
+shared.css              — all styles: tokens, motifs, nav, sections, templates, footer
 js/
   nav.js                — injects <nav>, 3-language toggle (URL rewrite), mobile menu
   footer.js             — injects <footer> with tagline logo + partner logos
   contact-form.js       — Formspree AJAX submission + intl-tel-input phone field
+  motifs.js             — draws [data-motif] accents; canonical copy of each SVG
+  activity.js           — activity status badge/CTA, teacher+sponsor lists
 images/
   hp-bg.jpg, kids.jpg   — hero background + photo
   favicon.svg, favicon-32.png, apple-touch-icon.png   — Ogen emblem icon set
@@ -53,6 +56,14 @@ sitemap.xml, robots.txt — SEO
 **When you change copy, update all three language files.** The live site is
 the source of truth for copy/markup/styling — there is no separate reference
 mockup.
+
+## Page templates
+
+Beyond the homepage there are two reusable shells — an **inner page**
+(`/about`) and an **activity page** (`/activities/<slug>`), both opening with
+the shared `.page-header`. An activity's whole state comes from one
+`data-status` attribute, and its teachers and sponsors are JSON arrays. See
+`CLAUDE.md` for the full contract before authoring either.
 
 ## Heading hierarchy (SEO)
 
