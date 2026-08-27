@@ -19,6 +19,10 @@
   --paper: #FBFAF6;
   --stone: #EEE7D8;
   --ink: #1B3E52;
+  /* Status-system greys/red — only used by the activity template. */
+  --muted: #9a9a94;
+  --muted-warm: #c8c2b4;
+  --danger: #8a3220;
   --font-latin: 'Mulish', sans-serif;
   --font-he: 'Heebo', sans-serif;
 }
@@ -64,6 +68,13 @@ html[lang="ru"] div[data-lang="ru"] { display:block; }
 .motif-leaf{ width:90px; height:150px; color: var(--olive); opacity:0.45; }
 .motif-wave{ width:200px; height:24px; color: var(--camel); opacity:0.6; }
 .motif-book{ width:160px; height:160px; color: var(--olive); opacity:0.12; }
+
+/* -70px suits the big bleeding shapes (ring, book). The smaller ones would
+   be almost entirely off-canvas at that inset, so they tuck in closer. */
+.page-header .motif-scatter,
+.page-header .motif-hatch,
+.page-header .motif-leaf,
+.page-header .motif-wave{ --motif-inset:-18px; }
 
 .pos-tl{ inset-block-start: var(--motif-inset, -70px); inset-inline-start: var(--motif-inset, -70px); }
 .pos-tr{ inset-block-start: var(--motif-inset, -70px); inset-inline-end:   var(--motif-inset, -70px); }
@@ -254,6 +265,114 @@ html[lang="he"] .partners-label{ font-family: var(--font-he); letter-spacing:0; 
 .partner-slot{ height:76px; display:flex; align-items:center; justify-content:center; }
 .partner-slot img{ max-height:76px; max-width:200px; width:auto; object-fit:contain; }
 footer .foot-line{ font-size:13px; color: var(--olive); }
+
+/* ============================== PAGE HEADER ==============================
+   Shared by the inner-page and activity-page templates. The motif is opt-in
+   per page via data-motif / data-corner on the .page-header itself; see the
+   MOTIFS block above and js/motifs.js.
+   ======================================================================== */
+.page-header{
+  margin-top:96px; background: var(--stone); padding:50px 24px 40px;
+  text-align:center; position:relative; overflow:hidden;
+}
+.breadcrumb{ font-size:13px; color: var(--olive); font-weight:700; margin-bottom:14px; }
+.breadcrumb a{ text-decoration:underline; }
+.breadcrumb .sep{ margin:0 6px; }
+.page-header h1{ font-size:36px; font-weight:700; color: var(--olive); max-width:700px; margin:0 auto; }
+html[lang="en"] .page-header h1, html[lang="ru"] .page-header h1{ font-weight:800; }
+
+/* ============================== INNER PAGE ============================== */
+.inner-body{ max-width:760px; margin:0 auto; padding:60px 24px 80px; }
+.inner-body h2{ font-size:26px; font-weight:700; color: var(--navy); margin:36px 0 16px; }
+.inner-body h2:first-child{ margin-top:0; }
+.inner-body p{ font-size:16.5px; color:#3f3f3a; margin-bottom:18px; }
+.pullquote{ border-inline-start:4px solid var(--terracotta); padding:6px 22px; margin:30px 0; font-size:18px; font-weight:700; color: var(--olive); }
+.inner-image{ width:100%; border-radius:14px; margin:28px 0; display:block; }
+.placeholder-img{
+  width:100%; height:280px; border-radius:14px; margin:28px 0; background: var(--stone);
+  display:flex; align-items:center; justify-content:center; color: var(--camel); font-size:14px; font-weight:700;
+}
+.team-grid{ display:flex; gap:20px; flex-wrap:wrap; margin:24px 0; }
+.team-card{ flex:1 1 160px; text-align:center; }
+.team-photo{ width:100px; height:100px; border-radius:50%; background: var(--stone); margin:0 auto 10px; object-fit:cover; display:block; }
+.team-card h3{ font-size:15px; font-weight:700; color: var(--navy); margin:0 0 4px; }
+.team-card p{ font-size:13px; color: var(--camel); margin:0; }
+
+/* ============================== ACTIVITY PAGE ============================== */
+.activity-layout{
+  max-width:1100px; margin:0 auto; padding:50px 24px 80px;
+  display:flex; gap:48px; align-items:flex-start; flex-wrap:wrap;
+}
+.activity-main{ flex:1 1 500px; min-width:0; }
+.activity-main h2{ font-size:22px; font-weight:700; color: var(--navy); margin:28px 0 12px; }
+.activity-main > *:first-child{ margin-top:0; }
+.activity-main p{ font-size:16px; color:#3f3f3a; margin-bottom:16px; }
+.activity-hero-img{
+  width:100%; height:280px; border-radius:16px; object-fit:cover; display:block;
+  background: linear-gradient(135deg, var(--stone), var(--camel)); margin-bottom:24px;
+}
+.facts-list{ list-style:none; }
+.facts-list li{ font-size:15.5px; color:#3f3f3a; padding-inline-start:26px; position:relative; margin-bottom:10px; }
+.facts-list li::before{ content:"\2713"; position:absolute; inset-inline-start:0; color: var(--terracotta); font-weight:800; }
+.faq-item{ margin-bottom:16px; }
+.faq-item p{ margin-bottom:0; }
+.faq-q{ font-weight:700; color: var(--navy); }
+
+/* Status badge — colour comes from the .is-<status> class that js/activity.js
+   adds, so badge and CTA are driven by the same single data-status value. */
+.status-badge{
+  display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:800;
+  padding:7px 16px; border-radius:999px; margin-bottom:16px;
+}
+.status-badge.is-draft{ background: var(--muted); color:#fff; }
+.status-badge.is-announcement{ background: var(--gold); color:#fff; }
+.status-badge.is-open{ background: var(--terracotta); color:#fff; }
+.status-badge.is-waitlist{ background: var(--navy); color:#fff; }
+.status-badge.is-closed{ background: var(--muted-warm); color:#5a5646; }
+.status-badge.is-cancelled{ background: var(--danger); color:#fff; }
+.status-badge.is-completed{ background: var(--camel); color:#fff; }
+
+/* Teachers + sponsors. Both are arrays, so the rows wrap at any count. */
+.credit-block{ display:flex; gap:40px; flex-wrap:wrap; margin-top:28px; padding-top:24px; border-top:1px solid var(--stone); }
+.credit-group{ display:flex; flex-direction:column; gap:12px; min-width:0; }
+.credit-group-label{ font-size:12px; font-weight:800; color: var(--terracotta); text-transform:uppercase; letter-spacing:0.05em; }
+html[lang="he"] .credit-group-label{ text-transform:none; letter-spacing:0; font-size:13px; }
+.credit-items{ display:flex; flex-wrap:wrap; gap:12px 28px; }
+.credit-item{ display:flex; align-items:center; gap:12px; }
+.credit-photo{
+  width:40px; height:40px; border-radius:50%; background: var(--stone); flex-shrink:0; object-fit:cover;
+  display:flex; align-items:center; justify-content:center; font-size:16px; color: var(--olive);
+}
+.credit-name{ display:block; font-size:14.5px; color: var(--navy); font-weight:700; }
+
+/* Sticky facts sidebar. 112px = 96px nav + 16px breathing room. */
+.activity-sidebar{
+  flex:0 0 320px; background: var(--paper); border:1px solid var(--stone); border-radius:16px;
+  padding:26px; position:sticky; top:112px; box-shadow:0 8px 30px rgba(27,62,82,0.08);
+}
+.sidebar-row{ display:flex; justify-content:space-between; align-items:flex-start; gap:16px; padding:12px 0; border-bottom:1px solid var(--stone); font-size:14.5px; }
+.sidebar-row:last-of-type{ border-bottom:none; }
+.sidebar-row .label{ color: var(--camel); font-weight:700; }
+.sidebar-row .value{ color: var(--navy); font-weight:700; text-align:end; }
+.sidebar-cta{
+  display:block; width:100%; margin-top:20px; padding:14px; border-radius:999px; border:none;
+  font-family:inherit; font-size:15.5px; font-weight:800; cursor:pointer; text-align:center;
+}
+.sidebar-cta.is-announcement{ background: var(--gold); color:#fff; }
+.sidebar-cta.is-open{ background: var(--terracotta); color:#fff; }
+.sidebar-cta.is-waitlist{ background: var(--navy); color:#fff; }
+.sidebar-cta.is-closed{ background:#e4e0d4; color:#a39d8c; cursor:not-allowed; }
+.sidebar-note{ font-size:12.5px; color: var(--camel); text-align:center; margin-top:10px; }
+.status-banner{ padding:16px; border-radius:12px; text-align:center; font-size:14.5px; font-weight:700; margin-top:8px; }
+.status-banner.is-draft{ background:#eee; color:#888; }
+.status-banner.is-cancelled{ background:#f6e2dd; color: var(--danger); }
+.status-banner.is-completed{ background: var(--stone); color: var(--olive); }
+
+@media (max-width:780px){
+  .activity-layout{ flex-direction:column; gap:32px; }
+  .activity-sidebar{ position:static; width:100%; flex-basis:auto; }
+  .page-header h1{ font-size:28px; }
+}
 
 /* ============================== CONFIRMATION / 404 ============================== */
 .thankyou{ margin-top:96px; min-height:calc(100vh - 96px); display:flex; align-items:center; justify-content:center; padding:60px 24px; text-align:center; }
