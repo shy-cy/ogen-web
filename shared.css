@@ -83,7 +83,9 @@ html[lang="ru"] div[data-lang="ru"] { display:block; }
 @media (max-width:640px){ .contact-leaf-top, .contact-leaf-bottom{ display:none; } }
 
 /* ============================== NAV ============================== */
-nav{
+/* Scoped to the injected site nav (a direct child of #page) so it cannot
+   capture other <nav> landmarks, e.g. the breadcrumb inside .page-header. */
+#page > nav{
   position:fixed; top:0; left:0; right:0; height:96px;
   background: rgba(251,250,246,0.92); backdrop-filter: blur(6px);
   border-bottom: 1px solid var(--stone);
