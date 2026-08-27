@@ -2,7 +2,7 @@
    Ogen — shared stylesheet
    Loaded by every page (HE at /, EN at /en/, RU at /ru/). Nav + footer are
    injected by js/nav.js and js/footer.js into #page; the contact form by
-   js/contact-form.js. Copy/markup are the approved reference-homepage.html.
+   js/contact-form.js.
 
    Scrollbar fix: <html> and <body> NEVER carry a dir attribute. Direction is
    set only on the #page wrapper (dir="rtl" for HE, "ltr" for EN/RU). <html>
