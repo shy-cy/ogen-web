@@ -333,7 +333,10 @@ html[lang="en"] .page-header h1, html[lang="ru"] .page-header h1{ font-weight:80
 .status-badge.is-completed{ background: var(--camel); color:#fff; }
 
 /* Teachers + sponsors. Both are arrays, so the rows wrap at any count. */
-.credit-block{ display:flex; gap:40px; flex-wrap:wrap; margin-top:28px; padding-top:24px; border-top:1px solid var(--stone); }
+/* Groups always stack — teachers above sponsors. As a wrapping row they sat
+   side by side or stacked purely on how wide the names happened to be, which
+   made Hebrew and English lay out differently for no good reason. */
+.credit-block{ display:flex; flex-direction:column; gap:26px; margin-top:28px; padding-top:24px; border-top:1px solid var(--stone); }
 .credit-group{ display:flex; flex-direction:column; gap:12px; min-width:0; }
 .credit-group-label{ font-size:12px; font-weight:800; color: var(--terracotta); text-transform:uppercase; letter-spacing:0.05em; }
 html[lang="he"] .credit-group-label{ text-transform:none; letter-spacing:0; font-size:13px; }
