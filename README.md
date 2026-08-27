@@ -50,8 +50,9 @@ sitemap.xml, robots.txt — SEO
 - The **language toggle** navigates to the twin URL (`/` ↔ `/en` ↔ `/ru`,
   `/confirmation` ↔ `/en/confirmation` ↔ `/ru/confirmation`), preserving the hash.
 
-**When you change copy, update all three language files.** The approved
-source of truth for copy/markup/styling is `ogen-handoff/reference-homepage.html`.
+**When you change copy, update all three language files.** The live site is
+the source of truth for copy/markup/styling — there is no separate reference
+mockup.
 
 ## Heading hierarchy (SEO)
 
@@ -70,15 +71,14 @@ loads `intl-tel-input` (Cyprus default) from CDN, and AJAX-submits to
 Wired to Formspree form `xpqgvple` → michal.shin@gmail.com. To change the
 destination email, use the Formspree dashboard, not code.
 
-## ⚠️ Before going live
+## Open item
 
-- **OG share image:** `og:image` / `twitter:image` point to
-  `https://www.ogen.cy/images/og-image.jpg`, which **does not exist yet**. A
-  1200×630 branded image is needed for link previews (WhatsApp/Facebook).
-- **Russian copy** is drafted from the reference but **has not been reviewed by
-  a native speaker** — including the `/ru/` `<title>` and meta description
-  (marked with a note in `ru/index.html`).
-- **Domain** `https://www.ogen.cy` is live (www primary).
+The site is live at `https://www.ogen.cy` (www primary).
+
+- **Russian copy has not been reviewed by a native speaker** — including the
+  `/ru/` `<title>` and meta description. Flagged inline at `ru/index.html:7`.
+  This is the only outstanding item; the OG share image and the Formspree
+  wiring are both done and confirmed working.
 
 ## Local preview
 
