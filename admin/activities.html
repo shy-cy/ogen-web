@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ogen admin · Activities</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+
+<div class="admin-bar">
+  <h1>Ogen admin</h1>
+  <a href="/admin/activities.html" style="color:#fff;font-size:12.5px;font-weight:700;">Activities</a>
+  <a href="/admin/users.html" style="color:#fff;font-size:12.5px;font-weight:700;opacity:.8;">Accounts</a>
+  <span class="spacer"></span>
+  <span class="who" id="who"></span>
+  <button type="button" id="logout">Sign out</button>
+</div>
+
+<!-- Stays hidden until `auth` resolves, so a role without access never sees
+     a half-rendered tool. -->
+<div class="wrap" id="app" hidden>
+  <div id="no-access" class="msg err" hidden></div>
+
+  <div class="layout" id="tool">
+    <div class="sidebar">
+      <div class="panel">
+        <h2>Activities</h2>
+        <div class="picker" id="picker"></div>
+        <button type="button" class="add-btn" id="new-activity" style="margin-top:12px;">+ New activity</button>
+      </div>
+    </div>
+
+    <div class="main">
+      <div id="messages"></div>
+      <div id="conflict-box"></div>
+
+      <div class="panel">
+        <h2>Settings</h2>
+        <div class="settings-grid" id="settings"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Content</h2>
+        <div id="fields"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Optional sections</h2>
+        <p class="hint" style="margin:-8px 0 14px;">Leave a field empty and its whole section is left out of the page — no empty heading is published.</p>
+        <div id="optional-fields"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Sidebar facts</h2>
+        <div id="facts"></div>
+      </div>
+
+      <div class="panel" id="list-included-panel">
+        <h2>What&rsquo;s included</h2>
+        <div class="items" id="list-included"></div>
+        <button type="button" class="add-btn" data-add="included" style="margin-top:12px;">+ Add an item</button>
+      </div>
+
+      <div class="panel" id="list-teachers-panel">
+        <h2>Teachers</h2>
+        <p class="hint" style="margin:-8px 0 14px;">Any number. They render as a row that wraps.</p>
+        <div class="items" id="list-teachers"></div>
+        <button type="button" class="add-btn" data-add="teachers" style="margin-top:12px;">+ Add a teacher</button>
+      </div>
+
+      <div class="panel" id="list-sponsors-panel">
+        <h2>Sponsors</h2>
+        <div class="items" id="list-sponsors"></div>
+        <button type="button" class="add-btn" data-add="sponsors" style="margin-top:12px;">+ Add a sponsor</button>
+      </div>
+
+      <div class="panel" id="list-faq-panel">
+        <h2>FAQ</h2>
+        <div class="items" id="list-faq"></div>
+        <button type="button" class="add-btn" data-add="faq" style="margin-top:12px;">+ Add a question</button>
+      </div>
+
+      <div class="panel">
+        <div class="actions">
+          <button type="button" class="btn btn-draft" id="btn-draft">Save draft</button>
+          <button type="button" class="btn btn-preview" id="btn-preview">Preview</button>
+          <button type="button" class="btn btn-publish" id="btn-publish">Publish</button>
+          <button type="button" class="btn btn-unpublish" id="btn-unpublish">Unpublish</button>
+          <button type="button" class="btn btn-delete" id="btn-delete">Delete&hellip;</button>
+        </div>
+      </div>
+
+      <div class="panel" id="preview-panel" hidden>
+        <h2>Preview</h2>
+        <p class="hint" style="margin:-8px 0 12px;">Rendered by the same function that publishes. What you see here is what gets committed.</p>
+        <div class="preview-tabs" id="preview-tabs"></div>
+        <iframe id="preview-frame" title="Preview"></iframe>
+        <ul class="file-list" id="preview-files"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/admin-session.js"></script>
+<script src="/js/repeatable-items.js"></script>
+<script src="/js/activities-admin.js"></script>
+</body>
+</html>

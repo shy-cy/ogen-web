@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ogen admin · Accounts</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+
+<div class="admin-bar">
+  <h1>Ogen admin</h1>
+  <a href="/admin/activities.html" style="color:#fff;font-size:12.5px;font-weight:700;opacity:.8;">Activities</a>
+  <a href="/admin/users.html" style="color:#fff;font-size:12.5px;font-weight:700;">Accounts</a>
+  <span class="spacer"></span>
+  <span class="who" id="who"></span>
+  <button type="button" id="logout">Sign out</button>
+</div>
+
+<div class="wrap" id="app" hidden>
+  <div id="no-access" class="msg err" hidden></div>
+  <div id="messages"></div>
+
+  <div id="setup-banner" class="msg warn" hidden>
+    <b>Setup mode.</b> You are signed in with the setup password because no accounts exist yet.
+    Create your account below — the setup password stops working the moment you do.
+  </div>
+
+  <div class="layout" id="tool">
+    <div class="main">
+      <div class="panel">
+        <h2>Accounts</h2>
+        <div id="user-list"></div>
+      </div>
+
+      <div class="panel">
+        <h2 id="form-title">Add an account</h2>
+        <div class="settings-grid">
+          <div><label for="u-name">Name</label><input type="text" id="u-name"></div>
+          <div><label for="u-email">Email</label><input type="email" id="u-email"></div>
+          <div><label for="u-role">Role</label><select id="u-role"></select>
+            <div class="hint" id="role-hint"></div></div>
+          <div><label for="u-pass">Password</label><input type="password" id="u-pass" autocomplete="new-password">
+            <div class="hint">At least 8 characters. There is no reset email — you set it and tell them.</div></div>
+        </div>
+        <div class="actions" style="position:static;margin-top:16px;">
+          <button type="button" class="btn btn-publish" id="u-save">Create account</button>
+          <button type="button" class="btn btn-draft" id="u-cancel" hidden>Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/admin-session.js"></script>
+<script>
+(function () {
+  if (!window.AdminSession.requireSession()) return;
+  var API = '/api/admin-users';
+  var $ = function (id) { return document.getElementById(id); };
+  var editing = null;
+  var roles = [];
+
+  function message(kind, text) {
+    $('messages').innerHTML = '';
+    if (text) {
+      var d = document.createElement('div');
+      d.className = 'msg ' + kind;
+      d.innerHTML = text;
+      $('messages').appendChild(d);
+    }
+  }
+
+  function describe(role) {
+    var p = (role.permissions && role.permissions.activities) || {};
+    if (!p.access) return 'No access to Activities';
+    return 'Activities: edits ' + (p.edit || []).join('/').toUpperCase() +
+           (p.publish ? ', may publish' : ', may NOT publish') +
+           (role.permissions.users && role.permissions.users.access ? ' · manages accounts' : '');
+  }
+
+  function renderRoles() {
+    var sel = $('u-role');
+    sel.innerHTML = '';
+    roles.forEach(function (r) {
+      var o = document.createElement('option');
+      o.value = r.id; o.textContent = r.name;
+      sel.appendChild(o);
+    });
+    sel.onchange = function () {
+      var r = roles.filter(function (x) { return x.id === sel.value; })[0];
+      $('role-hint').textContent = r ? describe(r) : '';
+    };
+    sel.onchange();
+  }
+
+  function renderUsers(users) {
+    var box = $('user-list');
+    box.innerHTML = '';
+    if (!users.length) {
+      box.innerHTML = '<p class="hint">No accounts yet.</p>';
+      return;
+    }
+    users.forEach(function (u) {
+      var row = document.createElement('div');
+      row.className = 'item';
+      row.innerHTML =
+        '<div class="item-head"><b>' + u.name + ' &lt;' + u.email + '&gt;</b>' +
+        '<span class="pill">' + u.adminRole + '</span>' +
+        (u.active ? '' : '<span class="pill draft">disabled</span>') + '</div>' +
+        '<div class="hint">Created ' + (u.createdAt || '').slice(0, 10) +
+        ' · last signed in ' + (u.lastLogin ? u.lastLogin.slice(0, 16).replace('T', ' ') : 'never') + '</div>';
+      var ctrls = document.createElement('div');
+      ctrls.className = 'item-ctrls';
+      ctrls.style.marginTop = '10px';
+      var edit = document.createElement('button');
+      edit.type = 'button'; edit.textContent = 'Edit';
+      edit.onclick = function () { startEdit(u); };
+      var toggle = document.createElement('button');
+      toggle.type = 'button'; toggle.textContent = u.active ? 'Disable' : 'Enable';
+      toggle.onclick = function () { save({ action: 'update', email: u.email, active: !u.active }); };
+      var del = document.createElement('button');
+      del.type = 'button'; del.className = 'del'; del.textContent = 'Delete';
+      del.onclick = function () {
+        if (window.confirm('Delete ' + u.email + '?')) save({ action: 'delete', email: u.email });
+      };
+      ctrls.appendChild(edit); ctrls.appendChild(toggle); ctrls.appendChild(del);
+      row.appendChild(ctrls);
+      box.appendChild(row);
+    });
+  }
+
+  function startEdit(u) {
+    editing = u.email;
+    $('form-title').textContent = 'Edit ' + u.email;
+    $('u-name').value = u.name;
+    $('u-email').value = u.email;
+    $('u-email').disabled = true;
+    $('u-role').value = u.adminRole;
+    $('u-role').onchange();
+    $('u-pass').value = '';
+    $('u-pass').placeholder = 'Leave blank to keep the current password';
+    $('u-save').textContent = 'Save changes';
+    $('u-cancel').hidden = false;
+  }
+
+  function resetForm() {
+    editing = null;
+    $('form-title').textContent = 'Add an account';
+    $('u-name').value = ''; $('u-email').value = ''; $('u-email').disabled = false;
+    $('u-pass').value = ''; $('u-pass').placeholder = '';
+    $('u-save').textContent = 'Create account';
+    $('u-cancel').hidden = true;
+  }
+
+  function refresh() {
+    return window.AdminSession.post(API, { action: 'list' }).then(function (res) {
+      $('app').hidden = false;
+      if (!res.ok) {
+        document.getElementById('tool').hidden = true;
+        $('no-access').hidden = false;
+        $('no-access').textContent = res.data.error || 'No access';
+        return;
+      }
+      roles = res.data.roles || [];
+      renderRoles();
+      renderUsers(res.data.users || []);
+      var s = window.AdminSession.get();
+      $('setup-banner').hidden = !(s && s.legacy);
+      $('who').textContent = s ? s.name + ' · ' + s.roleName : '';
+    });
+  }
+
+  function save(body) {
+    window.AdminSession.post(API, body).then(function (res) {
+      if (!res.ok) return message('err', res.data.error || 'That did not work');
+      var wasLegacy = (window.AdminSession.get() || {}).legacy;
+      message('ok', body.action === 'create'
+        ? 'Account created.' + (wasLegacy ? ' The setup password no longer works — sign in with this account from now on.' : '')
+        : 'Saved.');
+      resetForm();
+      refresh();
+    });
+  }
+
+  $('u-save').addEventListener('click', function () {
+    var body = editing
+      ? { action: 'update', email: editing, name: $('u-name').value, adminRole: $('u-role').value }
+      : { action: 'create', email: $('u-email').value, name: $('u-name').value, adminRole: $('u-role').value };
+    if ($('u-pass').value) body.password = $('u-pass').value;
+    if (!editing && !body.password) return message('err', 'A password is required for a new account');
+    save(body);
+  });
+  $('u-cancel').addEventListener('click', resetForm);
+  $('logout').addEventListener('click', window.AdminSession.logout);
+
+  refresh();
+})();
+</script>
+</body>
+</html>

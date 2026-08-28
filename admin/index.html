@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ogen admin · Sign in</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+
+<div class="login-wrap">
+  <form class="login-card" id="login-form">
+    <img src="/images/logos/logo-en.svg" alt="Ogen">
+
+    <div id="setup-note" class="msg warn" hidden>
+      No admin accounts exist yet. Sign in with the setup password to create the first one.
+    </div>
+    <div id="login-error" class="msg err" hidden></div>
+
+    <div class="field" id="email-field">
+      <label for="email">Email</label>
+      <input type="email" id="email" autocomplete="username" autofocus>
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input type="password" id="password" autocomplete="current-password" required>
+    </div>
+    <button type="submit" class="btn btn-publish" id="login-btn">Sign in</button>
+  </form>
+</div>
+
+<script src="/js/admin-session.js"></script>
+<script>
+(function () {
+  var form = document.getElementById('login-form');
+  var errBox = document.getElementById('login-error');
+  var btn = document.getElementById('login-btn');
+
+  // Already signed in? Go straight through.
+  if (window.AdminSession.get()) window.location.href = '/admin/activities.html';
+
+  function fail(message) {
+    errBox.textContent = message;
+    errBox.hidden = false;
+    btn.disabled = false;
+    btn.textContent = 'Sign in';
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    errBox.hidden = true;
+    btn.disabled = true;
+    btn.textContent = 'Signing in…';
+
+    window.AdminSession.post('/api/admin-login', {
+      action: 'login',
+      email: document.getElementById('email').value,
+      password: document.getElementById('password').value
+    }).then(function (res) {
+      if (!res.ok || !res.data.session) return fail(res.data.error || 'Sign in failed');
+      window.AdminSession.set(res.data.session);
+      // In setup mode the only useful next step is creating a real account.
+      window.location.href = res.data.setupMode ? '/admin/users.html' : '/admin/activities.html';
+    }).catch(function (err) {
+      fail('Could not reach the server: ' + err.message);
+    });
+  });
+})();
+</script>
+</body>
+</html>
