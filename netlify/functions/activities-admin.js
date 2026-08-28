@@ -522,7 +522,7 @@ exports.handler = async (event) => {
           authorName: session.name, authorEmail: session.email
         });
         await recordAudit(session, 'unpublish', slug, 'ok', { commit: commit.sha });
-        return json(200, { ok: true, slug, commit, removed: deletes, baseUpdatedAt: record.isoUpdated });
+        return json(200, { ok: true, slug, commit, removed: commit.removed, baseUpdatedAt: record.isoUpdated });
       }
 
       case 'delete': {

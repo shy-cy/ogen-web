@@ -74,11 +74,35 @@ async function getRef() {
   return ref.object.sha;
 }
 
+// Which of `paths` actually exist in a tree.
+//
+// GitHub rejects the ENTIRE tree with 422 GitRPC::BadObjectState if a null-sha
+// entry names a path that is not already in base_tree — you cannot ask it to
+// delete something that was never there. Callers legitimately don't know:
+// publishing a Hebrew-only activity asks to clear the EN and RU files, which on
+// a first publish have never existed. So "remove these paths if present" is the
+// contract, and the filtering belongs here, the one place that has seen the
+// base tree.
+async function presentIn(treeSha, paths) {
+  if (!paths.length) return [];
+  const tree = await gh(`/git/trees/${treeSha}?recursive=1`);
+  if (tree.truncated) {
+    // Repo too big to enumerate in one response — ask about each path instead.
+    const found = [];
+    for (const p of paths) {
+      if ((await readFile(p)) !== null) found.push(p);
+    }
+    return found;
+  }
+  const have = new Set((tree.tree || []).filter((e) => e.type === 'blob').map((e) => e.path));
+  return paths.filter((p) => have.has(p));
+}
+
 /**
  * Commit a set of files atomically.
  *
  * files:   [{ path, content, encoding: 'utf-8' | 'base64' }]
- * deletes: ['path/to/remove.html', …]   — omitted from the new tree
+ * deletes: ['path/to/remove.html', …]   — removed if present, ignored if not
  *
  * The ref update uses force:false, so if someone else committed while this was
  * being assembled the update is rejected rather than clobbering their commit.
@@ -90,6 +114,14 @@ async function commitToBranch({ files = [], deletes = [], message, authorName, a
   const baseSha = await getRef();
   const baseCommit = await gh(`/git/commits/${baseSha}`);
   const baseTree = baseCommit.tree.sha;
+
+  const removals = await presentIn(baseTree, deletes);
+  // Everything asked for was already gone and there is nothing to write, so the
+  // commit would be empty. Report the no-op rather than making a hollow commit.
+  if (!files.length && !removals.length) {
+    return { sha: baseSha, url: `https://github.com/${cfg.repo}/commit/${baseSha}`,
+             branch: cfg.branch, paths: [], removed: [], noop: true };
+  }
 
   const tree = [];
   for (const f of files) {
@@ -104,7 +136,7 @@ async function commitToBranch({ files = [], deletes = [], message, authorName, a
   }
   // A null sha removes the path from the new tree — this is how unpublish and
   // delete actually take a page off the site.
-  for (const path of deletes) {
+  for (const path of removals) {
     tree.push({ path, mode: '100644', type: 'blob', sha: null });
   }
 
@@ -133,7 +165,7 @@ async function commitToBranch({ files = [], deletes = [], message, authorName, a
     url: `https://github.com/${cfg.repo}/commit/${commit.sha}`,
     branch: cfg.branch,
     paths: files.map((f) => f.path),
-    removed: deletes.slice()
+    removed: removals
   };
 }
 

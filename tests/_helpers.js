@@ -84,11 +84,14 @@ function makeGithub(seedFiles) {
         throw err;
       }
       toWrite.forEach((f) => files.set(f.path, f.content));
-      deletes.forEach((p) => files.delete(p));
+      // Only paths that were actually there count as removed — the real
+      // commitToBranch filters absent paths out, because GitHub 422s on a
+      // null-sha entry for a path that is not in the base tree.
+      const removed = deletes.filter((p) => files.delete(p));
       const sha = 'commit' + (commits.length + 1);
-      commits.push({ sha, message, paths: toWrite.map((f) => f.path), removed: deletes.slice() });
+      commits.push({ sha, message, paths: toWrite.map((f) => f.path), removed: removed });
       return { sha, url: 'https://github.com/shy-cy/ogen-web/commit/' + sha, branch: 'main',
-               paths: toWrite.map((f) => f.path), removed: deletes.slice() };
+               paths: toWrite.map((f) => f.path), removed: removed };
     },
     async openPullRequest() { throw new Error('not used'); }
   };
