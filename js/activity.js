@@ -70,15 +70,11 @@
   const cfg = STATUS[status];
   if (!cfg) { console.warn('[activity] unknown status:', status); return; }
 
-  // --- draft pages are not for the public ------------------------------
-  // NOTE: this is a courtesy redirect, not access control. The site is static
-  // with no auth, so a deployed file is world-readable whatever this does.
-  // A genuinely unpublished activity should not be deployed at all until the
-  // admin backend exists. ?preview=1 lets an author view their own draft.
-  if (status === 'draft' && !/[?&]preview=1\b/.test(location.search)) {
-    location.replace('/404.html');
-    return;
-  }
+  // NOTE: `draft` is still in the STATUS table because the admin previews
+  // drafts in an iframe. It can no longer appear on the live site: a draft
+  // activity is never committed, so there is no page to serve. The redirect
+  // that used to live here was a courtesy, not access control, and the admin
+  // backend replaced it with the real thing.
 
   const esc = (str) => String(str).replace(/[&<>"]/g, (c) =>
     ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));

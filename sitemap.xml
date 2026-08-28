@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- GENERATED FILE — rebuilt on every activity publish/unpublish.
+     Edit netlify/functions/_activity-index.js, not this file. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
@@ -22,8 +24,29 @@
     <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/"/>
   </url>
-  <!-- Activity pages. Only publicly-visible statuses belong here: an
-       activity in `draft` must stay out of the sitemap. -->
+  <!-- Activities listing -->
+  <url>
+    <loc>https://www.ogen.cy/activities</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/activities"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/activities"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru/activities"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/activities"/>
+  </url>
+  <url>
+    <loc>https://www.ogen.cy/en/activities</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/activities"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/activities"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru/activities"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/activities"/>
+  </url>
+  <url>
+    <loc>https://www.ogen.cy/ru/activities</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/activities"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/activities"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru/activities"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/activities"/>
+  </url>
+  <!-- Activity pages. A draft activity has no files and never appears here. -->
   <url>
     <loc>https://www.ogen.cy/activities/hebrew-for-kids</loc>
     <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/activities/hebrew-for-kids"/>

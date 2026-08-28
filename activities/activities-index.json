@@ -1,0 +1,23 @@
+[
+  {
+    "slug": "hebrew-for-kids",
+    "status": "open",
+    "langs": [
+      "he",
+      "en",
+      "ru"
+    ],
+    "title": {
+      "he": "חוג עברית לילדים",
+      "en": "Children's Hebrew Class",
+      "ru": "Иврит для детей"
+    },
+    "summary": {
+      "he": "חוג שבועי לילדים, בקבוצות קטנות לפי גיל.",
+      "en": "A weekly class for children, in small groups by age.",
+      "ru": "Еженедельные занятия для детей в небольших группах по возрасту."
+    },
+    "heroImage": null,
+    "isoUpdated": "2026-08-27T09:00:00.000Z"
+  }
+]
