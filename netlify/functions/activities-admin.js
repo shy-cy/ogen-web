@@ -259,6 +259,26 @@ function extractImages(activity) {
   return { files, map };
 }
 
+// Every image file a record owns, by exact path.
+//
+// Deliberately NOT a prefix match on `images/activities/<slug>-`: the slug
+// "hebrew" would match "hebrew-for-kids-hero.png" and take another activity's
+// pictures down with it. The record already knows precisely which files are
+// its own, so it is asked.
+function imagePathsOf(activity) {
+  const out = [];
+  const take = (value) => {
+    const v = String(value || '');
+    if (v.indexOf('/images/activities/') === 0) out.push(v.slice(1));
+  };
+  if (activity) {
+    take(activity.heroImage);
+    (activity.teachers || []).forEach((t) => take(t && t.photo));
+    (activity.sponsors || []).forEach((s) => take(s && s.logo));
+  }
+  return out.filter((v, i) => out.indexOf(v) === i);
+}
+
 // --- normalising + permissions --------------------------------------------
 
 const emptyLang = () => ({ he: '', en: '', ru: '' });
@@ -608,11 +628,23 @@ exports.handler = async (event) => {
         if (body.confirmSlug !== slug) {
           return json(400, { error: 'Type the slug to confirm deletion' });
         }
+        // Both, because a record can have a published page AND a newer draft
+        // whose images were uploaded but never published.
         const published = await getPublished(slug);
+        const draft = await getDraft(slug);
         let commit = null;
-        if (published) {
+        if (published || draft) {
           const others = (await allPublished()).filter((a) => a.slug !== slug);
-          const deletes = LANGS.map((l) => filePathFor(slug, l)).concat([`activities/${slug}.json`]);
+          // Delete means the activity should not exist. Leaving its images
+          // behind left them on public URLs for good — including photographs of
+          // children, for an activity someone had deliberately removed. Nothing
+          // references them and nothing ever would; they were simply
+          // unreachable-but-served. Unpublish is different and keeps them: the
+          // draft still points at those paths and has to republish intact.
+          const images = imagePathsOf(published).concat(imagePathsOf(draft));
+          const deletes = LANGS.map((l) => filePathFor(slug, l))
+            .concat([`activities/${slug}.json`])
+            .concat(images.filter((v, i) => images.indexOf(v) === i));
           commit = await commitToBranch({
             files: buildDerivedFiles(others),
             deletes,
@@ -622,7 +654,8 @@ exports.handler = async (event) => {
         }
         await dropDraft(slug);
         await recordAudit(session, 'delete', slug, 'ok', { commit: commit && commit.sha });
-        return json(200, { ok: true, slug, commit, deleted: true });
+        return json(200, { ok: true, slug, commit, deleted: true,
+                           removed: commit ? commit.removed : [] });
       }
 
       default:
