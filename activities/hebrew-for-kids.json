@@ -11,10 +11,10 @@
   "corner": "tl",
   "heroImage": null,
   "isoCreated": "2026-08-27T09:00:00.000Z",
-  "isoUpdated": "2026-08-27T09:00:00.000Z",
+  "isoUpdated": "2026-08-28T15:47:36.173Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
-  "lastPublishedAt": "2026-08-27T09:00:00.000Z",
+  "lastPublishedAt": "2026-08-28T15:47:36.173Z",
   "title": {
     "he": "חוג עברית לילדים",
     "en": "Children's Hebrew Class",
@@ -79,21 +79,6 @@
       }
     }
   ],
-  "programLength": {
-    "he": "ספטמבר 2026 - יוני 2027, עם הפסקה לחופשת חורף.",
-    "en": "September 2026 - June 2027, with a break over the winter holidays.",
-    "ru": "Сентябрь 2026 - июнь 2027, с перерывом на зимние каникулы."
-  },
-  "instructionLanguage": {
-    "he": "עברית, עם הסברים באנגלית לפי הצורך.",
-    "en": "Hebrew, with explanations in English as needed.",
-    "ru": "Иврит, с пояснениями на английском при необходимости."
-  },
-  "prerequisites": {
-    "he": "מתאים למתחילים - אין צורך בידע קודם בעברית.",
-    "en": "Suitable for beginners - no previous Hebrew required.",
-    "ru": "Подходит для начинающих - предварительные знания иврита не нужны."
-  },
   "whatToBring": {
     "he": "מחברת וכלי כתיבה. שאר החומרים מסופקים על ידינו.",
     "en": "A notebook and something to write with. We provide everything else.",
@@ -129,29 +114,64 @@
   ],
   "facts": {
     "ages": {
-      "he": "6-10",
-      "en": "6-10",
-      "ru": "6-10"
+      "min": 6,
+      "max": 10
     },
     "schedule": {
-      "he": "ימי שלישי, 16:30",
-      "en": "Tuesdays, 16:30",
-      "ru": "По вторникам, 16:30"
+      "frequency": "weekly",
+      "sessions": [],
+      "legacyText": {
+        "he": "ימי שלישי, 16:30",
+        "en": "Tuesdays, 16:30",
+        "ru": "По вторникам, 16:30"
+      }
     },
-    "location": {
-      "he": "ניקוסיה",
-      "en": "Nicosia",
-      "ru": "Никосия"
+    "duration": {
+      "startDate": "",
+      "endDate": "",
+      "sessionCount": null,
+      "sessionMinutes": null,
+      "legacyText": {
+        "he": "ספטמבר 2026 - יוני 2027, עם הפסקה לחופשת חורף.",
+        "en": "September 2026 - June 2027, with a break over the winter holidays.",
+        "ru": "Сентябрь 2026 - июнь 2027, с перерывом на зимние каникулы."
+      }
     },
     "groupSize": {
-      "he": "עד 10 ילדים",
-      "en": "Up to 10 children",
-      "ru": "До 10 детей"
+      "groups": null,
+      "maxPerGroup": null,
+      "legacyText": {
+        "he": "עד 10 ילדים",
+        "en": "Up to 10 children",
+        "ru": "До 10 детей"
+      }
+    },
+    "instructionLanguage": {
+      "he": "עברית, עם הסברים באנגלית לפי הצורך.",
+      "en": "Hebrew, with explanations in English as needed.",
+      "ru": "Иврит, с пояснениями на английском при необходимости."
+    },
+    "prerequisites": {
+      "he": "מתאים למתחילים - אין צורך בידע קודם בעברית.",
+      "en": "Suitable for beginners - no previous Hebrew required.",
+      "ru": "Подходит для начинающих - предварительные знания иврита не нужны."
+    },
+    "location": {
+      "text": {
+        "he": "ניקוסיה",
+        "en": "Nicosia",
+        "ru": "Никосия"
+      }
     },
     "price": {
-      "he": "€120 לעונה",
-      "en": "€120 per season",
-      "ru": "€120 за сезон"
+      "registrationFee": null,
+      "fullPrice": null,
+      "perHourOverride": null,
+      "legacyText": {
+        "he": "€120 לעונה",
+        "en": "€120 per season",
+        "ru": "€120 за сезон"
+      }
     }
   },
   "teachers": [
@@ -193,5 +213,15 @@
       },
       "logo": "/images/partners/kehilot.png"
     }
-  ]
+  ],
+  "factVisibility": {
+    "ages": "public",
+    "schedule": "public",
+    "duration": "public",
+    "groupSize": "public",
+    "instructionLanguage": "public",
+    "prerequisites": "public",
+    "location": "members",
+    "price": "public"
+  }
 }
