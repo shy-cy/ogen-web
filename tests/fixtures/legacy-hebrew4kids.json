@@ -1,0 +1,128 @@
+{
+  "slug": "hebrew4kids",
+  "status": "announcement",
+  "motif": "ring",
+  "corner": "tl",
+  "spots": null,
+  "heroImage": "/images/activities/hebrew4kids-hero.png",
+  "ctaUrl": {
+    "he": "",
+    "en": "",
+    "ru": ""
+  },
+  "title": {
+    "he": "חוג עברית לילדים",
+    "en": "",
+    "ru": ""
+  },
+  "summary": {
+    "he": "חוג עברית",
+    "en": "",
+    "ru": ""
+  },
+  "about": {
+    "he": "חוג עברית",
+    "en": "",
+    "ru": ""
+  },
+  "metaTitle": {
+    "he": "חוג עברית",
+    "en": "",
+    "ru": ""
+  },
+  "metaDescription": {
+    "he": "חוג עברית",
+    "en": "",
+    "ru": ""
+  },
+  "heroAlt": {
+    "he": "חוג עברית",
+    "en": "",
+    "ru": ""
+  },
+  "programLength": {
+    "he": "90 דקות, עם הפסקה באמצע.",
+    "en": "",
+    "ru": ""
+  },
+  "instructionLanguage": {
+    "he": "עברית ואנגלית",
+    "en": "",
+    "ru": ""
+  },
+  "prerequisites": {
+    "he": "מתחילים",
+    "en": "",
+    "ru": ""
+  },
+  "whatToBring": {
+    "he": "מחברת וקלסר",
+    "en": "",
+    "ru": ""
+  },
+  "facts": {
+    "ages": {
+      "he": "6-10",
+      "en": "",
+      "ru": ""
+    },
+    "schedule": {
+      "he": "ימי רביעי, 16:30",
+      "en": "",
+      "ru": ""
+    },
+    "location": {
+      "he": "לימסול",
+      "en": "",
+      "ru": ""
+    },
+    "groupSize": {
+      "he": "שתי קבוצות של 7 תלמידים",
+      "en": "",
+      "ru": ""
+    },
+    "price": {
+      "he": "דמי הרשמה של 50 אירו + 360 אירו ל-12 שיעורים",
+      "en": "",
+      "ru": ""
+    }
+  },
+  "included": [],
+  "faq": [],
+  "teachers": [
+    {
+      "id": "tea-mtcyrd47-1",
+      "name": {
+        "he": "דורית",
+        "en": "",
+        "ru": ""
+      },
+      "photo": "/images/activities/hebrew4kids-teachers-tea-mtcyrd47-1.png"
+    },
+    {
+      "id": "tea-mtd1nrnl-2",
+      "name": {
+        "he": "עירית",
+        "en": "",
+        "ru": ""
+      },
+      "photo": "/images/activities/hebrew4kids-teachers-tea-mtd1nrnl-2.gif"
+    }
+  ],
+  "sponsors": [
+    {
+      "id": "spo-mtd1o2lk-3",
+      "name": {
+        "he": "היסתדרות הציונית",
+        "en": "",
+        "ru": ""
+      },
+      "logo": "/images/activities/hebrew4kids-sponsors-spo-mtd1o2lk-3.png"
+    }
+  ],
+  "isoUpdated": "2026-08-28T14:59:24.044Z",
+  "isoCreated": "2026-08-28T14:55:38.930Z",
+  "lastEditedBy": "michal@ogen.cy",
+  "lastEditedByName": "Michal",
+  "lastPublishedAt": "2026-08-28T14:59:24.044Z"
+}

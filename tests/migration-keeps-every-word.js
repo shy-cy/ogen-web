@@ -11,8 +11,13 @@
 // guessed at — it keeps publishing exactly as before until a human fills the
 // fields in.
 //
-// This suite runs against the REAL committed records, not fixtures, because the
-// question it answers is "what happens to the data that actually exists".
+// The pre-migration records are pinned in tests/fixtures/ rather than read live
+// from activities/. They were read live at first, which broke the moment those
+// records were republished in the new shape: migrating an already-migrated
+// record is a no-op, so there was no longer any legacy text to compare against.
+// The old shape is history now, and history belongs in a fixture. The real
+// records are still used, for the one property that stays true of them — that
+// migrating them again changes nothing.
 
 const fs = require('fs');
 const path = require('path');
@@ -20,20 +25,29 @@ const H = require('./_helpers');
 const { migrate, parseAgeRange, isLangObject } = require('../netlify/functions/_activity-migrate');
 const F = require('../netlify/functions/_activity-facts');
 
-const read = (slug) =>
+// Exactly what these two records looked like before facts were structured,
+// taken from commit d92bb5b.
+const legacyFixture = (slug) =>
+  JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'legacy-' + slug + '.json'), 'utf8'));
+
+// The records as they stand in the repo today.
+const live = (slug) =>
   JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'activities', slug + '.json'), 'utf8'));
 
 console.log('\n[migrating is safe to run twice]');
 // It runs on every read, so it will be applied to already-migrated records
 // constantly. If it were not idempotent it would corrode the data over time.
 ['hebrew-for-kids', 'hebrew4kids'].forEach((slug) => {
-  const once = migrate(read(slug));
-  const twice = migrate(once);
-  H.eq(JSON.stringify(twice), JSON.stringify(once), slug + ' is unchanged by a second migration');
+  [['the legacy', legacyFixture], ['the live', live]].forEach(([what, load]) => {
+    const once = migrate(load(slug));
+    const twice = migrate(once);
+    H.eq(JSON.stringify(twice), JSON.stringify(once),
+         what + ' ' + slug + ' record is unchanged by a second migration');
+  });
 });
 
 console.log('\n[nothing an admin typed is lost]');
-const legacy = read('hebrew4kids');
+const legacy = legacyFixture('hebrew4kids');
 const moved = migrate(legacy);
 
 // Every old fact sentence survives somewhere the page can still read it.
