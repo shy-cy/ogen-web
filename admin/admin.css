@@ -148,6 +148,20 @@ input:disabled,textarea:disabled,select:disabled{background:#f2f0ea;color:#8b8b8
   display:flex;flex-wrap:wrap;gap:5px 14px;}
 .file-list li::before{content:"·";margin-inline-end:5px;color:var(--camel);}
 
+/* Password reveal toggle (js/password-reveal.js). The button sits inside the
+   field's trailing edge; the input gets matching padding so the text never
+   runs underneath it. */
+.pw-wrap{ position:relative; display:block; }
+.pw-wrap input{ padding-inline-end:42px; }
+.pw-toggle{
+  position:absolute; inset-inline-end:6px; top:50%; transform:translateY(-50%);
+  width:30px; height:30px; padding:0; display:flex; align-items:center; justify-content:center;
+  background:none; border:none; cursor:pointer; color:var(--camel); border-radius:6px;
+}
+.pw-toggle:hover{ color:var(--olive); background:var(--stone); }
+.pw-toggle:focus-visible{ outline:2px solid var(--olive); outline-offset:1px; }
+.pw-toggle svg{ width:18px; height:18px; display:block; }
+
 /* ---------- login ---------- */
 .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
 .login-card{background:#fff;border:1px solid #e3ded1;border-radius:12px;padding:32px;width:100%;max-width:380px;}

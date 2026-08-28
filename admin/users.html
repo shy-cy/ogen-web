@@ -58,12 +58,16 @@
 </div>
 
 <script src="/js/admin-session.js"></script>
+<script src="/js/password-reveal.js"></script>
 <script>
 (function () {
   if (!window.AdminSession.requireSession()) return;
   var API = '/api/admin-users';
   var $ = function (id) { return document.getElementById(id); };
   var editing = null;
+
+  // Setting a password blind is where a typo costs the most.
+  window.PasswordReveal.attach(document.getElementById('u-pass'));
   var roles = [];
 
   function message(kind, text) {

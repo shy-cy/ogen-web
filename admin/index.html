@@ -35,11 +35,14 @@
 </div>
 
 <script src="/js/admin-session.js"></script>
+<script src="/js/password-reveal.js"></script>
 <script>
 (function () {
   var form = document.getElementById('login-form');
   var errBox = document.getElementById('login-error');
   var btn = document.getElementById('login-btn');
+
+  window.PasswordReveal.attach(document.getElementById('password'));
 
   // Already signed in? Go straight through.
   if (window.AdminSession.get()) window.location.href = '/admin/activities.html';
