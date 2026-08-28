@@ -38,25 +38,5 @@
     },
     "heroImage": "/images/activities/hebrew4kids-hero.png",
     "isoUpdated": "2026-08-28T14:59:24.044Z"
-  },
-  {
-    "slug": "zz-image-check",
-    "status": "announcement",
-    "langs": [
-      "he",
-      "en"
-    ],
-    "title": {
-      "he": "בדיקת תמונות",
-      "en": "Image check",
-      "ru": ""
-    },
-    "summary": {
-      "he": "בדיקה",
-      "en": "Check",
-      "ru": ""
-    },
-    "heroImage": "/images/activities/zz-image-check-hero.jpg",
-    "isoUpdated": "2026-08-28T15:40:34.821Z"
   }
 ]
