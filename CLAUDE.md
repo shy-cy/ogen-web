@@ -25,6 +25,8 @@ Three parallel language trees. Hebrew is the default and lives at the root.
 | `/about` | `about.html` | `he` | `rtl` |
 | `/en/about` | `en/about.html` | `en` | `ltr` |
 | `/ru/about` | `ru/about.html` | `ru` | `ltr` |
+| `/activities` | `activities/index.html` | `he` | `rtl` |
+| `/en/activities`, `/ru/activities` | `{en,ru}/activities/index.html` | | |
 | `/activities/<slug>` | `activities/<slug>.html` | `he` | `rtl` |
 | `/en/activities/<slug>` | `en/activities/<slug>.html` | `en` | `ltr` |
 | `/ru/activities/<slug>` | `ru/activities/<slug>.html` | `ru` | `ltr` |
@@ -33,7 +35,9 @@ Three parallel language trees. Hebrew is the default and lives at the root.
 | `/ru/confirmation` | `ru/confirmation.html` | `ru` | `ltr` |
 | any unknown path | `404.html` | set by JS from URL | set by JS |
 
-`hebrew-for-kids` is currently the only activity slug.
+`hebrew-for-kids` is currently the only activity slug. Activity pages and the
+listing pages are **generated** — see the Admin backend section. `/admin/` is
+the CMS; it is noindex and excluded in robots.txt.
 
 Confirmation pages are the contact form's redirect targets. `404.html` is the
 one page that inlines all three languages at once (via `data-lang` spans, shown
@@ -177,14 +181,111 @@ anyone who asks for it. Until an admin backend exists, a genuinely
 unpublished activity should not be committed or deployed at all, and must
 stay out of `sitemap.xml`.
 
+## Admin backend (Activities)
+
+A browser CMS at `/admin/` whose Netlify Functions render static HTML and commit
+it into this repository through the GitHub API, which triggers a deploy. **Content
+lives in git. Blobs holds everything that is not content.**
+
+```
+netlify/functions/
+  _blobs.js              the only place a Blobs store is opened; ALL store names
+                         are prefixed `ogen-` (see the warning below)
+  _user-store.js         ogen-admin-users, bcrypt @12
+  _session-store.js      ogen-admin-sessions, authenticate() + permission helpers
+  _roles.js              built-in roles in code; custom roles in ogen-admin-roles
+  _audit.js              ogen-admin-audit, best-effort, never blocks an action
+  _github.js             commitToBranch() — git-data API, atomic, supports deletes
+  _activity-template.js  renderActivityPage(activity, lang) — PURE
+  _activity-index.js     listing pages, activities-index.json, sitemap.xml
+  activities-admin.js    /api/activities-admin
+  admin-login.js         /api/admin-login
+  admin-users.js         /api/admin-users
+admin/index.html, admin/activities.html, admin/users.html, admin/admin.css
+js/admin-session.js, js/activities-admin.js, js/repeatable-items.js
+```
+
+### The rules that hold this together
+
+**1. A draft has no files.** `draft` is not a display state that hides a page —
+it is the absence of the page. A draft activity lives only in the
+`ogen-activity-drafts` Blobs store; nothing is committed, so there is no URL that
+could serve it. Publishing renders and commits; **unpublishing deletes those
+files again** and returns the record to Blobs, still editable. `delete` removes
+the record entirely. Never reintroduce a "publish it but hide it" draft.
+
+**2. Preview and publish share one render path.** Both call `generate()` in
+`activities-admin.js`, which differs only in whether it commits. There is
+deliberately no preview-only branch: a preview that renders through different
+code is a preview that can lie. `tests/preview-matches-publish.js` asserts the
+previewed HTML is byte-identical to the committed file.
+
+**3. Optimistic locking.** Every record carries `isoUpdated`. The client sends
+back the value it loaded as `baseUpdatedAt`; the server re-reads the current
+record — **from GitHub, never from the deployed bundle**, which trails a save by
+about a minute — and returns 409 if it has moved. An explicit `overwrite: true`
+is available and audited; nothing is ever silently clobbered.
+
+**4. Generated files are build artifacts.** `activities/<slug>.html`,
+`{en,ru}/activities/<slug>.html`, `activities/index.html` and its translations,
+`activities/activities-index.json` and `sitemap.xml` are all **generated**.
+Hand-editing one works right up until the next admin save silently overwrites
+it. Every generated page says so in a comment at the top. If a fix is needed
+outside the admin, change `activities/<slug>.json` (the source) or
+`_activity-template.js` (the markup) and regenerate — never the HTML.
+
+**5. Repeatable items** (what's included, FAQ, teachers, sponsors) go through
+`js/repeatable-items.js`, which enforces two rules that were bugs first: the form
+is read into the model before every redraw (or reordering eats whatever the admin
+just typed), and item ids are minted from the clock, never from list position (or
+removing a row reissues an id and merges two items' state).
+
+**6. Client-side permission checks are cosmetic.** The server re-checks
+`canAccess` / `canPublish` / `canEditLang` on every action and assumes the client
+is hostile. A role that may only edit Russian gets its Hebrew and English edits
+discarded server-side, and cannot add, remove or reorder items at all.
+
+### ⚠ Blobs namespacing
+
+Every store name is prefixed `ogen-` in `_blobs.js`. This is not decorative:
+during setup the configured credentials reached a store that already held
+**another site's** `admin-users`, `page-drafts` and `admin-audit` entries.
+Un-prefixed, that other site's admin accounts could have signed into the Ogen
+admin and published to this repo. Do not remove the prefix.
+
+### Environment
+
+Set with `netlify env:set` only — dashboard saves have not persisted reliably on
+this account — and remember that **an env change does not reach deployed
+functions until the next deploy**.
+
+| Var | For |
+|---|---|
+| `GITHUB_TOKEN` | fine-grained PAT, Contents R/W on `shy-cy/ogen-web` |
+| `GITHUB_REPO` / `GITHUB_BRANCH` | `shy-cy/ogen-web` / `main` |
+| `NETLIFY_BLOBS_SITE_ID` / `NETLIFY_BLOBS_TOKEN` | Blobs |
+| `ADMIN_PASSWORD` | bootstrap only — stops being accepted the moment one account exists |
+
+### Tests
+
+`node tests/run.js` — plain Node scripts, no framework, nothing to install.
+Each suite is named for the bug it defends against and opens with a comment
+explaining what went wrong. That comment is the point. Write new ones as you
+build, not afterwards.
+
 ## Local preview
 
 Asset paths are absolute (`/shared.css`, `/images/…`), so `file://` will not
 work. Serve from the repo root:
 
 ```
-npx serve .        # or: netlify dev
+npx serve .        # static pages only
+netlify dev        # needed for anything under /admin/ or /api/
 ```
+
+Blobs is unreliable locally: `netlify link` first, then pass credentials inline
+(`NETLIFY_BLOBS_TOKEN=… NETLIFY_BLOBS_SITE_ID=… netlify dev`), and expect to do
+final testing against the deployed site.
 
 ## Contact form
 
@@ -205,7 +306,7 @@ share image, Formspree wiring, domain) is done. Open items:
   and has not been proofread, including the status strings in `js/activity.js`.
 - **`/about` is placeholder copy** (`[content needed]`), hence `noindex` and no
   sitemap entry.
-- **No activities index page** exists yet, so activity breadcrumbs point at the
-  homepage `#offer` section. Nothing in the nav links to `/about` or to any
-  activity page yet either.
+- **Nothing in the nav links to `/about` or `/activities`** yet.
 - **Registration is not built.** The `open` CTA points at the contact section.
+- **Rotate the setup credentials.** The GitHub PAT and Netlify token were pasted
+  into a chat transcript during setup.
