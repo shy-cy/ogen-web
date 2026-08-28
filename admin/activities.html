@@ -37,7 +37,6 @@
     </div>
 
     <div class="main">
-      <div id="messages"></div>
       <div id="conflict-box"></div>
 
       <div class="panel">
@@ -86,7 +85,14 @@
         <button type="button" class="add-btn" data-add="faq" style="margin-top:12px;">+ Add a question</button>
       </div>
 
-      <div class="panel">
+      <!-- Sticky action bar. It is a direct child of .main on purpose: as its
+           own .panel the containing block was exactly its own height, so
+           position:sticky had no scroll range and it never actually stuck —
+           the buttons ended up 3000px down the page. #messages lives inside
+           it so feedback appears where the controls are, rather than at the
+           top of a form you have scrolled far past. -->
+      <div class="action-bar">
+        <div id="messages"></div>
         <div class="actions">
           <button type="button" class="btn btn-draft" id="btn-draft">Save draft</button>
           <button type="button" class="btn btn-preview" id="btn-preview">Preview</button>

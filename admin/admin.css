@@ -110,9 +110,18 @@ input:disabled,textarea:disabled,select:disabled{background:#f2f0ea;color:#8b8b8
 .item-image img{width:42px;height:42px;border-radius:50%;object-fit:cover;background:var(--stone);}
 
 /* ---------- actions ---------- */
-.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;
-  position:sticky;bottom:0;background:#fff;border-top:1px solid #e3ded1;
-  padding:14px 18px;margin:0 -18px -18px;border-radius:0 0 10px 10px;}
+/* The BAR is what sticks, and it is a direct child of the tall .main column so
+   it has scroll range to stick within. Sticking .actions inside its own panel
+   did nothing, because the panel was exactly as tall as the bar. */
+.action-bar{
+  position:sticky;bottom:0;z-index:20;margin-top:18px;
+  background:#fff;border:1px solid #e3ded1;border-radius:10px;
+  box-shadow:0 -6px 22px rgba(27,62,82,.10);
+}
+.action-bar #messages:empty{display:none;}
+.action-bar #messages{padding:14px 18px 0;}
+.action-bar .msg{margin-bottom:0;}
+.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:14px 18px;}
 .btn{font-family:inherit;font-size:14px;font-weight:800;padding:10px 20px;border-radius:999px;
   border:none;cursor:pointer;}
 .btn:disabled{opacity:.45;cursor:not-allowed;}

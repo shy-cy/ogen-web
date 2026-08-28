@@ -278,6 +278,23 @@
   // ---------- server calls ----------
   function send(body) { return window.AdminSession.post(API, body); }
 
+  // A new activity has no slug until you type one, and the server can only
+  // answer "Bad slug" to that. Catch it here where we can say what to do and
+  // put the cursor in the right box.
+  function requireSlug() {
+    var field = $('f-slug');
+    var slug = ((field && field.value) || S.slug || '').trim();
+    if (/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return true;
+    message('err', slug
+      ? '<b>' + slug + '</b> is not a usable slug. Use lower-case words joined by single hyphens, e.g. <b>hebrew-for-kids</b>.'
+      : 'Give the activity a slug first — it becomes its web address, e.g. <b>hebrew-for-kids</b>.');
+    if (field && !field.disabled) {
+      field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      field.focus();
+    }
+    return false;
+  }
+
   function showConflict(payload, retry) {
     var c = payload.conflict || {};
     var box = $('conflict-box');
@@ -360,6 +377,7 @@
   // ---------- actions ----------
   function doPreview() {
     message('');
+    if (!requireSlug()) return;
     var activity = readForm();
     send({ action: 'preview', activity: activity }).then(function (res) {
       if (!res.ok) return message('err', (res.data.validation || [res.data.error]).join(' · '));
@@ -395,6 +413,7 @@
 
   function doSaveDraft(overwrite) {
     message('');
+    if (!requireSlug()) return;
     var activity = readForm();
     activity.status = 'draft';
     send({ action: 'saveDraft', activity: activity, baseUpdatedAt: S.baseUpdatedAt, overwrite: !!overwrite })
@@ -412,6 +431,7 @@
 
   function doPublish(overwrite) {
     message('');
+    if (!requireSlug()) return;
     var activity = readForm();
     if (activity.status === 'draft') {
       return message('err', 'Set a status other than Draft to publish. A draft is never committed.');
