@@ -128,16 +128,22 @@ staying physically put. Homepage sections keep their own placement classes
 (`about-corner`, `why-corner`, `contact-leaf-top`, …) which only override
 inset, size and tone. Use each motif once per page; don't repeat one.
 
-**5. Icons are Lucide**, always white inside a 56px solid-color circle — never a
+**5. Every actionable CTA is terracotta** — `.btn-primary` in the hero, the
+contact form, and every `.sidebar-cta` regardless of status. Status is
+communicated by the coloured `.status-badge` above it, not by recolouring the
+one button on the page. Only `.sidebar-cta.is-closed` differs, because it is
+not pressable.
+
+**6. Icons are Lucide**, always white inside a 56px solid-color circle — never a
 colored icon on a transparent background. The anchor icon is the eyebrow marker
 in every section; reuse the same inline SVG rather than re-sourcing it. Offer
 cards use `book-open` / `music` / `users` / `graduation-cap`, colored olive /
 terracotta / navy / gold in that order.
 
-**6. Nav height is 96px** and several things key off it (`.hero` margin-top,
+**7. Nav height is 96px** and several things key off it (`.hero` margin-top,
 `.mobile-menu` top, `.thankyou` min-height). Change all of them together.
 
-**7. Design tokens** live in `:root` in `shared.css` — olive, camel, terracotta,
+**8. Design tokens** live in `:root` in `shared.css` — olive, camel, terracotta,
 gold, navy, paper, stone, ink. Hebrew uses Heebo, EN/RU use Mulish, switched via
 `html[lang="…"]` selectors. Use the tokens; don't hardcode hexes.
 
@@ -153,7 +159,38 @@ Two shells for pages beyond the homepage. Both open with the shared
 deliberately **absent from `sitemap.xml`**. Flip both once real copy lands.
 
 **Activity page** — `.activity-layout`: `.activity-main` beside a sticky
-`.activity-sidebar` of facts. Driven by three markup contracts:
+`.activity-sidebar` of facts.
+
+The main column reads About → What's included → What to bring → FAQ → credits.
+The sidebar is Ages → Schedule → Duration → Group size → Language of
+instruction → Prerequisites → Location → Price → CTA. The last three of those
+used to be sections in the main column; they are facts to scan, not prose.
+
+Sidebar facts are **structured values, not text**. `netlify/functions/_activity-facts.js`
+is the one place a fact becomes a sentence, built per language — so
+`{groups:2, maxPerGroup:7}` renders as "שתי קבוצות של עד 7 תלמידים" in Hebrew
+and "2 groups of up to 7 students" in English, and the three languages cannot
+drift. Price per hour is **computed**: `fullPrice ÷ (sessionCount × sessionMinutes ÷ 45)`,
+the 45 being the academic hour. `perHourOverride` wins when the arithmetic
+doesn't describe an activity.
+
+Two rules hold the change-over together:
+
+- **`legacyText` is not a leftover, it is the fallback.** Facts were free text
+  once. The migration in `_activity-migrate.js` converts only what is
+  unambiguous (an age range is two integers), keeps every other sentence
+  verbatim, and `factText()` publishes it until the structured fields are
+  filled in. A half-migrated record never blanks a live page. `migrate()` runs
+  on every read and is idempotent.
+- **`factVisibility` is built but not enforced.** Every fact carries
+  `public | members`, Location defaults to `members`, and
+  `isPubliclyVisible()` in `_activity-facts.js` returns `true` for everything
+  — deliberately, because there is no registration system yet and nobody could
+  be a member. That one function is what changes when it ships; the
+  members-only rows must then be served by the authenticated view, never
+  rendered into the static file and hidden with CSS.
+
+Driven by three markup contracts:
 
 1. **Status.** `<article class="activity" data-status="open">` is the only
    place status is declared. `js/activity.js` renders the badge *and* the
@@ -189,6 +226,8 @@ lives in git. Blobs holds everything that is not content.**
 
 ```
 netlify/functions/
+  _activity-facts.js     structured facts → one sentence per language; PURE
+  _activity-migrate.js   old free-text facts → structured, losing nothing; PURE
   _blobs.js              the only place a Blobs store is opened; ALL store names
                          are prefixed `ogen-` (see the warning below)
   _user-store.js         ogen-admin-users, bcrypt @12
@@ -219,6 +258,12 @@ the record entirely. Never reintroduce a "publish it but hide it" draft.
 deliberately no preview-only branch: a preview that renders through different
 code is a preview that can lie. `tests/preview-matches-publish.js` asserts the
 previewed HTML is byte-identical to the committed file.
+
+That is also why a just-uploaded image cannot be inlined into a preview: the
+render rewrites it to the path it *will* have, and preview doesn't commit, so
+the file isn't there yet. The data URLs come back **beside** the HTML as
+`imagePreview` and are put back in the iframe's DOM after it loads. The markup
+stays byte-identical. Never fix this by changing what `generate()` emits.
 
 **3. Optimistic locking.** Every record carries `isoUpdated`. The client sends
 back the value it loaded as `baseUpdatedAt`; the server re-reads the current

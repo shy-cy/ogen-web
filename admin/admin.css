@@ -177,3 +177,37 @@ input:disabled,textarea:disabled,select:disabled{background:#f2f0ea;color:#8b8b8
 .login-card img{height:64px;display:block;margin:0 auto 22px;}
 .login-card .field{margin-bottom:14px;}
 .login-card .btn{width:100%;margin-top:8px;}
+
+/* ---------- structured sidebar facts ---------- */
+/* Facts stopped being three free-text boxes and became numbers and dates, so
+   the sentence on the page is built per language instead of typed three times
+   and drifting. Each block is one fact: its editor, its visibility flag, and —
+   until someone fills the fields in — the free text it is still publishing. */
+.fact-block{border-top:1px solid #eee7d8;padding:16px 0;}
+.fact-block:first-child{border-top:none;padding-top:0;}
+.fact-head{display:flex;align-items:flex-start;gap:16px;margin-bottom:10px;}
+.fact-head .field-label{flex:1;font-size:12.5px;font-weight:800;color:var(--navy);
+  text-transform:none;letter-spacing:0;margin:0;}
+.fact-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;}
+.fact-vis{flex:0 0 170px;}
+.fact-vis label{font-size:10.5px;color:var(--camel);}
+.fact-vis .hint{font-size:10.5px;line-height:1.35;}
+
+.session-rows{display:flex;flex-direction:column;gap:8px;margin-top:12px;align-items:flex-start;}
+.session-row{display:flex;gap:8px;align-items:center;width:100%;max-width:460px;}
+.session-row select{flex:1;}
+.session-row input[type=time]{flex:0 0 130px;}
+.session-row button.del{font-family:inherit;font-size:12px;font-weight:700;padding:6px 10px;
+  border-radius:5px;border:1px solid #e6cdc7;background:#fff;color:var(--danger);cursor:pointer;}
+
+/* Which mode the price per hour is in has to be obvious: an admin who cannot
+   tell whether a number was calculated or typed will not trust either. */
+.perhour{margin-top:12px;padding:10px 13px;border-radius:8px;font-size:12.5px;line-height:1.45;}
+.perhour.is-idle{background:#f4f2ec;color:#7c7c74;}
+.perhour.is-auto{background:#eef1e8;color:var(--ok);font-weight:700;}
+.perhour.is-override{background:#fbf3e2;color:#8a6a20;font-weight:700;}
+
+.legacy-note{margin-top:12px;padding:10px 13px;border-radius:8px;background:#fbf3e2;
+  color:#8a6a20;font-size:12.5px;line-height:1.5;}
+.legacy-note b{display:block;margin-bottom:3px;}
+.legacy-note .hint{color:#a08a5a;margin-top:4px;}

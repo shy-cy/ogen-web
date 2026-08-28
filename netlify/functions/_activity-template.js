@@ -14,6 +14,8 @@
 // bare string. Section headings and sidebar labels are NOT admin-editable —
 // they are fixed per language and live in LABELS below.
 
+const { sidebarRows } = require('./_activity-facts');
+
 const SITE = 'https://www.ogen.cy';
 const LANGS = ['he', 'en', 'ru'];
 const STATUSES = ['draft', 'announcement', 'open', 'waitlist', 'closed', 'cancelled', 'completed'];
@@ -31,7 +33,7 @@ const LABELS = {
     about: 'על החוג', included: 'מה כלול', programLength: 'אורך התוכנית',
     instructionLanguage: 'שפת ההוראה', prerequisites: 'דרישות קדם',
     whatToBring: 'מה להביא', faq: 'שאלות נפוצות',
-    ages: 'גילאים', schedule: 'מועד', location: 'מיקום',
+    ages: 'גילאים', schedule: 'מועד', duration: 'משך', location: 'מיקום',
     groupSize: 'גודל קבוצה', price: 'מחיר',
     indexTitle: 'הפעילויות שלנו', indexLead: 'מה אפשר למצוא במרכז עוגן',
     indexEmpty: 'בקרוב נפרסם כאן את הפעילויות.', more: 'לפרטים'
@@ -42,7 +44,7 @@ const LABELS = {
     about: 'About the class', included: "What's included", programLength: 'Program Length',
     instructionLanguage: 'Language of instruction', prerequisites: 'Prerequisites',
     whatToBring: 'What to bring', faq: 'Frequently asked questions',
-    ages: 'Ages', schedule: 'When', location: 'Location',
+    ages: 'Ages', schedule: 'When', duration: 'Duration', location: 'Location',
     groupSize: 'Group size', price: 'Price',
     indexTitle: 'Our activities', indexLead: 'What you can find at Ogen Center',
     indexEmpty: 'Activities will be published here soon.', more: 'Details'
@@ -53,7 +55,7 @@ const LABELS = {
     about: 'О занятиях', included: 'Что входит', programLength: 'Длина программы',
     instructionLanguage: 'Язык преподавания', prerequisites: 'Требования к уровню',
     whatToBring: 'Что взять с собой', faq: 'Частые вопросы',
-    ages: 'Возраст', schedule: 'Когда', location: 'Место',
+    ages: 'Возраст', schedule: 'Когда', duration: 'Продолжительность', location: 'Место',
     groupSize: 'Размер группы', price: 'Цена',
     indexTitle: 'Наши занятия', indexLead: 'Что можно найти в центре Оген',
     indexEmpty: 'Занятия скоро появятся здесь.', more: 'Подробнее'
@@ -231,13 +233,16 @@ ${JSON.stringify(credits, null, 2)}
 `
       : '';
 
-  const facts = activity.facts || {};
-  const factRows = ['ages', 'schedule', 'location', 'groupSize', 'price']
-    .map((key) => ({ key, value: pick(facts[key], lang) }))
-    .filter((row) => row.value)
+  // Facts are structured values now, turned into a sentence per language by
+  // _activity-facts.js. Program length, language of instruction and
+  // prerequisites used to be their own sections in the main column; they are
+  // facts to scan, so they live here. data-fact-visibility is written out for
+  // every row but nothing acts on it yet — see isPubliclyVisible() for the one
+  // place that changes when registration ships.
+  const factRows = sidebarRows(activity, lang)
     .map(
       (row) =>
-        `      <div class="sidebar-row"><span class="label">${LABELS[lang][row.key]}</span><span class="value">${esc(row.value)}</span></div>`
+        `      <div class="sidebar-row" data-fact="${row.key}" data-fact-visibility="${row.visibility}"><span class="label">${LABELS[lang][row.key]}</span><span class="value">${esc(row.value)}</span></div>`
     )
     .join('\n');
 
@@ -276,13 +281,10 @@ ${GENERATED_NOTE(`activities/${slug}.json`)}
 
       <h2>${L.about}</h2>
       <p>${esc(pick(activity.about, lang))}</p>
-${includedBlock}${optionalBlock(L.programLength, pick(activity.programLength, lang))}${optionalBlock(
-    L.instructionLanguage,
-    pick(activity.instructionLanguage, lang)
-  )}${optionalBlock(L.prerequisites, pick(activity.prerequisites, lang))}${optionalBlock(
+${includedBlock}${optionalBlock(
     L.whatToBring,
     pick(activity.whatToBring, lang)
-  )}${creditsBlock}${faqBlock}    </div>
+  )}${faqBlock}${creditsBlock}    </div>
 
     <aside class="activity-sidebar">
 ${factRows}

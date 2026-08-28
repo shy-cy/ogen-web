@@ -34,7 +34,7 @@ const H = require('./_helpers');
     ctaUrl: { he: '/#contact', en: '/en/#contact', ru: '' },
     title: { he: 'בדיקה', en: 'Preview check', ru: '' },
     about: { he: 'תיאור', en: 'Description with a & ampersand', ru: '' },
-    programLength: { he: 'שנה', en: 'One year', ru: '' },
+    facts: { duration: { sessionCount: 30, sessionMinutes: 45 } },
     facts: { ages: { he: '6-10', en: '6-10', ru: '' }, price: { he: '€90', en: '€90', ru: '' } },
     included: [
       { id: 'inc-a', text: { he: 'פריט', en: 'An item', ru: '' } },

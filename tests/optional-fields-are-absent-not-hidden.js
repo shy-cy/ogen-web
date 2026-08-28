@@ -48,15 +48,18 @@ const base = {
   H.eq((one.match(/data-optional/g) || []).length, 1, 'exactly one optional block exists');
 
   console.log('\n[an optional field blank in one language is absent from that language only]');
+  // Program length, language of instruction and prerequisites used to be
+  // optional blocks here. They are sidebar facts now, so what to bring is the
+  // main-column optional field this checks; the fallback rule is unchanged.
   const mixed = Object.assign({}, base, {
     title: { he: 'מעורב', en: 'Mixed', ru: 'Смешанный' },
-    prerequisites: { he: 'אין', en: '', ru: '' }
+    whatToBring: { he: 'מחברת', en: '', ru: '' }
   });
-  H.ok(tpl.renderActivityPage(mixed, 'he').indexOf('דרישות קדם') !== -1,
+  H.ok(tpl.renderActivityPage(mixed, 'he').indexOf('מה להביא') !== -1,
        'Hebrew has it');
   // en falls back to he, so it IS present in English — the fallback chain is
   // deliberate and shared with preview. Russian falls back the same way.
-  H.ok(tpl.renderActivityPage(mixed, 'en').indexOf('Prerequisites') !== -1,
+  H.ok(tpl.renderActivityPage(mixed, 'en').indexOf('What to bring') !== -1,
        'English shows the Hebrew fallback rather than an empty section');
 
   console.log('\n[structural invariants of the shipped template]');
