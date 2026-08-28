@@ -276,7 +276,34 @@
   }
 
   // ---------- server calls ----------
-  function send(body) { return window.AdminSession.post(API, body); }
+  function send(body) {
+    return window.AdminSession.post(API, body).catch(function (err) {
+      // A rejected fetch — a dropped connection, or a function killed at its
+      // time limit — used to land in no .then at all. No message, no re-enabled
+      // button, no clue: the click looked like it had done nothing.
+      return { status: 0, ok: false, data: { error:
+        'The request never came back (' + err.message + '). It may still have ' +
+        'completed on the server — reload and check before trying again.' } };
+    });
+  }
+
+  // Never returns an empty string. A function killed at its time limit answers
+  // 502 with no JSON body, so res.data.error was undefined and
+  // (validation || [undefined]).join(' · ') produced '' — and message() renders
+  // nothing at all for ''. That is how a publish that HAD committed looked
+  // exactly like a dead button.
+  function failure(res, what) {
+    if (res.data && res.data.validation && res.data.validation.length) {
+      return res.data.validation.join(' · ');
+    }
+    if (res.data && res.data.error) return res.data.error;
+    if (res.status === 502 || res.status === 504) {
+      return what + ' timed out. Large images make this slow, and the work may ' +
+             'have finished anyway — <b>reload the page and check</b> before retrying, ' +
+             'so you do not publish twice.';
+    }
+    return what + ' failed (HTTP ' + res.status + ') and the server gave no reason.';
+  }
 
   // A new activity has no slug until you type one, and the server can only
   // answer "Bad slug" to that. Catch it here where we can say what to do and
@@ -316,7 +343,7 @@
 
   function refreshList(selectSlug) {
     return send({ action: 'list' }).then(function (res) {
-      if (!res.ok) return message('err', res.data.error || 'Could not load the list');
+      if (!res.ok) return message('err', failure(res, 'Loading the activity list'));
       var picker = $('picker');
       picker.innerHTML = '';
       res.data.activities.forEach(function (a) {
@@ -359,7 +386,7 @@
     clearConflict();
     message('');
     return send({ action: 'load', slug: slug }).then(function (res) {
-      if (!res.ok) return message('err', res.data.error || 'Could not load that activity');
+      if (!res.ok) return message('err', failure(res, 'Loading that activity'));
       fillForm(res.data.activity, res.data.baseUpdatedAt);
       if (res.data.source === 'draft') {
         message('warn', 'You are editing a <b>draft</b>. It has no page on the site until you publish it.');
@@ -380,7 +407,7 @@
     if (!requireSlug()) return;
     var activity = readForm();
     send({ action: 'preview', activity: activity }).then(function (res) {
-      if (!res.ok) return message('err', (res.data.validation || [res.data.error]).join(' · '));
+      if (!res.ok) return message('err', failure(res, 'Preview'));
       var d = res.data;
       $('preview-panel').hidden = false;
       var tabs = $('preview-tabs');
@@ -419,7 +446,7 @@
     send({ action: 'saveDraft', activity: activity, baseUpdatedAt: S.baseUpdatedAt, overwrite: !!overwrite })
       .then(function (res) {
         if (res.status === 409) return showConflict(res.data, doSaveDraft);
-        if (!res.ok) return message('err', (res.data.validation || [res.data.error]).join(' · '));
+        if (!res.ok) return message('err', failure(res, 'Saving the draft'));
         S.baseUpdatedAt = res.data.baseUpdatedAt;
         S.slug = res.data.slug;
         S.record = res.data.activity;
@@ -441,7 +468,7 @@
       .then(function (res) {
         applyLocks();
         if (res.status === 409) return showConflict(res.data, doPublish);
-        if (!res.ok) return message('err', (res.data.validation || [res.data.error]).join(' · '));
+        if (!res.ok) return message('err', failure(res, 'Publishing'));
         S.baseUpdatedAt = res.data.baseUpdatedAt;
         S.slug = res.data.slug;
         S.dirty = false;
@@ -457,7 +484,7 @@
     if (!window.confirm('Take this activity off the site?\n\nThe pages are deleted and it goes back to being a draft you can keep editing. Nothing is lost.')) return;
     send({ action: 'unpublish', slug: S.slug, baseUpdatedAt: S.baseUpdatedAt }).then(function (res) {
       if (res.status === 409) return showConflict(res.data, function () { doUnpublish(); });
-      if (!res.ok) return message('err', res.data.error || 'Could not unpublish');
+      if (!res.ok) return message('err', failure(res, 'Unpublishing'));
       message('ok', 'Unpublished — the pages are gone from the site and it is a draft again. ' +
         '<a href="' + res.data.commit.url + '" target="_blank" rel="noopener">View the commit</a>.');
       load(S.slug);
@@ -468,7 +495,7 @@
     var typed = window.prompt('This deletes the activity permanently — pages, source and draft.\n\nType the slug to confirm:\n' + S.slug);
     if (typed !== S.slug) return message('warn', 'Deletion cancelled.');
     send({ action: 'delete', slug: S.slug, confirmSlug: typed }).then(function (res) {
-      if (!res.ok) return message('err', res.data.error || 'Could not delete');
+      if (!res.ok) return message('err', failure(res, 'Deleting'));
       message('ok', 'Deleted.');
       fillForm(blankRecord(), null);
       refreshList(null);
