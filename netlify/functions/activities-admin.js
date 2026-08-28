@@ -30,6 +30,20 @@ const {
   filePathFor, pathFor, renderActivityPage
 } = require('./_activity-template');
 const { buildDerivedFiles, isPublic } = require('./_activity-index');
+const {
+  FACT_ORDER, TEXT_FACTS, DEFAULT_VISIBILITY, ACADEMIC_MINUTES,
+  num, pricePerHour
+} = require('./_activity-facts');
+const { migrate, normaliseFacts, normaliseVisibility, SHAPES } = require('./_activity-migrate');
+
+// How many day+time rows a frequency asks for. 'custom' means "as many as the
+// admin adds", so it has no fixed count.
+const FREQUENCIES = [
+  { key: 'one-time', label: 'One time', sessions: 1 },
+  { key: 'weekly', label: 'Weekly', sessions: 1 },
+  { key: 'twice-weekly', label: 'Twice weekly', sessions: 2 },
+  { key: 'custom', label: 'Custom', sessions: null }
+];
 
 const TOOL = 'activities';
 const DRAFT_STORE = 'activity-drafts';
@@ -55,18 +69,27 @@ const FIELD_SCHEMA = {
     { key: 'heroAlt', label: 'Hero image alt text' }
   ],
   optional: [
-    { key: 'programLength', label: 'Program Length', textarea: true },
-    { key: 'instructionLanguage', label: 'Language of instruction', textarea: true },
-    { key: 'prerequisites', label: 'Prerequisites / level', textarea: true },
     { key: 'whatToBring', label: 'What to bring', textarea: true }
   ],
+  // Sidebar facts, in the order they appear on the page. `kind` tells the client
+  // which editor to draw. Everything except the two text facts is structured
+  // values, so the sentence on the page is BUILT per language rather than typed
+  // three times and drifting.
   facts: [
-    { key: 'ages', label: 'Age range' },
-    { key: 'schedule', label: 'Schedule (day/time)' },
-    { key: 'location', label: 'Location' },
-    { key: 'groupSize', label: 'Group size' },
-    { key: 'price', label: 'Price' }
+    { key: 'ages', label: 'Ages', kind: 'ages' },
+    { key: 'schedule', label: 'Schedule', kind: 'schedule' },
+    { key: 'duration', label: 'Duration', kind: 'duration',
+      hint: 'Start, end, how many sessions, and how long each one runs' },
+    { key: 'groupSize', label: 'Group size', kind: 'groupSize' },
+    { key: 'instructionLanguage', label: 'Language of instruction', kind: 'text' },
+    { key: 'prerequisites', label: 'Prerequisites / level', kind: 'text' },
+    { key: 'location', label: 'Location', kind: 'location' },
+    { key: 'price', label: 'Price', kind: 'price' }
   ],
+  frequencies: FREQUENCIES,
+  visibilities: ['public', 'members'],
+  defaultVisibility: DEFAULT_VISIBILITY,
+  academicMinutes: ACADEMIC_MINUTES,
   lists: [
     { key: 'included', label: "What's included", itemFields: [{ key: 'text', label: 'Item' }] },
     { key: 'faq', label: 'FAQ', itemFields: [{ key: 'q', label: 'Question' }, { key: 'a', label: 'Answer', textarea: true }] },
@@ -80,17 +103,23 @@ const FIELD_SCHEMA = {
 };
 
 const SIMPLE_KEYS = FIELD_SCHEMA.simple.concat(FIELD_SCHEMA.optional).map((f) => f.key);
-const FACT_KEYS = FIELD_SCHEMA.facts.map((f) => f.key);
+const FACT_KEYS = FACT_ORDER;
+const FACT_BY_KEY = {};
+FIELD_SCHEMA.facts.forEach((f) => { FACT_BY_KEY[f.key] = f; });
 const LIST_KEYS = FIELD_SCHEMA.lists.map((l) => l.key);
 const LIST_BY_KEY = {};
 FIELD_SCHEMA.lists.forEach((l) => { LIST_BY_KEY[l.key] = l; });
 
 // --- storage ---------------------------------------------------------------
 
+// Every record is migrated on the way IN, so the rest of this file — merging,
+// validating, rendering — only ever deals with one shape. A record saved before
+// facts became structured is brought forward the moment it is opened.
 async function getDraft(slug) {
   const store = await optionalStore(DRAFT_STORE);
   if (!store) return null;
-  return (await store.get(draftKey(slug), { type: 'json' })) || null;
+  const raw = (await store.get(draftKey(slug), { type: 'json' })) || null;
+  return raw ? migrate(raw) : null;
 }
 
 async function putDraft(record) {
@@ -116,7 +145,10 @@ async function listDrafts() {
   return out;
 }
 
-const getPublished = (slug) => readJson(`activities/${slug}.json`);
+const getPublished = async (slug) => {
+  const raw = await readJson(`activities/${slug}.json`);
+  return raw ? migrate(raw) : null;
+};
 
 // Every published record, read from GitHub. Needed in full because the derived
 // files (listing pages, sitemap) are rebuilt from the complete set on each save.
@@ -190,8 +222,17 @@ function decodeImage(dataUrl) {
 
 // Pulls every base64 data URL out of the record, replaces it with a
 // site-root-absolute path, and returns the files to commit alongside.
+//
+// `map` is that substitution in reverse: future path → the data URL it came
+// from. Preview needs it. A just-uploaded image is rewritten to
+// /images/activities/… by the line above, but preview does not commit, so that
+// file does not exist yet and the preview showed a broken image for every
+// picture the admin had just chosen. The map lets the preview iframe put the
+// data URL back — WITHOUT touching the rendered HTML, which stays byte-for-byte
+// what publish would commit. See tests/preview-matches-publish.js.
 function extractImages(activity) {
   const files = [];
+  const map = {};
   const slug = activity.slug;
 
   const take = (dataUrl, name) => {
@@ -199,6 +240,7 @@ function extractImages(activity) {
     if (!img) return null;
     const path = `images/activities/${slug}-${name}.${img.ext}`;
     files.push({ path, content: img.base64, encoding: 'base64' });
+    map['/' + path] = dataUrl;
     return '/' + path;
   };
 
@@ -214,7 +256,7 @@ function extractImages(activity) {
       }
     });
   });
-  return files;
+  return { files, map };
 }
 
 // --- normalising + permissions --------------------------------------------
@@ -262,11 +304,40 @@ function mergeByPermission(current, incoming, session) {
 
   SIMPLE_KEYS.forEach((k) => { out[k] = mergeLang(base && base[k], incoming[k]); });
 
-  out.facts = out.facts || {};
+  // Facts split cleanly along the same line as everything else: the WORDS in a
+  // fact (the location, the language of instruction, the not-yet-migrated
+  // legacy sentence) merge per language, and the NUMBERS are structure that
+  // only a full-access session may touch. A Russian reviewer can translate
+  // "Limassol"; they cannot change the price.
+  const baseFacts = (base && base.facts) || {};
   const incFacts = incoming.facts || {};
-  FACT_KEYS.forEach((k) => {
-    out.facts[k] = mergeLang(base && base.facts && base.facts[k], incFacts[k]);
+  const facts = {};
+  FACT_KEYS.forEach((key) => {
+    const cur = baseFacts[key] || {};
+    const inc = incFacts[key] || {};
+
+    if (TEXT_FACTS.indexOf(key) !== -1) {
+      facts[key] = mergeLang(cur, inc);
+      return;
+    }
+    const merged = SHAPES[key] ? SHAPES[key](full ? inc : cur) : {};
+    if (key === 'location') merged.text = mergeLang(cur.text, inc.text);
+    const legacy = mergeLang(cur.legacyText, inc.legacyText);
+    if (LANGS.some((l) => String(legacy[l] || '').trim())) merged.legacyText = legacy;
+    facts[key] = merged;
   });
+  out.facts = normaliseFacts(facts);
+
+  // Which facts are members-only is structure, not words.
+  out.factVisibility = normaliseVisibility(
+    full && incoming.factVisibility ? incoming.factVisibility : (base && base.factVisibility)
+  );
+
+  // These three moved into facts. Drop any copy an older client still sends,
+  // so a stale tab cannot resurrect the pre-migration shape.
+  delete out.programLength;
+  delete out.instructionLanguage;
+  delete out.prerequisites;
 
   LIST_KEYS.forEach((key) => {
     const spec = LIST_BY_KEY[key];
@@ -323,7 +394,7 @@ function validate(activity) {
 
 async function generate(input, { commit, session, message }) {
   const activity = validate(JSON.parse(JSON.stringify(input)));
-  const imageFiles = extractImages(activity);
+  const { files: imageFiles, map: imageMap } = extractImages(activity);
 
   const present = langsPresent(activity);
   const html = {};
@@ -367,7 +438,12 @@ async function generate(input, { commit, session, message }) {
     deletes,
     liveUrls: present.map((l) => `https://www.ogen.cy${pathFor(activity.slug, l)}`)
   };
-  if (!commit) return result;
+  // Only preview needs the data URLs; sending megabytes back on a publish that
+  // has already written the files would be pure waste.
+  if (!commit) {
+    result.imagePreview = imageMap;
+    return result;
+  }
 
   result.commit = await commitToBranch({
     files,

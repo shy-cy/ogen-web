@@ -26,6 +26,7 @@
     lists: {},
     images: {},        // per-item pending uploads, keyed by ITEM ID (never index)
     previewLang: 'he',
+    scheduleSessions: [],
     dirty: false
   };
 
@@ -170,10 +171,280 @@
     S.schema.optional.forEach(function (d) {
       $('optional-fields').appendChild(fieldRow(d, langObj(rec[d.key]), 'f-' + d.key));
     });
-    $('facts').innerHTML = '';
-    S.schema.facts.forEach(function (d) {
-      $('facts').appendChild(fieldRow(d, langObj((rec.facts || {})[d.key]), 'fact-' + d.key));
+    renderFacts();
+  }
+
+  // ---------- sidebar facts ----------
+  // These were three free-text boxes per fact. Typing "שתי קבוצות של 7 תלמידים"
+  // meant every activity phrased the same fact differently, the translations
+  // drifted, and nothing could be computed from any of it. They are numbers and
+  // dates now, and the server builds the sentence per language.
+
+  var DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  function numField(id, label, value, extra) {
+    var input = el('input', Object.assign({ type: 'number', id: id, min: '0' }, extra || {}));
+    input.value = (value === 0 || value) ? value : '';
+    input.addEventListener('input', function () { S.dirty = true; refreshPerHour(); });
+    return el('div', {}, [el('label', { for: id, text: label }), input]);
+  }
+
+  function dateField(id, label, value) {
+    var input = el('input', { type: 'date', id: id });
+    input.value = value || '';
+    input.addEventListener('input', function () { S.dirty = true; });
+    return el('div', {}, [el('label', { for: id, text: label }), input]);
+  }
+
+  function readNum(id) {
+    var node = $(id);
+    if (!node || node.value === '') return null;
+    var n = Number(node.value);
+    return isFinite(n) ? n : null;
+  }
+
+  // The visibility flag every fact carries. Nothing enforces it yet — there is
+  // no registration system, so there is nobody who could be a member — but the
+  // shape is here so switching it on later is a config change, not a rebuild.
+  // The same "build the shape now, enforce later" move as draft status.
+  function visibilityControl(key) {
+    var current = (S.record.factVisibility || {})[key] ||
+                  (S.schema.defaultVisibility || {})[key] || 'public';
+    var sel = el('select', { id: 'fact-vis-' + key, class: 'vis-select' });
+    (S.schema.visibilities || ['public', 'members']).forEach(function (v) {
+      sel.appendChild(el('option', {
+        value: v,
+        text: v === 'public' ? 'Public' : 'Members only',
+        selected: v === current || null
+      }));
     });
+    sel.addEventListener('change', function () { S.dirty = true; });
+    return el('div', { class: 'fact-vis' }, [
+      el('label', { for: 'fact-vis-' + key, text: 'Visibility' }),
+      sel,
+      el('div', { class: 'hint', text: 'Everything is published for now — there is no members area yet.' })
+    ]);
+  }
+
+  // Words an admin typed before this fact was structured. They are still what
+  // the public page shows, so they are displayed rather than quietly dropped.
+  function legacyNote(fact) {
+    var legacy = fact && fact.legacyText;
+    if (!legacy) return null;
+    var lines = ['he', 'en', 'ru']
+      .filter(function (l) { return (legacy[l] || '').trim(); })
+      .map(function (l) { return LANG_NAME[l] + ': ' + legacy[l]; });
+    if (!lines.length) return null;
+    return el('div', { class: 'legacy-note' }, [
+      el('b', { text: 'Currently published as free text' }),
+      el('div', { text: lines.join('  ·  ') }),
+      el('div', { class: 'hint', text: 'Fill in the fields above and this is replaced. Leave them empty and this keeps showing.' })
+    ]);
+  }
+
+  function scheduleRows(fact) {
+    var box = el('div', { class: 'session-rows', id: 'schedule-rows' });
+    var freq = ($('fact-schedule-frequency') || {}).value || fact.frequency || 'weekly';
+    var spec = (S.schema.frequencies || []).filter(function (f) { return f.key === freq; })[0];
+    var wanted = spec && spec.sessions;
+    var sessions = S.scheduleSessions.slice();
+    if (wanted) {
+      while (sessions.length < wanted) sessions.push({ day: null, time: '' });
+      sessions = sessions.slice(0, wanted);
+    }
+    if (!wanted && !sessions.length) sessions.push({ day: null, time: '' });
+    S.scheduleSessions = sessions;
+
+    sessions.forEach(function (sess, i) {
+      var daySel = el('select', { id: 'fact-schedule-' + i + '-day' });
+      daySel.appendChild(el('option', { value: '', text: '— day —' }));
+      DAY_NAMES.forEach(function (name, d) {
+        daySel.appendChild(el('option', { value: String(d), text: name, selected: sess.day === d || null }));
+      });
+      daySel.addEventListener('change', function () { S.dirty = true; });
+      var time = el('input', { type: 'time', id: 'fact-schedule-' + i + '-time' });
+      time.value = sess.time || '';
+      time.addEventListener('input', function () { S.dirty = true; });
+
+      var row = el('div', { class: 'session-row' }, [daySel, time]);
+      if (!wanted) {
+        row.appendChild(el('button', {
+          type: 'button', class: 'del', text: 'Remove',
+          onclick: function () { syncSchedule(); S.scheduleSessions.splice(i, 1); S.dirty = true; redrawSchedule(); }
+        }));
+      }
+      box.appendChild(row);
+    });
+
+    if (!wanted) {
+      box.appendChild(el('button', {
+        type: 'button', class: 'add-btn', text: '+ Add another day',
+        onclick: function () { syncSchedule(); S.scheduleSessions.push({ day: null, time: '' }); S.dirty = true; redrawSchedule(); }
+      }));
+    }
+    return box;
+  }
+
+  // Same rule the repeatable lists live by: read the inputs into the model
+  // BEFORE redrawing, or a redraw eats whatever was just typed.
+  function syncSchedule() {
+    S.scheduleSessions = S.scheduleSessions.map(function (sess, i) {
+      var d = $('fact-schedule-' + i + '-day');
+      var t = $('fact-schedule-' + i + '-time');
+      if (!d && !t) return sess;
+      return { day: d && d.value !== '' ? Number(d.value) : null, time: t ? t.value : '' };
+    });
+    return S.scheduleSessions;
+  }
+
+  function redrawSchedule() {
+    var old = $('schedule-rows');
+    if (old && old.parentNode) old.parentNode.replaceChild(scheduleRows(currentSchedule()), old);
+  }
+
+  function currentSchedule() {
+    return ((S.record.facts || {}).schedule) || {};
+  }
+
+  // Price per academic hour, recomputed as you type. Same arithmetic as the
+  // server, with the 45-minute basis taken FROM the server so there is one
+  // source of truth for it rather than a copy that can drift.
+  function refreshPerHour() {
+    var note = $('perhour-note');
+    if (!note) return;
+    var override = readNum('fact-price-perHourOverride');
+    if (override != null) {
+      note.className = 'perhour is-override';
+      note.textContent = 'Override in use: ' + override + ' € per hour. Clear the box to go back to the calculated price.';
+      return;
+    }
+    var full = readNum('fact-price-fullPrice');
+    var count = readNum('fact-duration-sessionCount');
+    var mins = readNum('fact-duration-sessionMinutes');
+    var basis = (S.schema && S.schema.academicMinutes) || 45;
+    if (full == null || count == null || mins == null || full <= 0 || count <= 0 || mins <= 0) {
+      note.className = 'perhour is-idle';
+      note.textContent = 'Calculated automatically once Duration has a session count and length, and a full price is set. ' +
+                         'Nothing is shown on the page until then.';
+      return;
+    }
+    var hours = (count * mins) / basis;
+    var per = Math.round((full / hours) * 100) / 100;
+    note.className = 'perhour is-auto';
+    note.textContent = 'Calculated: ' + per + ' € per hour  (' + full + ' € ÷ ' + hours +
+                       ' academic hours — ' + count + ' × ' + mins + ' min at ' + basis + ' min/hour)';
+  }
+
+  function factBlock(d) {
+    var fact = (S.record.facts || {})[d.key] || {};
+    var body;
+
+    if (d.kind === 'text') {
+      body = fieldRow({ label: 'Text', textarea: true }, langObj(fact), 'fact-' + d.key);
+    } else if (d.kind === 'location') {
+      body = fieldRow({ label: 'Text' }, langObj(fact.text), 'fact-location');
+    } else if (d.kind === 'ages') {
+      body = el('div', { class: 'fact-grid' }, [
+        numField('fact-ages-min', 'Youngest', fact.min),
+        numField('fact-ages-max', 'Oldest', fact.max)
+      ]);
+    } else if (d.kind === 'schedule') {
+      S.scheduleSessions = (fact.sessions || []).map(function (x) {
+        return { day: x.day == null ? null : Number(x.day), time: x.time || '' };
+      });
+      var freqSel = el('select', { id: 'fact-schedule-frequency' });
+      (S.schema.frequencies || []).forEach(function (f) {
+        freqSel.appendChild(el('option', {
+          value: f.key, text: f.label, selected: f.key === (fact.frequency || 'weekly') || null
+        }));
+      });
+      freqSel.addEventListener('change', function () { syncSchedule(); S.dirty = true; redrawSchedule(); });
+      body = el('div', {}, [
+        el('div', { class: 'fact-grid' }, [
+          el('div', {}, [el('label', { for: 'fact-schedule-frequency', text: 'How often' }), freqSel])
+        ]),
+        scheduleRows(fact)
+      ]);
+    } else if (d.kind === 'duration') {
+      body = el('div', { class: 'fact-grid' }, [
+        dateField('fact-duration-startDate', 'Starts', fact.startDate),
+        dateField('fact-duration-endDate', 'Ends', fact.endDate),
+        numField('fact-duration-sessionCount', 'Number of sessions', fact.sessionCount),
+        numField('fact-duration-sessionMinutes', 'Minutes per session', fact.sessionMinutes)
+      ]);
+    } else if (d.kind === 'groupSize') {
+      body = el('div', { class: 'fact-grid' }, [
+        numField('fact-groupSize-groups', 'Number of groups', fact.groups),
+        numField('fact-groupSize-maxPerGroup', 'Max per group', fact.maxPerGroup)
+      ]);
+    } else if (d.kind === 'price') {
+      body = el('div', {}, [
+        el('div', { class: 'fact-grid' }, [
+          numField('fact-price-registrationFee', 'Registration fee (€)', fact.registrationFee),
+          numField('fact-price-fullPrice', 'Full course price (€)', fact.fullPrice),
+          numField('fact-price-perHourOverride', 'Per hour — manual override (€)', fact.perHourOverride)
+        ]),
+        el('div', { class: 'perhour is-idle', id: 'perhour-note' })
+      ]);
+    } else {
+      body = el('div', { class: 'hint', text: 'Unknown field kind "' + d.kind + '"' });
+    }
+
+    return el('div', { class: 'fact-block' }, [
+      el('div', { class: 'fact-head' }, [
+        el('div', { class: 'field-label', text: d.label }),
+        visibilityControl(d.key)
+      ]),
+      d.hint ? el('div', { class: 'hint', text: d.hint }) : null,
+      body,
+      legacyNote(fact)
+    ]);
+  }
+
+  function renderFacts() {
+    $('facts').innerHTML = '';
+    S.schema.facts.forEach(function (d) { $('facts').appendChild(factBlock(d)); });
+    refreshPerHour();
+  }
+
+  function readFacts() {
+    var facts = {};
+    var visibility = {};
+    S.schema.facts.forEach(function (d) {
+      visibility[d.key] = (($('fact-vis-' + d.key) || {}).value) || 'public';
+      var previous = (S.record.facts || {})[d.key] || {};
+      var out;
+      if (d.kind === 'text') out = readLangField('fact-' + d.key);
+      else if (d.kind === 'location') out = { text: readLangField('fact-location') };
+      else if (d.kind === 'ages') out = { min: readNum('fact-ages-min'), max: readNum('fact-ages-max') };
+      else if (d.kind === 'schedule') {
+        out = {
+          frequency: ($('fact-schedule-frequency') || {}).value || 'weekly',
+          sessions: syncSchedule().filter(function (x) { return x.day != null || x.time; })
+        };
+      } else if (d.kind === 'duration') {
+        out = {
+          startDate: ($('fact-duration-startDate') || {}).value || '',
+          endDate: ($('fact-duration-endDate') || {}).value || '',
+          sessionCount: readNum('fact-duration-sessionCount'),
+          sessionMinutes: readNum('fact-duration-sessionMinutes')
+        };
+      } else if (d.kind === 'groupSize') {
+        out = { groups: readNum('fact-groupSize-groups'), maxPerGroup: readNum('fact-groupSize-maxPerGroup') };
+      } else if (d.kind === 'price') {
+        out = {
+          registrationFee: readNum('fact-price-registrationFee'),
+          fullPrice: readNum('fact-price-fullPrice'),
+          perHourOverride: readNum('fact-price-perHourOverride')
+        };
+      } else out = {};
+
+      // Carry the legacy sentence through untouched. It is what the page still
+      // shows for anything not yet filled in, and a save must not drop it.
+      if (d.kind !== 'text' && previous.legacyText) out.legacyText = previous.legacyText;
+      facts[d.key] = out;
+    });
+    return { facts: facts, factVisibility: visibility };
   }
 
   // ---------- repeatable lists ----------
@@ -260,8 +531,9 @@
     S.schema.simple.concat(S.schema.optional).forEach(function (d) {
       rec[d.key] = readLangField('f-' + d.key);
     });
-    rec.facts = {};
-    S.schema.facts.forEach(function (d) { rec.facts[d.key] = readLangField('fact-' + d.key); });
+    var facts = readFacts();
+    rec.facts = facts.facts;
+    rec.factVisibility = facts.factVisibility;
 
     S.schema.lists.forEach(function (spec) {
       // sync() captures pending input without redrawing.
@@ -431,8 +703,26 @@
   }
 
   function showPreview(d) {
+    var frame = $('preview-frame');
+    // An image the admin has just chosen has been rewritten to the path it WILL
+    // have — but preview does not commit, so that file does not exist yet and
+    // every new picture previewed as a broken image. The data URLs come back
+    // alongside the HTML and are put back here, in the iframe's DOM, AFTER it
+    // has loaded: the HTML itself stays byte-for-byte what publish commits, and
+    // by load time js/activity.js has already drawn the teacher and sponsor
+    // photos, so those get swapped too.
+    frame.onload = function () {
+      var map = d.imagePreview;
+      if (!map) return;
+      var doc = frame.contentDocument;
+      if (!doc) return;
+      Array.prototype.forEach.call(doc.images, function (img) {
+        var src = img.getAttribute('src');
+        if (src && map[src]) img.src = map[src];
+      });
+    };
     // srcdoc: no preview server, no draft URL, nothing to clean up.
-    $('preview-frame').srcdoc = d.html[S.previewLang] || '';
+    frame.srcdoc = d.html[S.previewLang] || '';
     Array.prototype.forEach.call($('preview-tabs').children, function (b) {
       b.className = b.textContent.indexOf(LANG_NAME[S.previewLang]) === 0 ? 'active' : '';
     });
