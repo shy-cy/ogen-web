@@ -356,14 +356,20 @@ html[lang="he"] .credit-group-label{ text-transform:none; letter-spacing:0; font
 .sidebar-row{ display:flex; justify-content:space-between; align-items:flex-start; gap:16px; padding:12px 0; border-bottom:1px solid var(--stone); font-size:14.5px; }
 .sidebar-row:last-of-type{ border-bottom:none; }
 .sidebar-row .label{ color: var(--camel); font-weight:700; }
-.sidebar-row .value{ color: var(--navy); font-weight:700; text-align:end; }
+.sidebar-row .value{ color: var(--navy); font-weight:700; text-align:end; min-width:0; }
 .sidebar-cta{
   display:block; width:100%; margin-top:20px; padding:14px; border-radius:999px; border:none;
   font-family:inherit; font-size:15.5px; font-weight:800; cursor:pointer; text-align:center;
 }
-.sidebar-cta.is-announcement{ background: var(--gold); color:#fff; }
+/* Every actionable CTA is terracotta, the same as .btn-primary in the hero and
+   on the contact form. These had drifted to gold (announcement) and navy
+   (waitlist), which made the one button on the page that does something look
+   like a different kind of control on every activity. Status is still legible
+   at a glance — that is what the coloured .status-badge above is for. Only the
+   closed state differs, because it is not a button you can press. */
+.sidebar-cta.is-announcement{ background: var(--terracotta); color:#fff; }
 .sidebar-cta.is-open{ background: var(--terracotta); color:#fff; }
-.sidebar-cta.is-waitlist{ background: var(--navy); color:#fff; }
+.sidebar-cta.is-waitlist{ background: var(--terracotta); color:#fff; }
 .sidebar-cta.is-closed{ background:#e4e0d4; color:#a39d8c; cursor:not-allowed; }
 .sidebar-note{ font-size:12.5px; color: var(--camel); text-align:center; margin-top:10px; }
 .status-banner{ padding:16px; border-radius:12px; text-align:center; font-size:14.5px; font-weight:700; margin-top:8px; }
