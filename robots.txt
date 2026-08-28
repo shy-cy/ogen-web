@@ -1,5 +1,6 @@
 User-agent: *
 Allow: /
+Disallow: /admin/
 Disallow: /confirmation
 Disallow: /en/confirmation
 Disallow: /ru/confirmation

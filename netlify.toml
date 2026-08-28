@@ -1,7 +1,12 @@
-# Static site — no build step. Pretty URLs let /en/about resolve to
-# /en/about.html and strip trailing .html.
+# Static site — no build step for the site itself. Pretty URLs let /en/about
+# resolve to /en/about.html and strip trailing .html. The Netlify Functions
+# under netlify/functions back the admin only; npm install runs for them.
 [build]
   publish = "."
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
 
 [build.processing.html]
   pretty_urls = true
@@ -18,6 +23,19 @@
   for = "/images/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+# Friendly function routes. Must come BEFORE the catch-all 404 rule.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# Admin pages are static files; the gate is on the API, not the route.
+# Keep them out of search results regardless.
+[[headers]]
+  for = "/admin/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
 
 # Serve the localized 404 for unknown paths.
 [[redirects]]
