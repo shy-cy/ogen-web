@@ -1,0 +1,197 @@
+{
+  "slug": "hebrew-for-kids",
+  "status": "open",
+  "spots": 4,
+  "ctaUrl": {
+    "he": "/#contact",
+    "en": "/en/#contact",
+    "ru": "/ru/#contact"
+  },
+  "motif": "leaf",
+  "corner": "tl",
+  "heroImage": null,
+  "isoCreated": "2026-08-27T09:00:00.000Z",
+  "isoUpdated": "2026-08-27T09:00:00.000Z",
+  "lastEditedBy": "michal@ogen.cy",
+  "lastEditedByName": "Michal",
+  "lastPublishedAt": "2026-08-27T09:00:00.000Z",
+  "title": {
+    "he": "חוג עברית לילדים",
+    "en": "Children's Hebrew Class",
+    "ru": "Иврит для детей"
+  },
+  "metaTitle": {
+    "he": "חוג עברית לילדים · מרכז עוגן",
+    "en": "Children's Hebrew Class · Ogen Center",
+    "ru": "Иврит для детей · Центр Оген"
+  },
+  "metaDescription": {
+    "he": "חוג עברית שבועי לילדים בגילי 6-10 בניקוסיה, המבוסס על תוכנית הלימודים הרשמית של ההסתדרות הציונית.",
+    "en": "A weekly Hebrew class for children aged 6-10 in Nicosia, based on the official World Zionist Organization curriculum.",
+    "ru": "Еженедельные занятия ивритом для детей 6-10 лет в Никосии по официальной программе Всемирной сионистской организации."
+  },
+  "summary": {
+    "he": "חוג שבועי לילדים, בקבוצות קטנות לפי גיל.",
+    "en": "A weekly class for children, in small groups by age.",
+    "ru": "Еженедельные занятия для детей в небольших группах по возрасту."
+  },
+  "heroAlt": {
+    "he": "ילדים לומדים עברית במרכז עוגן",
+    "en": "Children learning Hebrew at Ogen Center",
+    "ru": "Дети изучают иврит в центре Оген"
+  },
+  "about": {
+    "he": "חוג שבועי המבוסס על תוכנית הלימודים הרשמית של ההסתדרות הציונית. הילדים לומדים עברית דרך משחק, שירה ויצירה, בקבוצות קטנות ומותאמות גיל.",
+    "en": "A weekly class based on the official curriculum of the World Zionist Organization. Children learn Hebrew through play, song and creative work, in small age-appropriate groups.",
+    "ru": "Еженедельные занятия по официальной программе Всемирной сионистской организации. Дети изучают иврит через игру, песни и творчество в небольших группах, сформированных по возрасту."
+  },
+  "included": [
+    {
+      "id": "inc-1a0471d46a8",
+      "text": {
+        "he": "מפגש שבועי של 60 דקות",
+        "en": "A weekly 60-minute session",
+        "ru": "Еженедельное занятие продолжительностью 60 минут"
+      }
+    },
+    {
+      "id": "inc-1a0471d46a9",
+      "text": {
+        "he": "חומרי לימוד והתנסות כלולים",
+        "en": "All learning and activity materials",
+        "ru": "Все учебные и творческие материалы"
+      }
+    },
+    {
+      "id": "inc-1a0471d46aa",
+      "text": {
+        "he": "קבוצות לפי גיל, עד 10 ילדים בקבוצה",
+        "en": "Groups by age, up to 10 children per group",
+        "ru": "Группы по возрасту, до 10 детей в группе"
+      }
+    },
+    {
+      "id": "inc-1a0471d46ab",
+      "text": {
+        "he": "מפגש הורים באמצע העונה",
+        "en": "A parents’ meeting mid-season",
+        "ru": "Родительская встреча в середине сезона"
+      }
+    }
+  ],
+  "programLength": {
+    "he": "ספטמבר 2026 - יוני 2027, עם הפסקה לחופשת חורף.",
+    "en": "September 2026 - June 2027, with a break over the winter holidays.",
+    "ru": "Сентябрь 2026 - июнь 2027, с перерывом на зимние каникулы."
+  },
+  "instructionLanguage": {
+    "he": "עברית, עם הסברים באנגלית לפי הצורך.",
+    "en": "Hebrew, with explanations in English as needed.",
+    "ru": "Иврит, с пояснениями на английском при необходимости."
+  },
+  "prerequisites": {
+    "he": "מתאים למתחילים - אין צורך בידע קודם בעברית.",
+    "en": "Suitable for beginners - no previous Hebrew required.",
+    "ru": "Подходит для начинающих - предварительные знания иврита не нужны."
+  },
+  "whatToBring": {
+    "he": "מחברת וכלי כתיבה. שאר החומרים מסופקים על ידינו.",
+    "en": "A notebook and something to write with. We provide everything else.",
+    "ru": "Тетрадь и ручку. Всё остальное мы предоставляем."
+  },
+  "faq": [
+    {
+      "id": "faq-1a0471d46ac",
+      "q": {
+        "he": "מה קורה אם לא מגיעים למפגש?",
+        "en": "What happens if we miss a session?",
+        "ru": "Что делать, если мы пропустили занятие?"
+      },
+      "a": {
+        "he": "ניתן להשלים בקבוצה מקבילה בתיאום מראש.",
+        "en": "You can make it up with a parallel group, arranged in advance.",
+        "ru": "Занятие можно отработать в параллельной группе, договорившись заранее."
+      }
+    },
+    {
+      "id": "faq-1a0471d46ad",
+      "q": {
+        "he": "מדיניות ביטול?",
+        "en": "What is the cancellation policy?",
+        "ru": "Какие условия отмены?"
+      },
+      "a": {
+        "he": "ביטול עד שבועיים לפני תחילת העונה מזכה בהחזר מלא.",
+        "en": "Cancelling up to two weeks before the season starts entitles you to a full refund.",
+        "ru": "При отмене не позднее чем за две недели до начала сезона возвращается полная стоимость."
+      }
+    }
+  ],
+  "facts": {
+    "ages": {
+      "he": "6-10",
+      "en": "6-10",
+      "ru": "6-10"
+    },
+    "schedule": {
+      "he": "ימי שלישי, 16:30",
+      "en": "Tuesdays, 16:30",
+      "ru": "По вторникам, 16:30"
+    },
+    "location": {
+      "he": "ניקוסיה",
+      "en": "Nicosia",
+      "ru": "Никосия"
+    },
+    "groupSize": {
+      "he": "עד 10 ילדים",
+      "en": "Up to 10 children",
+      "ru": "До 10 детей"
+    },
+    "price": {
+      "he": "€120 לעונה",
+      "en": "€120 per season",
+      "ru": "€120 за сезон"
+    }
+  },
+  "teachers": [
+    {
+      "id": "tch-1a0471d46ae",
+      "name": {
+        "he": "מאיה לוי",
+        "en": "Maya Levi",
+        "ru": "Майя Леви"
+      },
+      "photo": null
+    },
+    {
+      "id": "tch-1a0471d46af",
+      "name": {
+        "he": "דניאל כהן",
+        "en": "Daniel Cohen",
+        "ru": "Даниэль Коэн"
+      },
+      "photo": null
+    }
+  ],
+  "sponsors": [
+    {
+      "id": "spn-1a0471d46b0",
+      "name": {
+        "he": "ההסתדרות הציונית העולמית",
+        "en": "World Zionist Organization",
+        "ru": "Всемирная сионистская организация"
+      },
+      "logo": "/images/partners/wzo.png"
+    },
+    {
+      "id": "spn-1a0471d46b1",
+      "name": {
+        "he": "מכון קהילות",
+        "en": "Kehilot Institute",
+        "ru": "Институт Кехилот"
+      },
+      "logo": "/images/partners/kehilot.png"
+    }
+  ]
+}
