@@ -19,5 +19,24 @@
     },
     "heroImage": null,
     "isoUpdated": "2026-08-27T09:00:00.000Z"
+  },
+  {
+    "slug": "hebrew4kids",
+    "status": "announcement",
+    "langs": [
+      "he"
+    ],
+    "title": {
+      "he": "חוג עברית לילדים",
+      "en": "",
+      "ru": ""
+    },
+    "summary": {
+      "he": "חוג עברית",
+      "en": "",
+      "ru": ""
+    },
+    "heroImage": "/images/activities/hebrew4kids-hero.png",
+    "isoUpdated": "2026-08-28T14:55:38.930Z"
   }
 ]

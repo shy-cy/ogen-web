@@ -68,4 +68,9 @@
     <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru/activities/hebrew-for-kids"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/activities/hebrew-for-kids"/>
   </url>
+  <url>
+    <loc>https://www.ogen.cy/activities/hebrew4kids</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/activities/hebrew4kids"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/activities/hebrew4kids"/>
+  </url>
 </urlset>
