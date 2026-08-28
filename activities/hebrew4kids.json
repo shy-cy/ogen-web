@@ -40,21 +40,6 @@
     "en": "",
     "ru": ""
   },
-  "programLength": {
-    "he": "90 דקות, עם הפסקה באמצע.",
-    "en": "",
-    "ru": ""
-  },
-  "instructionLanguage": {
-    "he": "עברית ואנגלית",
-    "en": "",
-    "ru": ""
-  },
-  "prerequisites": {
-    "he": "מתחילים",
-    "en": "",
-    "ru": ""
-  },
   "whatToBring": {
     "he": "מחברת וקלסר",
     "en": "",
@@ -62,29 +47,64 @@
   },
   "facts": {
     "ages": {
-      "he": "6-10",
+      "min": 6,
+      "max": 10
+    },
+    "schedule": {
+      "frequency": "weekly",
+      "sessions": [],
+      "legacyText": {
+        "he": "ימי רביעי, 16:30",
+        "en": "",
+        "ru": ""
+      }
+    },
+    "duration": {
+      "startDate": "",
+      "endDate": "",
+      "sessionCount": null,
+      "sessionMinutes": null,
+      "legacyText": {
+        "he": "90 דקות, עם הפסקה באמצע.",
+        "en": "",
+        "ru": ""
+      }
+    },
+    "groupSize": {
+      "groups": null,
+      "maxPerGroup": null,
+      "legacyText": {
+        "he": "שתי קבוצות של 7 תלמידים",
+        "en": "",
+        "ru": ""
+      }
+    },
+    "instructionLanguage": {
+      "he": "עברית ואנגלית",
       "en": "",
       "ru": ""
     },
-    "schedule": {
-      "he": "ימי רביעי, 16:30",
+    "prerequisites": {
+      "he": "מתחילים",
       "en": "",
       "ru": ""
     },
     "location": {
-      "he": "לימסול",
-      "en": "",
-      "ru": ""
-    },
-    "groupSize": {
-      "he": "שתי קבוצות של 7 תלמידים",
-      "en": "",
-      "ru": ""
+      "text": {
+        "he": "לימסול",
+        "en": "",
+        "ru": ""
+      }
     },
     "price": {
-      "he": "דמי הרשמה של 50 אירו + 360 אירו ל-12 שיעורים",
-      "en": "",
-      "ru": ""
+      "registrationFee": null,
+      "fullPrice": null,
+      "perHourOverride": null,
+      "legacyText": {
+        "he": "דמי הרשמה של 50 אירו + 360 אירו ל-12 שיעורים",
+        "en": "",
+        "ru": ""
+      }
     }
   },
   "included": [],
@@ -120,9 +140,19 @@
       "logo": "/images/activities/hebrew4kids-sponsors-spo-mtd1o2lk-3.png"
     }
   ],
-  "isoUpdated": "2026-08-28T14:59:24.044Z",
+  "isoUpdated": "2026-08-28T15:47:42.493Z",
   "isoCreated": "2026-08-28T14:55:38.930Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
-  "lastPublishedAt": "2026-08-28T14:59:24.044Z"
+  "lastPublishedAt": "2026-08-28T15:47:42.493Z",
+  "factVisibility": {
+    "ages": "public",
+    "schedule": "public",
+    "duration": "public",
+    "groupSize": "public",
+    "instructionLanguage": "public",
+    "prerequisites": "public",
+    "location": "members",
+    "price": "public"
+  }
 }
