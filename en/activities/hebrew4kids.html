@@ -56,7 +56,11 @@
          source order rather than the CSS order property also keeps visual, DOM and
          keyboard order identical, so the registration button is not reached
          last by a screen reader while appearing first on screen. -->
-    <aside class="activity-sidebar">
+    <div class="activity-aside">
+      <figure class="activity-card-image" aria-hidden="true">
+        <img src="/images/activities/hebrew4kids-card-5fb3cf25.jpg" alt="" width="800" height="800" loading="lazy">
+      </figure>
+      <aside class="activity-sidebar">
       <div class="sidebar-group" data-group="participants">
         <span class="sidebar-group-icon" style="background:var(--olive)"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg></span>
         <div class="sidebar-group-body">
@@ -89,8 +93,9 @@
           </ul>
         </div>
       </div>
-      <div data-status-cta></div>
-    </aside>
+        <div data-status-cta></div>
+      </aside>
+    </div>
 
     <div class="activity-main">
       <h2>About the class</h2>
