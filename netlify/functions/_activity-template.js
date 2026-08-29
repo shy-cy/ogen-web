@@ -182,14 +182,54 @@ ${alts}
 </head>`;
 }
 
+// Body copy from the WYSIWYG, printed as the markup it is.
+//
+// The admin writes these in Quill, so the stored value is HTML — headings,
+// lists, links, emphasis. It is emitted UNESCAPED, which is only safe because
+// the server sanitises it to a fixed tag allowlist on every save
+// (sanitiseRich() in activities-admin.js). That is the contract: escaping here
+// instead would print the tags at the reader.
+//
+// Records written before the editor existed hold plain text with blank lines
+// between paragraphs. They are recognised by NOT starting with a block tag, and
+// still converted the way they always were, so nothing had to be migrated and
+// an unedited activity reads exactly as it did.
+const RICH_START = /^\s*<(?:p|h[1-6]|ul|ol|li|blockquote|strong|em|u|s|b|i|a|br)[\s>/]/i;
+
+// Markup down to a single line of readable text, for the places that take text
+// and not HTML: the meta description, og:description, the listing card blurb.
+function plainText(value) {
+  return String(value || '')
+    .replace(/<\/(p|h[1-6]|li|ul|ol|blockquote)\s*>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function richText(value) {
+  const s = String(value || '').trim();
+  if (!s) return '';
+  if (RICH_START.test(s)) return s;
+  return s.split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => `        <p>${esc(p).replace(/\n/g, '<br>')}</p>`)
+    .join('\n');
+}
+
 // An optional block renders only when it has content. Absent means absent —
 // no empty heading is emitted for js/activity.js to clean up afterwards.
 function optionalBlock(heading, value) {
-  if (!value) return '';
+  const body = richText(value);
+  if (!body) return '';
   return `
       <div data-optional>
         <h2>${heading}</h2>
-        <p>${esc(value)}</p>
+${body}
       </div>
 `;
 }
@@ -207,7 +247,12 @@ function renderActivityPage(activity, lang) {
 
   const title = pick(activity.title, lang);
   const metaTitle = pick(activity.metaTitle, lang) || title + L.suffix;
-  const metaDescription = pick(activity.metaDescription, lang) || pick(activity.about, lang).slice(0, 300);
+  // Falling back to the body means falling back to MARKUP now that About is
+  // written in the editor, and a meta description is plain text — a search
+  // result would otherwise read "&lt;p&gt;במרכז עוגן…". Tags out, entities
+  // decoded back to characters, whitespace collapsed to one line.
+  const metaDescription = pick(activity.metaDescription, lang)
+    || plainText(pick(activity.about, lang)).slice(0, 300);
 
   const motif = MOTIFS.indexOf(activity.motif) !== -1 ? activity.motif : 'ring';
   const corner = CORNERS.indexOf(activity.corner) !== -1 ? activity.corner : 'tl';
@@ -352,7 +397,7 @@ ${factGroups}
 
     <div class="activity-main">
       <h2>${L.about}</h2>
-      <p>${esc(pick(activity.about, lang))}</p>
+${richText(pick(activity.about, lang))}
 ${optionalBlock(
     L.whatToBring,
     pick(activity.whatToBring, lang)
@@ -383,7 +428,9 @@ function renderActivitiesIndexPage(activities, lang) {
 ${list
         .map((a) => {
           const title = pick(a.title, lang);
-          const blurb = pick(a.summary, lang) || pick(a.about, lang).slice(0, 140);
+          // Same reason as the meta description: the body is markup now, and a
+          // listing card blurb is text.
+          const blurb = pick(a.summary, lang) || plainText(pick(a.about, lang)).slice(0, 140);
           // The activity's square picture when it has one, and the coloured band
           // when it does not — so a listing with a mix of both still reads as a
           // grid. Decorative either way: the card's own heading names the

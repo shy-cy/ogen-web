@@ -9,6 +9,12 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;700;800&display=swap" rel="stylesheet">
+<!-- Quill, the same editor and version the Shirat HaYam admin uses for its body
+     fields. Loaded from a CDN because this project has no build step; the admin
+     is behind a login and is noindex, and js/activities-admin.js falls back to
+     plain textareas if it does not load, so a CDN outage costs formatting
+     rather than the ability to edit. -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.snow.min.css" rel="stylesheet">
 <link rel="stylesheet" href="/admin/admin.css">
 </head>
 <body>
@@ -39,33 +45,27 @@
     <div class="main">
       <div id="conflict-box"></div>
 
+      <!-- Panel order follows the order an activity is actually filled in:
+           what it IS, then what it SAYS, then who runs it, then the facts a
+           reader scans, then questions, then the things written once and left
+           alone. -->
       <div class="panel">
         <h2>Settings</h2>
         <div class="settings-grid" id="settings"></div>
+        <!-- The square picture belongs with the other things that identify the
+             activity rather than in a panel of its own. -->
+        <div id="card-image-panel" style="margin-top:24px;">
+          <h3>Card image</h3>
+          <p class="hint" style="margin:6px 0 14px;">A square picture, shown at the top of the activity's own page and on the activities listing. Any shape is accepted and cropped to a square from the centre, so keep the subject — and any text — away from the edges. Shared links use the share image in Search &amp; sharing, not this one.</p>
+          <div id="card-image"></div>
+        </div>
       </div>
 
       <div class="panel">
         <h2>Content</h2>
         <div id="fields"></div>
-      </div>
-
-      <!-- One square picture per activity, for listing and homepage cards. The
-           activity PAGE still has no image of its own, deliberately. -->
-      <div class="panel" id="card-image-panel">
-        <h2>Card image</h2>
-        <p class="hint" style="margin:-8px 0 14px;">A square picture for the activities listing and the homepage. Any shape is accepted and cropped to a square from the centre, so keep the subject away from the edges. The activity page itself does not show it, and shared links keep the Ogen share image.</p>
-        <div id="card-image"></div>
-      </div>
-
-      <div class="panel">
-        <h2>Optional sections</h2>
-        <p class="hint" style="margin:-8px 0 14px;">Leave a field empty and its whole section is left out of the page — no empty heading is published.</p>
-        <div id="optional-fields"></div>
-      </div>
-
-      <div class="panel">
-        <h2>Sidebar facts</h2>
-        <div id="facts"></div>
+        <div id="optional-fields" style="margin-top:24px;"></div>
+        <p class="hint" style="margin:14px 0 0;">Leave a field empty and its whole section is left out of the page — no empty heading is published.</p>
       </div>
 
       <div class="panel" id="list-teachers-panel">
@@ -79,6 +79,14 @@
         <h2>Sponsors</h2>
         <div class="items" id="list-sponsors"></div>
         <button type="button" class="add-btn" data-add="sponsors" style="margin-top:12px;">+ Add a sponsor</button>
+      </div>
+
+      <div class="panel">
+        <h2>Sidebar facts</h2>
+        <div id="facts"></div>
+        <!-- Where the registration button goes. It sits with the facts because
+             the button is the last thing in that column, directly under them. -->
+        <div id="cta-field" style="margin-top:24px;"></div>
       </div>
 
       <div class="panel" id="list-faq-panel">
@@ -129,6 +137,7 @@
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.min.js"></script>
 <script src="/js/admin-session.js"></script>
 <script src="/js/image-optimize.js"></script>
 <script src="/js/repeatable-items.js"></script>

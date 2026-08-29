@@ -55,6 +55,8 @@
     // Committed path -> the bytes we already hold for it. See adoptDeployed().
     freshBytes: {},
     freshTimer: null,
+    editors: {},        // field id -> Quill instance, for the rich fields
+    pendingEditors: [], // built during a render, mounted once they are in the DOM
     previewLang: 'he',
     scheduleSessions: [],
     dirty: false
@@ -111,10 +113,102 @@
     ]);
   }
 
+  // ---------- rich text ------------------------------------------------------
+  // Body copy is written in Quill — the same editor and version the Shirat HaYam
+  // admin uses — and the three languages are STACKED rather than side by side.
+  // The short fields are a comparison task and belong in columns; a paragraph of
+  // prose in a third of the width is not.
+  //
+  // The stored value is HTML. The page prints it as markup, which is safe only
+  // because the server sanitises it to a fixed tag allowlist on every save.
+  var RICH_TOOLBAR = [
+    ['bold', 'italic', 'underline'],
+    [{ header: 2 }],
+    [{ list: 'bullet' }, { list: 'ordered' }],
+    ['link'],
+    ['clean']
+  ];
+  var PLACEHOLDER = { he: 'כתבו כאן…', en: 'Write here…', ru: 'Напишите здесь…' };
+  var RICH_START = /^\s*<(?:p|h[1-6]|ul|ol|li|blockquote|strong|em|u|s|b|i|a|br)[\s>/]/i;
+
+  // Records written before the editor existed hold plain text with blank lines
+  // between paragraphs. Nothing was migrated — they are converted on the way IN
+  // to the editor, and only become HTML if someone actually edits and saves.
+  function toEditorHtml(value) {
+    var text = String(value || '').trim();
+    if (!text) return '';
+    if (RICH_START.test(text)) return text;
+    return text.split(/\n\s*\n/).map(function (p) { return p.trim(); }).filter(Boolean)
+      .map(function (p) {
+        return '<p>' + p.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/\n/g, '<br>') + '</p>';
+      }).join('');
+  }
+
+  // Quill writes '<p><br></p>' for an empty editor. Storing that would make an
+  // empty optional section render as an empty paragraph instead of vanishing.
+  function editorHtml(q) {
+    if (!q) return '';
+    var html = q.root.innerHTML;
+    return (html === '<p><br></p>' || html === '<p><br/></p>') ? '' : html;
+  }
+
+  function richRow(descriptor, values, idPrefix) {
+    var blocks = S.schema.langs.map(function (lang) {
+      var id = idPrefix + '-' + lang;
+      var editable = canEdit(lang);
+      var host = el('div', {});
+      S.pendingEditors.push({
+        id: id, host: host, lang: lang, editable: editable,
+        html: toEditorHtml((values && values[lang]) || '')
+      });
+      return el('div', { class: 'rich-lang ' + lang }, [
+        el('label', { text: LANG_NAME[lang] + (editable ? '' : ' (read-only for your role)') }),
+        el('div', { class: 'quill-wrap' + (editable ? '' : ' lang-locked') }, [host])
+      ]);
+    });
+    return el('div', { class: 'field-row' }, [
+      el('div', { class: 'field-label', text: descriptor.label + (descriptor.required ? ' *' : '') }),
+      descriptor.hint ? el('div', { class: 'hint', text: descriptor.hint }) : null,
+      el('div', { class: 'rich-stack' }, blocks)
+    ]);
+  }
+
+  // A rich field where Quill is unavailable stays a plain textarea, so a CDN
+  // that fails to load costs formatting rather than the ability to edit at all.
+  function contentRow(descriptor, values, idPrefix) {
+    return (descriptor.rich && window.Quill)
+      ? richRow(descriptor, values, idPrefix)
+      : fieldRow(descriptor, values, idPrefix);
+  }
+
+  // Quill has to attach to a node that is already in the document, so the
+  // editors are collected while the form is built and mounted after it lands.
+  function mountEditors() {
+    var waiting = S.pendingEditors;
+    S.pendingEditors = [];
+    waiting.forEach(function (spec) {
+      var q = new window.Quill(spec.host, {
+        theme: 'snow',
+        readOnly: !spec.editable,
+        placeholder: PLACEHOLDER[spec.lang] || '',
+        modules: { toolbar: RICH_TOOLBAR }
+      });
+      q.root.setAttribute('dir', spec.lang === 'he' ? 'rtl' : 'ltr');
+      q.root.style.textAlign = spec.lang === 'he' ? 'right' : 'left';
+      if (spec.html) q.root.innerHTML = spec.html;
+      q.on('text-change', function () { S.dirty = true; });
+      S.editors[spec.id] = q;
+    });
+  }
+
   function readLangField(idPrefix) {
     var out = {};
     S.schema.langs.forEach(function (lang) {
-      var node = $(idPrefix + '-' + lang);
+      var id = idPrefix + '-' + lang;
+      // A rich field lives in Quill, not in an input with that id.
+      if (S.editors[id]) { out[lang] = editorHtml(S.editors[id]); return; }
+      var node = $(id);
       out[lang] = node ? node.value : '';
     });
     return out;
@@ -148,11 +242,23 @@
       tl: 'Top / start', tr: 'Top / end', bl: 'Bottom / start', br: 'Bottom / end'
     }));
 
-    // Hero image
-    var ctaBox = el('div', { style: 'grid-column:1/-1;' });
-    ctaBox.appendChild(fieldRow({ label: 'Registration button link', hint: 'Where the CTA sends people, per language' },
-      langObj(rec.ctaUrl), 'f-ctaUrl'));
-    box.appendChild(ctaBox);
+  }
+
+  // The registration link, drawn under the sidebar facts because that is where
+  // the button it points at appears — last in that column, directly below them.
+  //
+  // It is one field for every status. The status decides what the button SAYS
+  // and whether it is pressable (see the STATUS table in js/activity.js); this
+  // decides where it goes. A `closed` activity keeps its link stored and simply
+  // does not offer it, so reopening does not mean typing the URL again.
+  function renderCtaField() {
+    var box = $('cta-field');
+    if (!box) return;
+    box.innerHTML = '';
+    box.appendChild(fieldRow({
+      label: 'Registration button link',
+      hint: 'Where the button under the facts sends people, per language. Leave empty and it points at the contact form.'
+    }, langObj(S.record.ctaUrl), 'f-ctaUrl'));
   }
 
   // Every upload is resized and re-encoded in the browser first — see
@@ -252,13 +358,17 @@
   // ---------- content fields ----------
   function renderFields() {
     var rec = S.record;
+    // The registry is rebuilt with the form. Keeping instances from a previous
+    // render would leave readForm reading editors that are no longer on screen.
+    S.editors = {};
+    S.pendingEditors = [];
     $('fields').innerHTML = '';
     S.schema.simple.forEach(function (d) {
-      $('fields').appendChild(fieldRow(d, langObj(rec[d.key]), 'f-' + d.key));
+      $('fields').appendChild(contentRow(d, langObj(rec[d.key]), 'f-' + d.key));
     });
     $('optional-fields').innerHTML = '';
     S.schema.optional.forEach(function (d) {
-      $('optional-fields').appendChild(fieldRow(d, langObj(rec[d.key]), 'f-' + d.key));
+      $('optional-fields').appendChild(contentRow(d, langObj(rec[d.key]), 'f-' + d.key));
     });
     // Its own panel at the foot of the form. Read from the schema like every
     // other group, so adding an SEO field stays a one line change on the server.
@@ -267,9 +377,12 @@
       $('seo-fields').appendChild(fieldRow(d, langObj(rec[d.key]), 'f-' + d.key));
     });
     renderCardImage();
+    renderCtaField();
     renderSeoOptions();
     renderShareImage();
     renderFacts();
+    // Last: Quill attaches to nodes that must already be in the document.
+    mountEditors();
   }
 
   // ---------- search & sharing, the parts that are not words -------------

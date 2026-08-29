@@ -232,3 +232,25 @@ input:disabled,textarea:disabled,select:disabled{background:#f2f0ea;color:#8b8b8
 .card-image-controls label{font-size:12.5px;font-weight:800;color:var(--navy);}
 .card-image-controls .link-btn{font-family:inherit;font-size:12px;font-weight:700;
   background:none;border:none;padding:0;color:var(--danger);cursor:pointer;text-decoration:underline;}
+
+/* ---------- rich text (Quill) ---------- */
+/* Three editors stacked, Hebrew then English then Russian, rather than the
+   three-column grid the short fields use. Body copy is written and read a
+   paragraph at a time; side by side it was three narrow columns of prose. */
+.rich-stack{ display:flex; flex-direction:column; gap:16px; }
+.rich-lang label{ display:block; margin-bottom:6px; }
+.quill-wrap{ border:1px solid #eee7d8; border-radius:8px; overflow:hidden; background:#fff; }
+.quill-wrap:focus-within{ border-color:var(--olive); }
+.quill-wrap .ql-toolbar.ql-snow{
+  border:none; border-bottom:1px solid #eee7d8; background:var(--stone);
+  border-radius:8px 8px 0 0; padding:6px 8px;
+}
+.quill-wrap .ql-container.ql-snow{ border:none; font-family:inherit; font-size:14px; color:var(--ink); }
+.quill-wrap .ql-editor{ min-height:140px; line-height:1.65; }
+.quill-wrap .ql-editor.ql-blank::before{ color:#a8a49a; font-style:normal; }
+/* The toolbar keeps its own direction so the buttons stay in one order in all
+   three editors; only the typing area flips. */
+.quill-wrap .ql-toolbar{ direction:ltr; }
+.quill-wrap.lang-locked .ql-editor,
+.quill-wrap.lang-locked .ql-toolbar{ background:var(--stone); color:#7a766c; cursor:not-allowed; }
+.quill-wrap.lang-locked .ql-toolbar button{ pointer-events:none; opacity:.45; }

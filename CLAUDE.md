@@ -358,9 +358,29 @@ js/admin-session.js, js/activities-admin.js, js/repeatable-items.js
 js/image-optimize.js   resizes + re-encodes every upload IN THE BROWSER
 ```
 
-The form is a **projection of `FIELD_SCHEMA`**, one panel per group: Settings,
-Content, Card image, Optional sections, Sidebar facts, Teachers, Sponsors, FAQ,
-then **Search & sharing** last. Meta title and meta description used to sit in
+The form is a **projection of `FIELD_SCHEMA`**, one panel per group, in the
+order an activity is actually filled in: **Settings** (slug, status, motif,
+corner, card image), **Content** (title, summary, about, what to bring),
+**Teachers**, **Sponsors**, **Sidebar facts** (the facts, then the registration
+button link — the button sits directly under them on the page), **FAQ**, then
+**Search & sharing** last.
+
+**About and What to bring are written in Quill** — the same editor and version
+the Shirat HaYam admin uses, loaded from a CDN because this project has no build
+step, with the three languages **stacked** rather than in the three-column grid
+the short fields use: those are a comparison task, a paragraph of prose is not.
+`rich: true` on the descriptor is the whole switch.
+
+That makes the stored value HTML, and `richText()` in the template prints it as
+markup. Three things hold that together: `sanitiseRich()` on the server runs on
+**every** save against a fixed tag allowlist (the value arrives in a request body
+like any other field, and the page prints it unescaped); `plainText()` strips the
+markup wherever text is wanted — meta description, og:description, the listing
+blurb — or a search result reads `&lt;p&gt;במרכז עוגן…`; and a value that does
+**not** start with a block tag is treated as the plain text it is and escaped, so
+records written before the editor need no migration and read exactly as before.
+Without Quill the field falls back to the plain textarea, so a CDN outage costs
+formatting rather than the ability to edit. Meta title and meta description used to sit in
 Content, between "About this activity" and "What to bring", where they read as
 more body copy to write, which is how a meta description ends up being a
 paragraph. They are their own `seo` group now.
