@@ -442,10 +442,23 @@ html[lang="he"] .credit-group-label{ text-transform:none; letter-spacing:0; font
   .activity-layout{ flex-direction:column; gap:32px; }
   .activity-aside{ position:static; width:100%; flex-basis:auto; }
   .activity-sidebar{ width:100%; }
-  /* Full width, a square picture would be enormous on a phone. It becomes a
-     band across the top of the column instead, the same shape the listing
-     cards use. */
-  .activity-card-image img{ aspect-ratio:16/7; }
+  /* The picture stays SQUARE at every width. It used to flatten to 16:7 here,
+     on the reasoning that a full-width square is enormous on a phone — which is
+     true, and is a size problem rather than a ratio one. Cropping a 1:1 upload
+     into a letterbox cut the top off every card image: the artwork is titled,
+     and the title is at the top.
+
+     So the ratio is left alone and the WIDTH is capped instead. On a phone the
+     column is narrower than the cap and the picture is simply full width; from
+     about 430px up it holds at 360px, near the 320px it occupies on a desktop.
+     margin-inline-end keeps it at the leading edge in all three languages with
+     no per-language rule.
+
+     aspect-ratio is NOT restated here on purpose. It is inherited from the base
+     rule above, together with the height:auto that makes it work — restating one
+     without the other is exactly how height="800" wins and the picture renders
+     800px tall. */
+  .activity-card-image{ max-width:360px; margin-inline-end:auto; }
 }
 @media (max-width:780px){
   .page-header h1{ font-size:28px; }

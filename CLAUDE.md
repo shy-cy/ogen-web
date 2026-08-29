@@ -162,9 +162,26 @@ deliberately **absent from `sitemap.xml`**. Flip both once real copy lands.
 `.activity-aside`, which stacks the activity's square picture
 (`.activity-card-image`) above the `.activity-sidebar` of facts. The column
 carries the width and the stickiness so both cards move together; an activity
-with no `cardImage` renders no frame at all rather than an empty one. Below
-939px the picture becomes a 16:7 band, because a full-width square on a phone
-is enormous.
+with no `cardImage` renders no frame at all rather than an empty one.
+
+The picture is **square at every width**. Below 939px it used to flatten to a
+16:7 band, on the reasoning that a full-width square is enormous on a phone —
+which is true, and is a size problem rather than a ratio one. It was being paid
+for in the wrong currency: the upload is cropped to 1:1 and the artwork is
+titled, so letterboxing cut the title off the top of every card image on every
+phone and tablet. The stacked layout caps `max-width` on the *figure* instead
+and never touches the image rule, so `height:auto` and `aspect-ratio:1/1` both
+survive. Below the cap the picture is simply full width;
+`margin-inline-end:auto` keeps it at the leading edge in all three languages.
+
+That pairing is the trap. `height="800"` on the `<img>` is a presentational
+hint, so **`height:auto` and `aspect-ratio` have to travel together** — restate
+one in a media query without the other and the attribute wins, the ratio is
+ignored, and the picture renders 800px tall. There is deliberately exactly one
+`.activity-card-image img` rule in the stylesheet so the pair cannot be split,
+and a test asserts that, on comment-stripped CSS — the rule opens with a comment
+explaining `height:auto`, and a naive search finds the words in the prose and
+passes whether or not the declaration is still there.
 
 The same picture is the listing card's thumbnail. It was **write-only** for a
 while — uploaded, cropped, optimised, committed, shown in the admin, and

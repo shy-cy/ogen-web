@@ -182,4 +182,49 @@ H.eq(shareOf(page), 'https://www.ogen.cy/images/og-image.jpg',
 H.ok(/image: activity\.shareImage \|\| '\/images\/og-image\.jpg'/.test(tpl),
   'a shared link uses the activity share image, falling back to the site one');
 
+console.log('\n[square at EVERY width, not just the wide one]');
+// The stacked layout used to flatten the picture to 16:7 below 939px, on the
+// reasoning that a full-width square is enormous on a phone. That reasoning is
+// about SIZE, and it was paid for in RATIO: the upload is cropped to 1:1 and the
+// artwork is titled, so letterboxing it cut the title off the top of every card
+// image on every phone and tablet. The width is capped now and the ratio is left
+// alone.
+//
+// Comments are stripped FIRST. The rule this guards opens with a comment
+// explaining height:auto, so a naive search finds the words in the prose and
+// passes whether or not the declaration is still there — which is exactly what
+// this suite did when it was first written, and it took a mutation to notice.
+const stripComments = (css) => css.replace(/\/\*[\s\S]*?\*\//g, '');
+const site = stripComments(fs.readFileSync(path.join(R, 'shared.css'), 'utf8'));
+const imgRule = site.slice(site.indexOf('.activity-card-image img{'));
+const imgBody = imgRule.slice(0, imgRule.indexOf('}'));
+H.ok(/aspect-ratio:1\/1/.test(imgBody), 'the picture declares a 1:1 ratio');
+H.ok(/height:auto/.test(imgBody), 'and height:auto, which is what lets the ratio apply');
+H.ok(imgBody.indexOf('height:auto') < imgBody.indexOf('aspect-ratio'),
+  'in that order, so the attribute hint is neutralised before the ratio is set');
+
+// The two belong together. height="800" on the <img> is a presentational hint,
+// so without height:auto it wins, aspect-ratio is ignored, and the picture
+// renders 800px tall in a 320px column — a bug this repo has already fixed once.
+// Verified in a real browser: removing height:auto reproduces exactly that, at
+// every width, in all three languages.
+H.eq((site.match(/\.activity-card-image img\{/g) || []).length, 1,
+  'there is exactly ONE rule for the picture, so the pair cannot be split across two');
+H.ok(!/aspect-ratio:16\/7/.test(site), 'nothing flattens it to a band any more');
+H.ok(!/\.activity-card-image img\{[^}]*aspect-ratio:(?!1\/1)/.test(site),
+  'and no rule overrides the ratio with anything else');
+
+// The size concern is answered by capping the WIDTH instead, which leaves the
+// ratio untouched. Below the cap the picture is simply full width.
+const stacked = site.slice(site.indexOf('@media (max-width:939px)'));
+const stackedBlock = stacked.slice(0, stacked.indexOf('\n}'));
+H.ok(/\.activity-card-image\{[^}]*max-width:\d+px/.test(stackedBlock),
+  'the stacked layout caps the width');
+H.ok(!/\.activity-card-image img\{/.test(stackedBlock),
+  'and does not touch the image rule at all, so height:auto and the ratio both survive');
+H.ok(/margin-inline-end:auto/.test(stackedBlock),
+  'it sits at the leading edge via a logical property, so it flips per language with no override');
+H.ok(!/margin-right:auto|margin-left:auto/.test(stackedBlock),
+  'and not with a physical one');
+
 H.done();
