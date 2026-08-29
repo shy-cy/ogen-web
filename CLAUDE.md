@@ -242,6 +242,7 @@ netlify/functions/
   admin-users.js         /api/admin-users
 admin/index.html, admin/activities.html, admin/users.html, admin/admin.css
 js/admin-session.js, js/activities-admin.js, js/repeatable-items.js
+js/image-optimize.js   resizes + re-encodes every upload IN THE BROWSER
 ```
 
 ### The rules that hold this together
@@ -285,7 +286,26 @@ is read into the model before every redraw (or reordering eats whatever the admi
 just typed), and item ids are minted from the clock, never from list position (or
 removing a row reissues an id and merges two items' state).
 
-**6. Client-side permission checks are cosmetic.** The server re-checks
+**6. Uploads are shrunk in the browser, not on the server.** `js/image-optimize.js`
+resizes and re-encodes before a byte is sent — hero to 1600px on the long edge
+as JPEG, teacher/sponsor images to 600px, transparency keeping them PNG, to
+match what the site already does by hand (`og-image.jpg` is 1200×630 at 72KB;
+`images/partners/*` are 19–51KB). Measured: an 865KB hero became 26KB, a 1.77MB
+logo 134KB.
+
+The browser is the right place because a server-side resize would fix only the
+page weight. An unoptimised upload also sent ~3.5MB towards Netlify's 6MB
+request limit and made the function re-upload all of it to GitHub, pushing it
+past its 10-second ceiling — which is what made a publish look like a dead
+button. Those two only get fixed before the bytes leave.
+
+It declines to act rather than make things worse: never scales up, never
+returns a file bigger than it was given (a 52KB PNG re-encodes to 59KB), never
+flattens an animated GIF, never rasterises an SVG, and honours EXIF orientation
+so a phone photo isn't drawn sideways. Publishing also deletes images the
+record has stopped pointing at, since changing format changes the filename.
+
+**7. Client-side permission checks are cosmetic.** The server re-checks
 `canAccess` / `canPublish` / `canEditLang` on every action and assumes the client
 is hostile. A role that may only edit Russian gets its Hebrew and English edits
 discarded server-side, and cannot add, remove or reorder items at all.
