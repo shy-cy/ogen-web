@@ -6,7 +6,7 @@
   "ctaUrl": {
     "he": "לחץ להרשמה",
     "en": "Register Now",
-    "ru": ""
+    "ru": "Register Now"
   },
   "title": {
     "he": "חוג עברית לילדים",
@@ -137,11 +137,11 @@
       "logo": "/images/activities/hebrew4kids-sponsors-spo-mtd1o2lk-3.png"
     }
   ],
-  "isoUpdated": "2026-08-29T10:50:32.682Z",
+  "isoUpdated": "2026-08-29T11:08:59.408Z",
   "isoCreated": "2026-08-28T14:55:38.930Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
-  "lastPublishedAt": "2026-08-29T10:50:32.682Z",
+  "lastPublishedAt": "2026-08-29T11:08:59.408Z",
   "factVisibility": {
     "ages": "public",
     "schedule": "public",
