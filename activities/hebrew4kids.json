@@ -3,7 +3,6 @@
   "status": "announcement",
   "motif": "ring",
   "corner": "tl",
-  "heroImage": "/images/activities/hebrew4kids-hero.jpg",
   "ctaUrl": {
     "he": "לחץ להרשמה",
     "en": "Register Now",
@@ -30,11 +29,6 @@
     "ru": ""
   },
   "metaDescription": {
-    "he": "חוג עברית",
-    "en": "",
-    "ru": ""
-  },
-  "heroAlt": {
     "he": "חוג עברית",
     "en": "",
     "ru": ""
@@ -143,11 +137,11 @@
       "logo": "/images/activities/hebrew4kids-sponsors-spo-mtd1o2lk-3.png"
     }
   ],
-  "isoUpdated": "2026-08-29T09:55:16.968Z",
+  "isoUpdated": "2026-08-29T10:12:37.489Z",
   "isoCreated": "2026-08-28T14:55:38.930Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
-  "lastPublishedAt": "2026-08-29T09:55:16.968Z",
+  "lastPublishedAt": "2026-08-29T10:12:37.489Z",
   "factVisibility": {
     "ages": "public",
     "schedule": "public",
