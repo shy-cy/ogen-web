@@ -23,18 +23,20 @@
     "slug": "hebrew4kids",
     "status": "announcement",
     "langs": [
-      "he"
+      "he",
+      "en",
+      "ru"
     ],
     "title": {
       "he": "חוג עברית לילדים",
-      "en": "",
-      "ru": ""
+      "en": "Hebrew Classes for Children",
+      "ru": "Уроки иврита для детей"
     },
     "summary": {
       "he": "עברית, ישראליות וחוויה של יחד",
-      "en": "",
-      "ru": ""
+      "en": "Hebrew, Israeli culture, and learning together",
+      "ru": "Иврит, Израиль и еврейская культура - учимся вместе"
     },
-    "isoUpdated": "2026-08-29T10:44:21.236Z"
+    "isoUpdated": "2026-08-29T10:48:13.698Z"
   }
 ]
