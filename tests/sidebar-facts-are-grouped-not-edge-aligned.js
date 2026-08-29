@@ -41,8 +41,11 @@ H.eq(grouped.length, facts.FACT_ORDER.length, 'no fact is grouped twice and none
 H.ok(grouped.every((k) => facts.FACT_ORDER.indexOf(k) !== -1), 'no group lists a fact that does not exist');
 
 console.log('\n[the sidebar CSS has no directional override]');
-const block = css.slice(css.indexOf('.sidebar-group{'), css.indexOf('.sidebar-cta{'));
-H.ok(block.length > 200, 'found the sidebar block in shared.css');
+// The groups are cards in two placements now — two in a row above the article,
+// two in a column beside it — but the shape inside each is unchanged, and so is
+// the reason this suite exists.
+const block = css.slice(css.indexOf('.fact-card{'), css.indexOf('.sidebar-cta{'));
+H.ok(block.length > 200, 'found the fact-card block in shared.css');
 H.ok(block.indexOf('[dir=') === -1, 'no [dir=…] selector');
 H.ok(!/text-align:\s*(left|right)/.test(block), 'no physical text-align');
 H.ok(!/(^|[^-])\b(margin|padding)-(left|right)\s*:/.test(block), 'no physical margin or padding');
@@ -54,8 +57,10 @@ H.ok(css.indexOf('.sidebar-row{') === -1, 'the old .sidebar-row rules are gone, 
 console.log('\n[what actually renders]');
 ['he', 'en', 'ru'].forEach((lang) => {
   const html = template.renderActivityPage(record, lang);
-  const aside = (html.match(/<aside class="activity-sidebar">[\s\S]*?<\/aside>/) || [])[0] || '';
-  H.ok(aside.length > 0, lang + ': the sidebar renders');
+  // Both placements together: the facts must all still be on the page, wherever
+  // the card holding them ended up.
+  const aside = (html.match(/<div class="activity-body">[\s\S]*?<\/article>/) || [])[0] || '';
+  H.ok(aside.length > 0, lang + ': the page body renders');
   H.ok(aside.indexOf('sidebar-row') === -1, lang + ': no label/value rows survive');
 
   // Every fact the record actually has must still be on the page. Compared
@@ -71,12 +76,12 @@ console.log('\n[what actually renders]');
 
   // A group with no facts would render as an icon and a heading labelling
   // nothing. Every group present must carry at least one fact.
-  const groups = aside.match(/<div class="sidebar-group"[\s\S]*?<\/ul>/g) || [];
+  const groups = aside.match(/<div class="fact-card" data-group="(?!credits)[\s\S]*?<\/ul>/g) || [];
   H.ok(groups.length > 0, lang + ': groups rendered');
   groups.forEach((g) => {
     const key = (g.match(/data-group="([a-z]+)"/) || [])[1];
     H.ok((g.match(/<li /g) || []).length > 0, lang + ': the ' + key + ' group is not empty');
-    H.ok(/<span class="sidebar-group-icon"/.test(g), lang + ': the ' + key + ' group has an icon');
+    H.ok(/<span class="fact-card-icon"/.test(g), lang + ': the ' + key + ' group has an icon');
     H.ok(/<h2>[^<]+<\/h2>/.test(g), lang + ': the ' + key + ' group has a heading');
   });
 

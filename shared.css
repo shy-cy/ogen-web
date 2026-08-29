@@ -299,17 +299,43 @@ html[lang="en"] .page-header h1, html[lang="ru"] .page-header h1{ font-weight:80
 .team-card p{ font-size:13px; color: var(--camel); margin:0; }
 
 /* ============================== ACTIVITY PAGE ============================== */
-.activity-layout{
+/* One grid holds the whole page body, and it does two jobs.
+
+   It is what lets the picture sit in two places from ONE copy of the markup:
+   under the hero when the page is a single column, at the head of the side
+   column when it is two. Above 939px only the area names change. No duplicated
+   <figure>, nothing hidden with display:none, so there is no second copy to
+   fall out of step and no image downloaded to never be shown.
+
+   The picture is the only element whose visual position differs from its place
+   in the source, and it may because it is decorative — aria-hidden with an
+   empty alt, so it is in neither the accessibility tree nor the tab order.
+   Everything readable is still placed by source order alone, which is what
+   keeps visual, DOM and keyboard order identical. That is also why the side
+   column sits at the TRAILING edge — left in Hebrew, right in English and
+   Russian — rather than the leading one: the article comes first in the source,
+   because on a phone it has to come before Staff and Details.
+
+   Grid also removed the old flex-wrap trap wholesale. The two columns needed
+   868px of usable width, so between 781px and ~915px the sidebar used to drop
+   below the article at its full 320px, hugging one edge, while the page still
+   looked like two columns. Areas cannot wrap; the single-column rule below
+   simply takes over. */
+.activity-body{
   max-width:1100px; margin:0 auto; padding:50px 24px 80px;
-  display:flex; gap:48px; align-items:flex-start;
-  /* Deliberately NOT flex-wrap:wrap. Wrapping created a dead zone between
-     781px and ~915px: the two columns no longer fitted (500 + 48 + 320 = 868
-     of usable width needed), so the sidebar dropped below the article at its
-     full 320px, still hugging one edge — the facts box vanished under a wall
-     of text while the page still looked like a two-column layout. The single
-     column below now takes over before that can happen. */
+  display:grid; grid-template-columns:minmax(0,1fr) 320px;
+  column-gap:48px; row-gap:18px; align-items:start;
+  grid-template-areas:
+    "row  row"
+    "main pic"
+    "main aside";
 }
-.activity-main{ flex:1 1 500px; min-width:0; }
+.activity-card-image{ grid-area:pic; }
+.activity-main{ grid-area:main; min-width:0; }
+.activity-aside{ grid-area:aside; display:flex; flex-direction:column; gap:18px; }
+/* The two cards a reader scans first, across the full measure. */
+.fact-row{ grid-area:row; display:flex; gap:24px; align-items:stretch; margin-bottom:14px; }
+.fact-row > *{ flex:1 1 0; min-width:0; }
 .activity-main h2{ font-size:22px; font-weight:700; color: var(--navy); margin:28px 0 12px; }
 .activity-main > *:first-child{ margin-top:0; }
 .activity-main p{ font-size:16px; color:#3f3f3a; margin-bottom:16px; }
@@ -339,27 +365,38 @@ html[lang="en"] .page-header h1, html[lang="ru"] .page-header h1{ font-weight:80
 /* Groups always stack — teachers above sponsors. As a wrapping row they sat
    side by side or stacked purely on how wide the names happened to be, which
    made Hebrew and English lay out differently for no good reason. */
-.credit-block{ display:flex; flex-direction:column; gap:26px; margin-top:28px; padding-top:24px; border-top:1px solid var(--stone); }
-.credit-group{ display:flex; flex-direction:column; gap:12px; min-width:0; }
-.credit-group-label{ font-size:12px; font-weight:800; color: var(--terracotta); text-transform:uppercase; letter-spacing:0.05em; }
-html[lang="he"] .credit-group-label{ text-transform:none; letter-spacing:0; font-size:13px; }
-.credit-items{ display:flex; flex-wrap:wrap; gap:12px 28px; }
-.credit-item{ display:flex; align-items:center; gap:12px; }
+.credit-block{ display:flex; flex-direction:column; gap:0; }
+.credit-group{ display:flex; flex-direction:column; gap:10px; min-width:0; }
+/* A rule rather than a gap between the two groups: the card is tall and they
+   are different kinds of credit. Tinted from the card's own gold. */
+.credit-group + .credit-group{ margin-top:16px; padding-top:16px; border-top:1px solid rgba(193,132,43,0.22); }
+/* Camel, not terracotta. These labels sit inside the gold card now, and
+   terracotta beside gold reads as a third colour nobody chose. */
+.credit-group-label{ font-size:11px; font-weight:800; color: var(--camel); text-transform:uppercase; letter-spacing:0.07em; }
+html[lang="he"] .credit-group-label{ text-transform:none; letter-spacing:0; font-size:12.5px; }
+/* Stacked, not a wrapping row. In a 320px column a row wraps after one item
+   anyway, and stacking keeps Hebrew and English laying out identically. */
+.credit-items{ display:flex; flex-direction:column; gap:10px; }
+.credit-item{ display:flex; align-items:center; gap:11px; min-width:0; }
 .credit-photo{
   width:40px; height:40px; border-radius:50%; background: var(--stone); flex-shrink:0; object-fit:cover;
   display:flex; align-items:center; justify-content:center; font-size:16px; color: var(--olive);
 }
-.credit-name{ display:block; font-size:14.5px; color: var(--navy); font-weight:700; }
+/* A sponsor mark is a logo, not a face. Cropping it into a circle like a
+   teacher photo cut the edges off — the WZO mark is 600x543 — so it is
+   CONTAINED in a rounded tile instead, on white, at its own aspect ratio. */
+.credit-logo{
+  width:44px; height:40px; border-radius:9px; object-fit:contain; flex-shrink:0;
+  background:#fff; border:1px solid var(--stone); padding:3px;
+}
+.credit-name{ display:block; font-size:14px; color: var(--navy); font-weight:700; min-width:0; overflow-wrap:anywhere; }
 
 /* Sticky facts sidebar. 112px = 96px nav + 16px breathing room. */
-/* The aside column: the activity's picture on top, the facts panel below it —
-   two stacked cards. The column carries the width and the stickiness now, so
-   both cards move together and the sidebar keeps behaving exactly as it did
-   when it was the flex child itself. */
-.activity-aside{
-  flex:0 0 320px; position:sticky; top:112px;
-  display:flex; flex-direction:column; gap:18px;
-}
+/* No position:sticky here. It was `sticky; top:112px` and it had stopped doing
+   anything: sticky only engages while the element is shorter than the viewport,
+   and this column passed that the day the card image was added — measured at
+   1032px against an 800px viewport. A rule describing behaviour the page does
+   not have is worse than no rule, so it is gone rather than carried forward. */
 .activity-card-image{
   margin:0; border-radius:16px; overflow:hidden;
   border:1px solid var(--stone); background: var(--stone);
@@ -376,33 +413,46 @@ html[lang="he"] .credit-group-label{ text-transform:none; letter-spacing:0; font
      what reserves the right space before it loads. */
   display:block; width:100%; height:auto; aspect-ratio:1/1; object-fit:cover;
 }
-.activity-sidebar{
+/* The four cards. One plain paper ground and a stone border for all of them —
+   the same panel the facts sat in before, now one per group. They are told
+   apart by their icon disc, not by a tinted background: four tinted panels in a
+   set read as four states of one thing rather than four kinds of information.
+   One colour each from the offer-card rotation, olive / terracotta / gold /
+   navy.
+
+   Nothing here is pushed to an edge. A flex row puts the icon at the leading
+   edge per direction on its own, and the text under it is start-aligned, which
+   is what `direction` already means — so there is not one directional override
+   in this block, which is the point. It replaced a .sidebar-row that put the
+   label at one edge and the value at the other (space-between plus
+   text-align:end): that shape has to be told which edge is which, and getting
+   it right in both directions took several attempts and kept regressing. */
+.fact-card{
   background: var(--paper); border:1px solid var(--stone); border-radius:16px;
-  padding:26px; box-shadow:0 8px 30px rgba(27,62,82,0.08);
+  padding:20px 22px; box-shadow:0 8px 30px rgba(27,62,82,0.08);
+  container-type:inline-size;
 }
-/* Grouped fact blocks: [icon] [heading + stacked facts].
-
-   This replaced a .sidebar-row that put the label at one edge and the value at
-   the other (justify-content:space-between plus text-align:end). That shape has
-   to be told which edge is which, and getting it right in both directions took
-   several attempts and kept regressing. Nothing below is pushed to an edge: a
-   flex row places the icon at the leading edge per direction on its own, and the
-   text under it is simply start-aligned, which is what `direction` already means.
-   There is not one directional override in this block, which is the point.
-
-   Ported from the Shirat HaYam event sidebar (.sidebar-detail), on Ogen tokens.
-   Its one [dir="rtl"] rule, for the list marker padding, is written here as
-   padding-inline-start instead, per the logical-properties rule in CLAUDE.md. */
-.sidebar-group{ display:flex; align-items:flex-start; gap:14px; padding:18px 0; border-top:1px solid var(--stone); }
-.sidebar-group:first-child{ padding-top:0; border-top:none; }
-.sidebar-group-icon{
+.fact-card-head{ display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+.fact-card-icon{
   flex:0 0 34px; width:34px; height:34px; border-radius:50%; color:#fff;
-  display:flex; align-items:center; justify-content:center; margin-top:2px;
+  display:flex; align-items:center; justify-content:center;
 }
-.sidebar-group-body{ min-width:0; flex:1; }
-.sidebar-group-body h2{
+.fact-card-head h2{
   font-size:11.5px; font-weight:800; color: var(--camel);
-  text-transform:uppercase; letter-spacing:0.09em; margin:0 0 10px;
+  text-transform:uppercase; letter-spacing:0.09em; margin:0; line-height:1.3;
+}
+/* Hebrew has no case, so uppercase is a no-op and the tracking just loosens the
+   word. Same treatment .credit-group-label already gets. */
+html[lang="he"] .fact-card-head h2{ text-transform:none; letter-spacing:0; font-size:13px; }
+/* A card wide enough lays its facts across instead of stacking them: a top-row
+   card is ~500px, and one narrow column of text in it would leave most of the
+   card empty. The card decides from ITS OWN width, not the viewport, so the same
+   component serves the full-width row and the 320px column with no variant. */
+@container (min-width:360px){
+  .fact-card .sidebar-facts{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:14px 20px;
+  }
+  .fact-card .sidebar-facts li{ margin-bottom:0; }
 }
 .sidebar-facts{ list-style:none; margin:0; padding:0; }
 .sidebar-facts li{ margin-bottom:11px; }
@@ -410,7 +460,7 @@ html[lang="he"] .credit-group-label{ text-transform:none; letter-spacing:0; font
 .sidebar-facts strong{ display:block; font-size:12px; font-weight:800; color: var(--navy); line-height:1.35; }
 .sidebar-facts span{ display:block; font-size:14px; font-weight:400; color: var(--ink); line-height:1.5; }
 .sidebar-cta{
-  display:block; width:100%; margin-top:20px; padding:14px; border-radius:999px; border:none;
+  display:block; width:100%; padding:14px; border-radius:999px; border:none;
   font-family:inherit; font-size:15.5px; font-weight:800; cursor:pointer; text-align:center;
 }
 /* Every actionable CTA is terracotta, the same as .btn-primary in the hero and
@@ -427,7 +477,7 @@ html[lang="he"] .credit-group-label{ text-transform:none; letter-spacing:0; font
 .sidebar-cta.is-waitlist{ background: var(--terracotta); color:#fff; }
 .sidebar-cta.is-closed{ background:#e4e0d4; color:#a39d8c; cursor:not-allowed; }
 .sidebar-note{ font-size:12.5px; color: var(--camel); text-align:center; margin-top:10px; }
-.status-banner{ padding:16px; border-radius:12px; text-align:center; font-size:14.5px; font-weight:700; margin-top:8px; }
+.status-banner{ padding:16px; border-radius:12px; text-align:center; font-size:14.5px; font-weight:700; }
 .status-banner.is-draft{ background:#eee; color:#888; }
 /* "Coming soon" has no button — registration is not open, so there is nothing
    to click. A gold tint under the gold badge; olive rather than gold for the
@@ -439,9 +489,18 @@ html[lang="he"] .credit-group-label{ text-transform:none; letter-spacing:0; font
 /* 940px, not 780: the two columns stop fitting at about 915px, so the switch
    to a single column has to happen above that, not 130px below it. */
 @media (max-width:939px){
-  .activity-layout{ flex-direction:column; gap:32px; }
-  .activity-aside{ position:static; width:100%; flex-basis:auto; }
-  .activity-sidebar{ width:100%; }
+  /* One column, and only the area names change — the picture leads the page,
+     then the two cards, then the article, then the rest. The <figure> is not
+     duplicated and nothing is display:none. */
+  .activity-body{
+    padding:36px 20px 60px; grid-template-columns:minmax(0,1fr); row-gap:28px;
+    grid-template-areas:
+      "pic"
+      "row"
+      "main"
+      "aside";
+  }
+  .fact-row{ flex-direction:column; gap:16px; margin-bottom:0; }
   /* The picture stays SQUARE at every width. It used to flatten to 16:7 here,
      on the reasoning that a full-width square is enormous on a phone — which is
      true, and is a size problem rather than a ratio one. Cropping a 1:1 upload

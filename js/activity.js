@@ -132,9 +132,13 @@
       if (!list.length) return '';
       const items = list.map(function(entry) {
         const img = entry.photo || entry.logo;
+        // A sponsor mark is a logo, not a face: contained in a tile at its own
+        // aspect ratio rather than cropped into a circle, which was cutting the
+        // edges off marks that are not square.
+        const cls = key === 'sponsors' ? 'credit-logo' : 'credit-photo';
         const face = img
-          ? `<img class="credit-photo" src="${esc(img)}" alt="">`
-          : `<span class="credit-photo" aria-hidden="true">${key === 'sponsors' ? '\u{1F3DB}' : '\u{1F464}'}</span>`;
+          ? `<img class="${cls}" src="${esc(img)}" alt="">`
+          : `<span class="${cls}" aria-hidden="true">${key === 'sponsors' ? '\u{1F3DB}' : '\u{1F464}'}</span>`;
         return `<div class="credit-item">${face}<span class="credit-name">${esc(entry.name || '')}</span></div>`;
       }).join('');
       return `<div class="credit-group">
@@ -144,7 +148,11 @@
     }).join('');
 
     if (groups) creditSlot.innerHTML = groups;
-    else creditSlot.remove();   // no teachers and no sponsors: no empty block
+    // No teachers and no sponsors: take the whole CARD, not just the slot inside
+    // it, or a gold icon and a heading are left labelling nothing. The template
+    // already declines to render the shell in that case; this is the safety net
+    // for a record whose credits are empty in this language only.
+    else (creditSlot.closest('.fact-card') || creditSlot).remove();
   }
 
   // --- 3. drop optional blocks that were left empty ----------------------

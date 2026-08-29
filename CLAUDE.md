@@ -158,11 +158,28 @@ Two shells for pages beyond the homepage. Both open with the shared
 `[content needed]` placeholder copy, so it carries `noindex` and is
 deliberately **absent from `sitemap.xml`**. Flip both once real copy lands.
 
-**Activity page** — `.activity-layout`: `.activity-main` beside a sticky
-`.activity-aside`, which stacks the activity's square picture
-(`.activity-card-image`) above the `.activity-sidebar` of facts. The column
-carries the width and the stickiness so both cards move together; an activity
-with no `cardImage` renders no frame at all rather than an empty one.
+**Activity page** — `.activity-body` is **one CSS grid** holding four things:
+the square picture (`.activity-card-image`), a `.fact-row` of two cards,
+`.activity-main`, and `.activity-aside` carrying the other two cards and the
+status CTA. An activity with no `cardImage` renders no frame at all rather than
+an empty one.
+
+Above 939px the grid is `"row row" / "main pic" / "main aside"` — the two cards
+a reader scans first across the full measure, then the article with the picture
+at the head of the column beside it. Below, the areas become
+`"pic" / "row" / "main" / "aside"` and nothing else changes.
+
+That is the whole point of using areas: **the picture exists once in the
+markup** and sits in two places. Rendering it twice and hiding one would drift,
+and the hidden copy would still be downloaded. It is also the only element whose
+visual position differs from its place in the source, and it may be, because it
+is decorative — `aria-hidden` with an empty alt, so it is in neither the
+accessibility tree nor the tab order. Everything readable is still placed by
+source order alone.
+
+Grid also retired the old wrap trap. Two flex columns needed 868px of usable
+width, so between 781px and ~915px the sidebar dropped below the article at its
+full 320px while the page still looked like two columns. Areas cannot wrap.
 
 The picture is **square at every width**. Below 939px it used to flatten to a
 16:7 band, on the reasoning that a full-width square is enormous on a phone —
@@ -197,26 +214,32 @@ The card image is **not** the share image. `shareImage` is a separate field with
 its own 1200×630 crop, and falls back to the site's `og-image.jpg`, never to the
 card.
 
-The main column reads About → What to bring → FAQ → credits. Three of the
-sidebar facts used to be sections in the main column; they are facts to scan,
-not prose.
+The main column reads About → What to bring → FAQ. Three of the facts used to be
+sections in it; they are facts to scan, not prose. Credits used to end it and are
+a card now.
 
-**The sidebar is three grouped blocks, not eight label/value rows.** Each is an
-icon, a heading, and its facts stacked underneath, ported from the Shirat HaYam
-event sidebar (`.sidebar-detail`) onto Ogen tokens:
+**The facts are four cards in two placements, not eight label/value rows.** Each
+is an icon, a heading, and its contents stacked underneath, ported from the
+Shirat HaYam event sidebar (`.sidebar-detail`) onto Ogen tokens:
 
-| Group | Facts, in this order |
-|---|---|
-| Who it is for | Ages, Group size, Prerequisites |
-| Schedule | When, Duration |
-| Details | Location, Language of instruction, Price |
+| Placement | Card | Contents, in this order |
+|---|---|---|
+| Top row | Who it is for | Ages, Group size, Prerequisites |
+| Top row | Schedule | When, Duration |
+| Side column | Staff & sponsors | Teachers, then sponsors |
+| Side column | Details | Location, Language of instruction, Price |
+
+A card wide enough lays its facts **across** rather than stacked, decided by a
+container query on the card's own inline size — so the same component serves the
+~500px row and the 320px column with no variant and no viewport breakpoint of
+its own.
 
 It was rows before: label at one edge, value at the other, via
 `justify-content:space-between` and `text-align:end`. That shape has to be told
 which edge is which, and in a site rendering the same markup both directions
 that instruction kept being wrong. It was fixed more than once and came back
 each time. **Nothing in the new block is pushed to an edge**, so there is not
-one directional override in the sidebar CSS, and a test asserts there never is.
+one directional override in the card CSS, and a test asserts there never is.
 
 `FACT_GROUPS` in `_activity-facts.js` owns the grouping and declares the order
 within each group, which is deliberately *not* `FACT_ORDER` (Location reads
@@ -230,19 +253,32 @@ why the schedule group is headed "Schedule" and not "When".
 Group icons are Lucide, white in a solid circle, per the icon rule, but at 34px
 rather than 56px: a 56px disc beside two lines of text in a 320px column is
 larger than the thing it labels. One colour per group from the offer-card
-rotation, olive / terracotta / navy.
+rotation, olive / terracotta / gold / navy — gold being the one the page was not
+already using, so the fourth card joined without moving the other three. The
+cards are **one plain `--paper` ground with a `--stone` border**, told apart by
+the icon disc alone: a tint per card was tried and dropped, because four tinted
+panels in a set read as four states of one thing rather than four kinds of
+information.
 
 The status badge sits under the `<h1>` in `.page-header`, so `js/activity.js`
 looks it up from the document rather than from the `.activity` article — status
 is still declared exactly once, on the article.
 
-**The sidebar comes first in the source**, which puts it at the leading edge of
-the reading direction — right in Hebrew, left in EN/RU — with no per-language
-rule, because a flex row already places its first item there. Source order
-rather than `order:` keeps visual, DOM and keyboard order identical. And the
-layout does **not** wrap: two columns need 868px of usable width, so it switches
-to a single column at 939px. It used to wrap between 781 and ~915px, dropping
-the facts box below the article at its full 320px width.
+**The article comes before the side column in the source**, and that single fact
+decides two things that look unrelated. On a phone it is what puts About and
+What to bring ahead of Staff and Details. On a desktop it is why the column sits
+at the **trailing** edge — left in Hebrew, right in EN/RU — because a grid row
+places its first item at the leading edge. They cannot be changed independently:
+keeping the column on the leading edge would need `order` or `column-reverse`,
+which splits visual from DOM order, and that is the rule this layout broke on
+before. The sidebar led the source until the redesign, when the required mobile
+order inverted it.
+
+There is **no `position:sticky`** on the column. It was `sticky; top:112px` and
+had stopped engaging the day the card image was added — sticky only applies
+while the element is shorter than the viewport, and the column measured 1032px
+against an 800px one. A rule describing behaviour the page does not have is
+worse than no rule.
 
 **The activity page still has no image.** There is no hero, and the template
 renders no picture of its own; share cards still fall back to the site's
@@ -267,7 +303,7 @@ request.
 upload, the storage and the admin preview are. Nothing renders `cardImage` on a
 page.
 
-Sidebar facts are **structured values, not text**. Two of them are the same
+Activity facts are **structured values, not text**. Two of them are the same
 `kind: 'location'` — the public `location` and the members-only `address` — so
 the admin keys those inputs by the **fact key, never the kind**; a hardcoded id
 gave both facts the same DOM ids and the read-back copied the location over the
@@ -405,7 +441,7 @@ js/image-optimize.js   resizes + re-encodes every upload IN THE BROWSER
 The form is a **projection of `FIELD_SCHEMA`**, one panel per group, in the
 order an activity is actually filled in: **Settings** (slug, status, motif,
 corner, card image), **Content** (title, summary, about, what to bring),
-**Teachers**, **Sponsors**, **Sidebar facts** (the facts, then the registration
+**Teachers**, **Sponsors**, **Activity facts** (the facts, then the registration
 button link — the button sits directly under them on the page), **FAQ**, then
 **Search & sharing** last.
 

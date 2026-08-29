@@ -48,55 +48,39 @@
 </div>
 
 <article class="activity" data-status="announcement" data-cta-url="https://www.ogen.cy/">
-  <div class="activity-layout">
-    <!-- The facts sidebar comes FIRST in the source on purpose. It belongs at
-         the leading edge of the reading direction — the right in Hebrew, the
-         left in English and Russian — and a flex row already places its first
-         item there, per direction, with no per-language rule. Doing it with
-         source order rather than the CSS order property also keeps visual, DOM and
-         keyboard order identical, so the registration button is not reached
-         last by a screen reader while appearing first on screen. -->
-    <div class="activity-aside">
+  <!-- Source order IS the order this reads in on a phone: picture, the two
+       cards a reader scans first, the article, then the rest. One CSS grid
+       holds all four, and above 939px it only renames the areas — the article
+       takes a column and the picture moves to the head of the one beside it.
+
+       The picture is the single thing whose visual position differs from its
+       place in the source, and it is allowed to because it is decorative:
+       aria-hidden with an empty alt, so it is in neither the accessibility tree
+       nor the tab order. Nothing readable moves. Everything else here is placed
+       by source order alone, which is what keeps visual, DOM and keyboard order
+       identical — and it is why the side column sits at the TRAILING edge (left
+       in Hebrew, right in English and Russian): the article comes first. -->
+  <div class="activity-body">
       <figure class="activity-card-image" aria-hidden="true">
         <img src="/images/activities/hebrew4kids-card-a1f8d75e.jpg" alt="" width="800" height="800" loading="lazy">
       </figure>
-      <aside class="activity-sidebar">
-      <div class="sidebar-group" data-group="participants">
-        <span class="sidebar-group-icon" style="background:var(--olive)"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg></span>
-        <div class="sidebar-group-body">
-          <h2>Для кого</h2>
-          <ul class="sidebar-facts">
-          <li data-fact="ages" data-fact-visibility="public"><strong>Возраст</strong><span>6-10</span></li>
-          <li data-fact="groupSize" data-fact-visibility="public"><strong>Размер группы</strong><span>2 группы по 7 учеников</span></li>
-          <li data-fact="prerequisites" data-fact-visibility="public"><strong>Требования к уровню</strong><span>Beginners</span></li>
-          </ul>
-        </div>
+    <div class="fact-row">
+      <div class="fact-card" data-group="participants">
+        <div class="fact-card-head"><span class="fact-card-icon" style="background:var(--olive)"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg></span><h2>Для кого</h2></div>
+        <ul class="sidebar-facts">
+            <li data-fact="ages" data-fact-visibility="public"><strong>Возраст</strong><span>6-10</span></li>
+            <li data-fact="groupSize" data-fact-visibility="public"><strong>Размер группы</strong><span>2 группы по 7 учеников</span></li>
+            <li data-fact="prerequisites" data-fact-visibility="public"><strong>Требования к уровню</strong><span>Beginners</span></li>
+        </ul>
       </div>
-      <div class="sidebar-group" data-group="schedule">
-        <span class="sidebar-group-icon" style="background:var(--terracotta)"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg></span>
-        <div class="sidebar-group-body">
-          <h2>Расписание</h2>
-          <ul class="sidebar-facts">
-          <li data-fact="schedule" data-fact-visibility="public"><strong>Когда</strong><span>по средам, 16:00</span></li>
-          <li data-fact="duration" data-fact-visibility="public"><strong>Продолжительность</strong><span>октябрь 2026 – декабрь 2026 · 10 занятий · 90 мин</span></li>
-          </ul>
-        </div>
+      <div class="fact-card" data-group="schedule">
+        <div class="fact-card-head"><span class="fact-card-icon" style="background:var(--terracotta)"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg></span><h2>Расписание</h2></div>
+        <ul class="sidebar-facts">
+            <li data-fact="schedule" data-fact-visibility="public"><strong>Когда</strong><span>по средам, 16:00</span></li>
+            <li data-fact="duration" data-fact-visibility="public"><strong>Продолжительность</strong><span>октябрь 2026 – декабрь 2026 · 10 занятий · 90 мин</span></li>
+        </ul>
       </div>
-      <div class="sidebar-group" data-group="practical">
-        <span class="sidebar-group-icon" style="background:var(--navy)"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></span>
-        <div class="sidebar-group-body">
-          <h2>Подробности</h2>
-          <ul class="sidebar-facts">
-          <li data-fact="location" data-fact-visibility="public"><strong>Место</strong><span>Limassol</span></li>
-          <li data-fact="instructionLanguage" data-fact-visibility="public"><strong>Язык преподавания</strong><span>Hebrew and English</span></li>
-          <li data-fact="price" data-fact-visibility="public"><strong>Цена</strong><span>регистрационный взнос 50 € · 300 € за курс · 15 € в час</span></li>
-          </ul>
-        </div>
-      </div>
-        <div data-status-cta></div>
-      </aside>
     </div>
-
     <div class="activity-main">
       <h2>О занятиях</h2>
 <p>В центре «Оген» мы приглашаем детей в возрасте <strong>от 6 до 10 лет</strong> на увлекательные занятия ивритом, которые сочетают изучение языка с знакомством с культурой и жизнью Израиля.</p><p>Занятия проводят <strong>Дорит и Ирит</strong> в тёплой, дружелюбной и поддерживающей атмосфере. Программа и задания адаптированы к возрасту и уровню владения ивритом каждого ребёнка.</p><p>На занятиях дети развивают:</p><ul><li>📖 <strong>Навыки чтения</strong> — знакомятся с буквами, словами и текстами и постепенно учатся читать самостоятельно.</li><li>✏️ <strong>Навыки письма</strong> — практикуются в написании букв и слов, расширяют словарный запас и учатся выражать свои мысли письменно.</li><li>💬 <strong>Разговорную речь</strong> — учатся говорить на иврите, вести диалог и уверенно использовать язык в повседневном общении.</li><li>🇮🇱 <strong>Знания об Израиле и израильской культуре</strong> — знакомятся с Израилем через рассказы, песни, игры и события из жизни страны.</li><li>🕎 <strong>Еврейские праздники и особые даты</strong> — узнают о праздниках, традициях, обычаях и историях, связанных с ними.</li></ul><p>Наша цель — не просто научить детей ивриту, а <strong>создать естественную связь с языком, Израилем и его культурой</strong>.</p><p>Занятия предназначены для детей <strong>6–10 лет</strong> и проходят с акцентом на общение, творчество, игры и совместное обучение в дружелюбной группе.</p>
@@ -105,9 +89,13 @@
         <h2>Что взять с собой</h2>
 <p>Тетрадь и пенал</p>
       </div>
+    </div>
 
-      <div class="credit-block" data-credits></div>
-      <script type="application/json" id="activity-credits">
+    <div class="activity-aside">
+      <div class="fact-card" data-group="credits">
+        <div class="fact-card-head"><span class="fact-card-icon" style="background:var(--gold)"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg></span><h2>Педагоги и партнёры</h2></div>
+        <div class="credit-block" data-credits></div>
+        <script type="application/json" id="activity-credits">
 {
   "teachers": [
     {
@@ -126,7 +114,17 @@
     }
   ]
 }
-      </script>
+        </script>
+      </div>
+      <div class="fact-card" data-group="practical">
+        <div class="fact-card-head"><span class="fact-card-icon" style="background:var(--navy)"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></span><h2>Подробности</h2></div>
+        <ul class="sidebar-facts">
+            <li data-fact="location" data-fact-visibility="public"><strong>Место</strong><span>Limassol</span></li>
+            <li data-fact="instructionLanguage" data-fact-visibility="public"><strong>Язык преподавания</strong><span>Hebrew and English</span></li>
+            <li data-fact="price" data-fact-visibility="public"><strong>Цена</strong><span>регистрационный взнос 50 € · 300 € за курс · 15 € в час</span></li>
+        </ul>
+      </div>
+      <div data-status-cta></div>
     </div>
   </div>
 </article>

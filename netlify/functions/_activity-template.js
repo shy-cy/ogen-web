@@ -36,13 +36,20 @@ const GROUP_ICONS = {
   practical: {
     color: 'var(--navy)',
     svg: '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>'
+  },
+  // The fourth card is the teaching staff and sponsors. Gold is the one colour
+  // in the offer-card rotation this page was not already using, so it joins
+  // without moving any of the three that were here.
+  credits: {
+    color: 'var(--gold)',
+    svg: '<path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/>'
   }
 };
 
 function groupIcon(key) {
   const icon = GROUP_ICONS[key];
   if (!icon) return '';
-  return `<span class="sidebar-group-icon" style="background:${icon.color}">` +
+  return `<span class="fact-card-icon" style="background:${icon.color}">` +
     '<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" ' +
     'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
     icon.svg + '</svg></span>';
@@ -70,7 +77,7 @@ const LABELS = {
     // Group headings. Deliberately not the same word as any fact inside them:
     // the schedule group holds a fact already labelled "מועד", and a heading
     // repeating it would read as the same row twice.
-    gParticipants: 'למי זה מתאים', gSchedule: 'לוח זמנים', gPractical: 'פרטים',
+    gParticipants: 'למי זה מתאים', gSchedule: 'לוח זמנים', gPractical: 'פרטים', gCredits: 'צוות וחסות',
     indexTitle: 'הפעילויות שלנו', indexLead: 'מה אפשר למצוא במרכז עוגן',
     indexEmpty: 'בקרוב נפרסם כאן את הפעילויות.', more: 'לפרטים'
   },
@@ -82,7 +89,7 @@ const LABELS = {
     whatToBring: 'What to bring', faq: 'Frequently asked questions',
     ages: 'Ages', schedule: 'When', duration: 'Duration', location: 'Location', address: 'Address',
     groupSize: 'Group size', price: 'Price',
-    gParticipants: 'Who it is for', gSchedule: 'Schedule', gPractical: 'Details',
+    gParticipants: 'Who it is for', gSchedule: 'Schedule', gPractical: 'Details', gCredits: 'Staff &amp; sponsors',
     indexTitle: 'Our activities', indexLead: 'What you can find at Ogen Center',
     indexEmpty: 'Activities will be published here soon.', more: 'Details'
   },
@@ -94,7 +101,7 @@ const LABELS = {
     whatToBring: 'Что взять с собой', faq: 'Частые вопросы',
     ages: 'Возраст', schedule: 'Когда', duration: 'Продолжительность', location: 'Место', address: 'Адрес',
     groupSize: 'Размер группы', price: 'Цена',
-    gParticipants: 'Для кого', gSchedule: 'Расписание', gPractical: 'Подробности',
+    gParticipants: 'Для кого', gSchedule: 'Расписание', gPractical: 'Подробности', gCredits: 'Педагоги и партнёры',
     indexTitle: 'Наши занятия', indexLead: 'Что можно найти в центре Оген',
     indexEmpty: 'Занятия скоро появятся здесь.', more: 'Подробнее'
   }
@@ -306,50 +313,60 @@ ${faqItems}
       .filter((s) => s && has(s.name, lang))
       .map((s) => (s.logo ? { name: pick(s.name, lang), logo: s.logo } : { name: pick(s.name, lang) }))
   };
-  const creditsBlock =
-    credits.teachers.length || credits.sponsors.length
-      ? `
-      <div class="credit-block" data-credits></div>
-      <script type="application/json" id="activity-credits">
-${JSON.stringify(credits, null, 2)}
-      </script>
-`
-      : '';
-
   // Facts are structured values now, turned into a sentence per language by
   // _activity-facts.js. Program length, language of instruction and
   // prerequisites used to be their own sections in the main column; they are
   // facts to scan, so they live here. data-fact-visibility is written out for
   // every row but nothing acts on it yet — see isPubliclyVisible() for the one
   // place that changes when registration ships.
-  // Grouped blocks, not label/value rows. Each group is an icon, a heading and
-  // a stack of facts, so nothing is pushed to an edge and nothing has to be told
-  // which edge is which. The old .sidebar-row put the label at the start and the
-  // value at the end with text-align:end, which is the shape that kept coming
-  // out wrong in Hebrew.
   //
-  // The heading is an h2 inside an <aside>: these are section labels, and giving
-  // them real headings makes the facts box navigable rather than a run of spans.
-  const factGroups = sidebarGroups(activity, lang)
-    .map((group) => {
-      const items = group.facts
-        .map(
-          (row) =>
-            `          <li data-fact="${row.key}" data-fact-visibility="${row.visibility}">` +
-            `<strong>${LABELS[lang][row.key]}</strong><span>${esc(row.value)}</span></li>`
-        )
-        .join('\n');
-      return `      <div class="sidebar-group" data-group="${group.key}">
-        ${groupIcon(group.key)}
-        <div class="sidebar-group-body">
-          <h2>${LABELS[lang]['g' + group.key.charAt(0).toUpperCase() + group.key.slice(1)]}</h2>
-          <ul class="sidebar-facts">
-${items}
-          </ul>
-        </div>
+  // Each group is a card: an icon, a heading and a stack of facts. Nothing is
+  // pushed to an edge and nothing has to be told which edge is which. The old
+  // .sidebar-row put the label at the start and the value at the end with
+  // text-align:end, which is the shape that kept coming out wrong in Hebrew.
+  //
+  // The heading is an h2: these are section labels, and giving them real
+  // headings makes the facts navigable rather than a run of spans.
+  const factCard = (key, heading, inner) =>
+    `      <div class="fact-card" data-group="${key}">
+        <div class="fact-card-head">${groupIcon(key)}<h2>${heading}</h2></div>
+${inner}
       </div>`;
-    })
-    .join('\n');
+
+  const cards = {};
+  sidebarGroups(activity, lang).forEach((group) => {
+    const items = group.facts
+      .map(
+        (row) =>
+          `            <li data-fact="${row.key}" data-fact-visibility="${row.visibility}">` +
+          `<strong>${LABELS[lang][row.key]}</strong><span>${esc(row.value)}</span></li>`
+      )
+      .join('\n');
+    const heading = LABELS[lang]['g' + group.key.charAt(0).toUpperCase() + group.key.slice(1)];
+    cards[group.key] = factCard(group.key, heading,
+      `        <ul class="sidebar-facts">\n${items}\n        </ul>`);
+  });
+
+  // Teachers and sponsors are a card in the same set, and the only one whose
+  // contents are still drawn by js/activity.js from the JSON block below. The
+  // SHELL is rendered here, and only when there is something to put in it, so
+  // an activity with neither gets no card rather than an empty gold heading.
+  const creditsCard =
+    credits.teachers.length || credits.sponsors.length
+      ? factCard('credits', L.gCredits,
+          `        <div class="credit-block" data-credits></div>
+        <script type="application/json" id="activity-credits">
+${JSON.stringify(credits, null, 2)}
+        </script>`)
+      : '';
+
+  // Two placements. The two cards a reader scans first run across the full
+  // measure above the article; the rest sit in a column beside it. A group with
+  // no facts is already dropped by sidebarGroups, so an activity that has filled
+  // in neither of the top two gets no row at all rather than an empty one.
+  const topCards = [cards.participants, cards.schedule].filter(Boolean).join('\n');
+  const factRow = topCards ? `    <div class="fact-row">\n${topCards}\n    </div>\n` : '';
+  const asideCards = [creditsCard, cards.practical].filter(Boolean).join('\n');
 
   // The activity's own picture, at the head of the aside column with the facts
   // panel beneath it — two stacked cards rather than one. It is the same square
@@ -406,28 +423,31 @@ ${GENERATED_NOTE(`activities/${slug}.json`)}
 </div>
 
 <article class="activity" data-status="${status}"${ctaAttr}>
-  <div class="activity-layout">
-    <!-- The facts sidebar comes FIRST in the source on purpose. It belongs at
-         the leading edge of the reading direction — the right in Hebrew, the
-         left in English and Russian — and a flex row already places its first
-         item there, per direction, with no per-language rule. Doing it with
-         source order rather than the CSS order property also keeps visual, DOM and
-         keyboard order identical, so the registration button is not reached
-         last by a screen reader while appearing first on screen. -->
-    <div class="activity-aside">
-${cardImageBlock}      <aside class="activity-sidebar">
-${factGroups}
-        <div data-status-cta></div>
-      </aside>
-    </div>
+  <!-- Source order IS the order this reads in on a phone: picture, the two
+       cards a reader scans first, the article, then the rest. One CSS grid
+       holds all four, and above 939px it only renames the areas — the article
+       takes a column and the picture moves to the head of the one beside it.
 
-    <div class="activity-main">
+       The picture is the single thing whose visual position differs from its
+       place in the source, and it is allowed to because it is decorative:
+       aria-hidden with an empty alt, so it is in neither the accessibility tree
+       nor the tab order. Nothing readable moves. Everything else here is placed
+       by source order alone, which is what keeps visual, DOM and keyboard order
+       identical — and it is why the side column sits at the TRAILING edge (left
+       in Hebrew, right in English and Russian): the article comes first. -->
+  <div class="activity-body">
+${cardImageBlock}${factRow}    <div class="activity-main">
       <h2>${L.about}</h2>
 ${richText(pick(activity.about, lang))}
 ${optionalBlock(
     L.whatToBring,
     pick(activity.whatToBring, lang)
-  )}${faqBlock}${creditsBlock}    </div>
+  )}${faqBlock}    </div>
+
+    <div class="activity-aside">
+${asideCards}
+      <div data-status-cta></div>
+    </div>
   </div>
 </article>
 

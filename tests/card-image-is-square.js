@@ -154,8 +154,16 @@ const withPic = Object.assign(activity(), { cardImage: '/images/activities/purim
 const page = renderActivityPage(withPic, 'he');
 H.ok(page.indexOf('/images/activities/purim-card-abc12345.jpg') !== -1, 'the picture is in the page');
 H.ok(/class="activity-card-image"/.test(page), 'in its own card above the facts panel');
-H.ok(page.indexOf('activity-card-image') < page.indexOf('activity-sidebar'),
-  'ABOVE it, not below — the picture leads the column');
+// It comes first in the whole body now, not just the column: that is what puts
+// it under the hero on a phone. On a desktop the grid moves it to the head of
+// the side column, which it may because it is decorative.
+// Compared against the ARTICLE, not the fact row: this fixture has no facts, so
+// it renders no row, and a fixture-dependent assertion would pass or fail on
+// something unrelated to the picture.
+H.ok(page.indexOf('activity-card-image') < page.indexOf('activity-main'),
+  'FIRST in the body, so it leads the page when the layout is a single column');
+H.ok(/grid-area:pic/.test(fs.readFileSync(path.join(R, 'shared.css'), 'utf8')),
+  'and the grid places it into the side column when there are two');
 H.ok(/alt=""/.test(page), 'with an empty alt: the h1 above already names the activity');
 
 // An activity with no picture must not render an empty frame.
