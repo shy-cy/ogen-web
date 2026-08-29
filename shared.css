@@ -451,14 +451,17 @@ html[lang="he"] .credit-group-label{ text-transform:none; letter-spacing:0; font
      So the ratio is left alone and the WIDTH is capped instead. On a phone the
      column is narrower than the cap and the picture is simply full width; from
      about 430px up it holds at 360px, near the 320px it occupies on a desktop.
-     margin-inline-end keeps it at the leading edge in all three languages with
-     no per-language rule.
+     Centred rather than pinned to the leading edge: once it stops filling the
+     column it reads as a plate in the middle of the page rather than a card
+     that lost its second column. margin-inline:auto is symmetric, so there is
+     nothing directional to get wrong and no per-language rule; below the cap the
+     picture fills the column and the auto margins simply have nothing to do.
 
      aspect-ratio is NOT restated here on purpose. It is inherited from the base
      rule above, together with the height:auto that makes it work — restating one
      without the other is exactly how height="800" wins and the picture renders
      800px tall. */
-  .activity-card-image{ max-width:360px; margin-inline-end:auto; }
+  .activity-card-image{ max-width:360px; margin-inline:auto; }
 }
 @media (max-width:780px){
   .page-header h1{ font-size:28px; }

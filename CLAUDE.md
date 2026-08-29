@@ -172,7 +172,8 @@ titled, so letterboxing cut the title off the top of every card image on every
 phone and tablet. The stacked layout caps `max-width` on the *figure* instead
 and never touches the image rule, so `height:auto` and `aspect-ratio:1/1` both
 survive. Below the cap the picture is simply full width;
-`margin-inline-end:auto` keeps it at the leading edge in all three languages.
+`margin-inline:auto` centres it once it stops filling the column — symmetric,
+so there is nothing directional to get wrong in any of the three languages.
 
 That pairing is the trap. `height="800"` on the `<img>` is a presentational
 hint, so **`height:auto` and `aspect-ratio` have to travel together** — restate

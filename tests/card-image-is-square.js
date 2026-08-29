@@ -222,8 +222,8 @@ H.ok(/\.activity-card-image\{[^}]*max-width:\d+px/.test(stackedBlock),
   'the stacked layout caps the width');
 H.ok(!/\.activity-card-image img\{/.test(stackedBlock),
   'and does not touch the image rule at all, so height:auto and the ratio both survive');
-H.ok(/margin-inline-end:auto/.test(stackedBlock),
-  'it sits at the leading edge via a logical property, so it flips per language with no override');
+H.ok(/margin-inline:auto/.test(stackedBlock),
+  'it is centred, with a symmetric logical property — nothing directional to get wrong');
 H.ok(!/margin-right:auto|margin-left:auto/.test(stackedBlock),
   'and not with a physical one');
 
