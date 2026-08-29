@@ -234,7 +234,8 @@ netlify/functions/
   _session-store.js      ogen-admin-sessions, authenticate() + permission helpers
   _roles.js              built-in roles in code; custom roles in ogen-admin-roles
   _audit.js              ogen-admin-audit, best-effort, never blocks an action
-  _github.js             commitToBranch() — git-data API, atomic, supports deletes
+  _github.js             commitToBranch() — git-data API, atomic, supports deletes,
+                         batched to stay well inside the 10s function limit
   _activity-template.js  renderActivityPage(activity, lang) — PURE
   _activity-index.js     listing pages, activities-index.json, sitemap.xml
   activities-admin.js    /api/activities-admin
@@ -305,7 +306,19 @@ flattens an animated GIF, never rasterises an SVG, and honours EXIF orientation
 so a phone photo isn't drawn sideways. Publishing also deletes images the
 record has stopped pointing at, since changing format changes the filename.
 
-**7. Client-side permission checks are cosmetic.** The server re-checks
+**7. A publish is a handful of requests, not one per file.** Netlify kills a
+function at ten seconds and a publish was taking eight, because it asked GitHub
+for everything in sequence. Text files now carry their content **inline in the
+tree** (`{path, mode, type, content}`), so pages, records, listing pages and the
+sitemap cost no request of their own — verified byte-identical, Hebrew included.
+Only base64 images go through `/git/blobs`, concurrently, capped at
+`CONCURRENCY` because bursts are what GitHub's secondary rate limits punish.
+`/branches/<name>` gives the head commit and its tree together. Net effect: a
+publish is ~4 requests plus one per image, and adding content adds none.
+`allPublished()` reads its records together for the same reason. Don't
+reintroduce a per-file `await` in a loop here.
+
+**8. Client-side permission checks are cosmetic.** The server re-checks
 `canAccess` / `canPublish` / `canEditLang` on every action and assumes the client
 is hostile. A role that may only edit Russian gets its Hebrew and English edits
 discarded server-side, and cannot add, remove or reorder items at all.

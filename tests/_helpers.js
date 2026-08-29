@@ -75,9 +75,25 @@ function makeGithub(seedFiles) {
     _commits: commits,
     _failNextCommit(err) { failNextCommit = err; },
     config: () => ({ token: 'test', repo: 'shy-cy/ogen-web', branch: 'main' }),
+    CONCURRENCY: 6,
+    // Same contract as the real one: bounded parallelism, results in input
+    // order. Kept faithful so a handler that relies on the ordering is tested
+    // against the ordering it will actually get.
+    async mapConcurrent(items, limit, fn) {
+      const out = new Array(items.length);
+      let next = 0;
+      await Promise.all(new Array(Math.min(limit, items.length)).fill(null).map(async () => {
+        for (;;) {
+          const i = next++;
+          if (i >= items.length) return;
+          out[i] = await fn(items[i], i);
+        }
+      }));
+      return out;
+    },
+    async getHead() { return { commitSha: 'testsha', treeSha: 'testtree' }; },
     async readFile(p) { return files.has(p) ? files.get(p) : null; },
     async readJson(p) { return files.has(p) ? JSON.parse(files.get(p)) : null; },
-    async getRef() { return 'testsha'; },
     async commitToBranch({ files: toWrite = [], deletes = [], message }) {
       if (failNextCommit) {
         const err = failNextCommit; failNextCommit = null;

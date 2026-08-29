@@ -36,8 +36,9 @@ function fakeGithub(existing) {
       text: async () => JSON.stringify(obj)
     });
 
-    if (route === '/git/ref/heads/main') return reply(200, { object: { sha: 'basecommit' } });
-    if (route === '/git/commits/basecommit') return reply(200, { tree: { sha: 'basetree' } });
+    if (route === '/branches/main') {
+      return reply(200, { commit: { sha: 'basecommit', commit: { tree: { sha: 'basetree' } } } });
+    }
     if (route === '/git/trees/basetree?recursive=1') {
       return reply(200, {
         truncated: false,
@@ -160,8 +161,9 @@ const nulls = (calls) => ((treeBody(calls) || {}).tree || []).filter((e) => e.sh
       const reply = (status, obj, raw) => ({
         ok: status < 400, status, text: async () => (raw !== undefined ? raw : JSON.stringify(obj))
       });
-      if (route === '/git/ref/heads/main') return reply(200, { object: { sha: 'basecommit' } });
-      if (route === '/git/commits/basecommit') return reply(200, { tree: { sha: 'basetree' } });
+      if (route === '/branches/main') {
+        return reply(200, { commit: { sha: 'basecommit', commit: { tree: { sha: 'basetree' } } } });
+      }
       if (route === '/git/trees/basetree?recursive=1') return reply(200, { truncated: true, tree: [] });
       if (route.indexOf('/contents/') === 0) {
         perPath++;

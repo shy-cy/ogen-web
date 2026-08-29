@@ -7,8 +7,42 @@
 // reason (supported to 100MB).
 //
 // Every publish is ONE commit: all files land, or none do.
+//
+// It is also as few round trips as it can be. Netlify kills a function at ten
+// seconds, and this used to spend that budget on a queue of sequential requests
+// — one POST per file to create its blob, plus two calls just to find the head
+// of the branch. A publish with four images took eight seconds, and every extra
+// teacher or sponsor pushed it closer to the edge. Three changes fixed it:
+//
+//   - text files carry their content INLINE in the tree, so they cost no
+//     request at all (verified byte-identical, Hebrew included);
+//   - the images that genuinely need a blob upload go up concurrently;
+//   - one call to /branches/<name> yields both the commit and its tree.
+//
+// The result grows flat in text — an activity with fifty FAQ entries costs the
+// same as one with none — and only sub-linearly in pictures.
 
 const API = 'https://api.github.com';
+
+// Parallel requests per publish. Kept modest on purpose: GitHub's secondary
+// rate limits punish bursts, and beyond a handful the wall-clock gain is small
+// next to the risk of being throttled mid-commit.
+const CONCURRENCY = 6;
+
+// Promise.all with a ceiling. Order of results matches order of input.
+async function mapConcurrent(items, limit, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  const runners = new Array(Math.min(limit, items.length)).fill(null).map(async () => {
+    for (;;) {
+      const i = next++;
+      if (i >= items.length) return;
+      out[i] = await fn(items[i], i);
+    }
+  });
+  await Promise.all(runners);
+  return out;
+}
 
 function config() {
   const token = process.env.GITHUB_TOKEN;
@@ -67,11 +101,15 @@ async function readJson(path, ref) {
   }
 }
 
-async function getRef() {
+// The branch endpoint carries the head commit AND its tree. This replaced a
+// getRef() that read /git/ref/heads/<branch> for the commit sha, followed by a
+// second call to /git/commits/<sha> for its tree — two round trips to learn one
+// pair of facts.
+async function getHead() {
   const cfg = config();
-  const ref = await gh(`/git/ref/heads/${cfg.branch}`);
-  if (ref.notFound) throw new Error(`Branch ${cfg.branch} not found`);
-  return ref.object.sha;
+  const br = await gh(`/branches/${encodeURIComponent(cfg.branch)}`);
+  if (br.notFound) throw new Error(`Branch ${cfg.branch} not found`);
+  return { commitSha: br.commit.sha, treeSha: br.commit.commit.tree.sha };
 }
 
 // Which of `paths` actually exist in a tree.
@@ -111,9 +149,7 @@ async function commitToBranch({ files = [], deletes = [], message, authorName, a
   const cfg = config();
   if (!files.length && !deletes.length) throw new Error('Nothing to commit');
 
-  const baseSha = await getRef();
-  const baseCommit = await gh(`/git/commits/${baseSha}`);
-  const baseTree = baseCommit.tree.sha;
+  const { commitSha: baseSha, treeSha: baseTree } = await getHead();
 
   const removals = await presentIn(baseTree, deletes);
   // Everything asked for was already gone and there is nothing to write, so the
@@ -124,16 +160,26 @@ async function commitToBranch({ files = [], deletes = [], message, authorName, a
   }
 
   const tree = [];
-  for (const f of files) {
+
+  // A tree entry may carry its content directly, and GitHub writes the blob
+  // itself. Every HTML page, JSON record and sitemap therefore costs nothing
+  // beyond the tree request it is already part of. Only base64 needs the blobs
+  // endpoint, because inline content is UTF-8 text.
+  files
+    .filter((f) => f.encoding !== 'base64')
+    .forEach((f) => {
+      tree.push({ path: f.path, mode: '100644', type: 'blob', content: String(f.content) });
+    });
+
+  const binaries = files.filter((f) => f.encoding === 'base64');
+  const uploaded = await mapConcurrent(binaries, CONCURRENCY, async (f) => {
     const blob = await gh('/git/blobs', {
       method: 'POST',
-      body: {
-        content: f.encoding === 'base64' ? f.content : String(f.content),
-        encoding: f.encoding === 'base64' ? 'base64' : 'utf-8'
-      }
+      body: { content: f.content, encoding: 'base64' }
     });
-    tree.push({ path: f.path, mode: '100644', type: 'blob', sha: blob.sha });
-  }
+    return { path: f.path, mode: '100644', type: 'blob', sha: blob.sha };
+  });
+  tree.push(...uploaded);
   // A null sha removes the path from the new tree — this is how unpublish and
   // delete actually take a page off the site.
   for (const path of removals) {
@@ -175,4 +221,5 @@ async function openPullRequest({ title, head, base, body }) {
   return gh('/pulls', { method: 'POST', body: { title, head, base, body } });
 }
 
-module.exports = { config, gh, readFile, readJson, getRef, commitToBranch, openPullRequest };
+module.exports = { config, gh, readFile, readJson, getHead, mapConcurrent,
+                   CONCURRENCY, commitToBranch, openPullRequest };

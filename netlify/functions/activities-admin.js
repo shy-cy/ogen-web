@@ -23,7 +23,7 @@
 
 const { authenticate, canAccess, canPublish, editLangs, canEditLang } = require('./_session-store');
 const { requireStore, optionalStore } = require('./_blobs');
-const { readJson, commitToBranch } = require('./_github');
+const { readJson, commitToBranch, mapConcurrent, CONCURRENCY } = require('./_github');
 const { recordAudit } = require('./_audit');
 const {
   LANGS, STATUSES, MOTIFS, CORNERS, langsPresent, pick,
@@ -154,12 +154,11 @@ const getPublished = async (slug) => {
 // files (listing pages, sitemap) are rebuilt from the complete set on each save.
 async function allPublished() {
   const index = (await readJson('activities/activities-index.json')) || [];
-  const out = [];
-  for (const entry of index) {
-    const rec = await getPublished(entry.slug);
-    if (rec) out.push(rec);
-  }
-  return out;
+  // Together, not one after another. Every save rebuilds the derived files from
+  // the complete set, so this runs on every preview and every publish, and read
+  // number twenty used to be waiting on read number nineteen for no reason.
+  const records = await mapConcurrent(index, CONCURRENCY, (entry) => getPublished(entry.slug));
+  return records.filter(Boolean);
 }
 
 // The working copy: a draft supersedes the published file, because it is the
