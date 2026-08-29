@@ -44,14 +44,31 @@
     <a href="/ru">Главная</a><span class="sep">&#8594;</span><a href="/ru/activities">Занятия</a><span class="sep">&#8594;</span>Иврит для детей
   </nav>
   <h1>Иврит для детей</h1>
+  <p data-status-badge></p>
 </div>
 
 <article class="activity" data-status="open" data-cta-url="/ru/#contact">
   <div class="activity-layout">
-    <div class="activity-main">
-      <div class="activity-hero-img" role="img" aria-label="Дети изучают иврит в центре Оген"></div>
-      <p data-status-badge></p>
+    <!-- The facts sidebar comes FIRST in the source on purpose. It belongs at
+         the leading edge of the reading direction — the right in Hebrew, the
+         left in English and Russian — and a flex row already places its first
+         item there, per direction, with no per-language rule. Doing it with
+         source order rather than the CSS order property also keeps visual, DOM and
+         keyboard order identical, so the registration button is not reached
+         last by a screen reader while appearing first on screen. -->
+    <aside class="activity-sidebar">
+      <div class="sidebar-row" data-fact="ages" data-fact-visibility="public"><span class="label">Возраст</span><span class="value">6-10</span></div>
+      <div class="sidebar-row" data-fact="schedule" data-fact-visibility="public"><span class="label">Когда</span><span class="value">По вторникам, 16:30</span></div>
+      <div class="sidebar-row" data-fact="duration" data-fact-visibility="public"><span class="label">Продолжительность</span><span class="value">Сентябрь 2026 - июнь 2027, с перерывом на зимние каникулы.</span></div>
+      <div class="sidebar-row" data-fact="groupSize" data-fact-visibility="public"><span class="label">Размер группы</span><span class="value">До 10 детей</span></div>
+      <div class="sidebar-row" data-fact="instructionLanguage" data-fact-visibility="public"><span class="label">Язык преподавания</span><span class="value">Иврит, с пояснениями на английском при необходимости.</span></div>
+      <div class="sidebar-row" data-fact="prerequisites" data-fact-visibility="public"><span class="label">Требования к уровню</span><span class="value">Подходит для начинающих - предварительные знания иврита не нужны.</span></div>
+      <div class="sidebar-row" data-fact="location" data-fact-visibility="members"><span class="label">Место</span><span class="value">Никосия</span></div>
+      <div class="sidebar-row" data-fact="price" data-fact-visibility="public"><span class="label">Цена</span><span class="value">€120 за сезон</span></div>
+      <div data-status-cta></div>
+    </aside>
 
+    <div class="activity-main">
       <h2>О занятиях</h2>
       <p>Еженедельные занятия по официальной программе Всемирной сионистской организации. Дети изучают иврит через игру, песни и творчество в небольших группах, сформированных по возрасту.</p>
 
@@ -90,18 +107,6 @@
 }
       </script>
     </div>
-
-    <aside class="activity-sidebar">
-      <div class="sidebar-row" data-fact="ages" data-fact-visibility="public"><span class="label">Возраст</span><span class="value">6-10</span></div>
-      <div class="sidebar-row" data-fact="schedule" data-fact-visibility="public"><span class="label">Когда</span><span class="value">По вторникам, 16:30</span></div>
-      <div class="sidebar-row" data-fact="duration" data-fact-visibility="public"><span class="label">Продолжительность</span><span class="value">Сентябрь 2026 - июнь 2027, с перерывом на зимние каникулы.</span></div>
-      <div class="sidebar-row" data-fact="groupSize" data-fact-visibility="public"><span class="label">Размер группы</span><span class="value">До 10 детей</span></div>
-      <div class="sidebar-row" data-fact="instructionLanguage" data-fact-visibility="public"><span class="label">Язык преподавания</span><span class="value">Иврит, с пояснениями на английском при необходимости.</span></div>
-      <div class="sidebar-row" data-fact="prerequisites" data-fact-visibility="public"><span class="label">Требования к уровню</span><span class="value">Подходит для начинающих - предварительные знания иврита не нужны.</span></div>
-      <div class="sidebar-row" data-fact="location" data-fact-visibility="members"><span class="label">Место</span><span class="value">Никосия</span></div>
-      <div class="sidebar-row" data-fact="price" data-fact-visibility="public"><span class="label">Цена</span><span class="value">€120 за сезон</span></div>
-      <div data-status-cta></div>
-    </aside>
   </div>
 </article>
 

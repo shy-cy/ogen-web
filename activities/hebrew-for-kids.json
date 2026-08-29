@@ -8,12 +8,11 @@
   },
   "motif": "leaf",
   "corner": "tl",
-  "heroImage": null,
   "isoCreated": "2026-08-27T09:00:00.000Z",
-  "isoUpdated": "2026-08-29T09:55:13.389Z",
+  "isoUpdated": "2026-08-29T10:12:34.213Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
-  "lastPublishedAt": "2026-08-29T09:55:13.389Z",
+  "lastPublishedAt": "2026-08-29T10:12:34.213Z",
   "title": {
     "he": "חוג עברית לילדים",
     "en": "Children's Hebrew Class",
@@ -33,11 +32,6 @@
     "he": "חוג שבועי לילדים, בקבוצות קטנות לפי גיל.",
     "en": "A weekly class for children, in small groups by age.",
     "ru": "Еженедельные занятия для детей в небольших группах по возрасту."
-  },
-  "heroAlt": {
-    "he": "ילדים לומדים עברית במרכז עוגן",
-    "en": "Children learning Hebrew at Ogen Center",
-    "ru": "Дети изучают иврит в центре Оген"
   },
   "about": {
     "he": "חוג שבועי המבוסס על תוכנית הלימודים הרשמית של ההסתדרות הציונית. הילדים לומדים עברית דרך משחק, שירה ויצירה, בקבוצות קטנות ומותאמות גיל.",
