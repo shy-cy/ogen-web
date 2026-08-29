@@ -35,7 +35,7 @@ Three parallel language trees. Hebrew is the default and lives at the root.
 | `/ru/confirmation` | `ru/confirmation.html` | `ru` | `ltr` |
 | any unknown path | `404.html` | set by JS from URL | set by JS |
 
-`hebrew-for-kids` is currently the only activity slug. Activity pages and the
+`hebrew4kids` is currently the only activity slug. Activity pages and the
 listing pages are **generated** — see the Admin backend section. `/admin/` is
 the CMS; it is noindex and excluded in robots.txt.
 

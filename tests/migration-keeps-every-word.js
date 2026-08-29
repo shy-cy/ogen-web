@@ -30,21 +30,29 @@ const F = require('../netlify/functions/_activity-facts');
 const legacyFixture = (slug) =>
   JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'legacy-' + slug + '.json'), 'utf8'));
 
-// The records as they stand in the repo today.
-const live = (slug) =>
-  JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'activities', slug + '.json'), 'utf8'));
+// The records as they stand in the repo today — DISCOVERED, not listed by name.
+// Naming them meant the suite depended on particular activities existing, and it
+// broke the day hebrew-for-kids was deleted. Deleting an activity is a normal
+// admin action; what is being asserted here is a property of whatever records
+// there are, so it should ask the directory. An empty list is fine — the legacy
+// fixtures below carry the interesting cases regardless.
+const ACTIVITIES = path.join(__dirname, '..', 'activities');
+const liveSlugs = fs.readdirSync(ACTIVITIES)
+  .filter((f) => f.endsWith('.json') && f !== 'activities-index.json')
+  .map((f) => f.slice(0, -'.json'.length));
+const live = (slug) => JSON.parse(fs.readFileSync(path.join(ACTIVITIES, slug + '.json'), 'utf8'));
 
 console.log('\n[migrating is safe to run twice]');
 // It runs on every read, so it will be applied to already-migrated records
 // constantly. If it were not idempotent it would corrode the data over time.
-['hebrew-for-kids', 'hebrew4kids'].forEach((slug) => {
-  [['the legacy', legacyFixture], ['the live', live]].forEach(([what, load]) => {
-    const once = migrate(load(slug));
-    const twice = migrate(once);
-    H.eq(JSON.stringify(twice), JSON.stringify(once),
-         what + ' ' + slug + ' record is unchanged by a second migration');
-  });
-});
+const twiceIsTheSame = (what, slug, record) => {
+  const once = migrate(record);
+  H.eq(JSON.stringify(migrate(once)), JSON.stringify(once),
+       what + ' ' + slug + ' record is unchanged by a second migration');
+};
+['hebrew-for-kids', 'hebrew4kids'].forEach((slug) => twiceIsTheSame('the legacy', slug, legacyFixture(slug)));
+liveSlugs.forEach((slug) => twiceIsTheSame('the live', slug, live(slug)));
+console.log('      (live records checked: ' + (liveSlugs.join(', ') || 'none') + ')');
 
 console.log('\n[nothing an admin typed is lost]');
 const legacy = legacyFixture('hebrew4kids');

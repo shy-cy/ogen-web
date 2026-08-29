@@ -153,11 +153,19 @@ function ruReviewerSession() {
   });
 }
 
-// Seed the fake repo with the real committed activity, so tests run against
-// the actual record shape rather than a hand-made fixture.
+// Seed the fake repo with a real published activity, so tests run against the
+// actual record shape rather than a hand-made one.
+//
+// It is PINNED in tests/fixtures/, not read from activities/. It used to be
+// read live, which meant the whole suite depended on a particular activity
+// still existing — and six suites broke the day hebrew-for-kids was deleted,
+// which is a normal thing for an admin to do and must not be able to break the
+// tests. The fixture is that record as it was last published (commit 973084f):
+// still real data, just no longer a moving target. Re-pin it from a current
+// record if the shape changes.
 function seedRepo() {
   const record = JSON.parse(
-    fs.readFileSync(path.join(__dirname, '..', 'activities', 'hebrew-for-kids.json'), 'utf8')
+    fs.readFileSync(path.join(__dirname, 'fixtures', 'activity-record.json'), 'utf8')
   );
   return {
     record,
