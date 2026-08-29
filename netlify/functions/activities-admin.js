@@ -320,6 +320,11 @@ function extractImages(activity) {
 // "hebrew" would match "hebrew-for-kids-hero.png" and take another activity's
 // pictures down with it. The record already knows precisely which files are
 // its own, so it is asked.
+// Pictures this record has STOPPED pointing at but has not deleted yet. See the
+// deferred deletion in generate() for why they linger for one publish.
+const retiredOf = (activity) =>
+  ((activity && activity.retiredImages) || []).filter((p) => typeof p === 'string' && p);
+
 function imagePathsOf(activity) {
   const out = [];
   const take = (value) => {
@@ -486,6 +491,29 @@ async function generate(input, { commit, session, message, previous }) {
   const activity = validate(JSON.parse(JSON.stringify(input)));
   const { files: imageFiles, map: imageMap } = extractImages(activity);
 
+  // --- deferred image deletion ---------------------------------------------
+  // A picture is NOT deleted in the same commit that stops referencing it. It is
+  // recorded as retired, and removed one publish later.
+  //
+  // Deleting immediately opened a window that was worse than the orphan it
+  // avoided. A deploy does not reach every edge at the same instant, and a
+  // reader can be holding the previous HTML: for a minute after a replacement,
+  // a page still asking for the old file met a tree that no longer had it. That
+  // 404 was then served with /images/* long-cache headers and STUCK — the
+  // browser kept it and stopped asking, so the picture was broken there for
+  // good. It happened to a real teacher photo on this site.
+  //
+  // One publish of slack is enough: by the time a retired file is removed, the
+  // deploy that referenced it is two deploys old. The list is recomputed from
+  // scratch every publish, so it cannot grow, and a picture that comes back
+  // (the same bytes hash to the same name) is dropped from it rather than
+  // deleted. This must happen before the record is serialised below.
+  const keeping = imagePathsOf(activity);
+  const retiredNow = imagePathsOf(previous).filter((p) => keeping.indexOf(p) === -1);
+  const dueForDeletion = retiredOf(previous).filter((p) => keeping.indexOf(p) === -1);
+  if (retiredNow.length) activity.retiredImages = retiredNow;
+  else delete activity.retiredImages;
+
   const present = langsPresent(activity);
   const html = {};
   const files = [];
@@ -519,15 +547,11 @@ async function generate(input, { commit, session, message, previous }) {
   const deletes = LANGS.filter((l) => present.indexOf(l) === -1)
     .map((l) => filePathFor(activity.slug, l));
 
-  // So must pictures the record has stopped pointing at. Swapping a hero for
-  // one in a different format changes its filename — a PNG replaced by a JPEG
-  // is a new path — and the old file would otherwise sit in the repository for
-  // good, unreferenced and still served, the same way deleted activities used
-  // to leave their photos behind.
-  const keeping = imagePathsOf(activity);
-  imagePathsOf(previous).forEach((p) => {
-    if (keeping.indexOf(p) === -1 && deletes.indexOf(p) === -1) deletes.push(p);
-  });
+  // And pictures retired by the PREVIOUS publish, which nothing has referenced
+  // for a full deploy cycle. Without this they would sit in the repository for
+  // good, unreferenced and still served, the way deleted activities used to
+  // leave their photos behind.
+  dueForDeletion.forEach((p) => { if (deletes.indexOf(p) === -1) deletes.push(p); });
 
   const result = {
     slug: activity.slug,
@@ -721,7 +745,11 @@ exports.handler = async (event) => {
           // references them and nothing ever would; they were simply
           // unreachable-but-served. Unpublish is different and keeps them: the
           // draft still points at those paths and has to republish intact.
-          const images = imagePathsOf(published).concat(imagePathsOf(draft));
+          // Retired-but-not-yet-removed pictures go too. They are still in the
+          // repository and still served; nothing else will ever come back for
+          // them once the record is gone.
+          const images = imagePathsOf(published).concat(imagePathsOf(draft))
+            .concat(retiredOf(published)).concat(retiredOf(draft));
           const deletes = LANGS.map((l) => filePathFor(slug, l))
             .concat([`activities/${slug}.json`])
             .concat(images.filter((v, i) => images.indexOf(v) === i));

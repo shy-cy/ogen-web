@@ -116,7 +116,12 @@ const activity = (slug) => ({
   const after = pathsOf('swap');
   H.ok(/\.jpg$/.test(after[0]), 'the replacement is committed as a JPEG');
   H.ok(github._files.has(after[0]), 'and the new file is there');
-  H.ok(!github._files.has(before[0]), 'and the file it replaced is gone');
+  // Retired rather than removed: deleting it in this same commit is what used
+  // to hand a reader with the previous HTML a 404 that then stuck in their
+  // cache. It goes on the next publish.
+  H.ok(github._files.has(before[0]), 'the file it replaced survives one more publish');
+  const swapRec = JSON.parse(github._files.get('activities/swap.json'));
+  H.eq(JSON.stringify(swapRec.retiredImages), JSON.stringify([before[0]]), 'and is listed as retired');
   H.eq(after[1], before[1], 'the sponsor logo did not change, so its URL did not either');
   H.ok(github._files.has(before[1]), 'a picture that did not change is left alone');
 

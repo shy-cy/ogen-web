@@ -82,7 +82,12 @@ const activity = (photo, logo) => ({
   const second = photoOf();
   H.ok(second !== first, 'the URL changed with the bytes');
   H.ok(github._files.has(second.slice(1)), 'the new file is committed');
-  H.ok(!github._files.has(first.slice(1)), 'and the file it replaced is deleted, not orphaned');
+  // NOT deleted yet — see tests/a-replaced-image-outlives-its-deploy.js. It is
+  // retired now and removed on the next publish, so a reader still holding the
+  // previous HTML cannot meet a 404.
+  H.ok(github._files.has(first.slice(1)), 'the file it replaced survives this publish');
+  const retired = JSON.parse(github._files.get('activities/purim.json')).retiredImages || [];
+  H.eq(JSON.stringify(retired), JSON.stringify([first.slice(1)]), 'and the record says it is retired');
   H.eq(logoOf(), logoFirst, 'a sibling image that did not change keeps its URL');
   H.ok(github._files.has(logoFirst.slice(1)), 'and its file is left alone');
   base = res.body.baseUpdatedAt;
@@ -97,9 +102,22 @@ const activity = (photo, logo) => ({
     base = r.body.baseUpdatedAt;
   }
   const left = filesForSlug();
-  H.eq(left.length, 2, 'after eight uploads the repo holds two images, not eight: ' + left.join(', '));
-  H.ok(left.indexOf(photoOf().slice(1)) !== -1, 'the one the record points at is the one that is there');
+  // Three, not eight: the current photo, the sponsor logo, and exactly ONE
+  // retired file awaiting the next publish. The deferral costs one file, and
+  // that cost does not grow however many times a picture is replaced.
+  H.eq(left.length, 3, 'after eight uploads the repo holds three images, not eight: ' + left.join(', '));
+  H.ok(left.indexOf(photoOf().slice(1)) !== -1, 'the one the record points at is there');
   H.ok(left.indexOf(logoOf().slice(1)) !== -1, 'alongside the sponsor logo it never changed');
+  H.eq((JSON.parse(github._files.get('activities/purim.json')).retiredImages || []).length, 1,
+       'and exactly one picture is waiting to be removed');
+
+  // One more publish with no image change collects it.
+  const settle = await H.call(fn.handler, Object.assign(
+    { action: 'publish', activity: activity(png(8), png(9)), baseUpdatedAt: base }, auth));
+  H.eq(settle.status, 200, 'a quiet publish succeeds');
+  H.eq(filesForSlug().length, 2, 'and sweeps the retired file up, leaving two');
+  H.ok(!JSON.parse(github._files.get('activities/purim.json')).retiredImages,
+       'with nothing left retired');
 
   console.log('\n[and the header this exists to justify is still set]');
   const toml = fs.readFileSync(path.join(__dirname, '..', 'netlify.toml'), 'utf8');

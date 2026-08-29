@@ -449,6 +449,23 @@ replacement instead of only when the extension happened to change — which is
 what stops repeated replacements accumulating orphans. The same picture
 re-uploaded hashes the same, so an unchanged image never churns its URL.
 
+**A replaced picture is retired, not deleted** — removed one publish later,
+never in the commit that stops referencing it. Deleting immediately opened a
+window worse than the orphan it avoided: a deploy does not reach every edge at
+once, so for about a minute a reader holding the previous HTML asked for a file
+the new tree no longer had. That 404 was served with the `/images/*` long-cache
+header and **stuck** — the browser kept it, stopped asking, and the picture was
+broken there permanently until a hard reload. It happened to a real teacher
+photo. `retiredImages` on the record carries the list; it is recomputed every
+publish so it cannot grow, a picture that comes back is dropped from it rather
+than deleted, and deleting an activity takes its retired files too.
+
+That is also why **`/images/activities/*` is deliberately not `immutable`** in
+`netlify.toml` while the rest of `/images/*` still is. Netlify applies path
+headers to error responses, so a transient 404 under a long immutable cache
+becomes permanent. Uploads do not need `immutable` to cache well — the content
+hash means anything unchanged keeps its URL and revalidates to a 304.
+
 Existing un-hashed files are left alone: `take()` only runs for a `data:` URL,
 so a record that already holds a path keeps it, and nothing is renamed behind
 anyone's back. A file gets a hashed name the next time that picture is replaced.

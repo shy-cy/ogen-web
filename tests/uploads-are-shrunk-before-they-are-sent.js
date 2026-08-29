@@ -82,9 +82,14 @@ H.ok(/first frame/.test(IO.isPassThrough('image/gif', gif(3))), 'and says why');
 
 // The real GIF in the repo is a still, so it must NOT be treated as animated —
 // otherwise every static GIF would skip optimisation for no reason.
-const REAL_GIF = path.join(__dirname, '..', 'images', 'activities',
-                           'hebrew4kids-teachers-tea-mtd1nrnl-2.gif');
-if (fs.existsSync(REAL_GIF)) {
+// Found rather than named: uploaded filenames carry a content hash now, so a
+// hardcoded name stopped existing the first time that picture was replaced and
+// these two checks silently skipped instead of failing.
+const ACTIVITY_IMAGES = path.join(__dirname, '..', 'images', 'activities');
+const REAL_GIF = (fs.existsSync(ACTIVITY_IMAGES) ? fs.readdirSync(ACTIVITY_IMAGES) : [])
+  .filter((f) => f.endsWith('.gif'))
+  .map((f) => path.join(ACTIVITY_IMAGES, f))[0];
+if (REAL_GIF) {
   const bytes = new Uint8Array(fs.readFileSync(REAL_GIF));
   H.ok(!IO.isAnimatedGif(bytes), 'the still GIF committed in this repo is not read as animated');
   H.eq(IO.isPassThrough('image/gif', bytes), null, 'so it goes through the normal path');

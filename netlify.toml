@@ -19,10 +19,34 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
 
+# Hand-placed assets — logos, partner marks, the share card, the favicons. These
+# are committed by hand, never move, and never 404, so a year is honest.
 [[headers]]
   for = "/images/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+# Admin-managed uploads, and deliberately NOT immutable.
+#
+# Netlify applies these headers to error responses too, so a 404 under this path
+# was cached for a year and never revalidated. Files here legitimately appear and
+# disappear — a publish replaces one picture with another — and a reader who
+# asked for one during a deploy got a 404 that STUCK: the image stayed broken in
+# that browser for good, through any number of ordinary reloads, because it had
+# stopped asking. Only a hard reload cleared it. That happened to a real teacher
+# photo on this site.
+#
+# `immutable` is not needed to cache these well: the filenames carry a content
+# hash, so anything unchanged keeps its URL and revalidates to a cheap 304, and
+# anything changed arrives at a new URL anyway. The short max-age is what lets a
+# transient 404 expire instead of becoming permanent.
+#
+# This rule is more specific than the one above; that it actually wins is
+# verified against the deployed site, not assumed from the documentation.
+[[headers]]
+  for = "/images/activities/*"
+  [headers.values]
+    Cache-Control = "public, max-age=300, must-revalidate"
 
 # Friendly function routes. Must come BEFORE the catch-all 404 rule.
 [[redirects]]
