@@ -447,12 +447,26 @@ html[lang="he"] .fact-card-head h2{ text-transform:none; letter-spacing:0; font-
 /* A card wide enough lays its facts across instead of stacking them: a top-row
    card is ~500px, and one narrow column of text in it would leave most of the
    card empty. The card decides from ITS OWN width, not the viewport, so the same
-   component serves the full-width row and the 320px column with no variant. */
+   component serves the full-width row and the 320px column with no variant.
+
+   TWO columns, not auto-fit. auto-fit packs as many 140px tracks as fit, which
+   is three at ~500px — so four facts filled one row and left the fourth alone
+   beside two empty tracks, and three facts put the date range in a third of the
+   card where it could not hold one line. A fixed pair divides both counts:
+   four land two-by-two, and three flow so that Location sits under When and
+   Duration keeps half the card. One declaration, both problems. */
 @container (min-width:360px){
   .fact-card .sidebar-facts{
-    display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:14px 20px;
+    display:grid; grid-template-columns:repeat(2,1fr); gap:16px 24px;
   }
   .fact-card .sidebar-facts li{ margin-bottom:0; }
+  /* Except the price. Every other card holds facts a reader scans in any order,
+     so two columns is just better use of the width. The price is four numbers
+     that ADD UP — fee, per lesson, per semester, total — and in two columns the
+     total lands beside the semester price instead of under the two figures it
+     sums, which is the one thing that row exists to show. It is one column at
+     every width, and it is the only card that asks for anything. */
+  .fact-card[data-group="price"] .sidebar-facts{ grid-template-columns:1fr; gap:11px; }
 }
 .sidebar-facts{ list-style:none; margin:0; padding:0; }
 .sidebar-facts li{ margin-bottom:11px; }
@@ -463,6 +477,14 @@ html[lang="he"] .fact-card-head h2{ text-transform:none; letter-spacing:0; font-
    newline in it rather than markup — nothing in a fact is ever interpreted as
    HTML, and the sanitiser has one less place to matter. */
 .sidebar-facts span{ display:block; font-size:14px; font-weight:400; color: var(--ink); line-height:1.5; white-space:pre-line; }
+/* The qualifier on a price row — "(10 sessions × 2 lessons)". It is neither the
+   label nor the number, so it is neither bold nor full size: its own quiet
+   italic line between them, which keeps the row scannable as label-then-figure
+   in a column three other cards also read down. */
+.fact-note{
+  display:block; font-style:italic; font-size:12px; color: var(--camel);
+  line-height:1.35; margin-top:1px;
+}
 .sidebar-cta{
   display:block; width:100%; padding:14px; border-radius:999px; border:none;
   font-family:inherit; font-size:15.5px; font-weight:800; cursor:pointer; text-align:center;

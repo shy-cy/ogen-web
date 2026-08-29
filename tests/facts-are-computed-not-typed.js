@@ -78,43 +78,97 @@ H.eq(F.formatSchedule({ frequency: 'one-time', sessions: [{ day: 3, time: '16:30
 H.eq(F.formatSchedule({ frequency: 'twice-weekly', sessions: [{ day: 1, time: '17:00' }, { day: 3, time: '16:30' }] }, 'en'),
      'Mondays, 17:00 · Wednesdays, 16:30', 'twice weekly lists both days');
 
-// The date range takes its own line; how often and how long stay together.
-H.eq(text('duration', 'he'), 'ספטמבר 2026 – יוני 2027\n12 מפגשים · 90 דקות', 'duration in Hebrew');
-H.eq(text('duration', 'en'), 'September 2026 – June 2027\n12 sessions · 90 min', 'duration in English');
-H.eq(text('duration', 'ru'), 'сентябрь 2026 – июнь 2027\n12 занятий · 90 мин', 'duration in Russian');
+// The date range takes its own line; how often and how long stay together. The
+// two months are joined with a PLAIN HYPHEN — an en dash renders unpredictably
+// beside Hebrew numerals, and the age range has always used a hyphen anyway.
+H.eq(text('duration', 'he'), 'ספטמבר 2026 - יוני 2027\n12 מפגשים · 90 דקות', 'duration in Hebrew');
+H.eq(text('duration', 'en'), 'September 2026 - June 2027\n12 sessions · 90 min', 'duration in English');
+H.eq(text('duration', 'ru'), 'сентябрь 2026 - июнь 2027\n12 занятий · 90 мин', 'duration in Russian');
 H.eq(F.formatDuration({ sessionCount: 12, sessionMinutes: 90 }, 'en'), '12 sessions · 90 min',
      'with no dates there is no first line and no stray newline');
 H.eq(F.formatDuration({ sessionCount: 1 }, 'he'), 'מפגש אחד', 'one session is singular');
 H.eq(F.formatDuration({}, 'en'), '', 'an empty duration says nothing');
 
-// Four lines, one number each. They were a single ·-joined sentence, which made
+// NO EN OR EM DASH ANYWHERE IN A GENERATED FACT. This is the assertion, not the
+// three above it: those pin three strings, and a fourth formatter could
+// reintroduce one without any of them noticing. Facts are built here, so the
+// character can only enter here.
+F.FACT_ORDER.forEach((key) => {
+  ['he', 'en', 'ru'].forEach((lang) => {
+    const value = F.factText(ACT, key, lang);
+    H.ok(!/[\u2013\u2014]/.test(value), 'no dash in ' + key + '/' + lang + (value ? '' : ' (empty)'));
+  });
+});
+
+// FOUR ROWS, one number each. They were a single ·-joined sentence, which made
 // the registration fee and the course price read as one figure and hid that they
-// add up. Nothing here is typed: the fee and the full price are fields, per-lesson
-// is fullPrice ÷ academic hours, and the qualifier and the total are derived.
-H.eq(text('price', 'he'),
-  'דמי הרשמה – 50 €\nעלות לשיעור – 15 €\nעלות לסמסטר: 12 מפגשים של 2 שיעורים – 360 €\nסה״כ לסמסטר – 410 €',
-  'price in Hebrew, four lines');
+// add up. Rows rather than lines because the price is its own card now: a card
+// headed "Price" whose one fact is also labelled "Price" says it twice.
+//
+// Nothing here is typed: the fee and the full price are fields, per-lesson is
+// fullPrice ÷ academic hours, and the qualifier and the total are derived.
+const D12 = { sessionCount: 12, sessionMinutes: 90 };
+H.eq(JSON.stringify(F.priceRows(ACT.facts.price, 'he', D12)),
+  JSON.stringify([
+    { label: 'דמי הרשמה', note: '', value: '50 €' },
+    { label: 'עלות לשיעור', note: '', value: '15 €' },
+    { label: 'עלות לסמסטר', note: '(12 מפגשים × 2 שיעורים)', value: '360 €' },
+    { label: 'סה״כ לסמסטר', note: '', value: '410 €' }
+  ]), 'price in Hebrew, four rows');
+H.eq(JSON.stringify(F.priceRows(ACT.facts.price, 'en', D12)),
+  JSON.stringify([
+    { label: 'Registration fee', note: '', value: '50 €' },
+    { label: 'Cost per lesson', note: '', value: '15 €' },
+    { label: 'Cost per semester', note: '(12 sessions × 2 lessons)', value: '360 €' },
+    { label: 'Total for the semester', note: '', value: '410 €' }
+  ]), 'price in English');
+H.eq(JSON.stringify(F.priceRows(ACT.facts.price, 'ru', D12)),
+  JSON.stringify([
+    { label: 'Регистрационный взнос', note: '', value: '50 €' },
+    { label: 'Стоимость урока', note: '', value: '15 €' },
+    { label: 'Стоимость семестра', note: '(12 занятий × 2 урока)', value: '360 €' },
+    { label: 'Итого за семестр', note: '', value: '410 €' }
+  ]), 'price in Russian');
+
+// The qualifier is its OWN field, not glued onto the label. It renders as a
+// quiet italic line between the label and the number, so a label that carried it
+// would print the parenthesis in bold beside the heading.
+['he', 'en', 'ru'].forEach((lang) => {
+  const rows = F.priceRows(ACT.facts.price, lang, D12);
+  H.ok(rows.filter((r) => r.note).length === 1, lang + ': exactly one row carries a qualifier');
+  H.ok(!rows.some((r) => /[()×]/.test(r.label)), lang + ': and no label has it glued on');
+});
+
+// The string form is DERIVED from the rows, so a page and a caller with no room
+// for rows cannot disagree about the price.
 H.eq(text('price', 'en'),
-  'Registration fee – 50 €\nCost per lesson – 15 €\nCost per semester: 12 sessions of 2 lessons – 360 €\nTotal for the semester – 410 €',
-  'price in English');
-H.eq(text('price', 'ru'),
-  'Регистрационный взнос – 50 €\nСтоимость урока – 15 €\nСтоимость семестра: 12 занятий по 2 урока – 360 €\nИтого за семестр – 410 €',
-  'price in Russian');
+  'Registration fee - 50 €\nCost per lesson - 15 €\n' +
+  'Cost per semester (12 sessions × 2 lessons) - 360 €\nTotal for the semester - 410 €',
+  'and the one-string form says the same thing');
 
 // The total is COMPUTED, so it cannot drift from the two numbers above it.
 const bumped = { registrationFee: 80, fullPrice: 360 };
-H.ok(F.formatPrice(bumped, 'en', { sessionCount: 12, sessionMinutes: 90 }).indexOf('Total for the semester – 440 €') !== -1,
+H.eq(F.priceRows(bumped, 'en', D12).slice(-1)[0].value, '440 €',
      'change the fee and the total follows');
 // And it only appears when there are two numbers to add.
-H.ok(F.formatPrice({ fullPrice: 360 }, 'en', {}).indexOf('Total') === -1,
-     'a price with nothing to add shows no total repeating the line above it');
-// Every line is conditional, so this is the shape for every activity.
-H.eq(F.formatPrice({ fullPrice: 360 }, 'en', {}), 'Cost per semester – 360 €',
-     'an activity with only a full price renders one line');
-H.eq(F.formatPrice({}, 'en', {}), '', 'and one with no price says nothing');
-// "N sessions of M lessons" only when a session divides into whole lessons.
-H.ok(F.formatPrice({ fullPrice: 360 }, 'en', { sessionCount: 12, sessionMinutes: 60 }).indexOf('of') === -1,
+H.ok(!F.priceRows({ fullPrice: 360 }, 'en', {}).some((r) => r.label.indexOf('Total') === 0),
+     'a price with nothing to add shows no total repeating the row above it');
+// Every row is conditional, so this is the shape for every activity.
+H.eq(JSON.stringify(F.priceRows({ fullPrice: 360 }, 'en', {})),
+     JSON.stringify([{ label: 'Cost per semester', note: '', value: '360 €' }]),
+     'an activity with only a full price renders one row');
+H.eq(JSON.stringify(F.priceRows({}, 'en', {})), '[]', 'and one with no price says nothing');
+// The qualifier appears only when a session divides into whole lessons.
+H.eq(F.priceRows({ fullPrice: 360 }, 'en', { sessionCount: 12, sessionMinutes: 60 })[0].note, '',
      'a 60-minute session is 1.33 lessons, so the qualifier is dropped rather than printed');
+
+// factPriceRows() is the entry point the template uses, and it takes the whole
+// activity so the duration it divides by cannot be passed in wrong.
+H.eq(JSON.stringify(F.factPriceRows(ACT, 'en')),
+     JSON.stringify(F.priceRows(ACT.facts.price, 'en', ACT.facts.duration)),
+     'factPriceRows finds the duration itself');
+H.eq(JSON.stringify(F.factPriceRows({ facts: { price: { legacyText: { en: '50 euro' } } } }, 'en')), '[]',
+     'a price that is still free text has no rows, so it renders as an ordinary fact');
 
 console.log('\n[the sidebar, in order, with empties dropped]');
 const rows = F.sidebarRows(ACT, 'he');

@@ -224,15 +224,35 @@ Shirat HaYam event sidebar (`.sidebar-detail`) onto Ogen tokens:
 
 | Placement | Card | Contents, in this order |
 |---|---|---|
-| Top row | Who it is for | Ages, Group size, Prerequisites |
-| Top row | Schedule | When, Duration |
+| Top row | Who it is for | Ages, Group size, Prerequisites, Language of instruction |
+| Top row | When & where | When, Duration, Location |
+| Side column | Price | its four derived rows |
 | Side column | Staff & sponsors | Teachers, then sponsors |
-| Side column | Details | Location, Language of instruction, Price |
+
+The grouping answers the questions a parent asks in the order they ask them — is
+this for my child, when and where is it, what does it cost — and then who
+teaches it. It replaced a **"Details" card that was the leftovers of the other
+three**: Location, Language of instruction and Price had nothing in common
+except not fitting elsewhere. Language of instruction is a prerequisite in
+practice, a reader asking when also asks where, and a number a family decides on
+should not be the last line of a mixed list. Details is gone, not emptied.
+
+Price **leads the side column**, directly above the registration button: read
+what it costs, then press the thing that acts on it.
 
 A card wide enough lays its facts **across** rather than stacked, decided by a
 container query on the card's own inline size — so the same component serves the
 ~500px row and the 320px column with no variant and no viewport breakpoint of
-its own.
+its own. It is **two columns, not `auto-fit`**, and that one declaration does two
+things: four facts land two-by-two instead of leaving the fourth beside two
+empty tracks, and three flow so **Location sits under When** while Duration
+keeps half the card — the width its date range needs to hold one line. Put
+`auto-fit` back and both regress silently.
+
+The **price card is the one exception**, one column at every width. Every other
+card holds facts a reader scans in any order; the price is four numbers that add
+up, and in two columns the total lands beside the semester price rather than
+under the figures it sums.
 
 It was rows before: label at one edge, value at the other, via
 `justify-content:space-between` and `text-align:end`. That shape has to be told
@@ -242,19 +262,24 @@ each time. **Nothing in the new block is pushed to an edge**, so there is not
 one directional override in the card CSS, and a test asserts there never is.
 
 `FACT_GROUPS` in `_activity-facts.js` owns the grouping and declares the order
-within each group, which is deliberately *not* `FACT_ORDER` (Location reads
-before Language of instruction). `FACT_ORDER` stays the canonical list of what a
-fact is, and the module throws at require time if the two disagree, so a fact
-cannot be silently dropped from every group or listed in two. A group whose
-facts are all empty is dropped whole rather than rendering a lone icon and
-heading. Group headings never repeat a label inside their own group, which is
-why the schedule group is headed "Schedule" and not "When".
+within each group, which is deliberately *not* `FACT_ORDER` — Location comes
+after Duration so the two-column flow puts it under When. `FACT_ORDER` stays the
+canonical list of what a fact is, and the module throws at require time if the
+two disagree, so a fact cannot be silently dropped from every group or listed in
+two. A group whose facts are all empty is dropped whole rather than rendering a
+lone icon and heading. Group headings never repeat a label inside their own
+group, which is why the schedule card is headed "When & where" (מתי ואיפה /
+Когда и где) rather than "When", and why the price card renders its four derived
+rows rather than one row labelled "Price" under a heading saying the same
+thing.
 
 Group icons are Lucide, white in a solid circle, per the icon rule, but at 34px
 rather than 56px: a 56px disc beside two lines of text in a 320px column is
 larger than the thing it labels. One colour per group from the offer-card
-rotation, olive / terracotta / gold / navy — gold being the one the page was not
-already using, so the fourth card joined without moving the other three. The
+rotation, olive / terracotta / navy / gold in card order — gold being the one
+the page was not already using, so the fourth card joined without moving the
+other three. Price kept the navy the retired Details card had, so regrouping
+moved no colour either. The
 cards are **one plain `--paper` ground with a `--stone` border**, told apart by
 the icon disc alone: a tint per card was tried and dropped, because four tinted
 panels in a set read as four states of one thing rather than four kinds of
@@ -266,7 +291,7 @@ is still declared exactly once, on the article.
 
 **The article comes before the side column in the source**, and that single fact
 decides two things that look unrelated. On a phone it is what puts About and
-What to bring ahead of Staff and Details. On a desktop it is why the column sits
+What to bring ahead of Price and Staff. On a desktop it is why the column sits
 at the **trailing** edge — left in Hebrew, right in EN/RU — because a grid row
 places its first item at the leading edge. They cannot be changed independently:
 keeping the column on the leading edge would need `order` or `column-reverse`,
@@ -314,19 +339,30 @@ Hebrew and "2 groups / up to 7 students per group" in English, and the three
 languages cannot drift.
 
 **Several facts are more than one line.** Group size splits the count from the
-size; duration puts the date range above the sessions; price is four lines. The
-value stays plain **escaped text with a `\n` in it** — never markup — and
-`.sidebar-facts span` carries `white-space:pre-line`. Nothing in a fact is ever
-interpreted as HTML, which is one less place the sanitiser has to matter.
+size; duration puts the date range above the sessions. The value stays plain
+**escaped text with a `\n` in it** — never markup — and `.sidebar-facts span`
+carries `white-space:pre-line`. Nothing in a fact is ever interpreted as HTML,
+which is one less place the sanitiser has to matter. **No fact ever contains an
+en or em dash**; the date range joins its two months with a plain hyphen, the
+same character the age range uses, and a test asserts every generated fact in
+every language is free of both.
 
-**The price is four derived lines and nothing is typed twice:**
+**The price is four derived rows and nothing is typed twice:**
 
-| Line | Where it comes from |
+| Row | Where it comes from |
 |---|---|
 | Registration fee | `registrationFee` |
 | Cost per lesson | `fullPrice ÷ (sessionCount × sessionMinutes ÷ 45)`, or `perHourOverride` |
-| Cost per semester | `fullPrice`, qualified by "N sessions of M lessons" |
+| Cost per semester | `fullPrice`, qualified by "(N sessions × M lessons)" |
 | Total for the semester | **`registrationFee + fullPrice`, computed** |
+
+Rows, not four lines in one value: the price is its own card now, and a card
+headed "Price" whose single fact is also labelled "Price" says it twice.
+`priceRows()` returns `{label, note, value}` and is the single builder —
+`formatPrice()` derives the one-string form from it, so a page and a caller with
+no room for rows cannot disagree. The qualifier is the `note`, its own quiet
+italic line (`.fact-note`) between the label and the number: it is neither, and
+glued onto either it reads as a second label or as part of the figure.
 
 A "lesson" is the 45-minute academic hour; a "session" is one meeting, so a
 90-minute session is two lessons. That is the same number per-hour always
@@ -335,9 +371,9 @@ field**, so it cannot drift from the two numbers above it.
 
 Every line is conditional on the data behind it, so this is the shape for every
 activity rather than a layout that fits one: an activity with only a full price
-renders a single line, and the total appears only when there are two numbers to
-add, since otherwise it would repeat the line above it. The "N sessions of M
-lessons" qualifier appears only when a session divides into whole lessons — a
+renders a single row, and the total appears only when there are two numbers to
+add, since otherwise it would repeat the row above it. The "(N sessions × M
+lessons)" qualifier appears only when a session divides into whole lessons — a
 60-minute session is 1.33 lessons, which is arithmetic, not a sentence.
 
 Two rules hold the change-over together:

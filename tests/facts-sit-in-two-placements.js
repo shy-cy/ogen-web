@@ -1,8 +1,8 @@
 // What this defends against:
 //
 // The facts were one panel in one column. They are four cards in TWO places
-// now: "Who it is for" and "Schedule" run across the full measure above the
-// article, and "Staff & sponsors" and "Details" sit in a column beside it.
+// now: "Who it is for" and "When & where" run across the full measure above the
+// article, and "Price" and "Staff & sponsors" sit in a column beside it.
 //
 // Splitting one thing into two is where content goes missing, so this pins
 // which card lands where, and that the set is still complete.
@@ -15,7 +15,7 @@
 //     is to render it twice and hide one. Two copies drift, and the hidden one
 //     is still downloaded.
 //   - The article comes BEFORE the side column in the source. That is what puts
-//     the article ahead of Staff and Details on a phone, and it is also why the
+//     the article ahead of Price and Staff on a phone, and it is also why the
 //     column sits at the trailing edge — left in Hebrew, right in English and
 //     Russian. The two are the same fact and cannot be changed independently.
 
@@ -44,9 +44,11 @@ LANGS.forEach((lang) => {
   const groupsIn = (chunk) => (chunk.match(/data-group="(\w+)"/g) || []).map((m) => m.slice(12, -1));
 
   H.eq(groupsIn(row).join(','), 'participants,schedule',
-    lang + ': the top row is who it is for, then schedule');
-  H.eq(groupsIn(aside).join(','), 'credits,practical',
-    lang + ': the side column is staff & sponsors, then details');
+    lang + ': the top row is who it is for, then when & where');
+  // Price LEADS the column, directly above the registration button: a family
+  // reads what it costs and then presses the thing that acts on it.
+  H.eq(groupsIn(aside).join(','), 'price,credits',
+    lang + ': the side column is price, then staff & sponsors');
 
   // Nothing lost in the split: every group the record has is somewhere.
   const all = (html.match(/data-group="(\w+)"/g) || []).length;
@@ -84,7 +86,7 @@ console.log('\n[the article precedes the side column — mobile order and edge a
 LANGS.forEach((lang) => {
   const html = template.renderActivityPage(record, lang);
   H.ok(at(html, 'activity-main') < at(html, 'activity-aside'),
-    lang + ': article first, so Staff and Details follow it on a phone');
+    lang + ': article first, so Price and Staff follow it on a phone');
 });
 // A flex/grid row places the first item at the leading edge, so article-first
 // IS column-at-the-trailing-edge. No CSS may quietly undo it.
@@ -99,9 +101,24 @@ const card = css.slice(css.indexOf('.fact-card{'), css.indexOf('.fact-card-head{
 H.ok(/background:\s*var\(--paper\)/.test(card), 'one paper ground for all four');
 H.ok(/border:1px solid var\(--stone\)/.test(card), 'separated by a stone border');
 // The tinted version was tried and dropped: four tinted panels read as four
-// states of one thing rather than four kinds of information.
-LANGS.forEach(() => {});
-H.ok(!/\.fact-card\[data-group=/.test(css), 'no per-card background tint');
+// states of one thing rather than four kinds of information. So a per-card rule
+// may never touch the SURFACE — no background, border, shadow or text colour.
+// This used to forbid every per-card selector, which is a blunter rule than the
+// one it was defending and started failing the day one card earned a layout
+// override.
+const perCard = css.match(/\.fact-card\[data-group="[a-z]+"\][^{]*\{[^}]*\}/g) || [];
+perCard.forEach((rule) => {
+  const key = (rule.match(/data-group="([a-z]+)"/) || [])[1];
+  H.ok(!/(background|border|box-shadow|(^|[^-])\bcolor)\s*:/.test(rule),
+    'the ' + key + ' card does not tint itself');
+});
+// And exactly one card overrides anything at all, so a second is a decision
+// rather than a drift. The price is four numbers that ADD UP, so it stays one
+// column at every width and the total sits under the figures it sums; every
+// other card holds facts a reader scans in any order.
+H.eq(perCard.map((r) => (r.match(/data-group="([a-z]+)"/) || [])[1]).join(','), 'price',
+  'the price is the only card that asks for anything');
+H.ok(/grid-template-columns:\s*1fr/.test(perCard[0] || ''), 'and what it asks for is a single column');
 ['olive', 'terracotta', 'navy', 'gold'].forEach((c) => {
   H.ok(new RegExp("color: 'var\\(--" + c + "\\)'")
     .test(fs.readFileSync(path.join(R, 'netlify/functions/_activity-template.js'), 'utf8')),

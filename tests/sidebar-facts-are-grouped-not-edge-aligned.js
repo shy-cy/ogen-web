@@ -27,7 +27,12 @@ const H = require('./_helpers');
 const R = path.join(__dirname, '..');
 const facts = require('../netlify/functions/_activity-facts.js');
 const template = require('../netlify/functions/_activity-template.js');
-const css = fs.readFileSync(path.join(R, 'shared.css'), 'utf8');
+// COMMENTS STRIPPED. The rules below are explained by comments that name the
+// very words they search for — "nothing is pushed to an edge", "two columns,
+// not auto-fit" — so a naive search finds the prose and passes whether or not
+// the declaration is still there. That mistake got past a review three times on
+// this project.
+const css = fs.readFileSync(path.join(R, 'shared.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
 const record = require('../activities/hebrew4kids.json');
 
 console.log('[every fact is grouped exactly once]');
@@ -54,6 +59,38 @@ H.ok(!/\b(left|right)\s*:/.test(block), 'no physical left/right offsets');
 H.ok(block.indexOf('space-between') === -1, 'nothing is pushed to opposite edges');
 H.ok(css.indexOf('.sidebar-row{') === -1, 'the old .sidebar-row rules are gone, not merely unused');
 
+console.log('\n[a wide card is two columns, and that is what places two facts]');
+// This one declaration does two things that look unrelated, which is why it is
+// pinned rather than left to read as a taste choice:
+//
+//   - "Who it is for" holds four facts. auto-fit packs as many 140px tracks as
+//     fit — three at the ~500px of a top-row card — so the fourth landed alone
+//     beside two empty tracks.
+//   - "When & where" holds three. With a fixed pair they flow so that Location
+//     sits UNDER When, and Duration keeps half the card, which is the width its
+//     date range needs to stay on one line.
+//
+// Put auto-fit back and both regress silently: nothing overflows, nothing
+// errors, the cards just go ragged and Duration wraps to three lines.
+const cqAt = css.indexOf('@container (min-width:360px)');
+const cq = css.slice(cqAt, css.indexOf('\n.sidebar-facts{', cqAt));
+H.ok(cq.length > 60, 'found the container query');
+H.ok(/grid-template-columns:\s*repeat\(2,\s*1fr\)/.test(cq), 'a wide card is exactly two columns');
+H.ok(cq.indexOf('auto-fit') === -1, 'not auto-fit, which gave three and left a ragged shelf');
+// The card decides from ITS OWN width, so one component serves the ~500px row
+// and the 320px column with no variant and no viewport breakpoint of its own.
+H.ok(css.indexOf('container-type:inline-size') !== -1, 'and it is the card that decides, not the viewport');
+
+console.log('\n[the price qualifier is a quiet line, not a label]');
+// "(10 sessions x 2 lessons)" is neither the label nor the number. Given the
+// label's weight it reads as a second label; given the number's size it reads
+// as part of the figure.
+const note = css.slice(css.indexOf('.fact-note{'), css.indexOf('}', css.indexOf('.fact-note{')));
+H.ok(note.length > 20, 'found the .fact-note rule');
+H.ok(/font-style:\s*italic/.test(note), 'it is italic');
+H.ok(/display:\s*block/.test(note), 'and on its own line, between the two');
+H.ok(!/font-weight:\s*[6-9]00|font-weight:\s*bold/.test(note), 'and never bold, which would make it a second label');
+
 console.log('\n[what actually renders]');
 ['he', 'en', 'ru'].forEach((lang) => {
   const html = template.renderActivityPage(record, lang);
@@ -71,8 +108,17 @@ console.log('\n[what actually renders]');
   expected.forEach((key) => {
     H.ok(aside.indexOf('data-fact="' + key + '"') !== -1, lang + ': ' + key + ' is on the page');
   });
-  H.eq((aside.match(/data-fact="/g) || []).length, expected.length,
-    lang + ': and appears exactly once');
+  const rendered = (aside.match(/data-fact="([a-zA-Z]+)"/g) || [])
+    .map((m) => m.slice(11, -1));
+  H.eq(Array.from(new Set(rendered)).sort().join(','), expected.slice().sort().join(','),
+    lang + ': and nothing else appears');
+  // One fact is one row, with ONE exception: the price is four numbers a family
+  // compares, so it renders its derived rows individually. Asserted rather than
+  // tolerated, so a second multi-row fact has to be a decision.
+  const multi = rendered.filter((k, i) => rendered.indexOf(k) !== i);
+  H.eq(Array.from(new Set(multi)).join(','), 'price',
+    lang + ': and the price is the only fact that renders as more than one row');
+  H.eq(rendered.filter((k) => k === 'price').length, 4, lang + ': as four rows');
 
   // A group with no facts would render as an icon and a heading labelling
   // nothing. Every group present must carry at least one fact.
@@ -97,7 +143,7 @@ console.log('\n[what actually renders]');
 });
 
 console.log('\n[groups are labelled in every language]');
-['participants', 'schedule', 'practical'].forEach((key) => {
+['participants', 'schedule', 'price'].forEach((key) => {
   const seen = {};
   ['he', 'en', 'ru'].forEach((lang) => {
     const html = template.renderActivityPage(record, lang);
@@ -111,8 +157,13 @@ console.log('\n[groups are labelled in every language]');
 
 console.log('\n[an activity with nothing to say drops the group whole]');
 const bare = JSON.parse(JSON.stringify(record));
+// Every fact the card holds, not just the two it is named for — Location moved
+// in here when Details was retired, and a card with only a location left is not
+// an empty card.
 bare.facts.schedule = {};
 bare.facts.duration = {};
+bare.facts.location = {};
+bare.facts.address = {};
 const bareGroups = facts.sidebarGroups(bare, 'en').map((g) => g.key);
 H.ok(bareGroups.indexOf('schedule') === -1, 'the empty schedule group is dropped, not rendered blank');
 H.ok(bareGroups.indexOf('participants') !== -1, 'the groups that still have facts stay');

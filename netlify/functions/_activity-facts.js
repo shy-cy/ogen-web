@@ -187,7 +187,10 @@ function formatDuration(f, lang) {
 
   const from = monthYear(f.startDate, lang);
   const to = monthYear(f.endDate, lang);
-  if (from && to) { parts.push(`${from} – ${to}`); dateRange = true; }
+  // A plain hyphen, not an en dash: one less character that renders
+  // unpredictably beside Hebrew numerals, and the same joiner the age range
+  // has always used.
+  if (from && to) { parts.push(`${from} - ${to}`); dateRange = true; }
   else if (from) {
     parts.push(lang === 'he' ? `החל מ${from}` :
                lang === 'ru' ? `с ${monthYearGenitive(f.startDate, lang)}` : `From ${from}`);
@@ -297,59 +300,79 @@ function lessonsPerSession(duration) {
   return Number.isInteger(lessons) && lessons > 0 ? lessons : null;
 }
 
-// Four lines, one number each, because that is what a parent compares. It was a
-// single ·-joined sentence, which made the registration fee and the course price
-// look like one figure and hid that they add up.
+// Four ROWS, one number each, because that is what a parent compares. It was a
+// single ·-joined sentence once, which made the registration fee and the course
+// price look like one figure and hid that they add up.
 //
-// Every line is conditional on the data behind it, so this is the shape for
+// Rows rather than four lines in one value, because the price is its own card
+// now: a card headed "Price" whose single fact is also labelled "Price" reads as
+// the same row twice, which is exactly what the group-heading rule forbids. Each
+// row is a label, an optional italic qualifier, and one number — the same shape
+// every other fact in every other card uses.
+//
+// Every row is conditional on the data behind it, so this is the shape for
 // EVERY activity, not a layout that only fits this one: an activity with just a
-// full price renders one line. The total appears only when there are two
-// numbers to add — otherwise it would repeat the line above it.
+// full price renders one row. The total appears only when there are two numbers
+// to add — otherwise it would repeat the row above it.
 //
 // Nothing here is typed. registrationFee and fullPrice are fields; per-lesson is
-// fullPrice ÷ academic hours (or perHourOverride); the "N sessions of M lessons"
+// fullPrice ÷ academic hours (or perHourOverride); the "N sessions × M lessons"
 // qualifier and the total are both derived. Change either field and all four
-// lines stay consistent.
-function formatPrice(f, lang, duration) {
-  const lines = [];
+// rows stay consistent.
+function priceRows(f, lang, duration) {
+  const rows = [];
   const fee = num(f.registrationFee);
   const full = num(f.fullPrice);
   const hasFee = fee != null && fee > 0;
   const hasFull = full != null && full > 0;
 
   const L = {
-    he: { fee: 'דמי הרשמה', lesson: 'עלות לשיעור', term: 'עלות לסמסטר', total: 'סה״כ לסמסטר' },
-    en: { fee: 'Registration fee', lesson: 'Cost per lesson', term: 'Cost per semester', total: 'Total for the semester' },
+    he: { fee: 'דמי הרשמה', lesson: 'עלות לשיעור', term: 'עלות לסמסטר', total: 'סה״כ לסמסטר',
+          session: ['מפגש', 'מפגשים'], unit: ['שיעור', 'שיעורים'] },
+    en: { fee: 'Registration fee', lesson: 'Cost per lesson', term: 'Cost per semester', total: 'Total for the semester',
+          session: ['session', 'sessions'], unit: ['lesson', 'lessons'] },
     ru: { fee: 'Регистрационный взнос', lesson: 'Стоимость урока', term: 'Стоимость семестра', total: 'Итого за семестр' }
   }[lang] || null;
-  if (!L) return '';
-  const line = (label, value) => `${label} – ${value}`;
+  if (!L) return [];
+  const row = (label, value, note) => ({ label, note: note || '', value });
 
-  if (hasFee) lines.push(line(L.fee, money(fee)));
+  if (hasFee) rows.push(row(L.fee, money(fee)));
 
   const per = pricePerHour(f, duration);
-  if (per) lines.push(line(L.lesson, money(per.value)));
+  if (per) rows.push(row(L.lesson, money(per.value)));
 
   if (hasFull) {
     const sessions = num(duration && duration.sessionCount);
     const lessons = lessonsPerSession(duration);
-    let term = L.term;
+    let note = '';
     if (sessions != null && sessions > 0 && lessons != null) {
-      const detail =
-        lang === 'he'
-          ? `${sessions} ${sessions === 1 ? 'מפגש' : 'מפגשים'} של ${lessons} ${lessons === 1 ? 'שיעור' : 'שיעורים'}`
-          : lang === 'ru'
-          ? `${sessions} ${ruPlural(sessions, 'занятие', 'занятия', 'занятий')} по ${lessons} ${ruPlural(lessons, 'урок', 'урока', 'уроков')}`
-          : `${sessions} ${sessions === 1 ? 'session' : 'sessions'} of ${lessons} ${lessons === 1 ? 'lesson' : 'lessons'}`;
-      term = `${L.term}: ${detail}`;
+      // A multiplication sign, because that is the arithmetic: N meetings each
+      // worth M academic hours. "of" / "של" / "по" read as prose and needed
+      // three translations to say one operator.
+      note = lang === 'he'
+        ? `(${sessions} ${sessions === 1 ? L.session[0] : L.session[1]} × ${lessons} ${lessons === 1 ? L.unit[0] : L.unit[1]})`
+        : lang === 'ru'
+        ? `(${sessions} ${ruPlural(sessions, 'занятие', 'занятия', 'занятий')} × ${lessons} ${ruPlural(lessons, 'урок', 'урока', 'уроков')})`
+        : `(${sessions} ${sessions === 1 ? L.session[0] : L.session[1]} × ${lessons} ${lessons === 1 ? L.unit[0] : L.unit[1]})`;
     }
-    lines.push(line(term, money(full)));
+    rows.push(row(L.term, money(full), note));
   }
 
   // Computed, never typed, so it cannot drift from the two numbers above it.
-  if (hasFee && hasFull) lines.push(line(L.total, money(fee + full)));
+  if (hasFee && hasFull) rows.push(row(L.total, money(fee + full)));
 
-  return lines.join('\n');
+  return rows;
+}
+
+// The same rows as one string. This is what factText() returns, so it is still
+// what decides whether the price fact is empty and what a caller with no room
+// for rows prints. It is DERIVED from priceRows rather than built beside it —
+// two builders would drift, and a page and a test would disagree about the
+// price.
+function formatPrice(f, lang, duration) {
+  return priceRows(f, lang, duration)
+    .map((r) => `${r.label}${r.note ? ' ' + r.note : ''} - ${r.value}`)
+    .join('\n');
 }
 
 
@@ -376,6 +399,17 @@ function factText(activity, key, lang) {
   return text || pick(f.legacyText, lang);
 }
 
+// The price fact, as rows, for the one card that renders them individually.
+// Returns [] when there are no structured numbers — which is also when
+// factText() falls back to the words an admin typed, and that fallback is a
+// sentence, not rows, so the caller renders it as an ordinary fact.
+function factPriceRows(activity, lang) {
+  const facts = (activity && activity.facts) || {};
+  const f = facts.price;
+  if (!f || typeof f !== 'object') return [];
+  return priceRows(f, lang, facts.duration);
+}
+
 // The sidebar, in order, with empty rows dropped.
 function sidebarRows(activity, lang) {
   return FACT_ORDER
@@ -384,22 +418,32 @@ function sidebarRows(activity, lang) {
     .filter((row) => isPubliclyVisible(row.visibility));
 }
 
-// The sidebar is three groups, each with an icon and a label, rather than eight
+// The facts are four cards, each with an icon and a label, rather than nine
 // label/value rows. The rows put the label at one edge and the value at the
 // other, which is a shape that has to be told which edge is which, and that is
-// what kept breaking in Hebrew. A group stacks its facts instead, so nothing is
+// what kept breaking in Hebrew. A card stacks its facts instead, so nothing is
 // pushed to an edge and the direction is simply inherited.
 //
-// Each group lists its facts in the order they should read, which is not
-// FACT_ORDER: Location comes before Language of instruction here because a
-// reader scanning "Practical" wants the place first. FACT_ORDER stays the
+// The grouping answers the three questions a parent asks in the order they ask
+// them — is this for my child, when and where is it, what does it cost — and
+// then who teaches it. It replaced a "Details" card that was the leftovers of
+// the other three: Location, Language of instruction and Price had nothing in
+// common except not fitting elsewhere. Language of instruction moved to "Who it
+// is for" (it is a prerequisite in practice), Location to "When & where" (a
+// reader asking when also asks where), and Price became its own card, because a
+// number a family decides on should not be the last line of a mixed list.
+//
+// Each card lists its facts in the order they should READ, which is not
+// FACT_ORDER: Location comes after Duration here so that a wide card, which
+// lays its facts out in two columns, puts Location under When and leaves
+// Duration the width to hold its date range on one line. FACT_ORDER stays the
 // canonical list of what a fact IS, and the assertion below ties the two
 // together, so a fact can neither appear twice nor vanish by being left out of
-// every group.
+// every card.
 const FACT_GROUPS = [
-  { key: 'participants', facts: ['ages', 'groupSize', 'prerequisites'] },
-  { key: 'schedule',     facts: ['schedule', 'duration'] },
-  { key: 'practical',    facts: ['location', 'address', 'instructionLanguage', 'price'] }
+  { key: 'participants', facts: ['ages', 'groupSize', 'prerequisites', 'instructionLanguage'] },
+  { key: 'schedule',     facts: ['schedule', 'duration', 'location', 'address'] },
+  { key: 'price',        facts: ['price'] }
 ];
 
 (function assertEveryFactIsGroupedExactlyOnce() {
@@ -415,7 +459,7 @@ const FACT_GROUPS = [
 
 // Groups with their facts resolved, ready to render. A group whose facts are all
 // empty or all members-only is dropped whole, so an activity that has not filled
-// in its schedule gets no empty "Schedule" heading with an icon beside it.
+// in its schedule gets no empty "When & where" heading with an icon beside it.
 function sidebarGroups(activity, lang) {
   const rows = sidebarRows(activity, lang);
   const byKey = {};
@@ -433,6 +477,7 @@ module.exports = {
   ACADEMIC_MINUTES, CURRENCY,
   num, pick, ruPlural, monthYear,
   formatAges, formatSchedule, formatDuration, formatGroupSize, formatPrice,
+  priceRows, factPriceRows,
   academicHours, pricePerHour,
   visibilityOf, isPubliclyVisible, factText, sidebarRows,
   FACT_GROUPS, sidebarGroups

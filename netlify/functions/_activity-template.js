@@ -14,7 +14,7 @@
 // bare string. Section headings and sidebar labels are NOT admin-editable —
 // they are fixed per language and live in LABELS below.
 
-const { sidebarGroups } = require('./_activity-facts');
+const { sidebarGroups, factPriceRows } = require('./_activity-facts');
 
 // Sidebar group icons. Lucide, drawn white inside a solid circle, which is the
 // site's icon rule. The circle is 34px rather than the 56px used for section
@@ -33,9 +33,11 @@ const GROUP_ICONS = {
     color: 'var(--terracotta)',
     svg: '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/>'
   },
-  practical: {
+  // Price keeps the navy the old "Details" card had, so regrouping did not move
+  // a colour: the set is still olive / terracotta / navy / gold in card order.
+  price: {
     color: 'var(--navy)',
-    svg: '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>'
+    svg: '<rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01"/><path d="M18 12h.01"/>'
   },
   // The fourth card is the teaching staff and sponsors. Gold is the one colour
   // in the offer-card rotation this page was not already using, so it joins
@@ -74,10 +76,10 @@ const LABELS = {
     whatToBring: 'מה להביא', faq: 'שאלות נפוצות',
     ages: 'גילאים', schedule: 'מועד', duration: 'משך', location: 'מיקום', address: 'כתובת',
     groupSize: 'גודל קבוצה', price: 'מחיר',
-    // Group headings. Deliberately not the same word as any fact inside them:
-    // the schedule group holds a fact already labelled "מועד", and a heading
-    // repeating it would read as the same row twice.
-    gParticipants: 'למי זה מתאים', gSchedule: 'לוח זמנים', gPractical: 'פרטים', gCredits: 'צוות וחסות',
+    // Group headings. Deliberately not the same word as any fact inside them —
+    // which is also why the price card renders its four derived rows rather than
+    // one row labelled "מחיר" under a heading saying the same thing.
+    gParticipants: 'למי זה מתאים', gSchedule: 'מתי ואיפה', gPrice: 'מחיר', gCredits: 'צוות וחסות',
     indexTitle: 'הפעילויות שלנו', indexLead: 'מה אפשר למצוא במרכז עוגן',
     indexEmpty: 'בקרוב נפרסם כאן את הפעילויות.', more: 'לפרטים'
   },
@@ -89,7 +91,7 @@ const LABELS = {
     whatToBring: 'What to bring', faq: 'Frequently asked questions',
     ages: 'Ages', schedule: 'When', duration: 'Duration', location: 'Location', address: 'Address',
     groupSize: 'Group size', price: 'Price',
-    gParticipants: 'Who it is for', gSchedule: 'Schedule', gPractical: 'Details', gCredits: 'Staff &amp; sponsors',
+    gParticipants: 'Who it is for', gSchedule: 'When &amp; where', gPrice: 'Price', gCredits: 'Staff &amp; sponsors',
     indexTitle: 'Our activities', indexLead: 'What you can find at Ogen Center',
     indexEmpty: 'Activities will be published here soon.', more: 'Details'
   },
@@ -101,7 +103,7 @@ const LABELS = {
     whatToBring: 'Что взять с собой', faq: 'Частые вопросы',
     ages: 'Возраст', schedule: 'Когда', duration: 'Продолжительность', location: 'Место', address: 'Адрес',
     groupSize: 'Размер группы', price: 'Цена',
-    gParticipants: 'Для кого', gSchedule: 'Расписание', gPractical: 'Подробности', gCredits: 'Педагоги и партнёры',
+    gParticipants: 'Для кого', gSchedule: 'Когда и где', gPrice: 'Цена', gCredits: 'Педагоги и партнёры',
     indexTitle: 'Наши занятия', indexLead: 'Что можно найти в центре Оген',
     indexEmpty: 'Занятия скоро появятся здесь.', more: 'Подробнее'
   }
@@ -333,15 +335,34 @@ ${faqItems}
 ${inner}
       </div>`;
 
+  // One fact is one <li>: its label, then its value under it. The exception is
+  // the price, which is four numbers a family compares rather than one value —
+  // so it renders its derived rows individually, each with the same label/value
+  // shape. The "N sessions × M lessons" qualifier is not part of the label and
+  // not part of the number, so it gets its own quiet italic line between them.
+  const factItem = (row) => {
+    const open = `            <li data-fact="${row.key}" data-fact-visibility="${row.visibility}">`;
+    if (row.key === 'price') {
+      const rows = factPriceRows(activity, lang);
+      if (rows.length) {
+        return rows
+          .map(
+            (r) =>
+              open + `<strong>${esc(r.label)}</strong>` +
+              (r.note ? `<em class="fact-note">${esc(r.note)}</em>` : '') +
+              `<span>${esc(r.value)}</span></li>`
+          )
+          .join('\n');
+      }
+      // No structured numbers: factText() fell back to the words an admin typed,
+      // and that is a sentence, so it prints as an ordinary fact.
+    }
+    return open + `<strong>${LABELS[lang][row.key]}</strong><span>${esc(row.value)}</span></li>`;
+  };
+
   const cards = {};
   sidebarGroups(activity, lang).forEach((group) => {
-    const items = group.facts
-      .map(
-        (row) =>
-          `            <li data-fact="${row.key}" data-fact-visibility="${row.visibility}">` +
-          `<strong>${LABELS[lang][row.key]}</strong><span>${esc(row.value)}</span></li>`
-      )
-      .join('\n');
+    const items = group.facts.map(factItem).join('\n');
     const heading = LABELS[lang]['g' + group.key.charAt(0).toUpperCase() + group.key.slice(1)];
     cards[group.key] = factCard(group.key, heading,
       `        <ul class="sidebar-facts">\n${items}\n        </ul>`);
@@ -360,13 +381,17 @@ ${JSON.stringify(credits, null, 2)}
         </script>`)
       : '';
 
-  // Two placements. The two cards a reader scans first run across the full
-  // measure above the article; the rest sit in a column beside it. A group with
-  // no facts is already dropped by sidebarGroups, so an activity that has filled
-  // in neither of the top two gets no row at all rather than an empty one.
+  // Two placements. The two cards a reader scans first — who it is for, and
+  // when and where — run across the full measure above the article; price and
+  // credits sit in a column beside it. A group with no facts is already dropped
+  // by sidebarGroups, so an activity that has filled in neither of the top two
+  // gets no row at all rather than an empty one.
   const topCards = [cards.participants, cards.schedule].filter(Boolean).join('\n');
   const factRow = topCards ? `    <div class="fact-row">\n${topCards}\n    </div>\n` : '';
-  const asideCards = [creditsCard, cards.practical].filter(Boolean).join('\n');
+  // Price leads the column, directly above the registration button: a family
+  // reads what it costs and then presses the thing that acts on it. Staff and
+  // sponsors follow, because who teaches it is what you read after deciding.
+  const asideCards = [cards.price, creditsCard].filter(Boolean).join('\n');
 
   // The activity's own picture, at the head of the aside column with the facts
   // panel beneath it — two stacked cards rather than one. It is the same square
