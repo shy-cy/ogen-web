@@ -4,9 +4,9 @@
   "motif": "ring",
   "corner": "tl",
   "ctaUrl": {
-    "he": "",
-    "en": "",
-    "ru": ""
+    "he": "https://www.ogen.cy/",
+    "en": "https://www.ogen.cy/",
+    "ru": "https://www.ogen.cy/"
   },
   "title": {
     "he": "עברית לילדים",
@@ -144,11 +144,11 @@
       "logo": "/images/activities/hebrew4kids-sponsors-spo-mtd1o2lk-3.png"
     }
   ],
-  "isoUpdated": "2026-08-29T15:42:26.399Z",
+  "isoUpdated": "2026-08-29T15:53:44.440Z",
   "isoCreated": "2026-08-28T14:55:38.930Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
-  "lastPublishedAt": "2026-08-29T15:42:26.399Z",
+  "lastPublishedAt": "2026-08-29T15:53:44.440Z",
   "factVisibility": {
     "ages": "public",
     "schedule": "public",
@@ -160,7 +160,11 @@
     "address": "members",
     "price": "public"
   },
-  "cardImage": "/images/activities/hebrew4kids-card-009c0569.jpg",
-  "shareImage": "/images/activities/hebrew4kids-share-8010dc49.jpg",
-  "robots": "index"
+  "cardImage": "/images/activities/hebrew4kids-card-fcbd83a8.jpg",
+  "shareImage": "/images/activities/hebrew4kids-share-216b0217.jpg",
+  "robots": "index",
+  "retiredImages": [
+    "images/activities/hebrew4kids-card-009c0569.jpg",
+    "images/activities/hebrew4kids-share-8010dc49.jpg"
+  ]
 }
