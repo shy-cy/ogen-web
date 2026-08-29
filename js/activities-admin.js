@@ -134,7 +134,7 @@
     });
     var heroInput = el('input', { type: 'file', accept: 'image/*', id: 'f-hero', style: 'font-size:12px;' });
     heroInput.addEventListener('change', function () {
-      readImage(heroInput, function (dataUrl) { S.images.hero = dataUrl; heroPreview.src = dataUrl; S.dirty = true; });
+      readImage(heroInput, 'hero', function (dataUrl) { S.images.hero = dataUrl; heroPreview.src = dataUrl; S.dirty = true; });
     });
     box.appendChild(el('div', {}, [
       el('label', { text: 'Hero image' }),
@@ -147,17 +147,34 @@
     box.appendChild(ctaBox);
   }
 
-  function readImage(input, cb) {
+  // Every upload is resized and re-encoded in the browser first — see
+  // js/image-optimize.js. Nobody should have to remember to shrink a photo
+  // before choosing it, and the three things that went wrong when nobody did
+  // (a 3.5MB request body, a function that ran out of time, a 2.6MB page) all
+  // start at the moment the bytes leave this input.
+  //
+  // The 3MB cap is now a floor-through case rather than the usual one: it stops
+  // a file too large to even decode. The server keeps its own limit regardless,
+  // because a check that only runs in the browser is not a check.
+  function readImage(input, slot, cb) {
     var file = input.files && input.files[0];
     if (!file) return;
-    if (file.size > 3 * 1024 * 1024) {
-      message('err', 'That image is ' + (file.size / 1048576).toFixed(1) + 'MB. The limit is 3MB.');
+    if (file.size > 12 * 1024 * 1024) {
+      message('err', 'That image is ' + (file.size / 1048576).toFixed(1) +
+                     'MB, which is too big to process in the browser. Please save a smaller copy first.');
       input.value = '';
       return;
     }
-    var reader = new FileReader();
-    reader.onload = function () { cb(reader.result); };
-    reader.readAsDataURL(file);
+    input.disabled = true;
+    window.ImageOptimize.optimize(file, slot).then(function (result) {
+      input.disabled = false;
+      message('ok', 'Image ready: <b>' + window.ImageOptimize.describe(result) + '</b>');
+      cb(result.dataUrl);
+    }).catch(function (err) {
+      input.disabled = false;
+      input.value = '';
+      message('err', 'That image could not be processed: ' + err.message);
+    });
   }
 
   // ---------- content fields ----------
@@ -495,7 +512,7 @@
             var file = el('input', { type: 'file', accept: 'image/*', style: 'font-size:12px;',
               disabled: structureLocked || null });
             file.addEventListener('change', function () {
-              readImage(file, function (dataUrl) { S.images[item.id] = dataUrl; img.src = dataUrl; S.dirty = true; });
+              readImage(file, 'credit', function (dataUrl) { S.images[item.id] = dataUrl; img.src = dataUrl; S.dirty = true; });
             });
             box.appendChild(el('div', { class: 'item-image' }, [
               img, el('div', {}, [el('label', { text: spec.image === 'logo' ? 'Logo' : 'Photo' }), file])

@@ -89,6 +89,21 @@ const activity = (slug) => ({
        'the other activity keeps its hero, despite sharing the prefix');
   H.ok(github._files.has('activities/hebrew-for-kids.html'), 'and its page is untouched');
 
+  console.log('\n[replacing a picture takes the old file with it]');
+  // Swapping a hero for one in a different format changes its filename, so the
+  // old file would sit in the repository unreferenced and still served.
+  const JPEG = 'data:image/jpeg;base64,' + Buffer.from([
+    0xFF,0xD8,0xFF,0xE0,0x00,0x10,0x4A,0x46,0x49,0x46,0x00,0x01,0xFF,0xD9]).toString('base64');
+  const first = await H.call(fn.handler, Object.assign({ action: 'publish', activity: activity('swap') }, auth));
+  H.ok(github._files.has('images/activities/swap-hero.png'), 'the first hero is a PNG');
+  const swapped = Object.assign(activity('swap'), { heroImage: JPEG });
+  await H.call(fn.handler, Object.assign(
+    { action: 'publish', activity: swapped, baseUpdatedAt: first.body.baseUpdatedAt }, auth));
+  H.ok(github._files.has('images/activities/swap-hero.jpg'), 'the replacement is committed');
+  H.ok(!github._files.has('images/activities/swap-hero.png'), 'and the file it replaced is gone');
+  H.ok(github._files.has('images/activities/swap-teachers-tea-1.png'),
+       'a picture that did not change is left alone');
+
   console.log('\n[deleting an activity that has no images at all still works]');
   const plain = Object.assign(activity('plain'), { heroImage: null, teachers: [], sponsors: [] });
   await H.call(fn.handler, Object.assign({ action: 'publish', activity: plain }, auth));

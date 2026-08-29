@@ -412,7 +412,7 @@ function validate(activity) {
 // --- THE ONE BUILDER -------------------------------------------------------
 // preview → commit:false, publish → commit:true. Identical up to the commit.
 
-async function generate(input, { commit, session, message }) {
+async function generate(input, { commit, session, message, previous }) {
   const activity = validate(JSON.parse(JSON.stringify(input)));
   const { files: imageFiles, map: imageMap } = extractImages(activity);
 
@@ -448,6 +448,16 @@ async function generate(input, { commit, session, message }) {
   // Languages that used to exist and no longer do must have their files removed.
   const deletes = LANGS.filter((l) => present.indexOf(l) === -1)
     .map((l) => filePathFor(activity.slug, l));
+
+  // So must pictures the record has stopped pointing at. Swapping a hero for
+  // one in a different format changes its filename — a PNG replaced by a JPEG
+  // is a new path — and the old file would otherwise sit in the repository for
+  // good, unreferenced and still served, the same way deleted activities used
+  // to leave their photos behind.
+  const keeping = imagePathsOf(activity);
+  imagePathsOf(previous).forEach((p) => {
+    if (keeping.indexOf(p) === -1 && deletes.indexOf(p) === -1) deletes.push(p);
+  });
 
   const result = {
     slug: activity.slug,
@@ -588,7 +598,7 @@ exports.handler = async (event) => {
         merged.lastPublishedAt = merged.isoUpdated;
 
         const out = await generate(merged, {
-          commit: true, session,
+          commit: true, session, previous: record,
           message: `Publish activity: ${slug} (${merged.status})\n\nvia Ogen admin by ${session.name} <${session.email}>`
         });
         // git is now the source of truth for this slug.
