@@ -50,6 +50,7 @@
     baseUpdatedAt: null,
     lists: {},
     images: {},        // per-item pending uploads, keyed by ITEM ID (never index)
+    cardImage: undefined,  // pending square upload: undefined = untouched, null = removed
     previewLang: 'he',
     scheduleSessions: [],
     dirty: false
@@ -191,7 +192,74 @@
     S.schema.optional.forEach(function (d) {
       $('optional-fields').appendChild(fieldRow(d, langObj(rec[d.key]), 'f-' + d.key));
     });
+    // Its own panel at the foot of the form. Read from the schema like every
+    // other group, so adding an SEO field stays a one line change on the server.
+    $('seo-fields').innerHTML = '';
+    (S.schema.seo || []).forEach(function (d) {
+      $('seo-fields').appendChild(fieldRow(d, langObj(rec[d.key]), 'f-' + d.key));
+    });
+    renderCardImage();
     renderFacts();
+  }
+
+  // ---------- card image ----------
+  // One picture per activity, not per language, so it is drawn once rather than
+  // in the three column grid every translatable field uses.
+  //
+  // S.cardImage holds a pending upload the same way S.images holds pending
+  // list-item uploads: the data URL never goes into S.record, because the record
+  // is what the server merges against and a data URL is not a path. collect()
+  // puts it on the outgoing copy at save time.
+  function renderCardImage() {
+    var box = $('card-image');
+    if (!box) return;
+    box.innerHTML = '';
+
+    // A picture shown in every language is structure, not words. The server
+    // enforces this; disabling the input here just avoids offering an action
+    // that would be discarded.
+    var mayEdit = S.schema.langs.every(canEdit);
+    var current = S.cardImage || S.record.cardImage || '';
+
+    var frame = el('div', { class: 'card-image-frame' });
+    if (current) {
+      frame.appendChild(el('img', { src: current, alt: 'Card image preview' }));
+    } else {
+      frame.appendChild(el('span', { class: 'card-image-empty', text: 'No image' }));
+    }
+
+    var input = el('input', {
+      type: 'file', id: 'f-cardImage', accept: 'image/*', disabled: !mayEdit || null
+    });
+    input.addEventListener('change', function () {
+      readImage(input, 'card', function (dataUrl) {
+        S.cardImage = dataUrl;
+        S.dirty = true;
+        renderCardImage();
+      });
+    });
+
+    var controls = el('div', { class: 'card-image-controls' }, [
+      el('label', { for: 'f-cardImage', text: current ? 'Replace image' : 'Choose an image' }),
+      input,
+      current && mayEdit
+        ? el('button', {
+            type: 'button', class: 'link-btn', text: 'Remove',
+            onclick: function () {
+              // null, not undefined: the server reads `incoming.cardImage !==
+              // undefined` to tell "cleared" from "not sent by a role that may
+              // not touch it", and publish then deletes the orphaned file.
+              S.cardImage = null;
+              S.record.cardImage = null;
+              S.dirty = true;
+              renderCardImage();
+            }
+          })
+        : null,
+      !mayEdit ? el('div', { class: 'hint', text: 'Read-only for your role: the card image is shown in every language.' }) : null
+    ]);
+
+    box.appendChild(el('div', { class: 'card-image-row' }, [frame, controls]));
   }
 
   // ---------- sidebar facts ----------
@@ -589,9 +657,17 @@
     rec.corner = $('f-corner').value;
     rec.ctaUrl = readLangField('f-ctaUrl');
 
-    S.schema.simple.concat(S.schema.optional).forEach(function (d) {
+    // Every translatable scalar, in whichever panel it was drawn. Missing the
+    // SEO group here would read the form back without it and silently blank a
+    // meta description on the next save.
+    S.schema.simple.concat(S.schema.optional, S.schema.seo || []).forEach(function (d) {
       rec[d.key] = readLangField('f-' + d.key);
     });
+
+    // A pending upload is a data URL and wins; otherwise send back the stored
+    // path. S.cardImage is explicitly null after a Remove, and null must travel
+    // so the server can tell "cleared" from "absent".
+    rec.cardImage = S.cardImage !== undefined ? S.cardImage : (S.record.cardImage || null);
     var facts = readFacts();
     rec.facts = facts.facts;
     rec.factVisibility = facts.factVisibility;
@@ -698,6 +774,10 @@
     S.slug = record.slug || null;
     S.baseUpdatedAt = baseUpdatedAt || null;
     S.images = {};
+    // undefined, not null: null means "the admin pressed Remove". Loading a
+    // different activity must forget a pending upload, not carry it across and
+    // publish one activity's photograph onto another.
+    S.cardImage = undefined;
     S.dirty = false;
     renderSettings();
     renderFields();

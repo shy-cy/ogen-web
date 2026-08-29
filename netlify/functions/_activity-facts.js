@@ -323,11 +323,56 @@ function sidebarRows(activity, lang) {
     .filter((row) => isPubliclyVisible(row.visibility));
 }
 
+// The sidebar is three groups, each with an icon and a label, rather than eight
+// label/value rows. The rows put the label at one edge and the value at the
+// other, which is a shape that has to be told which edge is which, and that is
+// what kept breaking in Hebrew. A group stacks its facts instead, so nothing is
+// pushed to an edge and the direction is simply inherited.
+//
+// Each group lists its facts in the order they should read, which is not
+// FACT_ORDER: Location comes before Language of instruction here because a
+// reader scanning "Practical" wants the place first. FACT_ORDER stays the
+// canonical list of what a fact IS, and the assertion below ties the two
+// together, so a fact can neither appear twice nor vanish by being left out of
+// every group.
+const FACT_GROUPS = [
+  { key: 'participants', facts: ['ages', 'groupSize', 'prerequisites'] },
+  { key: 'schedule',     facts: ['schedule', 'duration'] },
+  { key: 'practical',    facts: ['location', 'instructionLanguage', 'price'] }
+];
+
+(function assertEveryFactIsGroupedExactlyOnce() {
+  const seen = [].concat(...FACT_GROUPS.map((g) => g.facts));
+  const missing = FACT_ORDER.filter((k) => seen.indexOf(k) === -1);
+  const extra = seen.filter((k) => FACT_ORDER.indexOf(k) === -1);
+  const twice = seen.filter((k, i) => seen.indexOf(k) !== i);
+  if (missing.length || extra.length || twice.length) {
+    throw new Error('FACT_GROUPS is out of step with FACT_ORDER: ' +
+      JSON.stringify({ missing, extra, twice }));
+  }
+})();
+
+// Groups with their facts resolved, ready to render. A group whose facts are all
+// empty or all members-only is dropped whole, so an activity that has not filled
+// in its schedule gets no empty "Schedule" heading with an icon beside it.
+function sidebarGroups(activity, lang) {
+  const rows = sidebarRows(activity, lang);
+  const byKey = {};
+  rows.forEach((r) => { byKey[r.key] = r; });
+  return FACT_GROUPS
+    .map((group) => ({
+      key: group.key,
+      facts: group.facts.map((k) => byKey[k]).filter(Boolean)
+    }))
+    .filter((group) => group.facts.length);
+}
+
 module.exports = {
   FACT_ORDER, TEXT_FACTS, STRUCTURED_FACTS, DEFAULT_VISIBILITY,
   ACADEMIC_MINUTES, CURRENCY,
   num, pick, ruPlural, monthYear,
   formatAges, formatSchedule, formatDuration, formatGroupSize, formatPrice,
   academicHours, pricePerHour,
-  visibilityOf, isPubliclyVisible, factText, sidebarRows
+  visibilityOf, isPubliclyVisible, factText, sidebarRows,
+  FACT_GROUPS, sidebarGroups
 };

@@ -14,7 +14,39 @@
 // bare string. Section headings and sidebar labels are NOT admin-editable —
 // they are fixed per language and live in LABELS below.
 
-const { sidebarRows } = require('./_activity-facts');
+const { sidebarGroups } = require('./_activity-facts');
+
+// Sidebar group icons. Lucide, drawn white inside a solid circle, which is the
+// site's icon rule. The circle is 34px rather than the 56px used for section
+// eyebrows and offer cards: those sit in open space on a full-width section,
+// this one sits beside two lines of text in a 320px column, and a 56px disc
+// there is larger than the text it labels.
+//
+// One colour per group, taken from the offer-card rotation so the activity page
+// and the homepage use the same three.
+const GROUP_ICONS = {
+  participants: {
+    color: 'var(--olive)',
+    svg: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/>'
+  },
+  schedule: {
+    color: 'var(--terracotta)',
+    svg: '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/>'
+  },
+  practical: {
+    color: 'var(--navy)',
+    svg: '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>'
+  }
+};
+
+function groupIcon(key) {
+  const icon = GROUP_ICONS[key];
+  if (!icon) return '';
+  return `<span class="sidebar-group-icon" style="background:${icon.color}">` +
+    '<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" ' +
+    'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    icon.svg + '</svg></span>';
+}
 
 const SITE = 'https://www.ogen.cy';
 const LANGS = ['he', 'en', 'ru'];
@@ -35,6 +67,10 @@ const LABELS = {
     whatToBring: 'מה להביא', faq: 'שאלות נפוצות',
     ages: 'גילאים', schedule: 'מועד', duration: 'משך', location: 'מיקום',
     groupSize: 'גודל קבוצה', price: 'מחיר',
+    // Group headings. Deliberately not the same word as any fact inside them:
+    // the schedule group holds a fact already labelled "מועד", and a heading
+    // repeating it would read as the same row twice.
+    gParticipants: 'למי זה מתאים', gSchedule: 'לוח זמנים', gPractical: 'פרטים',
     indexTitle: 'הפעילויות שלנו', indexLead: 'מה אפשר למצוא במרכז עוגן',
     indexEmpty: 'בקרוב נפרסם כאן את הפעילויות.', more: 'לפרטים'
   },
@@ -46,6 +82,7 @@ const LABELS = {
     whatToBring: 'What to bring', faq: 'Frequently asked questions',
     ages: 'Ages', schedule: 'When', duration: 'Duration', location: 'Location',
     groupSize: 'Group size', price: 'Price',
+    gParticipants: 'Who it is for', gSchedule: 'Schedule', gPractical: 'Details',
     indexTitle: 'Our activities', indexLead: 'What you can find at Ogen Center',
     indexEmpty: 'Activities will be published here soon.', more: 'Details'
   },
@@ -57,6 +94,7 @@ const LABELS = {
     whatToBring: 'Что взять с собой', faq: 'Частые вопросы',
     ages: 'Возраст', schedule: 'Когда', duration: 'Продолжительность', location: 'Место',
     groupSize: 'Размер группы', price: 'Цена',
+    gParticipants: 'Для кого', gSchedule: 'Расписание', gPractical: 'Подробности',
     indexTitle: 'Наши занятия', indexLead: 'Что можно найти в центре Оген',
     indexEmpty: 'Занятия скоро появятся здесь.', more: 'Подробнее'
   }
@@ -218,11 +256,33 @@ ${JSON.stringify(credits, null, 2)}
   // facts to scan, so they live here. data-fact-visibility is written out for
   // every row but nothing acts on it yet — see isPubliclyVisible() for the one
   // place that changes when registration ships.
-  const factRows = sidebarRows(activity, lang)
-    .map(
-      (row) =>
-        `      <div class="sidebar-row" data-fact="${row.key}" data-fact-visibility="${row.visibility}"><span class="label">${LABELS[lang][row.key]}</span><span class="value">${esc(row.value)}</span></div>`
-    )
+  // Grouped blocks, not label/value rows. Each group is an icon, a heading and
+  // a stack of facts, so nothing is pushed to an edge and nothing has to be told
+  // which edge is which. The old .sidebar-row put the label at the start and the
+  // value at the end with text-align:end, which is the shape that kept coming
+  // out wrong in Hebrew.
+  //
+  // The heading is an h2 inside an <aside>: these are section labels, and giving
+  // them real headings makes the facts box navigable rather than a run of spans.
+  const factGroups = sidebarGroups(activity, lang)
+    .map((group) => {
+      const items = group.facts
+        .map(
+          (row) =>
+            `          <li data-fact="${row.key}" data-fact-visibility="${row.visibility}">` +
+            `<strong>${LABELS[lang][row.key]}</strong><span>${esc(row.value)}</span></li>`
+        )
+        .join('\n');
+      return `      <div class="sidebar-group" data-group="${group.key}">
+        ${groupIcon(group.key)}
+        <div class="sidebar-group-body">
+          <h2>${LABELS[lang]['g' + group.key.charAt(0).toUpperCase() + group.key.slice(1)]}</h2>
+          <ul class="sidebar-facts">
+${items}
+          </ul>
+        </div>
+      </div>`;
+    })
     .join('\n');
 
   // Per-language so the CTA lands in the reader's own tree (or an external
@@ -263,7 +323,7 @@ ${GENERATED_NOTE(`activities/${slug}.json`)}
          keyboard order identical, so the registration button is not reached
          last by a screen reader while appearing first on screen. -->
     <aside class="activity-sidebar">
-${factRows}
+${factGroups}
       <div data-status-cta></div>
     </aside>
 

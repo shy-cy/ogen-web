@@ -49,6 +49,14 @@
         <div id="fields"></div>
       </div>
 
+      <!-- One square picture per activity, for listing and homepage cards. The
+           activity PAGE still has no image of its own, deliberately. -->
+      <div class="panel" id="card-image-panel">
+        <h2>Card image</h2>
+        <p class="hint" style="margin:-8px 0 14px;">A square picture for the activities listing and the homepage. Any shape is accepted and cropped to a square from the centre, so keep the subject away from the edges. The activity page itself does not show it, and shared links keep the Ogen share image.</p>
+        <div id="card-image"></div>
+      </div>
+
       <div class="panel">
         <h2>Optional sections</h2>
         <p class="hint" style="margin:-8px 0 14px;">Leave a field empty and its whole section is left out of the page — no empty heading is published.</p>
@@ -77,6 +85,16 @@
         <h2>FAQ</h2>
         <div class="items" id="list-faq"></div>
         <button type="button" class="add-btn" data-add="faq" style="margin-top:12px;">+ Add a question</button>
+      </div>
+
+      <!-- Search and share, last and on its own. These are written once and then
+           left alone; everything above is what an admin opens this form to
+           change. Sitting among the content fields, "Meta description" read as
+           more body copy to write. -->
+      <div class="panel" id="seo-panel">
+        <h2>Search &amp; sharing</h2>
+        <p class="hint" style="margin:-8px 0 14px;">How this activity appears in search results. Leave a field empty and the page falls back to the title and the site defaults. Shared links use the Ogen share image.</p>
+        <div id="seo-fields"></div>
       </div>
 
       <!-- Sticky action bar. It is a direct child of .main on purpose: as its

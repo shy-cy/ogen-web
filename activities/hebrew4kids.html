@@ -57,14 +57,38 @@
          keyboard order identical, so the registration button is not reached
          last by a screen reader while appearing first on screen. -->
     <aside class="activity-sidebar">
-      <div class="sidebar-row" data-fact="ages" data-fact-visibility="public"><span class="label">גילאים</span><span class="value">6-10</span></div>
-      <div class="sidebar-row" data-fact="schedule" data-fact-visibility="public"><span class="label">מועד</span><span class="value">ימי רביעי, 16:00</span></div>
-      <div class="sidebar-row" data-fact="duration" data-fact-visibility="public"><span class="label">משך</span><span class="value">אוקטובר 2026 – דצמבר 2026 · 10 מפגשים · 90 דקות</span></div>
-      <div class="sidebar-row" data-fact="groupSize" data-fact-visibility="public"><span class="label">גודל קבוצה</span><span class="value">שתי קבוצות של עד 7 תלמידים</span></div>
-      <div class="sidebar-row" data-fact="instructionLanguage" data-fact-visibility="public"><span class="label">שפת ההוראה</span><span class="value">עברית ואנגלית</span></div>
-      <div class="sidebar-row" data-fact="prerequisites" data-fact-visibility="public"><span class="label">דרישות קדם</span><span class="value">מתחילים</span></div>
-      <div class="sidebar-row" data-fact="location" data-fact-visibility="members"><span class="label">מיקום</span><span class="value">לימסול</span></div>
-      <div class="sidebar-row" data-fact="price" data-fact-visibility="members"><span class="label">מחיר</span><span class="value">דמי הרשמה 50 € · 300 € לקורס · 15 € לשעה</span></div>
+      <div class="sidebar-group" data-group="participants">
+        <span class="sidebar-group-icon" style="background:var(--olive)"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg></span>
+        <div class="sidebar-group-body">
+          <h2>למי זה מתאים</h2>
+          <ul class="sidebar-facts">
+          <li data-fact="ages" data-fact-visibility="public"><strong>גילאים</strong><span>6-10</span></li>
+          <li data-fact="groupSize" data-fact-visibility="public"><strong>גודל קבוצה</strong><span>שתי קבוצות של עד 7 תלמידים</span></li>
+          <li data-fact="prerequisites" data-fact-visibility="public"><strong>דרישות קדם</strong><span>מתחילים</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="sidebar-group" data-group="schedule">
+        <span class="sidebar-group-icon" style="background:var(--terracotta)"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg></span>
+        <div class="sidebar-group-body">
+          <h2>לוח זמנים</h2>
+          <ul class="sidebar-facts">
+          <li data-fact="schedule" data-fact-visibility="public"><strong>מועד</strong><span>ימי רביעי, 16:00</span></li>
+          <li data-fact="duration" data-fact-visibility="public"><strong>משך</strong><span>אוקטובר 2026 – דצמבר 2026 · 10 מפגשים · 90 דקות</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="sidebar-group" data-group="practical">
+        <span class="sidebar-group-icon" style="background:var(--navy)"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></span>
+        <div class="sidebar-group-body">
+          <h2>פרטים</h2>
+          <ul class="sidebar-facts">
+          <li data-fact="location" data-fact-visibility="members"><strong>מיקום</strong><span>לימסול</span></li>
+          <li data-fact="instructionLanguage" data-fact-visibility="public"><strong>שפת ההוראה</strong><span>עברית ואנגלית</span></li>
+          <li data-fact="price" data-fact-visibility="members"><strong>מחיר</strong><span>דמי הרשמה 50 € · 300 € לקורס · 15 € לשעה</span></li>
+          </ul>
+        </div>
+      </div>
       <div data-status-cta></div>
     </aside>
 

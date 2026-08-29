@@ -211,3 +211,18 @@ input:disabled,textarea:disabled,select:disabled{background:#f2f0ea;color:#8b8b8
   color:#8a6a20;font-size:12.5px;line-height:1.5;}
 .legacy-note b{display:block;margin-bottom:3px;}
 .legacy-note .hint{color:#a08a5a;margin-top:4px;}
+
+/* Card image. The frame is a real 1:1 box with object-fit:cover, so the preview
+   shows exactly the crop the browser produced rather than a letterboxed hint of
+   it. An admin who cannot see what was cut away cannot tell that the subject
+   was cut off. */
+.card-image-row{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;}
+.card-image-frame{flex:0 0 160px;width:160px;aspect-ratio:1/1;border-radius:12px;
+  border:1px solid #eee7d8;background:#f4f2ec;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;}
+.card-image-frame img{width:100%;height:100%;object-fit:cover;display:block;}
+.card-image-empty{font-size:12px;font-weight:700;color:#a8a49a;}
+.card-image-controls{flex:1 1 240px;display:flex;flex-direction:column;gap:8px;align-items:flex-start;}
+.card-image-controls label{font-size:12.5px;font-weight:800;color:var(--navy);}
+.card-image-controls .link-btn{font-family:inherit;font-size:12px;font-weight:700;
+  background:none;border:none;padding:0;color:var(--danger);cursor:pointer;text-decoration:underline;}

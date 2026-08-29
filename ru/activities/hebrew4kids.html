@@ -57,14 +57,38 @@
          keyboard order identical, so the registration button is not reached
          last by a screen reader while appearing first on screen. -->
     <aside class="activity-sidebar">
-      <div class="sidebar-row" data-fact="ages" data-fact-visibility="public"><span class="label">Возраст</span><span class="value">6-10</span></div>
-      <div class="sidebar-row" data-fact="schedule" data-fact-visibility="public"><span class="label">Когда</span><span class="value">по средам, 16:00</span></div>
-      <div class="sidebar-row" data-fact="duration" data-fact-visibility="public"><span class="label">Продолжительность</span><span class="value">октябрь 2026 – декабрь 2026 · 10 занятий · 90 мин</span></div>
-      <div class="sidebar-row" data-fact="groupSize" data-fact-visibility="public"><span class="label">Размер группы</span><span class="value">2 группы по 7 учеников</span></div>
-      <div class="sidebar-row" data-fact="instructionLanguage" data-fact-visibility="public"><span class="label">Язык преподавания</span><span class="value">Hebrew and English</span></div>
-      <div class="sidebar-row" data-fact="prerequisites" data-fact-visibility="public"><span class="label">Требования к уровню</span><span class="value">Beginners</span></div>
-      <div class="sidebar-row" data-fact="location" data-fact-visibility="members"><span class="label">Место</span><span class="value">Limassol</span></div>
-      <div class="sidebar-row" data-fact="price" data-fact-visibility="members"><span class="label">Цена</span><span class="value">регистрационный взнос 50 € · 300 € за курс · 15 € в час</span></div>
+      <div class="sidebar-group" data-group="participants">
+        <span class="sidebar-group-icon" style="background:var(--olive)"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg></span>
+        <div class="sidebar-group-body">
+          <h2>Для кого</h2>
+          <ul class="sidebar-facts">
+          <li data-fact="ages" data-fact-visibility="public"><strong>Возраст</strong><span>6-10</span></li>
+          <li data-fact="groupSize" data-fact-visibility="public"><strong>Размер группы</strong><span>2 группы по 7 учеников</span></li>
+          <li data-fact="prerequisites" data-fact-visibility="public"><strong>Требования к уровню</strong><span>Beginners</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="sidebar-group" data-group="schedule">
+        <span class="sidebar-group-icon" style="background:var(--terracotta)"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg></span>
+        <div class="sidebar-group-body">
+          <h2>Расписание</h2>
+          <ul class="sidebar-facts">
+          <li data-fact="schedule" data-fact-visibility="public"><strong>Когда</strong><span>по средам, 16:00</span></li>
+          <li data-fact="duration" data-fact-visibility="public"><strong>Продолжительность</strong><span>октябрь 2026 – декабрь 2026 · 10 занятий · 90 мин</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="sidebar-group" data-group="practical">
+        <span class="sidebar-group-icon" style="background:var(--navy)"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></span>
+        <div class="sidebar-group-body">
+          <h2>Подробности</h2>
+          <ul class="sidebar-facts">
+          <li data-fact="location" data-fact-visibility="members"><strong>Место</strong><span>Limassol</span></li>
+          <li data-fact="instructionLanguage" data-fact-visibility="public"><strong>Язык преподавания</strong><span>Hebrew and English</span></li>
+          <li data-fact="price" data-fact-visibility="members"><strong>Цена</strong><span>регистрационный взнос 50 € · 300 € за курс · 15 € в час</span></li>
+          </ul>
+        </div>
+      </div>
       <div data-status-cta></div>
     </aside>
 

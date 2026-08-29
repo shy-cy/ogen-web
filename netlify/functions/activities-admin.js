@@ -63,12 +63,20 @@ const FIELD_SCHEMA = {
   simple: [
     { key: 'title', label: 'Title', required: true },
     { key: 'summary', label: 'Card summary', hint: 'One line, shown on the activities listing' },
-    { key: 'about', label: 'About this activity', textarea: true, required: true },
-    { key: 'metaTitle', label: 'Meta title', hint: 'Defaults to the title' },
-    { key: 'metaDescription', label: 'Meta description', textarea: true }
+    { key: 'about', label: 'About this activity', textarea: true, required: true }
   ],
   optional: [
     { key: 'whatToBring', label: 'What to bring', textarea: true }
+  ],
+  // Search and share. Its own group, and its own panel at the foot of the form,
+  // because it is written once and then left alone, while everything above it is
+  // what an admin actually comes here to edit. Sitting between "About" and
+  // "What to bring" it read as another piece of body copy and got filled in with
+  // one, which is how a meta description ends up being a paragraph.
+  seo: [
+    { key: 'metaTitle', label: 'Meta title', hint: 'Defaults to the title. Shown as the headline in search results' },
+    { key: 'metaDescription', label: 'Meta description', textarea: true,
+      hint: 'The grey text under the search result. Around 155 characters' }
   ],
   // Sidebar facts, in the order they appear on the page. `kind` tells the client
   // which editor to draw. Everything except the two text facts is structured
@@ -100,7 +108,13 @@ const FIELD_SCHEMA = {
   langs: LANGS
 };
 
-const SIMPLE_KEYS = FIELD_SCHEMA.simple.concat(FIELD_SCHEMA.optional).map((f) => f.key);
+// Every translatable scalar field, whichever panel it is drawn in. Grouping is a
+// question for the form, not for the record: an SEO field is saved, merged and
+// permission checked exactly like a content one.
+const SIMPLE_KEYS = FIELD_SCHEMA.simple
+  .concat(FIELD_SCHEMA.optional)
+  .concat(FIELD_SCHEMA.seo)
+  .map((f) => f.key);
 const FACT_KEYS = FACT_ORDER;
 const FACT_BY_KEY = {};
 FIELD_SCHEMA.facts.forEach((f) => { FACT_BY_KEY[f.key] = f; });
@@ -241,6 +255,14 @@ function extractImages(activity) {
     return '/' + path;
   };
 
+  // The square listing image. One per activity, so a fixed name rather than an
+  // id: re-uploading replaces the file instead of accumulating one per attempt.
+  // The extension still varies with the format, which is why publish also
+  // deletes the paths a record has stopped pointing at.
+  if (activity.cardImage && String(activity.cardImage).startsWith('data:')) {
+    activity.cardImage = take(activity.cardImage, 'card') || null;
+  }
+
   ['teachers', 'sponsors'].forEach((key) => {
     const imageField = LIST_BY_KEY[key].image;
     (activity[key] || []).forEach((item) => {
@@ -266,6 +288,7 @@ function imagePathsOf(activity) {
     if (v.indexOf('/images/activities/') === 0) out.push(v.slice(1));
   };
   if (activity) {
+    take(activity.cardImage);
     (activity.teachers || []).forEach((t) => take(t && t.photo));
     (activity.sponsors || []).forEach((s) => take(s && s.logo));
   }
@@ -310,8 +333,13 @@ function mergeByPermission(current, incoming, session) {
     ['status', 'motif', 'corner'].forEach((k) => {
       if (incoming[k] !== undefined) out[k] = incoming[k];
     });
+    // The card image is one picture for every language, so it is structure, not
+    // words. A role that may only edit Russian must not be able to change the
+    // image every language shows, exactly as it cannot change the price.
+    if (incoming.cardImage !== undefined) out.cardImage = incoming.cardImage || null;
     out.ctaUrl = langObject(incoming.ctaUrl !== undefined ? incoming.ctaUrl : out.ctaUrl);
   } else {
+    out.cardImage = (base && base.cardImage) || null;
     out.ctaUrl = langObject(out.ctaUrl);
   }
 

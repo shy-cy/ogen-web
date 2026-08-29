@@ -26,7 +26,13 @@
   // them in the same range as the partner logos in images/partners/.
   var PROFILES = {
     hero:   { maxEdge: 1600, quality: 0.82 },
-    credit: { maxEdge: 600,  quality: 0.85 }
+    credit: { maxEdge: 600,  quality: 0.85 },
+    // Listing and homepage cards. `square` crops to 1:1 rather than fitting
+    // inside a box: a card grid where one tile is 4:3 and the next is 16:9 is
+    // the thing the fixed ratio exists to prevent, so the ratio is guaranteed
+    // here, at upload, rather than asked for in a hint nobody reads. 800 covers
+    // a ~360px tile on a 2× screen.
+    card:   { maxEdge: 800,  quality: 0.82, square: true }
   };
 
   // Scale down to fit inside maxEdge, never up. An image already small enough
@@ -40,6 +46,30 @@
       width: Math.max(1, Math.round(width * ratio)),
       height: Math.max(1, Math.round(height * ratio)),
       scaled: true
+    };
+  }
+
+  // The centre square of a rectangle, and how big to draw it. Cropping rather
+  // than squashing: a squashed portrait is a defect anyone can see, and letterbox
+  // bars would put the activity's own background colour inside a grid of tiles
+  // that already has one.
+  //
+  // Centre is the only defensible automatic choice. A face is usually near the
+  // middle and never reliably at an edge, and the alternative is asking an admin
+  // to pick a focal point, which is a bigger feature than this one.
+  function squareCrop(width, height, maxEdge) {
+    var side = Math.min(width, height);
+    var out = Math.min(side, maxEdge);
+    return {
+      sx: Math.round((width - side) / 2),
+      sy: Math.round((height - side) / 2),
+      sSide: side,
+      width: out,
+      height: out,
+      // Whether anything was actually cut away. A source that is already square
+      // is not cropped, which is what makes it safe to hand the original back.
+      cropped: width !== height,
+      scaled: out < side
     };
   }
 
@@ -159,13 +189,19 @@
       return decode(file).then(function (source) {
         var sw = source.width || source.naturalWidth;
         var sh = source.height || source.naturalHeight;
-        var size = targetSize(sw, sh, profile.maxEdge);
+        var size = profile.square
+          ? squareCrop(sw, sh, profile.maxEdge)
+          : targetSize(sw, sh, profile.maxEdge);
 
         var canvas = document.createElement('canvas');
         canvas.width = size.width;
         canvas.height = size.height;
         var ctx = canvas.getContext('2d');
-        ctx.drawImage(source, 0, 0, size.width, size.height);
+        if (profile.square) {
+          ctx.drawImage(source, size.sx, size.sy, size.sSide, size.sSide, 0, 0, size.width, size.height);
+        } else {
+          ctx.drawImage(source, 0, 0, size.width, size.height);
+        }
         if (source.close) source.close();
 
         // JPEG never carries alpha, so there is nothing to check for one.
@@ -183,7 +219,14 @@
           // the target. Bytes are not the only cost: a 4000px image has to be
           // decoded into memory on a phone whatever it weighs on the wire.
           var muchTooBig = Math.max(sw, sh) > profile.maxEdge * 2;
-          if (blob.size >= file.size && !muchTooBig) {
+          // Handing the original back is only safe when the canvas was not the
+          // point. For a square slot it usually IS the point: a 1000×600 upload
+          // that re-encodes larger must still come back cropped, or the one
+          // promise this profile makes is broken by the size check. So the
+          // bail-out is available only when nothing was cut away, which is to
+          // say when the source was already square.
+          var mustKeepCanvas = profile.square && size.cropped;
+          if (blob.size >= file.size && !muchTooBig && !mustKeepCanvas) {
             return asDataUrl(file).then(function (dataUrl) {
               return { dataUrl: dataUrl, before: file.size, after: file.size, width: sw, height: sh,
                        type: file.type,
@@ -191,9 +234,16 @@
             });
           }
           return asDataUrl(blob).then(function (dataUrl) {
+            var note;
+            if (profile.square) {
+              note = size.cropped
+                ? 'cropped to a square ' + size.width + '×' + size.height
+                : (size.scaled ? 'resized to ' + size.width + '×' + size.height : 're-encoded');
+            } else {
+              note = size.scaled ? 'resized to ' + size.width + '×' + size.height : 're-encoded';
+            }
             return { dataUrl: dataUrl, before: file.size, after: blob.size,
-                     width: size.width, height: size.height, type: type,
-                     note: size.scaled ? 'resized to ' + size.width + '×' + size.height : 're-encoded' };
+                     width: size.width, height: size.height, type: type, note: note };
           });
         });
       });
@@ -211,6 +261,7 @@
   return {
     PROFILES: PROFILES,
     targetSize: targetSize,
+    squareCrop: squareCrop,
     isAnimatedGif: isAnimatedGif,
     chooseType: chooseType,
     isPassThrough: isPassThrough,

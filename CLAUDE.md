@@ -161,10 +161,40 @@ deliberately **absent from `sitemap.xml`**. Flip both once real copy lands.
 **Activity page** — `.activity-layout`: `.activity-main` beside a sticky
 `.activity-sidebar` of facts.
 
-The main column reads About → What to bring → FAQ → credits. The sidebar is
-Ages → Schedule → Duration → Group size → Language of instruction →
-Prerequisites → Location → Price → CTA. Three of those used to be sections in
-the main column; they are facts to scan, not prose.
+The main column reads About → What to bring → FAQ → credits. Three of the
+sidebar facts used to be sections in the main column; they are facts to scan,
+not prose.
+
+**The sidebar is three grouped blocks, not eight label/value rows.** Each is an
+icon, a heading, and its facts stacked underneath, ported from the Shirat HaYam
+event sidebar (`.sidebar-detail`) onto Ogen tokens:
+
+| Group | Facts, in this order |
+|---|---|
+| Who it is for | Ages, Group size, Prerequisites |
+| Schedule | When, Duration |
+| Details | Location, Language of instruction, Price |
+
+It was rows before: label at one edge, value at the other, via
+`justify-content:space-between` and `text-align:end`. That shape has to be told
+which edge is which, and in a site rendering the same markup both directions
+that instruction kept being wrong. It was fixed more than once and came back
+each time. **Nothing in the new block is pushed to an edge**, so there is not
+one directional override in the sidebar CSS, and a test asserts there never is.
+
+`FACT_GROUPS` in `_activity-facts.js` owns the grouping and declares the order
+within each group, which is deliberately *not* `FACT_ORDER` (Location reads
+before Language of instruction). `FACT_ORDER` stays the canonical list of what a
+fact is, and the module throws at require time if the two disagree, so a fact
+cannot be silently dropped from every group or listed in two. A group whose
+facts are all empty is dropped whole rather than rendering a lone icon and
+heading. Group headings never repeat a label inside their own group, which is
+why the schedule group is headed "Schedule" and not "When".
+
+Group icons are Lucide, white in a solid circle, per the icon rule, but at 34px
+rather than 56px: a 56px disc beside two lines of text in a 320px column is
+larger than the thing it labels. One colour per group from the offer-card
+rotation, olive / terracotta / navy.
 
 The status badge sits under the `<h1>` in `.page-header`, so `js/activity.js`
 looks it up from the document rather than from the `.activity` article — status
@@ -178,9 +208,28 @@ layout does **not** wrap: two columns need 868px of usable width, so it switches
 to a single column at 939px. It used to wrap between 781 and ~915px, dropping
 the facts box below the article at its full 320px width.
 
-**Activities have no hero image.** There is no image field on an activity at
-all; share cards fall back to the site's `og-image.jpg` and listing cards keep a
-plain coloured band.
+**The activity page still has no image.** There is no hero, and the template
+renders no picture of its own; share cards still fall back to the site's
+`og-image.jpg`. That part has not changed and is not an oversight.
+
+**An activity does now carry one image: `cardImage`**, a square picture for the
+activities listing and the homepage, added after the rule above was written and
+deliberately narrower than it. The activity page does not show it and `og:image`
+does not point at it, so a shared link is still the branded site card rather
+than a 1:1 crop letterboxed into a 1.91:1 slot.
+
+It is **structure, not words** — one picture for all three languages — so a role
+that may only edit Russian cannot change it, exactly as it cannot change the
+price. The path is `images/activities/<slug>-card.<ext>`: a fixed name rather
+than an id, so re-uploading replaces the file instead of accumulating one per
+attempt, and it is listed in `imagePathsOf()` so deleting an activity takes the
+photograph down with it. A cleared field travels as `null`, never absent, since
+"remove this image" and "this role did not send one" must not be the same
+request.
+
+**The homepage and listing display logic is not built yet.** The field, the
+upload, the storage and the admin preview are. Nothing renders `cardImage` on a
+page.
 
 Sidebar facts are **structured values, not text**. `netlify/functions/_activity-facts.js`
 is the one place a fact becomes a sentence, built per language — so
@@ -271,6 +320,21 @@ js/admin-session.js, js/activities-admin.js, js/repeatable-items.js
 js/image-optimize.js   resizes + re-encodes every upload IN THE BROWSER
 ```
 
+The form is a **projection of `FIELD_SCHEMA`**, one panel per group: Settings,
+Content, Card image, Optional sections, Sidebar facts, Teachers, Sponsors, FAQ,
+then **Search & sharing** last. Meta title and meta description used to sit in
+Content, between "About this activity" and "What to bring", where they read as
+more body copy to write, which is how a meta description ends up being a
+paragraph. They are their own `seo` group now.
+
+Moving a field between groups touches **three** places that must stay in step:
+the client renders each group, the client **reads the form back** from the same
+groups, and the server merges `SIMPLE_KEYS`. The read-back is the dangerous one,
+because nothing about it looks wrong — the field renders, the admin types into
+it, the save succeeds, and the value is gone. `SIMPLE_KEYS` therefore concats
+every group, and a test asserts that exactly the groups drawn are the groups
+read back.
+
 ### The rules that hold this together
 
 **1. A draft has no files.** `draft` is not a display state that hides a page —
@@ -314,10 +378,20 @@ removing a row reissues an id and merges two items' state).
 
 **6. Uploads are shrunk in the browser, not on the server.** `js/image-optimize.js`
 resizes and re-encodes before a byte is sent — hero to 1600px on the long edge
-as JPEG, teacher/sponsor images to 600px, transparency keeping them PNG, to
-match what the site already does by hand (`og-image.jpg` is 1200×630 at 72KB;
-`images/partners/*` are 19–51KB). Measured: an 865KB hero became 26KB, a 1.77MB
-logo 134KB.
+as JPEG, teacher/sponsor images to 600px, card images cropped to a centred
+square at 800px, transparency keeping them PNG, to match what the site already
+does by hand (`og-image.jpg` is 1200×630 at 72KB; `images/partners/*` are
+19–51KB). Measured: an 865KB hero became 26KB, a 1.77MB logo 134KB.
+
+The `card` profile **crops rather than fits**, and that changes one rule. Every
+other slot may hand back the original file when re-encoding produced something
+larger, which is right: a 52KB partner logo becomes 59KB. But the original of a
+1000×600 upload is 1000×600, and returning it would silently break the only
+promise a square slot makes. So the bail-out is refused whenever anything was
+actually cut away — `mustKeepCanvas` in `optimize()`. A source that was already
+square may still take it, because the original is square too. Centre is the crop
+because a face is usually near the middle and never reliably at an edge; the
+alternative is a focal-point picker, which is a bigger feature than this one.
 
 The browser is the right place because a server-side resize would fix only the
 page weight. An unoptimised upload also sent ~3.5MB towards Netlify's 6MB
