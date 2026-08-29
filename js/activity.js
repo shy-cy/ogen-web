@@ -30,7 +30,7 @@
       banner: { he:'עמוד זה עדיין לא פורסם', en:'This page has not been published yet', ru:'Эта страница ещё не опубликована' }
     },
     announcement: {
-      badge: { he:'הכרזה', en:'Announcement', ru:'Анонс' },
+      badge: { he:'בקרוב', en:'Coming soon', ru:'Скоро' },
       cta:   { he:'רישום עניין', en:'Register interest', ru:'Оставить заявку' },
       note:  { he:'נעדכן אתכם כשההרשמה תיפתח', en:"We'll let you know when registration opens", ru:'Мы сообщим вам, когда откроется запись' }
     },

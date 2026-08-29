@@ -16,6 +16,31 @@
 
   var API = '/api/activities-admin';
   var LANG_NAME = { he: 'Hebrew', en: 'English', ru: 'Russian' };
+
+  // What an admin READS for each status. The keys are the status values and
+  // never change — `announcement` is still `announcement` in the record, on the
+  // article and in every CSS class; only the wording here moved to "Coming
+  // soon", matching the badge visitors see and the homepage's own vocabulary.
+  //
+  // Two forms because they sit in different room: `label` is the dropdown,
+  // which can afford to explain itself, and `pill` is the 10px badge in the
+  // activity picker, which CSS uppercases. The picker used to print the raw key
+  // instead, so it was the one admin surface the label change would have
+  // missed.
+  var STATUS_LABELS = {
+    draft:        { label: 'Draft (not published)', pill: 'Draft' },
+    announcement: { label: 'Coming soon',           pill: 'Coming soon' },
+    open:         { label: 'Open for registration', pill: 'Open' },
+    waitlist:     { label: 'Waitlist',              pill: 'Waitlist' },
+    closed:       { label: 'Registration closed',   pill: 'Closed' },
+    cancelled:    { label: 'Cancelled',             pill: 'Cancelled' },
+    completed:    { label: 'Completed',             pill: 'Completed' }
+  };
+  var STATUS_SELECT = {};
+  Object.keys(STATUS_LABELS).forEach(function (k) { STATUS_SELECT[k] = STATUS_LABELS[k].label; });
+  var statusPill = function (status) {
+    return (STATUS_LABELS[status] && STATUS_LABELS[status].pill) || status;
+  };
   var S = {
     schema: null,
     editLangs: [],
@@ -112,10 +137,7 @@
       el('div', { class: 'hint', text: isNew ? 'lower-case-words-with-hyphens' : 'Fixed once published' })
     ]));
 
-    box.appendChild(select('f-status', 'Status', S.schema.statuses, rec.status || 'draft', {
-      draft: 'Draft (not published)', announcement: 'Announcement', open: 'Open for registration',
-      waitlist: 'Waitlist', closed: 'Registration closed', cancelled: 'Cancelled', completed: 'Completed'
-    }));
+    box.appendChild(select('f-status', 'Status', S.schema.statuses, rec.status || 'draft', STATUS_SELECT));
     box.appendChild(select('f-motif', 'Header motif', S.schema.motifs, rec.motif || 'ring'));
     box.appendChild(select('f-corner', 'Motif corner', S.schema.corners, rec.corner || 'tl', {
       tl: 'Top / start', tr: 'Top / end', bl: 'Bottom / start', br: 'Bottom / end'
@@ -168,6 +190,12 @@
     $('optional-fields').innerHTML = '';
     S.schema.optional.forEach(function (d) {
       $('optional-fields').appendChild(fieldRow(d, langObj(rec[d.key]), 'f-' + d.key));
+    });
+    // Its own panel at the foot of the form. Read from the schema like every
+    // other group, so adding an SEO field stays a one line change on the server.
+    $('seo-fields').innerHTML = '';
+    (S.schema.seo || []).forEach(function (d) {
+      $('seo-fields').appendChild(fieldRow(d, langObj(rec[d.key]), 'f-' + d.key));
     });
     renderFacts();
   }
@@ -567,7 +595,10 @@
     rec.corner = $('f-corner').value;
     rec.ctaUrl = readLangField('f-ctaUrl');
 
-    S.schema.simple.concat(S.schema.optional).forEach(function (d) {
+    // Every translatable scalar, in whichever panel it was drawn. Missing the
+    // SEO group here would read the form back without it and silently blank a
+    // meta description on the next save.
+    S.schema.simple.concat(S.schema.optional, S.schema.seo || []).forEach(function (d) {
       rec[d.key] = readLangField('f-' + d.key);
     });
     var facts = readFacts();
@@ -665,7 +696,7 @@
           onclick: function () { load(a.slug); }
         }, [
           el('span', { class: 'slug', text: title }),
-          el('span', { class: 'pill ' + a.status, text: a.status })
+          el('span', { class: 'pill ' + a.status, text: statusPill(a.status) })
         ]));
       });
     });
