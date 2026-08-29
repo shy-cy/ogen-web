@@ -4,9 +4,9 @@
   "motif": "ring",
   "corner": "tl",
   "ctaUrl": {
-    "he": "לחץ להרשמה",
-    "en": "Register Now",
-    "ru": "Register Now"
+    "he": "",
+    "en": "",
+    "ru": ""
   },
   "title": {
     "he": "עברית לילדים",
@@ -144,11 +144,11 @@
       "logo": "/images/activities/hebrew4kids-sponsors-spo-mtd1o2lk-3.png"
     }
   ],
-  "isoUpdated": "2026-08-29T15:26:59.650Z",
+  "isoUpdated": "2026-08-29T15:42:26.399Z",
   "isoCreated": "2026-08-28T14:55:38.930Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
-  "lastPublishedAt": "2026-08-29T15:26:59.650Z",
+  "lastPublishedAt": "2026-08-29T15:42:26.399Z",
   "factVisibility": {
     "ages": "public",
     "schedule": "public",
