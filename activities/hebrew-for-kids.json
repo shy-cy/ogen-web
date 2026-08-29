@@ -1,7 +1,6 @@
 {
   "slug": "hebrew-for-kids",
   "status": "open",
-  "spots": 4,
   "ctaUrl": {
     "he": "/#contact",
     "en": "/en/#contact",
@@ -11,10 +10,10 @@
   "corner": "tl",
   "heroImage": null,
   "isoCreated": "2026-08-27T09:00:00.000Z",
-  "isoUpdated": "2026-08-28T15:47:36.173Z",
+  "isoUpdated": "2026-08-29T09:55:13.389Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
-  "lastPublishedAt": "2026-08-28T15:47:36.173Z",
+  "lastPublishedAt": "2026-08-29T09:55:13.389Z",
   "title": {
     "he": "חוג עברית לילדים",
     "en": "Children's Hebrew Class",
@@ -45,40 +44,6 @@
     "en": "A weekly class based on the official curriculum of the World Zionist Organization. Children learn Hebrew through play, song and creative work, in small age-appropriate groups.",
     "ru": "Еженедельные занятия по официальной программе Всемирной сионистской организации. Дети изучают иврит через игру, песни и творчество в небольших группах, сформированных по возрасту."
   },
-  "included": [
-    {
-      "id": "inc-1a0471d46a8",
-      "text": {
-        "he": "מפגש שבועי של 60 דקות",
-        "en": "A weekly 60-minute session",
-        "ru": "Еженедельное занятие продолжительностью 60 минут"
-      }
-    },
-    {
-      "id": "inc-1a0471d46a9",
-      "text": {
-        "he": "חומרי לימוד והתנסות כלולים",
-        "en": "All learning and activity materials",
-        "ru": "Все учебные и творческие материалы"
-      }
-    },
-    {
-      "id": "inc-1a0471d46aa",
-      "text": {
-        "he": "קבוצות לפי גיל, עד 10 ילדים בקבוצה",
-        "en": "Groups by age, up to 10 children per group",
-        "ru": "Группы по возрасту, до 10 детей в группе"
-      }
-    },
-    {
-      "id": "inc-1a0471d46ab",
-      "text": {
-        "he": "מפגש הורים באמצע העונה",
-        "en": "A parents’ meeting mid-season",
-        "ru": "Родительская встреча в середине сезона"
-      }
-    }
-  ],
   "whatToBring": {
     "he": "מחברת וכלי כתיבה. שאר החומרים מסופקים על ידינו.",
     "en": "A notebook and something to write with. We provide everything else.",
