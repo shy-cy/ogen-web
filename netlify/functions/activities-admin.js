@@ -27,7 +27,7 @@ const { requireStore, optionalStore } = require('./_blobs');
 const { readJson, commitToBranch, mapConcurrent, CONCURRENCY } = require('./_github');
 const { recordAudit } = require('./_audit');
 const {
-  LANGS, STATUSES, MOTIFS, CORNERS, langsPresent, pick,
+  LANGS, STATUSES, MOTIFS, CORNERS, langsPresent, pick, isLinkish,
   filePathFor, pathFor, renderActivityPage
 } = require('./_activity-template');
 const { buildDerivedFiles, isPublic } = require('./_activity-index');
@@ -526,6 +526,21 @@ function validate(activity) {
   if (activity.corner && CORNERS.indexOf(activity.corner) === -1) errors.push(`Unknown corner "${activity.corner}"`);
   if (!hasAnyText(langObject(activity.title))) errors.push('A title is required in at least one language');
   if (!langsPresent(activity).length) errors.push('At least one language needs a title before this can be published');
+  // The registration button's target has to be a link. The template already
+  // refuses to publish anything else, so silence here would mean the admin
+  // typed a value, saw it saved, and never learned it was being thrown away.
+  // Say so instead, naming the language, because the field is per-language and
+  // only one of the three is usually wrong.
+  const cta = activity.ctaUrl && typeof activity.ctaUrl === 'object' ? activity.ctaUrl : {};
+  LANGS.forEach((l) => {
+    const v = String(cta[l] == null ? '' : cta[l]).trim();
+    if (v && !isLinkish(v)) {
+      errors.push(`The registration button link for ${l.toUpperCase()} is not a web address: "${v}". ` +
+        'Use a full https:// link, or a path on this site such as /#contact. ' +
+        'Leave it empty to send people to the contact form. ' +
+        "It is not the button's wording — the status decides that.");
+    }
+  });
   if (errors.length) {
     const err = new Error(errors[0]);
     err.validation = errors;

@@ -418,14 +418,21 @@ html[lang="he"] .credit-group-label{ text-transform:none; letter-spacing:0; font
    (waitlist), which made the one button on the page that does something look
    like a different kind of control on every activity. Status is still legible
    at a glance — that is what the coloured .status-badge above is for. Only the
-   closed state differs, because it is not a button you can press. */
-.sidebar-cta.is-announcement{ background: var(--terracotta); color:#fff; }
+   closed state differs, because it is not a button you can press.
+
+   No .is-announcement here: that status draws no button at all now, so a rule
+   for one would describe something that is never rendered. It returns with the
+   button. */
 .sidebar-cta.is-open{ background: var(--terracotta); color:#fff; }
 .sidebar-cta.is-waitlist{ background: var(--terracotta); color:#fff; }
 .sidebar-cta.is-closed{ background:#e4e0d4; color:#a39d8c; cursor:not-allowed; }
 .sidebar-note{ font-size:12.5px; color: var(--camel); text-align:center; margin-top:10px; }
 .status-banner{ padding:16px; border-radius:12px; text-align:center; font-size:14.5px; font-weight:700; margin-top:8px; }
 .status-banner.is-draft{ background:#eee; color:#888; }
+/* "Coming soon" has no button — registration is not open, so there is nothing
+   to click. A gold tint under the gold badge; olive rather than gold for the
+   text, which at 14.5px on a tint of its own colour is not readable enough. */
+.status-banner.is-announcement{ background:#f7ecd9; color: var(--olive); }
 .status-banner.is-cancelled{ background:#f6e2dd; color: var(--danger); }
 .status-banner.is-completed{ background: var(--stone); color: var(--olive); }
 

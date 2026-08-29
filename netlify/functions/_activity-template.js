@@ -121,6 +121,27 @@ function pick(field, lang) {
 
 const has = (field, lang) => pick(field, lang) !== '';
 
+// Is this value plainly a link? The registration button's target is free text in
+// the admin, and what got typed into it once was the button's own LABEL —
+// "Register Now" — which became <a href="Register Now"> and resolved, relative
+// to the page, to a 404 that still SAID "Register interest". It looked right and
+// only failed on click.
+//
+// So a value is used only when a browser could follow it: an absolute http(s)
+// URL, a path on this site, a fragment, or mail/phone. Anything else is dropped
+// and the button falls back to the contact section, which is where it pointed
+// before the field was filled in at all. A dead end is worse than the default.
+//
+// This is an allowlist, not a blocklist, because the value is printed into an
+// href: `javascript:` and `data:` are excluded by never being matched, rather
+// than by being remembered. Whitespace is rejected outright — every shape below
+// is a single token, and a value with a space in it is prose.
+const LINKISH = /^(?:https?:\/\/\S+|\/\S*|#\S*|mailto:\S+|tel:\S+)$/i;
+function isLinkish(value) {
+  const s = String(value == null ? '' : value).trim();
+  return s !== '' && LINKISH.test(s);
+}
+
 // A language is published only if it has its own title. Falling back to Hebrew
 // under an /en/ URL would be worse than not having the page.
 function langsPresent(activity) {
@@ -347,7 +368,12 @@ ${items}
 
   // Per-language so the CTA lands in the reader's own tree (or an external
   // registration URL later). A plain string still works — pick() passes it through.
-  const ctaUrl = pick(activity.ctaUrl, lang);
+  //
+  // A value that is not plainly a link is dropped rather than published: see
+  // isLinkish. The attribute simply does not appear, and js/activity.js falls
+  // back to '#register', the contact section.
+  const ctaRaw = pick(activity.ctaUrl, lang);
+  const ctaUrl = isLinkish(ctaRaw) ? ctaRaw : '';
   const ctaAttr = ctaUrl ? ` data-cta-url="${esc(ctaUrl)}"` : '';
 
   return `${head({
@@ -485,7 +511,7 @@ ${cards}
 
 module.exports = {
   SITE, LANGS, STATUSES, MOTIFS, CORNERS, LABELS, FALLBACK,
-  esc, pick, has, langsPresent,
+  esc, pick, has, langsPresent, isLinkish,
   pathFor, filePathFor, indexPathFor, indexFilePathFor, homeFor,
   renderActivityPage, renderActivitiesIndexPage
 };

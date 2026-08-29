@@ -257,7 +257,8 @@
     box.innerHTML = '';
     box.appendChild(fieldRow({
       label: 'Registration button link',
-      hint: 'Where the button under the facts sends people, per language. Leave empty and it points at the contact form.'
+      hint: 'The web address the button opens — a full https:// link, or a path on this site such as /#contact. ' +
+            'Not the button\'s wording: the status decides that. Leave empty and it points at the contact form.'
     }, langObj(S.record.ctaUrl), 'f-ctaUrl'));
   }
 
@@ -991,6 +992,39 @@
     return false;
   }
 
+  // The registration button's target must be a link, not the button's wording.
+  // The same rule as isLinkish() in netlify/functions/_activity-template.js,
+  // which is the one that decides — this only says so before the round trip, so
+  // a typo is a red line under the field rather than a rejected publish. A test
+  // asserts the two patterns stay identical.
+  var LINKISH = /^(?:https?:\/\/\S+|\/\S*|#\S*|mailto:\S+|tel:\S+)$/i;
+
+  // message() writes HTML, and what is being quoted back is whatever the admin
+  // typed into the field.
+  function escText(v) {
+    return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function requireCtaLink() {
+    var bad = null;
+    (S.schema.langs || ['he', 'en', 'ru']).forEach(function (lang) {
+      if (bad) return;
+      var field = $('f-ctaUrl-' + lang);
+      var v = ((field && field.value) || '').trim();
+      if (v && !LINKISH.test(v)) bad = { lang: lang, value: v, field: field };
+    });
+    if (!bad) return true;
+    message('err', 'The registration button link for <b>' + LANG_NAME[bad.lang] + '</b> is not a web address: <b>' +
+      escText(bad.value) + '</b>.<br>It is where the button goes, not what it says — the status decides the wording. ' +
+      'Use a full <b>https://</b> link or a path on this site such as <b>/#contact</b>, ' +
+      'or leave it empty to send people to the contact form.');
+    if (bad.field) {
+      bad.field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      bad.field.focus();
+    }
+    return false;
+  }
+
   function showConflict(payload, retry) {
     var c = payload.conflict || {};
     var box = $('conflict-box');
@@ -1083,6 +1117,7 @@
   function doPreview() {
     message('');
     if (!requireSlug()) return;
+    if (!requireCtaLink()) return;
     var activity = readForm();
     send({ action: 'preview', activity: activity }).then(function (res) {
       if (!res.ok) return message('err', failure(res, 'Preview'));
@@ -1137,6 +1172,7 @@
   function doSaveDraft(overwrite) {
     message('');
     if (!requireSlug()) return;
+    if (!requireCtaLink()) return;
     var activity = readForm();
     activity.status = 'draft';
     send({ action: 'saveDraft', activity: activity, baseUpdatedAt: S.baseUpdatedAt, overwrite: !!overwrite })
@@ -1155,6 +1191,7 @@
   function doPublish(overwrite) {
     message('');
     if (!requireSlug()) return;
+    if (!requireCtaLink()) return;
     var activity = readForm();
     if (activity.status === 'draft') {
       return message('err', 'Set a status other than Draft to publish. A draft is never committed.');

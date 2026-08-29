@@ -29,10 +29,22 @@
       badge:  { he:'טיוטה - לא גלוי לציבור', en:'Draft — not publicly visible', ru:'Черновик — не виден публично' },
       banner: { he:'עמוד זה עדיין לא פורסם', en:'This page has not been published yet', ru:'Эта страница ещё не опубликована' }
     },
+    // No button. Registration is not open yet, so there is nothing to click
+    // through to — a "Register interest" link had to point somewhere, and what
+    // it pointed at was the contact form pretending to be a registration.
+    // It is a banner for the same reason draft, cancelled and completed are:
+    // every status without an action says so the same way, rather than this one
+    // being an action that happens to be missing. The wording is the note it
+    // used to carry under the button.
+    //
+    // The `cta` strings are gone rather than kept unused, so nothing in this
+    // table describes a button that is never drawn. They come back with the
+    // registration system, which is also what would give them a real target.
     announcement: {
-      badge: { he:'בקרוב', en:'Coming soon', ru:'Скоро' },
-      cta:   { he:'רישום עניין', en:'Register interest', ru:'Оставить заявку' },
-      note:  { he:'נעדכן אתכם כשההרשמה תיפתח', en:"We'll let you know when registration opens", ru:'Мы сообщим вам, когда откроется запись' }
+      badge:  { he:'בקרוב', en:'Coming soon', ru:'Скоро' },
+      banner: { he:'נעדכן אתכם כשההרשמה תיפתח',
+                en:"We'll let you know when registration opens",
+                ru:'Мы сообщим вам, когда откроется запись' }
     },
     open: {
       badge: { he:'פתוח לרישום', en:'Open for registration', ru:'Открыта запись' },

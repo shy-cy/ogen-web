@@ -303,6 +303,32 @@ Driven by three markup contracts:
    lives in the `STATUS` table in that file, and `data-cta-url` is the button
    target.
 
+   An entry carries **either a `cta` or a `banner`**, and that is what decides
+   whether the status offers anything to press. Four of the seven are banners:
+   `draft`, `announcement`, `cancelled`, `completed`. `closed` is the one
+   pressable-looking exception, a disabled button.
+
+   **`announcement` deliberately has no button.** It used to render a real
+   "Register interest" link, and a link needs a target — but registration is not
+   built, so it either led to the contact form pretending to be a registration
+   or to whatever was typed in the registration-link field. What got typed there
+   once was the button's own *label*, which shipped as
+   `<a href="Register Now">` and 404'd in all three languages while still
+   *reading* "Register interest". It looked right and failed only on click. The
+   `cta` strings are deleted rather than kept unused; they return with the
+   registration system, which is also what would give them a real target.
+
+   **`ctaUrl` is only published when it is plainly a link** — `isLinkish()` in
+   `_activity-template.js`, an allowlist of http(s), a site path, a fragment,
+   `mailto:` and `tel:`. Anything else is dropped and the button falls back to
+   `#register`, the contact section, because a dead end is worse than the
+   default. `validate()` also refuses it on save, naming the language, so a
+   wrong value is corrected rather than silently discarded — silence is how it
+   reached the live site. `js/activities-admin.js` repeats the same pattern
+   client-side for immediate feedback, and a test asserts the two stay
+   character-identical. Being an allowlist is also what keeps `javascript:` out
+   of an href.
+
    There is deliberately **no "places left"**. It was a number an admin typed
    and then had to remember to decrement, so it was wrong the moment anyone
    registered. It comes back when there is a registration system to compute it
