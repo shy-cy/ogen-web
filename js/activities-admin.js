@@ -975,11 +975,14 @@
         S.baseUpdatedAt = res.data.baseUpdatedAt;
         S.slug = res.data.slug;
         S.dirty = false;
-        message('ok',
-          'Published. <a href="' + res.data.commit.url + '" target="_blank" rel="noopener">View the commit</a>. ' +
+        // AFTER the reload, not before. load() clears the message box on its way
+        // in, so a confirmation written here and then reloaded over is a
+        // confirmation nobody ever sees — which is how publishing went silent
+        // once already, and looked like a dead button.
+        var done = 'Published. <a href="' + res.data.commit.url + '" target="_blank" rel="noopener">View the commit</a>. ' +
           'Netlify takes about a minute to deploy, then: ' +
-          res.data.liveUrls.map(function (u) { return '<a href="' + u + '" target="_blank" rel="noopener">' + u + '</a>'; }).join(' · '));
-        load(S.slug);
+          res.data.liveUrls.map(function (u) { return '<a href="' + u + '" target="_blank" rel="noopener">' + u + '</a>'; }).join(' · ');
+        load(S.slug).then(function () { message('ok', done); });
       });
   }
 
@@ -988,9 +991,10 @@
     send({ action: 'unpublish', slug: S.slug, baseUpdatedAt: S.baseUpdatedAt }).then(function (res) {
       if (res.status === 409) return showConflict(res.data, function () { doUnpublish(); });
       if (!res.ok) return message('err', failure(res, 'Unpublishing'));
-      message('ok', 'Unpublished — the pages are gone from the site and it is a draft again. ' +
-        '<a href="' + res.data.commit.url + '" target="_blank" rel="noopener">View the commit</a>.');
-      load(S.slug);
+      var done = 'Unpublished — the pages are gone from the site and it is a draft again. ' +
+        '<a href="' + res.data.commit.url + '" target="_blank" rel="noopener">View the commit</a>.';
+      // After the reload, for the same reason as doPublish.
+      load(S.slug).then(function () { message('ok', done); });
     });
   }
 
