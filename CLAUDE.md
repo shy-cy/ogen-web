@@ -438,6 +438,21 @@ request limit and made the function re-upload all of it to GitHub, pushing it
 past its 10-second ceiling — which is what made a publish look like a dead
 button. Those two only get fixed before the bytes leave.
 
+**Uploaded filenames carry a content hash** — `<slug>-teachers-<id>-<hash8>.png`
+— because `netlify.toml` serves `/images/*` as `immutable` for a year, and item
+ids are stable. Re-uploading a photo in the same format used to write different
+bytes to the *same* URL, so every visitor who had seen the old one kept it and
+could never be sent the new one; one sponsor logo served three different files
+under a single URL. The hash makes that header true rather than weakening it,
+and it makes the stale-image cleanup in `generate()` fire on **every**
+replacement instead of only when the extension happened to change — which is
+what stops repeated replacements accumulating orphans. The same picture
+re-uploaded hashes the same, so an unchanged image never churns its URL.
+
+Existing un-hashed files are left alone: `take()` only runs for a `data:` URL,
+so a record that already holds a path keeps it, and nothing is renamed behind
+anyone's back. A file gets a hashed name the next time that picture is replaced.
+
 It declines to act rather than make things worse: never scales up, never
 returns a file bigger than it was given (a 52KB PNG re-encodes to 59KB), never
 flattens an animated GIF, never rasterises an SVG, and honours EXIF orientation

@@ -21,6 +21,7 @@
 //   published, Blobs for drafts — never from the deployed bundle, which trails
 //   a save by a minute) and refuses to write if it has moved.
 
+const crypto = require('crypto');
 const { authenticate, canAccess, canPublish, editLangs, canEditLang } = require('./_session-store');
 const { requireStore, optionalStore } = require('./_blobs');
 const { readJson, commitToBranch, mapConcurrent, CONCURRENCY } = require('./_github');
@@ -258,10 +259,29 @@ function extractImages(activity) {
   const map = {};
   const slug = activity.slug;
 
+  // The filename carries a hash OF THE PICTURE, so replacing one produces a new
+  // URL rather than new bytes at the old one.
+  //
+  // netlify.toml serves /images/* as `immutable` for a year, which tells a
+  // browser never to revalidate. That was true when /images/ held only
+  // hand-placed files; the admin made it a lie. Item ids are stable, so
+  // re-uploading a teacher's photo in the same format reused the exact
+  // filename — and every visitor who had already seen the old one kept it for
+  // a year and could not be sent the new one. One sponsor logo here has served
+  // three different files under a single URL.
+  //
+  // Hashing makes the header honest instead of weakening it. It also makes the
+  // stale-image cleanup below fire on EVERY replacement rather than only when
+  // the format (and so the extension) happened to change, which is what stops
+  // repeated replacements accumulating orphans.
+  //
+  // Same picture re-uploaded means the same hash, so an unchanged image does
+  // not churn its URL or bust anyone's cache for nothing.
   const take = (dataUrl, name) => {
     const img = decodeImage(dataUrl);
     if (!img) return null;
-    const path = `images/activities/${slug}-${name}.${img.ext}`;
+    const digest = crypto.createHash('sha256').update(img.base64).digest('hex').slice(0, 8);
+    const path = `images/activities/${slug}-${name}-${digest}.${img.ext}`;
     files.push({ path, content: img.base64, encoding: 'base64' });
     map['/' + path] = dataUrl;
     return '/' + path;

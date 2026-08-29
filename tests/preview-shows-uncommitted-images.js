@@ -52,8 +52,12 @@ function activity() {
   const map = prev.body.imagePreview || {};
   const keys = Object.keys(map).sort();
   H.eq(keys.length, 2, 'both uploads are in the map');
-  H.ok(keys.indexOf('/images/activities/purim-workshop-teachers-tea-1.png') !== -1, 'the teacher photo is there');
-  H.ok(keys.indexOf('/images/activities/purim-workshop-sponsors-spo-1.png') !== -1, 'the sponsor logo is there');
+  // Filenames carry a content hash, so these are matched by shape rather than
+  // spelled out — the hash is the point, not an incidental.
+  H.ok(keys.some((k) => /^\/images\/activities\/purim-workshop-teachers-tea-1-[0-9a-f]{8}\.png$/.test(k)),
+       'the teacher photo is there, under a hashed name');
+  H.ok(keys.some((k) => /^\/images\/activities\/purim-workshop-sponsors-spo-1-[0-9a-f]{8}\.png$/.test(k)),
+       'the sponsor logo is there, under a hashed name');
   keys.forEach((k) => H.eq(map[k], PNG, 'the map returns the original data URL for ' + k));
 
   console.log('\n[every image the page references can be resolved]');
@@ -70,7 +74,7 @@ function activity() {
   creditSrcs.forEach((src) => H.ok(!!map[src], 'the credit image ' + src + ' can be shown too'));
 
   console.log('\n[the HTML itself is untouched — no base64 leaks into the page]');
-  H.ok(credits.teachers[0].photo === '/images/activities/purim-workshop-teachers-tea-1.png',
+  H.ok(/^\/images\/activities\/purim-workshop-teachers-tea-1-[0-9a-f]{8}\.png$/.test(credits.teachers[0].photo),
        'the credits block carries the real path, not the data URL');
 
   console.log('\n[publish does not carry the data URLs back]');
@@ -79,8 +83,9 @@ function activity() {
     Object.assign({ action: 'publish', activity: activity() }, auth));
   H.eq(pub.status, 200, 'the publish succeeds');
   H.ok(pub.body.imagePreview === undefined, 'no image map comes back from a publish');
-  H.ok(github._files.has('images/activities/purim-workshop-teachers-tea-1.png'), 'the teacher photo is committed');
-  H.ok(github._files.has('images/activities/purim-workshop-sponsors-spo-1.png'), 'the sponsor logo is committed');
+  const committed = JSON.parse(github._files.get('activities/purim-workshop.json'));
+  H.ok(github._files.has(committed.teachers[0].photo.slice(1)), 'the teacher photo is committed');
+  H.ok(github._files.has(committed.sponsors[0].logo.slice(1)), 'the sponsor logo is committed');
 
   console.log('\n[a record with no new uploads has an empty map, not a missing one]');
   const again = await H.call(fn.handler, Object.assign({

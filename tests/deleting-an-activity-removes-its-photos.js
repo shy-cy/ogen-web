@@ -36,15 +36,24 @@ const activity = (slug) => ({
   await H.installSession(blobs, session);
   const auth = { token: session.token };
 
-  const IMAGES = [
-    'images/activities/purim-teachers-tea-1.png',
-    'images/activities/purim-sponsors-spo-1.png'
-  ];
+  // Filenames carry a content hash now, so the expected paths are read back
+  // from the record the publish actually wrote rather than spelled out here.
+  // The record is the source of truth for which files an activity owns, which
+  // is the same reason imagePathsOf() asks it instead of matching a prefix.
+  const pathsOf = (slug) => {
+    const rec = JSON.parse(github._files.get(`activities/${slug}.json`));
+    return [].concat((rec.teachers || []).map((t) => t.photo),
+                     (rec.sponsors || []).map((s) => s.logo))
+             .filter(Boolean).map((x) => x.replace(/^\//, ''));
+  };
 
   console.log('\n[publishing puts the images in the repo]');
   const pub = await H.call(fn.handler, Object.assign({ action: 'publish', activity: activity('purim') }, auth));
   H.eq(pub.status, 200, 'the publish succeeds');
-  IMAGES.forEach((p) => H.ok(github._files.has(p), p + ' is committed'));
+  const IMAGES = pathsOf('purim');
+  H.eq(IMAGES.length, 2, 'the record owns two pictures');
+  H.ok(IMAGES.every((x) => /-[0-9a-f]{8}\.[a-z]+$/.test(x)), 'each filename carries a content hash');
+  IMAGES.forEach((x) => H.ok(github._files.has(x), x + ' is committed'));
 
   console.log('\n[unpublishing keeps them — the draft still points at them]');
   const un = await H.call(fn.handler, Object.assign(
@@ -65,7 +74,7 @@ const activity = (slug) => ({
   H.eq(back.status, 200, 'it republishes');
   const html = github._files.get('activities/purim.html');
   const credits = JSON.parse(/id="activity-credits">([\s\S]*?)<\/script>/.exec(html)[1]);
-  H.eq(credits.teachers[0].photo, '/images/activities/purim-teachers-tea-1.png',
+  H.eq(credits.teachers[0].photo, '/' + IMAGES[0],
        'and still points at its teacher photo');
   IMAGES.forEach((p) => H.ok(github._files.has(p), p + ' survived the round trip'));
 
@@ -81,12 +90,14 @@ const activity = (slug) => ({
   // A prefix match on `images/activities/<slug>-` would have made "hebrew"
   // delete "hebrew-for-kids-hero.png". The paths come from the record instead.
   await H.call(fn.handler, Object.assign({ action: 'publish', activity: activity('hebrew-for-kids-extra') }, auth));
+  const extraImages = pathsOf('hebrew-for-kids-extra');
   const short = await H.call(fn.handler, Object.assign({ action: 'publish', activity: activity('hebrew') }, auth));
   H.eq(short.status, 200, 'a short-slug activity publishes alongside a longer one');
+  const shortImages = pathsOf('hebrew');
   await H.call(fn.handler, Object.assign({ action: 'delete', slug: 'hebrew', confirmSlug: 'hebrew' }, auth));
-  H.ok(!github._files.has('images/activities/hebrew-teachers-tea-1.png'), 'its own photo is deleted');
-  H.ok(github._files.has('images/activities/hebrew-for-kids-extra-teachers-tea-1.png'),
-       'the other activity keeps its photo, despite sharing the prefix');
+  shortImages.forEach((x) => H.ok(!github._files.has(x), 'its own photo is deleted: ' + x));
+  extraImages.forEach((x) => H.ok(github._files.has(x),
+       'the other activity keeps its photo, despite sharing the prefix: ' + x));
   H.ok(github._files.has('activities/hebrew-for-kids.html'), 'and its page is untouched');
 
   console.log('\n[replacing a picture takes the old file with it]');
@@ -95,15 +106,19 @@ const activity = (slug) => ({
   const JPEG = 'data:image/jpeg;base64,' + Buffer.from([
     0xFF,0xD8,0xFF,0xE0,0x00,0x10,0x4A,0x46,0x49,0x46,0x00,0x01,0xFF,0xD9]).toString('base64');
   const first = await H.call(fn.handler, Object.assign({ action: 'publish', activity: activity('swap') }, auth));
-  H.ok(github._files.has('images/activities/swap-teachers-tea-1.png'), 'the first photo is a PNG');
+  const before = pathsOf('swap');
+  H.ok(/\.png$/.test(before[0]), 'the first photo is a PNG');
+  H.ok(github._files.has(before[0]), 'and it is committed');
   const swapped = activity('swap');
   swapped.teachers = [{ id: 'tea-1', name: { he: 'דורית', en: 'Dorit', ru: '' }, photo: JPEG }];
   await H.call(fn.handler, Object.assign(
     { action: 'publish', activity: swapped, baseUpdatedAt: first.body.baseUpdatedAt }, auth));
-  H.ok(github._files.has('images/activities/swap-teachers-tea-1.jpg'), 'the replacement is committed');
-  H.ok(!github._files.has('images/activities/swap-teachers-tea-1.png'), 'and the file it replaced is gone');
-  H.ok(github._files.has('images/activities/swap-sponsors-spo-1.png'),
-       'a picture that did not change is left alone');
+  const after = pathsOf('swap');
+  H.ok(/\.jpg$/.test(after[0]), 'the replacement is committed as a JPEG');
+  H.ok(github._files.has(after[0]), 'and the new file is there');
+  H.ok(!github._files.has(before[0]), 'and the file it replaced is gone');
+  H.eq(after[1], before[1], 'the sponsor logo did not change, so its URL did not either');
+  H.ok(github._files.has(before[1]), 'a picture that did not change is left alone');
 
   console.log('\n[deleting an activity that has no images at all still works]');
   const plain = Object.assign(activity('plain'), { teachers: [], sponsors: [] });
