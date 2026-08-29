@@ -34,9 +34,9 @@
     "ru": "Уроки иврита для детей 6–10 лет в центре «Оген». Чтение, письмо и разговорный иврит, а также знакомство с Израилем, еврейскими праздниками и культурой."
   },
   "whatToBring": {
-    "he": "מחברת וקלסר",
-    "en": "",
-    "ru": ""
+    "he": "מחברת וקלמר",
+    "en": "Notebook and pencil case",
+    "ru": "Тетрадь и пенал"
   },
   "facts": {
     "ages": {
@@ -80,18 +80,18 @@
     "instructionLanguage": {
       "he": "עברית ואנגלית",
       "en": "Hebrew and English",
-      "ru": ""
+      "ru": "Hebrew and English"
     },
     "prerequisites": {
       "he": "מתחילים",
       "en": "Beginners",
-      "ru": ""
+      "ru": "Beginners"
     },
     "location": {
       "text": {
         "he": "לימסול",
         "en": "Limassol",
-        "ru": ""
+        "ru": "Limassol"
       }
     },
     "price": {
@@ -111,8 +111,8 @@
       "id": "tea-mtcyrd47-1",
       "name": {
         "he": "דורית",
-        "en": "",
-        "ru": ""
+        "en": "Dorit ",
+        "ru": "Dorit"
       },
       "photo": "/images/activities/hebrew4kids-teachers-tea-mtcyrd47-1.png"
     },
@@ -120,8 +120,8 @@
       "id": "tea-mtd1nrnl-2",
       "name": {
         "he": "עירית",
-        "en": "",
-        "ru": ""
+        "en": "Irit",
+        "ru": "Irit"
       },
       "photo": "/images/activities/hebrew4kids-teachers-tea-mtd1nrnl-2.gif"
     }
@@ -137,11 +137,11 @@
       "logo": "/images/activities/hebrew4kids-sponsors-spo-mtd1o2lk-3.png"
     }
   ],
-  "isoUpdated": "2026-08-29T10:48:13.698Z",
+  "isoUpdated": "2026-08-29T10:50:32.682Z",
   "isoCreated": "2026-08-28T14:55:38.930Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
-  "lastPublishedAt": "2026-08-29T10:48:13.698Z",
+  "lastPublishedAt": "2026-08-29T10:50:32.682Z",
   "factVisibility": {
     "ages": "public",
     "schedule": "public",
