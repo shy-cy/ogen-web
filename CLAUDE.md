@@ -159,7 +159,25 @@ Two shells for pages beyond the homepage. Both open with the shared
 deliberately **absent from `sitemap.xml`**. Flip both once real copy lands.
 
 **Activity page** — `.activity-layout`: `.activity-main` beside a sticky
-`.activity-sidebar` of facts.
+`.activity-aside`, which stacks the activity's square picture
+(`.activity-card-image`) above the `.activity-sidebar` of facts. The column
+carries the width and the stickiness so both cards move together; an activity
+with no `cardImage` renders no frame at all rather than an empty one. Below
+939px the picture becomes a 16:7 band, because a full-width square on a phone
+is enormous.
+
+The same picture is the listing card's thumbnail. It was **write-only** for a
+while — uploaded, cropped, optimised, committed, shown in the admin, and
+rendered nowhere, because the listing thumb was a hardcoded empty span. An
+activity without one still gets the coloured band, so a mixed listing reads as
+a grid. It is decorative in both places: empty `alt`, because the heading beside
+it already names the activity. Note `height:auto` in the CSS is load-bearing —
+the `width`/`height` attributes are presentational hints, so without it
+`height="800"` wins and `aspect-ratio` is ignored.
+
+The card image is **not** the share image. `shareImage` is a separate field with
+its own 1200×630 crop, and falls back to the site's `og-image.jpg`, never to the
+card.
 
 The main column reads About → What to bring → FAQ → credits. Three of the
 sidebar facts used to be sections in the main column; they are facts to scan,
@@ -469,6 +487,16 @@ hash means anything unchanged keeps its URL and revalidates to a 304.
 Existing un-hashed files are left alone: `take()` only runs for a `data:` URL,
 so a record that already holds a path keeps it, and nothing is renamed behind
 anyone's back. A file gets a hashed name the next time that picture is replaced.
+
+**The admin keeps the bytes it uploaded until the URL answers.** A publish
+commits the picture and rewrites the record to the path it will have, but
+Netlify takes about a minute to deploy — and the admin used to reload the record
+and swap the bytes it was showing for a URL that was not being served yet. Every
+freshly uploaded picture went to a broken image icon for a minute, and the 404 it
+collected sat in the cache for five more. `S.freshBytes` maps a committed path to
+the bytes already in hand; a background check swaps in the real file the moment
+it answers, by patching the `<img>` rather than redrawing (a redraw would discard
+anything typed since the publish). Display only: the record still holds the path.
 
 It declines to act rather than make things worse: never scales up, never
 returns a file bigger than it was given (a 52KB PNG re-encodes to 59KB), never

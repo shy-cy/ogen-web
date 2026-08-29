@@ -33,6 +33,7 @@ function indexEntry(a) {
     langs: langsPresent(a),
     title: a.title,
     summary: a.summary || null,
+    cardImage: a.cardImage || null,
     isoUpdated: a.isoUpdated || null
   };
 }

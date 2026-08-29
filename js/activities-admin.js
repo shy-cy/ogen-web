@@ -52,6 +52,9 @@
     images: {},        // per-item pending uploads, keyed by ITEM ID (never index)
     cardImage: undefined,  // pending square upload: undefined = untouched, null = removed
     shareImage: undefined, // pending 1200x630 upload, same three states
+    // Committed path -> the bytes we already hold for it. See adoptDeployed().
+    freshBytes: {},
+    freshTimer: null,
     previewLang: 'he',
     scheduleSessions: [],
     dirty: false
@@ -161,6 +164,70 @@
   // The 3MB cap is now a floor-through case rather than the usual one: it stops
   // a file too large to even decode. The server keeps its own limit regardless,
   // because a check that only runs in the browser is not a check.
+  // ---------- surviving the minute between a commit and a deploy -------------
+  // Publishing writes the picture to git and rewrites the record to the path it
+  // will have. Netlify then takes about a minute to deploy. In between, the
+  // admin reloaded the record and swapped the bytes it was showing for a path
+  // that was not being served yet — so every freshly uploaded picture went to a
+  // broken image icon for a minute, and the 404 it collected then sat in the
+  // browser cache for another five.
+  //
+  // The bytes are already in hand, so they are kept and shown until the real URL
+  // answers. This is display only: the record holds the path, and a save sends
+  // the path, exactly as before.
+  function rememberFreshBytes(saved, pending) {
+    if (!saved || !pending) return;
+    var keep = function (path, dataUrl) {
+      if (path && dataUrl && String(dataUrl).indexOf('data:') === 0) S.freshBytes[path] = dataUrl;
+    };
+    keep(saved.cardImage, pending.cardImage);
+    keep(saved.shareImage, pending.shareImage);
+    // Teachers and sponsors, from the schema rather than by name, so a new list
+    // with an image field is covered without touching this.
+    (S.schema.lists || []).forEach(function (spec) {
+      if (!spec.image) return;
+      (saved[spec.key] || []).forEach(function (item) {
+        if (item) keep(item[spec.image], pending.items[item.id]);
+      });
+    });
+    confirmFreshBytes();
+  }
+
+  // Swap in the real file the moment it answers. Done by patching the element
+  // rather than redrawing: a redraw here would discard whatever the admin has
+  // typed since the publish.
+  function adoptDeployed(path) {
+    delete S.freshBytes[path];
+    var live = document.querySelectorAll('[data-fresh-path="' + path + '"]');
+    Array.prototype.forEach.call(live, function (img) {
+      img.removeAttribute('data-fresh-path');
+      img.src = path;
+    });
+  }
+
+  function confirmFreshBytes() {
+    if (S.freshTimer || !Object.keys(S.freshBytes).length) return;
+    var started = Date.now();
+    var tick = function () {
+      S.freshTimer = null;
+      var paths = Object.keys(S.freshBytes);
+      if (!paths.length) return;
+      // cache:'reload' so a 404 collected a moment ago cannot answer for the file.
+      Promise.all(paths.map(function (path) {
+        return window.fetch(path, { method: 'GET', cache: 'reload' })
+          .then(function (r) { if (r.ok) adoptDeployed(path); })
+          .catch(function () {});
+      })).then(function () {
+        // Give up after five minutes rather than polling for ever. The bytes on
+        // screen stay correct either way; only the swap to the real URL is lost.
+        if (Object.keys(S.freshBytes).length && Date.now() - started < 300000) {
+          S.freshTimer = window.setTimeout(tick, 5000);
+        }
+      });
+    };
+    S.freshTimer = window.setTimeout(tick, 3000);
+  }
+
   function readImage(input, slot, cb) {
     var file = input.files && input.files[0];
     if (!file) return;
@@ -254,11 +321,17 @@
     // enforces this; disabling the input here just avoids offering an action
     // that would be discarded.
     var mayEdit = S.schema.langs.every(canEdit);
-    var current = cfg.current;
+    var stored = cfg.stored || '';
+    // Bytes we still hold for a path that was committed but may not be deployed
+    // yet — see rememberFreshBytes().
+    var fresh = !cfg.pending && stored ? S.freshBytes[stored] : null;
+    var current = cfg.pending || fresh || stored;
 
     var frame = el('div', { class: cfg.frameClass });
     if (current) {
-      frame.appendChild(el('img', { src: current, alt: cfg.alt }));
+      var img = el('img', { src: current, alt: cfg.alt });
+      if (fresh) img.setAttribute('data-fresh-path', stored);
+      frame.appendChild(img);
     } else {
       frame.appendChild(el('span', { class: 'card-image-empty', text: 'No image' }));
     }
@@ -285,7 +358,7 @@
       boxId: 'card-image', frameClass: 'card-image-frame', inputId: 'f-cardImage',
       alt: 'Card image preview',
       readOnly: 'Read-only for your role: the card image is shown in every language.',
-      current: S.cardImage || S.record.cardImage || '',
+      pending: S.cardImage, stored: S.record.cardImage || '',
       onPick: function (input) {
         readImage(input, 'card', function (dataUrl) {
           S.cardImage = dataUrl;
@@ -310,7 +383,7 @@
       boxId: 'share-image', frameClass: 'share-image-frame', inputId: 'f-shareImage',
       alt: 'Share image preview',
       readOnly: 'Read-only for your role: the share image is shown in every language.',
-      current: S.shareImage || S.record.shareImage || '',
+      pending: S.shareImage, stored: S.record.shareImage || '',
       onPick: function (input) {
         readImage(input, 'share', function (dataUrl) {
           S.shareImage = dataUrl;
@@ -693,7 +766,10 @@
             // Per-item state is keyed by the item's own id, which is why those
             // ids must never be positional.
             // No src rather than an empty one — see the note on the hero preview.
-            var img = el('img', { src: S.images[item.id] || item[spec.image] || null, alt: '' });
+            var storedSrc = item[spec.image] || '';
+            var freshSrc = !S.images[item.id] && storedSrc ? S.freshBytes[storedSrc] : null;
+            var img = el('img', { src: S.images[item.id] || freshSrc || storedSrc || null, alt: '' });
+            if (freshSrc) img.setAttribute('data-fresh-path', storedSrc);
             var file = el('input', { type: 'file', accept: 'image/*', style: 'font-size:12px;',
               disabled: structureLocked || null });
             file.addEventListener('change', function () {
@@ -868,6 +944,10 @@
   }
 
   function load(slug) {
+    // Held bytes belong to the activity they were uploaded for. The reload after
+    // a publish asks for the SAME slug, so they survive that; opening a
+    // different activity drops them.
+    if (slug !== S.slug) S.freshBytes = {};
     clearConflict();
     message('');
     return send({ action: 'load', slug: slug }).then(function (res) {
@@ -967,11 +1047,19 @@
       return message('err', 'Set a status other than Draft to publish. A draft is never committed.');
     }
     $('btn-publish').disabled = true;
+    // What we uploaded in this session, before load() forgets it.
+    var pending = {
+      cardImage: S.cardImage, shareImage: S.shareImage,
+      items: Object.assign({}, S.images)
+    };
     send({ action: 'publish', activity: activity, baseUpdatedAt: S.baseUpdatedAt, overwrite: !!overwrite })
       .then(function (res) {
         applyLocks();
         if (res.status === 409) return showConflict(res.data, doPublish);
         if (!res.ok) return message('err', failure(res, 'Publishing'));
+        // Before load(): fillForm redraws from the record, and by then the
+        // pictures must already know they still have their own bytes.
+        rememberFreshBytes(res.data.activity, pending);
         S.baseUpdatedAt = res.data.baseUpdatedAt;
         S.slug = res.data.slug;
         S.dirty = false;
@@ -1013,6 +1101,7 @@
   $('logout').addEventListener('click', window.AdminSession.logout);
   $('new-activity').addEventListener('click', function () {
     clearConflict(); message('');
+    S.freshBytes = {};
     fillForm(blankRecord(), null);
     refreshList(null);
   });

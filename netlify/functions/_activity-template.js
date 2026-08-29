@@ -285,6 +285,21 @@ ${items}
     })
     .join('\n');
 
+  // The activity's own picture, at the head of the aside column with the facts
+  // panel beneath it — two stacked cards rather than one. It is the same square
+  // image the listing cards use, so an activity is recognisable from the listing
+  // to its own page without asking an admin for a second picture.
+  //
+  // Decorative: the alt is empty and it is aria-hidden, because the heading
+  // right above it already names the activity and a screen reader announcing
+  // "Hebrew for children" twice is noise, not information.
+  const cardImageBlock = activity.cardImage
+    ? `      <figure class="activity-card-image" aria-hidden="true">
+        <img src="${esc(activity.cardImage)}" alt="" width="800" height="800" loading="lazy">
+      </figure>
+`
+    : '';
+
   // Per-language so the CTA lands in the reader's own tree (or an external
   // registration URL later). A plain string still works — pick() passes it through.
   const ctaUrl = pick(activity.ctaUrl, lang);
@@ -328,10 +343,12 @@ ${GENERATED_NOTE(`activities/${slug}.json`)}
          source order rather than the CSS order property also keeps visual, DOM and
          keyboard order identical, so the registration button is not reached
          last by a screen reader while appearing first on screen. -->
-    <aside class="activity-sidebar">
+    <div class="activity-aside">
+${cardImageBlock}      <aside class="activity-sidebar">
 ${factGroups}
-      <div data-status-cta></div>
-    </aside>
+        <div data-status-cta></div>
+      </aside>
+    </div>
 
     <div class="activity-main">
       <h2>${L.about}</h2>
@@ -367,9 +384,13 @@ ${list
         .map((a) => {
           const title = pick(a.title, lang);
           const blurb = pick(a.summary, lang) || pick(a.about, lang).slice(0, 140);
-          // A coloured band, not a picture: activities no longer carry an
-          // image of their own. It is decorative, hence aria-hidden.
-          const thumb = `      <span class="activity-card-thumb" aria-hidden="true"></span>`;
+          // The activity's square picture when it has one, and the coloured band
+          // when it does not — so a listing with a mix of both still reads as a
+          // grid. Decorative either way: the card's own heading names the
+          // activity, so the alt is empty rather than a repeat of it.
+          const thumb = a.cardImage
+            ? `      <img class="activity-card-thumb" src="${esc(a.cardImage)}" alt="" width="800" height="800" loading="lazy">`
+            : `      <span class="activity-card-thumb" aria-hidden="true"></span>`;
           return `    <a class="activity-card" href="${pathFor(a.slug, lang)}">
 ${thumb}
       <h2>${esc(title)}</h2>

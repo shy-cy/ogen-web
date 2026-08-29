@@ -33,6 +33,16 @@ const R = path.join(__dirname, '..');
 const src = fs.readFileSync(path.join(R, 'js/image-optimize.js'), 'utf8');
 const adminFn = fs.readFileSync(path.join(R, 'netlify/functions/activities-admin.js'), 'utf8');
 const adminJs = fs.readFileSync(path.join(R, 'js/activities-admin.js'), 'utf8');
+const { renderActivityPage } = require('../netlify/functions/_activity-template');
+const { renderActivitiesIndexPage } = require('../netlify/functions/_activity-template');
+
+const activity = () => ({
+  slug: 'purim', status: 'open',
+  title: { he: 'סדנת פורים', en: 'Purim workshop', ru: '' },
+  summary: { he: 'תקציר', en: 'Summary', ru: '' },
+  about: { he: 'תיאור', en: 'About', ru: '' },
+  facts: {}, teachers: [], sponsors: [], faq: []
+});
 const adminHtml = fs.readFileSync(path.join(R, 'admin/activities.html'), 'utf8');
 
 console.log('[the profile exists and asks for a square]');
@@ -128,10 +138,44 @@ H.ok(/renderCardImage/.test(adminJs), 'and something that draws it');
 H.ok(/aspect-ratio:1\/1/.test(fs.readFileSync(path.join(R, 'admin/admin.css'), 'utf8')),
   'the preview frame is a real square, so the admin sees the actual crop');
 
-console.log('\n[the activity page still has no image of its own]');
+console.log('\n[the picture is actually shown, in both places]');
+// It was write-only for a while: uploaded, cropped, optimised, committed, shown
+// in the admin — and rendered on no public page at all, because the listing
+// thumb was a hardcoded empty span. An image an admin cannot see the effect of
+// is worse than no image field.
 const tpl = fs.readFileSync(path.join(R, 'netlify/functions/_activity-template.js'), 'utf8');
-H.ok(tpl.indexOf('cardImage') === -1,
-  'the activity page does not render it: this field is for listing cards');
+const IDX = fs.readFileSync(path.join(R, 'netlify/functions/_activity-index.js'), 'utf8');
+H.ok(/activity\.cardImage/.test(tpl), 'the activity page renders it');
+H.ok(/a\.cardImage/.test(tpl), 'and so does the listing card');
+H.ok(/cardImage: a\.cardImage \|\| null/.test(IDX),
+  'and activities-index.json carries it, so anything else built from that has it too');
+
+const withPic = Object.assign(activity(), { cardImage: '/images/activities/purim-card-abc12345.jpg' });
+const page = renderActivityPage(withPic, 'he');
+H.ok(page.indexOf('/images/activities/purim-card-abc12345.jpg') !== -1, 'the picture is in the page');
+H.ok(/class="activity-card-image"/.test(page), 'in its own card above the facts panel');
+H.ok(page.indexOf('activity-card-image') < page.indexOf('activity-sidebar'),
+  'ABOVE it, not below — the picture leads the column');
+H.ok(/alt=""/.test(page), 'with an empty alt: the h1 above already names the activity');
+
+// An activity with no picture must not render an empty frame.
+const noPic = renderActivityPage(activity(), 'he');
+H.ok(noPic.indexOf('activity-card-image') === -1, 'an activity with no picture gets no empty frame');
+H.ok(noPic.indexOf('<img') === -1 || !/activity-card-image/.test(noPic), 'and no stray img');
+
+// The listing keeps the coloured band for an activity with no picture, so a
+// mixed listing still reads as a grid rather than a ragged column.
+const listWith = renderActivitiesIndexPage([withPic], 'he');
+const listWithout = renderActivitiesIndexPage([activity()], 'he');
+H.ok(/<img class="activity-card-thumb"/.test(listWith), 'a card with a picture uses an img');
+H.ok(/<span class="activity-card-thumb"/.test(listWithout), 'one without keeps the coloured band');
+H.ok(listWith.indexOf('/images/activities/purim-card-abc12345.jpg') !== -1,
+  'and it points at the right file');
+
+// The two fields stay distinct: a card image must never become the share card.
+const shareOf = (html) => (/og:image" content="([^"]+)"/.exec(html) || [])[1];
+H.eq(shareOf(page), 'https://www.ogen.cy/images/og-image.jpg',
+  'having a card image does NOT make it the share image');
 // Precise about WHICH image, now that an activity can carry its own share card:
 // the card image must never become the share image by accident, and an activity
 // with no share image of its own still falls back to the site's.
