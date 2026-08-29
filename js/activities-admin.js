@@ -191,12 +191,6 @@
     S.schema.optional.forEach(function (d) {
       $('optional-fields').appendChild(fieldRow(d, langObj(rec[d.key]), 'f-' + d.key));
     });
-    // Its own panel at the foot of the form. Read from the schema like every
-    // other group, so adding an SEO field stays a one line change on the server.
-    $('seo-fields').innerHTML = '';
-    (S.schema.seo || []).forEach(function (d) {
-      $('seo-fields').appendChild(fieldRow(d, langObj(rec[d.key]), 'f-' + d.key));
-    });
     renderFacts();
   }
 
@@ -595,10 +589,7 @@
     rec.corner = $('f-corner').value;
     rec.ctaUrl = readLangField('f-ctaUrl');
 
-    // Every translatable scalar, in whichever panel it was drawn. Missing the
-    // SEO group here would read the form back without it and silently blank a
-    // meta description on the next save.
-    S.schema.simple.concat(S.schema.optional, S.schema.seo || []).forEach(function (d) {
+    S.schema.simple.concat(S.schema.optional).forEach(function (d) {
       rec[d.key] = readLangField('f-' + d.key);
     });
     var facts = readFacts();
