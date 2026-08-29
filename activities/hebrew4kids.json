@@ -6,8 +6,8 @@
   "spots": null,
   "heroImage": "/images/activities/hebrew4kids-hero.jpg",
   "ctaUrl": {
-    "he": "",
-    "en": "",
+    "he": "לחץ להרשמה",
+    "en": "Register Now",
     "ru": ""
   },
   "title": {
@@ -52,7 +52,12 @@
     },
     "schedule": {
       "frequency": "weekly",
-      "sessions": [],
+      "sessions": [
+        {
+          "day": 3,
+          "time": "16:00"
+        }
+      ],
       "legacyText": {
         "he": "ימי רביעי, 16:30",
         "en": "",
@@ -60,10 +65,10 @@
       }
     },
     "duration": {
-      "startDate": "",
-      "endDate": "",
-      "sessionCount": null,
-      "sessionMinutes": null,
+      "startDate": "2026-10-14",
+      "endDate": "2026-12-23",
+      "sessionCount": 10,
+      "sessionMinutes": 90,
       "legacyText": {
         "he": "90 דקות, עם הפסקה באמצע.",
         "en": "",
@@ -71,8 +76,8 @@
       }
     },
     "groupSize": {
-      "groups": null,
-      "maxPerGroup": null,
+      "groups": 2,
+      "maxPerGroup": 7,
       "legacyText": {
         "he": "שתי קבוצות של 7 תלמידים",
         "en": "",
@@ -81,24 +86,24 @@
     },
     "instructionLanguage": {
       "he": "עברית ואנגלית",
-      "en": "",
+      "en": "Hebrew and English",
       "ru": ""
     },
     "prerequisites": {
       "he": "מתחילים",
-      "en": "",
+      "en": "Beginners",
       "ru": ""
     },
     "location": {
       "text": {
         "he": "לימסול",
-        "en": "",
+        "en": "Limassol",
         "ru": ""
       }
     },
     "price": {
-      "registrationFee": null,
-      "fullPrice": null,
+      "registrationFee": 50,
+      "fullPrice": 300,
       "perHourOverride": null,
       "legacyText": {
         "he": "דמי הרשמה של 50 אירו + 360 אירו ל-12 שיעורים",
@@ -140,11 +145,11 @@
       "logo": "/images/activities/hebrew4kids-sponsors-spo-mtd1o2lk-3.png"
     }
   ],
-  "isoUpdated": "2026-08-29T08:42:34.401Z",
+  "isoUpdated": "2026-08-29T09:38:24.355Z",
   "isoCreated": "2026-08-28T14:55:38.930Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
-  "lastPublishedAt": "2026-08-29T08:42:34.401Z",
+  "lastPublishedAt": "2026-08-29T09:38:24.355Z",
   "factVisibility": {
     "ages": "public",
     "schedule": "public",
@@ -153,6 +158,6 @@
     "instructionLanguage": "public",
     "prerequisites": "public",
     "location": "members",
-    "price": "public"
+    "price": "members"
   }
 }
