@@ -65,8 +65,7 @@ const FIELD_SCHEMA = {
     { key: 'summary', label: 'Card summary', hint: 'One line, shown on the activities listing' },
     { key: 'about', label: 'About this activity', textarea: true, required: true },
     { key: 'metaTitle', label: 'Meta title', hint: 'Defaults to the title' },
-    { key: 'metaDescription', label: 'Meta description', textarea: true },
-    { key: 'heroAlt', label: 'Hero image alt text' }
+    { key: 'metaDescription', label: 'Meta description', textarea: true }
   ],
   optional: [
     { key: 'whatToBring', label: 'What to bring', textarea: true }
@@ -242,9 +241,6 @@ function extractImages(activity) {
     return '/' + path;
   };
 
-  if (activity.heroImage && activity.heroImage.startsWith('data:')) {
-    activity.heroImage = take(activity.heroImage, 'hero') || null;
-  }
   ['teachers', 'sponsors'].forEach((key) => {
     const imageField = LIST_BY_KEY[key].image;
     (activity[key] || []).forEach((item) => {
@@ -270,7 +266,6 @@ function imagePathsOf(activity) {
     if (v.indexOf('/images/activities/') === 0) out.push(v.slice(1));
   };
   if (activity) {
-    take(activity.heroImage);
     (activity.teachers || []).forEach((t) => take(t && t.photo));
     (activity.sponsors || []).forEach((s) => take(s && s.logo));
   }
@@ -312,7 +307,7 @@ function mergeByPermission(current, incoming, session) {
   // session that may edit every language. A restricted role gets the words
   // and not the structure.
   if (full) {
-    ['status', 'motif', 'corner', 'heroImage'].forEach((k) => {
+    ['status', 'motif', 'corner'].forEach((k) => {
       if (incoming[k] !== undefined) out[k] = incoming[k];
     });
     out.ctaUrl = langObject(incoming.ctaUrl !== undefined ? incoming.ctaUrl : out.ctaUrl);

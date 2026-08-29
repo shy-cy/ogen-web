@@ -170,15 +170,10 @@ function renderActivityPage(activity, lang) {
   const title = pick(activity.title, lang);
   const metaTitle = pick(activity.metaTitle, lang) || title + L.suffix;
   const metaDescription = pick(activity.metaDescription, lang) || pick(activity.about, lang).slice(0, 300);
-  const heroAlt = pick(activity.heroAlt, lang) || title;
 
   const motif = MOTIFS.indexOf(activity.motif) !== -1 ? activity.motif : 'ring';
   const corner = CORNERS.indexOf(activity.corner) !== -1 ? activity.corner : 'tl';
   const status = STATUSES.indexOf(activity.status) !== -1 ? activity.status : 'draft';
-
-  const hero = activity.heroImage
-    ? `<img class="activity-hero-img" src="${esc(activity.heroImage)}" alt="${esc(heroAlt)}">`
-    : `<div class="activity-hero-img" role="img" aria-label="${esc(heroAlt)}"></div>`;
 
   const faqItems = (activity.faq || [])
     .filter((item) => item && has(item.q, lang))
@@ -241,7 +236,9 @@ ${JSON.stringify(credits, null, 2)}
     description: metaDescription,
     canonical: pathFor(slug, lang),
     alternates,
-    image: activity.heroImage || '/images/og-image.jpg',
+    // Activities have no picture of their own, so every share card is the
+    // site's branded one.
+    image: '/images/og-image.jpg',
     robots: 'index, follow'
   })}
 <body>
@@ -253,25 +250,30 @@ ${GENERATED_NOTE(`activities/${slug}.json`)}
     <a href="${homeFor(lang)}">${L.home}</a><span class="sep">${L.sep}</span><a href="${indexPathFor(lang)}">${L.activities}</a><span class="sep">${L.sep}</span>${esc(title)}
   </nav>
   <h1>${esc(title)}</h1>
+  <p data-status-badge></p>
 </div>
 
 <article class="activity" data-status="${status}"${ctaAttr}>
   <div class="activity-layout">
-    <div class="activity-main">
-      ${hero}
-      <p data-status-badge></p>
+    <!-- The facts sidebar comes FIRST in the source on purpose. It belongs at
+         the leading edge of the reading direction — the right in Hebrew, the
+         left in English and Russian — and a flex row already places its first
+         item there, per direction, with no per-language rule. Doing it with
+         source order rather than the CSS order property also keeps visual, DOM and
+         keyboard order identical, so the registration button is not reached
+         last by a screen reader while appearing first on screen. -->
+    <aside class="activity-sidebar">
+${factRows}
+      <div data-status-cta></div>
+    </aside>
 
+    <div class="activity-main">
       <h2>${L.about}</h2>
       <p>${esc(pick(activity.about, lang))}</p>
 ${optionalBlock(
     L.whatToBring,
     pick(activity.whatToBring, lang)
   )}${faqBlock}${creditsBlock}    </div>
-
-    <aside class="activity-sidebar">
-${factRows}
-      <div data-status-cta></div>
-    </aside>
   </div>
 </article>
 
@@ -299,9 +301,9 @@ ${list
         .map((a) => {
           const title = pick(a.title, lang);
           const blurb = pick(a.summary, lang) || pick(a.about, lang).slice(0, 140);
-          const thumb = a.heroImage
-            ? `      <img class="activity-card-thumb" src="${esc(a.heroImage)}" alt="">`
-            : `      <span class="activity-card-thumb" aria-hidden="true"></span>`;
+          // A coloured band, not a picture: activities no longer carry an
+          // image of their own. It is decorative, hence aria-hidden.
+          const thumb = `      <span class="activity-card-thumb" aria-hidden="true"></span>`;
           return `    <a class="activity-card" href="${pathFor(a.slug, lang)}">
 ${thumb}
       <h2>${esc(title)}</h2>

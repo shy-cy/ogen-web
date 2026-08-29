@@ -23,7 +23,6 @@ const activity = (slug) => ({
   status: 'open',
   title: { he: 'סדנה', en: 'Workshop', ru: '' },
   about: { he: 'תיאור', en: 'Description', ru: '' },
-  heroImage: PNG,
   teachers: [{ id: 'tea-1', name: { he: 'דורית', en: 'Dorit', ru: '' }, photo: PNG }],
   sponsors: [{ id: 'spo-1', name: { he: 'קרן', en: 'Fund', ru: '' }, logo: PNG }],
   included: [], faq: [], facts: {}
@@ -38,7 +37,6 @@ const activity = (slug) => ({
   const auth = { token: session.token };
 
   const IMAGES = [
-    'images/activities/purim-hero.png',
     'images/activities/purim-teachers-tea-1.png',
     'images/activities/purim-sponsors-spo-1.png'
   ];
@@ -66,7 +64,9 @@ const activity = (slug) => ({
   }, auth));
   H.eq(back.status, 200, 'it republishes');
   const html = github._files.get('activities/purim.html');
-  H.ok(html.indexOf('/images/activities/purim-hero.png') !== -1, 'and still points at its hero');
+  const credits = JSON.parse(/id="activity-credits">([\s\S]*?)<\/script>/.exec(html)[1]);
+  H.eq(credits.teachers[0].photo, '/images/activities/purim-teachers-tea-1.png',
+       'and still points at its teacher photo');
   IMAGES.forEach((p) => H.ok(github._files.has(p), p + ' survived the round trip'));
 
   console.log('\n[deleting takes the photos with it]');
@@ -84,9 +84,9 @@ const activity = (slug) => ({
   const short = await H.call(fn.handler, Object.assign({ action: 'publish', activity: activity('hebrew') }, auth));
   H.eq(short.status, 200, 'a short-slug activity publishes alongside a longer one');
   await H.call(fn.handler, Object.assign({ action: 'delete', slug: 'hebrew', confirmSlug: 'hebrew' }, auth));
-  H.ok(!github._files.has('images/activities/hebrew-hero.png'), 'its own hero is deleted');
-  H.ok(github._files.has('images/activities/hebrew-for-kids-extra-hero.png'),
-       'the other activity keeps its hero, despite sharing the prefix');
+  H.ok(!github._files.has('images/activities/hebrew-teachers-tea-1.png'), 'its own photo is deleted');
+  H.ok(github._files.has('images/activities/hebrew-for-kids-extra-teachers-tea-1.png'),
+       'the other activity keeps its photo, despite sharing the prefix');
   H.ok(github._files.has('activities/hebrew-for-kids.html'), 'and its page is untouched');
 
   console.log('\n[replacing a picture takes the old file with it]');
@@ -95,17 +95,18 @@ const activity = (slug) => ({
   const JPEG = 'data:image/jpeg;base64,' + Buffer.from([
     0xFF,0xD8,0xFF,0xE0,0x00,0x10,0x4A,0x46,0x49,0x46,0x00,0x01,0xFF,0xD9]).toString('base64');
   const first = await H.call(fn.handler, Object.assign({ action: 'publish', activity: activity('swap') }, auth));
-  H.ok(github._files.has('images/activities/swap-hero.png'), 'the first hero is a PNG');
-  const swapped = Object.assign(activity('swap'), { heroImage: JPEG });
+  H.ok(github._files.has('images/activities/swap-teachers-tea-1.png'), 'the first photo is a PNG');
+  const swapped = activity('swap');
+  swapped.teachers = [{ id: 'tea-1', name: { he: 'דורית', en: 'Dorit', ru: '' }, photo: JPEG }];
   await H.call(fn.handler, Object.assign(
     { action: 'publish', activity: swapped, baseUpdatedAt: first.body.baseUpdatedAt }, auth));
-  H.ok(github._files.has('images/activities/swap-hero.jpg'), 'the replacement is committed');
-  H.ok(!github._files.has('images/activities/swap-hero.png'), 'and the file it replaced is gone');
-  H.ok(github._files.has('images/activities/swap-teachers-tea-1.png'),
+  H.ok(github._files.has('images/activities/swap-teachers-tea-1.jpg'), 'the replacement is committed');
+  H.ok(!github._files.has('images/activities/swap-teachers-tea-1.png'), 'and the file it replaced is gone');
+  H.ok(github._files.has('images/activities/swap-sponsors-spo-1.png'),
        'a picture that did not change is left alone');
 
   console.log('\n[deleting an activity that has no images at all still works]');
-  const plain = Object.assign(activity('plain'), { heroImage: null, teachers: [], sponsors: [] });
+  const plain = Object.assign(activity('plain'), { teachers: [], sponsors: [] });
   await H.call(fn.handler, Object.assign({ action: 'publish', activity: plain }, auth));
   const gone = await H.call(fn.handler, Object.assign(
     { action: 'delete', slug: 'plain', confirmSlug: 'plain' }, auth));

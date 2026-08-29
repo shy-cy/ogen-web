@@ -122,19 +122,6 @@
     }));
 
     // Hero image
-    var heroPreview = el('img', {
-      src: S.images.hero || rec.heroImage || '',
-      alt: '', style: 'width:60px;height:40px;object-fit:cover;border-radius:5px;background:#EEE7D8;'
-    });
-    var heroInput = el('input', { type: 'file', accept: 'image/*', id: 'f-hero', style: 'font-size:12px;' });
-    heroInput.addEventListener('change', function () {
-      readImage(heroInput, 'hero', function (dataUrl) { S.images.hero = dataUrl; heroPreview.src = dataUrl; S.dirty = true; });
-    });
-    box.appendChild(el('div', {}, [
-      el('label', { text: 'Hero image' }),
-      el('div', { style: 'display:flex;gap:8px;align-items:center;' }, [heroPreview, heroInput])
-    ]));
-
     var ctaBox = el('div', { style: 'grid-column:1/-1;' });
     ctaBox.appendChild(fieldRow({ label: 'Registration button link', hint: 'Where the CTA sends people, per language' },
       langObj(rec.ctaUrl), 'f-ctaUrl'));
@@ -502,7 +489,8 @@
           if (spec.image) {
             // Per-item state is keyed by the item's own id, which is why those
             // ids must never be positional.
-            var img = el('img', { src: S.images[item.id] || item[spec.image] || '', alt: '' });
+            // No src rather than an empty one — see the note on the hero preview.
+            var img = el('img', { src: S.images[item.id] || item[spec.image] || null, alt: '' });
             var file = el('input', { type: 'file', accept: 'image/*', style: 'font-size:12px;',
               disabled: structureLocked || null });
             file.addEventListener('change', function () {
@@ -534,8 +522,6 @@
     rec.motif = $('f-motif').value;
     rec.corner = $('f-corner').value;
     rec.ctaUrl = readLangField('f-ctaUrl');
-    if (S.images.hero) rec.heroImage = S.images.hero;
-    else if (S.record.heroImage) rec.heroImage = S.record.heroImage;
 
     S.schema.simple.concat(S.schema.optional).forEach(function (d) {
       rec[d.key] = readLangField('f-' + d.key);

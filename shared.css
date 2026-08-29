@@ -301,26 +301,32 @@ html[lang="en"] .page-header h1, html[lang="ru"] .page-header h1{ font-weight:80
 /* ============================== ACTIVITY PAGE ============================== */
 .activity-layout{
   max-width:1100px; margin:0 auto; padding:50px 24px 80px;
-  display:flex; gap:48px; align-items:flex-start; flex-wrap:wrap;
+  display:flex; gap:48px; align-items:flex-start;
+  /* Deliberately NOT flex-wrap:wrap. Wrapping created a dead zone between
+     781px and ~915px: the two columns no longer fitted (500 + 48 + 320 = 868
+     of usable width needed), so the sidebar dropped below the article at its
+     full 320px, still hugging one edge — the facts box vanished under a wall
+     of text while the page still looked like a two-column layout. The single
+     column below now takes over before that can happen. */
 }
 .activity-main{ flex:1 1 500px; min-width:0; }
 .activity-main h2{ font-size:22px; font-weight:700; color: var(--navy); margin:28px 0 12px; }
 .activity-main > *:first-child{ margin-top:0; }
 .activity-main p{ font-size:16px; color:#3f3f3a; margin-bottom:16px; }
-.activity-hero-img{
-  width:100%; height:280px; border-radius:16px; object-fit:cover; display:block;
-  background: linear-gradient(135deg, var(--stone), var(--camel)); margin-bottom:24px;
-}
 .faq-item{ margin-bottom:16px; }
 .faq-item p{ margin-bottom:0; }
 .faq-q{ font-weight:700; color: var(--navy); }
 
 /* Status badge — colour comes from the .is-<status> class that js/activity.js
    adds, so badge and CTA are driven by the same single data-status value. */
+/* Sits directly under the H1 in .page-header, which is centred, so the badge
+   centres with it. margin-top separates it from the title; there is nothing
+   below it inside the header, so no bottom margin. */
 .status-badge{
   display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:800;
-  padding:7px 16px; border-radius:999px; margin-bottom:16px;
+  padding:7px 16px; border-radius:999px; margin-top:16px;
 }
+.status-badge:empty{ display:none; }
 .status-badge.is-draft{ background: var(--muted); color:#fff; }
 .status-badge.is-announcement{ background: var(--gold); color:#fff; }
 .status-badge.is-open{ background: var(--terracotta); color:#fff; }
@@ -374,9 +380,13 @@ html[lang="he"] .credit-group-label{ text-transform:none; letter-spacing:0; font
 .status-banner.is-cancelled{ background:#f6e2dd; color: var(--danger); }
 .status-banner.is-completed{ background: var(--stone); color: var(--olive); }
 
-@media (max-width:780px){
+/* 940px, not 780: the two columns stop fitting at about 915px, so the switch
+   to a single column has to happen above that, not 130px below it. */
+@media (max-width:939px){
   .activity-layout{ flex-direction:column; gap:32px; }
   .activity-sidebar{ position:static; width:100%; flex-basis:auto; }
+}
+@media (max-width:780px){
   .page-header h1{ font-size:28px; }
 }
 

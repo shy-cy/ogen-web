@@ -138,6 +138,24 @@ const raw = tpl.renderActivityPage(Object.assign({}, withRetired, { facts: {} })
 H.ok(raw.indexOf('data-spots') === -1, 'even an unmigrated record renders no places-left attribute');
 H.ok(raw.indexOf('facts-list') === -1, 'and no bullet list');
 
+console.log('\n[the hero image is gone, with nothing left where it sat]');
+// hebrew4kids was published with a hero. Removing the field must not leave an
+// empty container behind, which is the usual way an image "removal" goes wrong.
+const hadHero = legacyFixture('hebrew4kids');
+H.ok(!!hadHero.heroImage, 'the fixture really does carry a hero image');
+const noHero = migrate(hadHero);
+H.ok(noHero.heroImage === undefined, 'heroImage is dropped');
+H.ok(noHero.heroAlt === undefined, 'and its alt text with it — there is nothing left to describe');
+const heroPage = tpl.renderActivityPage(noHero, 'he');
+H.ok(heroPage.indexOf('activity-hero-img') === -1, 'no hero element is rendered');
+H.ok(heroPage.indexOf('<img') === -1, 'and no image tag at all is left in the activity markup');
+// The share card falls back to the site's own branded image rather than nothing.
+H.ok(heroPage.indexOf('og:image" content="https://www.ogen.cy/images/og-image.jpg"') !== -1,
+     'the share image falls back to the site og-image');
+// A record that still holds a hero (an old committed one) must render the same.
+const stillHasIt = tpl.renderActivityPage(Object.assign({}, noHero, { heroImage: '/images/x.png' }), 'he');
+H.ok(stillHasIt.indexOf('/images/x.png') === -1, 'a leftover heroImage value is ignored, not rendered');
+
 console.log('\n[a record with no facts at all does not crash]');
 const empty = migrate({ slug: 'x' });
 H.eq(F.sidebarRows(empty, 'he').length, 0, 'it just has an empty sidebar');

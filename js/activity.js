@@ -83,7 +83,10 @@
     ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
 
   // --- 1. badge + CTA, both from `status` -------------------------------
-  const badgeSlot = root.querySelector('[data-status-badge]');
+  // Searched from the document, not from `root`: the badge sits under the H1
+  // in .page-header, which is OUTSIDE the .activity article. Status is still
+  // declared exactly once, on the article — this only reads it from further up.
+  const badgeSlot = document.querySelector('[data-status-badge]');
   if (badgeSlot) {
     badgeSlot.className = 'status-badge is-' + status;
     badgeSlot.textContent = pick(cfg.badge);

@@ -182,6 +182,14 @@ function migrate(record) {
   delete out.spots;
   delete out.included;
 
+  // The hero image is gone too. Activities are described by their words and
+  // their facts; the one picture on the page was a decorative band that every
+  // activity would have needed sourcing for. `heroAlt` goes with it — there is
+  // nothing left to describe. The share card falls back to the site's own
+  // og-image, and the listing cards keep their coloured band.
+  delete out.heroImage;
+  delete out.heroAlt;
+
   return out;
 }
 

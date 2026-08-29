@@ -161,10 +161,26 @@ deliberately **absent from `sitemap.xml`**. Flip both once real copy lands.
 **Activity page** — `.activity-layout`: `.activity-main` beside a sticky
 `.activity-sidebar` of facts.
 
-The main column reads About → What to bring → FAQ → credits.
-The sidebar is Ages → Schedule → Duration → Group size → Language of
-instruction → Prerequisites → Location → Price → CTA. The last three of those
-used to be sections in the main column; they are facts to scan, not prose.
+The main column reads About → What to bring → FAQ → credits. The sidebar is
+Ages → Schedule → Duration → Group size → Language of instruction →
+Prerequisites → Location → Price → CTA. Three of those used to be sections in
+the main column; they are facts to scan, not prose.
+
+The status badge sits under the `<h1>` in `.page-header`, so `js/activity.js`
+looks it up from the document rather than from the `.activity` article — status
+is still declared exactly once, on the article.
+
+**The sidebar comes first in the source**, which puts it at the leading edge of
+the reading direction — right in Hebrew, left in EN/RU — with no per-language
+rule, because a flex row already places its first item there. Source order
+rather than `order:` keeps visual, DOM and keyboard order identical. And the
+layout does **not** wrap: two columns need 868px of usable width, so it switches
+to a single column at 939px. It used to wrap between 781 and ~915px, dropping
+the facts box below the article at its full 320px width.
+
+**Activities have no hero image.** There is no image field on an activity at
+all; share cards fall back to the site's `og-image.jpg` and listing cards keep a
+plain coloured band.
 
 Sidebar facts are **structured values, not text**. `netlify/functions/_activity-facts.js`
 is the one place a fact becomes a sentence, built per language — so
