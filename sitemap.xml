@@ -73,4 +73,16 @@
     <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/activities/hebrew4kids"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/activities/hebrew4kids"/>
   </url>
+  <url>
+    <loc>https://www.ogen.cy/activities/zz-timing</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/activities/zz-timing"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/activities/zz-timing"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/activities/zz-timing"/>
+  </url>
+  <url>
+    <loc>https://www.ogen.cy/en/activities/zz-timing</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/activities/zz-timing"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/activities/zz-timing"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/activities/zz-timing"/>
+  </url>
 </urlset>
