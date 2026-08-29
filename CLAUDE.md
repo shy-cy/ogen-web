@@ -308,12 +308,37 @@ Activity facts are **structured values, not text**. Two of them are the same
 the admin keys those inputs by the **fact key, never the kind**; a hardcoded id
 gave both facts the same DOM ids and the read-back copied the location over the
 address. `netlify/functions/_activity-facts.js`
-is the one place a fact becomes a sentence, built per language — so
-`{groups:2, maxPerGroup:7}` renders as "שתי קבוצות של עד 7 תלמידים" in Hebrew
-and "2 groups of up to 7 students" in English, and the three languages cannot
-drift. Price per hour is **computed**: `fullPrice ÷ (sessionCount × sessionMinutes ÷ 45)`,
-the 45 being the academic hour. `perHourOverride` wins when the arithmetic
-doesn't describe an activity.
+is the one place a fact becomes display text, built per language — so
+`{groups:2, maxPerGroup:7}` renders as "2 קבוצות / עד 7 תלמידים בקבוצה" in
+Hebrew and "2 groups / up to 7 students per group" in English, and the three
+languages cannot drift.
+
+**Several facts are more than one line.** Group size splits the count from the
+size; duration puts the date range above the sessions; price is four lines. The
+value stays plain **escaped text with a `\n` in it** — never markup — and
+`.sidebar-facts span` carries `white-space:pre-line`. Nothing in a fact is ever
+interpreted as HTML, which is one less place the sanitiser has to matter.
+
+**The price is four derived lines and nothing is typed twice:**
+
+| Line | Where it comes from |
+|---|---|
+| Registration fee | `registrationFee` |
+| Cost per lesson | `fullPrice ÷ (sessionCount × sessionMinutes ÷ 45)`, or `perHourOverride` |
+| Cost per semester | `fullPrice`, qualified by "N sessions of M lessons" |
+| Total for the semester | **`registrationFee + fullPrice`, computed** |
+
+A "lesson" is the 45-minute academic hour; a "session" is one meeting, so a
+90-minute session is two lessons. That is the same number per-hour always
+computed — the label changed, the arithmetic did not. The **total is never a
+field**, so it cannot drift from the two numbers above it.
+
+Every line is conditional on the data behind it, so this is the shape for every
+activity rather than a layout that fits one: an activity with only a full price
+renders a single line, and the total appears only when there are two numbers to
+add, since otherwise it would repeat the line above it. The "N sessions of M
+lessons" qualifier appears only when a session divides into whole lessons — a
+60-minute session is 1.33 lessons, which is arithmetic, not a sentence.
 
 Two rules hold the change-over together:
 

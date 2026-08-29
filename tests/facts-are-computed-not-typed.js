@@ -52,11 +52,16 @@ const ACT = {
 };
 const text = (key, lang) => F.factText(ACT, key, lang);
 
-// The Hebrew group-size wording is the one the site already used, and Hebrew
-// counts groups in the feminine — "שתי קבוצות", never "2 קבוצות".
-H.eq(text('groupSize', 'he'), 'שתי קבוצות של עד 7 תלמידים', 'Hebrew group size reads as a sentence');
-H.eq(text('groupSize', 'en'), '2 groups of up to 7 students', 'English group size');
-H.eq(F.formatGroupSize({ groups: 1, maxPerGroup: 7 }, 'he'), 'קבוצה אחת של עד 7 תלמידים', 'one group is singular');
+// Two lines, not a sentence: how many groups, then how big one is. They are
+// separate numbers a reader compares, and as one phrase they wrapped mid-clause
+// in a 320px column. The Hebrew takes the numeral rather than the feminine word
+// form ("2 קבוצות", not "שתי קבוצות") — on its own line it is a data point.
+H.eq(text('groupSize', 'he'), '2 קבוצות\nעד 7 תלמידים בקבוצה', 'Hebrew group size is two lines');
+H.eq(text('groupSize', 'en'), '2 groups\nup to 7 students per group', 'English group size');
+H.eq(text('groupSize', 'ru'), '2 группы\nдо 7 учеников в группе', 'Russian group size');
+H.eq(F.formatGroupSize({ groups: 1, maxPerGroup: 7 }, 'he'), 'קבוצה אחת\nעד 7 תלמידים בקבוצה', 'one group is singular');
+// With no group count there is nothing to say "per group" about.
+H.eq(F.formatGroupSize({ maxPerGroup: 7 }, 'en'), 'Up to 7 students', 'and no group count drops the qualifier');
 H.eq(F.formatGroupSize({ maxPerGroup: 7 }, 'he'), 'עד 7 תלמידים', 'no group count, just a cap');
 H.eq(F.formatGroupSize({ groups: 5 }, 'ru'), '5 групп', 'Russian takes the right plural for 5');
 H.eq(F.formatGroupSize({ groups: 2 }, 'ru'), '2 группы', 'and for 2');
@@ -73,13 +78,43 @@ H.eq(F.formatSchedule({ frequency: 'one-time', sessions: [{ day: 3, time: '16:30
 H.eq(F.formatSchedule({ frequency: 'twice-weekly', sessions: [{ day: 1, time: '17:00' }, { day: 3, time: '16:30' }] }, 'en'),
      'Mondays, 17:00 · Wednesdays, 16:30', 'twice weekly lists both days');
 
-H.eq(text('duration', 'he'), 'ספטמבר 2026 – יוני 2027 · 12 מפגשים · 90 דקות', 'duration in Hebrew');
-H.eq(text('duration', 'en'), 'September 2026 – June 2027 · 12 sessions · 90 min', 'duration in English');
+// The date range takes its own line; how often and how long stay together.
+H.eq(text('duration', 'he'), 'ספטמבר 2026 – יוני 2027\n12 מפגשים · 90 דקות', 'duration in Hebrew');
+H.eq(text('duration', 'en'), 'September 2026 – June 2027\n12 sessions · 90 min', 'duration in English');
+H.eq(text('duration', 'ru'), 'сентябрь 2026 – июнь 2027\n12 занятий · 90 мин', 'duration in Russian');
+H.eq(F.formatDuration({ sessionCount: 12, sessionMinutes: 90 }, 'en'), '12 sessions · 90 min',
+     'with no dates there is no first line and no stray newline');
 H.eq(F.formatDuration({ sessionCount: 1 }, 'he'), 'מפגש אחד', 'one session is singular');
 H.eq(F.formatDuration({}, 'en'), '', 'an empty duration says nothing');
 
-H.eq(text('price', 'he'), 'דמי הרשמה 50 € · 360 € לקורס · 15 € לשעה', 'price in Hebrew, per-hour included');
-H.eq(text('price', 'en'), '50 € registration fee · 360 € for the course · 15 € per hour', 'price in English');
+// Four lines, one number each. They were a single ·-joined sentence, which made
+// the registration fee and the course price read as one figure and hid that they
+// add up. Nothing here is typed: the fee and the full price are fields, per-lesson
+// is fullPrice ÷ academic hours, and the qualifier and the total are derived.
+H.eq(text('price', 'he'),
+  'דמי הרשמה – 50 €\nעלות לשיעור – 15 €\nעלות לסמסטר: 12 מפגשים של 2 שיעורים – 360 €\nסה״כ לסמסטר – 410 €',
+  'price in Hebrew, four lines');
+H.eq(text('price', 'en'),
+  'Registration fee – 50 €\nCost per lesson – 15 €\nCost per semester: 12 sessions of 2 lessons – 360 €\nTotal for the semester – 410 €',
+  'price in English');
+H.eq(text('price', 'ru'),
+  'Регистрационный взнос – 50 €\nСтоимость урока – 15 €\nСтоимость семестра: 12 занятий по 2 урока – 360 €\nИтого за семестр – 410 €',
+  'price in Russian');
+
+// The total is COMPUTED, so it cannot drift from the two numbers above it.
+const bumped = { registrationFee: 80, fullPrice: 360 };
+H.ok(F.formatPrice(bumped, 'en', { sessionCount: 12, sessionMinutes: 90 }).indexOf('Total for the semester – 440 €') !== -1,
+     'change the fee and the total follows');
+// And it only appears when there are two numbers to add.
+H.ok(F.formatPrice({ fullPrice: 360 }, 'en', {}).indexOf('Total') === -1,
+     'a price with nothing to add shows no total repeating the line above it');
+// Every line is conditional, so this is the shape for every activity.
+H.eq(F.formatPrice({ fullPrice: 360 }, 'en', {}), 'Cost per semester – 360 €',
+     'an activity with only a full price renders one line');
+H.eq(F.formatPrice({}, 'en', {}), '', 'and one with no price says nothing');
+// "N sessions of M lessons" only when a session divides into whole lessons.
+H.ok(F.formatPrice({ fullPrice: 360 }, 'en', { sessionCount: 12, sessionMinutes: 60 }).indexOf('of') === -1,
+     'a 60-minute session is 1.33 lessons, so the qualifier is dropped rather than printed');
 
 console.log('\n[the sidebar, in order, with empties dropped]');
 const rows = F.sidebarRows(ACT, 'he');
@@ -96,8 +131,8 @@ const half = { facts: { groupSize: { legacyText: { he: 'שתי קבוצות של
 H.eq(F.factText(half, 'groupSize', 'he'), 'שתי קבוצות של 7 תלמידים', 'the old words still show');
 H.eq(F.factText(half, 'groupSize', 'en'), 'שתי קבוצות של 7 תלמידים', 'and fall back the same way translations do');
 const filled = { facts: { groupSize: { groups: 2, maxPerGroup: 7, legacyText: { he: 'ישן', en: '', ru: '' } } } };
-H.eq(F.factText(filled, 'groupSize', 'he'), 'שתי קבוצות של עד 7 תלמידים',
-     'once the numbers are in, the built sentence wins over the old text');
+H.eq(F.factText(filled, 'groupSize', 'he'), '2 קבוצות\nעד 7 תלמידים בקבוצה',
+     'once the numbers are in, the built value wins over the old text');
 
 console.log('\n[visibility is carried AND enforced]');
 // Where an activity happens is two facts now. The general one is public, so a

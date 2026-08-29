@@ -183,16 +183,19 @@ function monthYearGenitive(iso, lang) {
 
 function formatDuration(f, lang) {
   const parts = [];
+  let dateRange = false;
 
   const from = monthYear(f.startDate, lang);
   const to = monthYear(f.endDate, lang);
-  if (from && to) parts.push(`${from} – ${to}`);
+  if (from && to) { parts.push(`${from} – ${to}`); dateRange = true; }
   else if (from) {
     parts.push(lang === 'he' ? `החל מ${from}` :
                lang === 'ru' ? `с ${monthYearGenitive(f.startDate, lang)}` : `From ${from}`);
+    dateRange = true;
   } else if (to) {
     parts.push(lang === 'he' ? `עד ${to}` :
                lang === 'ru' ? `до ${monthYearGenitive(f.endDate, lang)}` : `Until ${to}`);
+    dateRange = true;
   }
 
   const count = num(f.sessionCount);
@@ -213,7 +216,12 @@ function formatDuration(f, lang) {
     );
   }
 
-  return parts.join(' · ');
+  // The date range gets its own line; how often and how long stay together on
+  // the next. They answer different questions, and as one ·-joined run they
+  // wrapped arbitrarily in a narrow column.
+  const range = parts.length && dateRange ? parts.shift() : null;
+  const rest = parts.join(' · ');
+  return [range, rest].filter(Boolean).join('\n');
 }
 
 function formatGroupSize(f, lang) {
@@ -223,26 +231,31 @@ function formatGroupSize(f, lang) {
   const hasPer = per != null && per > 0;
   if (!hasGroups && !hasPer) return '';
 
+  // Two lines, not one sentence: "how many groups" and "how big is a group" are
+  // separate numbers a reader compares, and joining them with "of" made a
+  // 320px column wrap them mid-phrase. NEWLINE, not <br> — the value is escaped
+  // text and stays text; .sidebar-facts span carries white-space:pre-line.
+  //
+  // Hebrew takes the numeral here rather than the HE_FEM word form. On its own
+  // line "2 קבוצות" reads as the data point it is, which is what the rest of
+  // the card does.
+  let g = '';
+  let pr = '';
   if (lang === 'he') {
-    const g = hasGroups
-      ? (groups === 1 ? 'קבוצה אחת' : `${HE_FEM[groups] || groups} קבוצות`)
-      : '';
-    const p = hasPer ? `עד ${per} תלמידים` : '';
-    if (g && p) return `${g} של ${p}`;
-    return g || p;
+    if (hasGroups) g = groups === 1 ? 'קבוצה אחת' : `${groups} קבוצות`;
+    if (hasPer) pr = hasGroups ? `עד ${per} תלמידים בקבוצה` : `עד ${per} תלמידים`;
+  } else if (lang === 'ru') {
+    if (hasGroups) g = `${groups} ${ruPlural(groups, 'группа', 'группы', 'групп')}`;
+    const students = `${per} ${ruPlural(per, 'ученика', 'учеников', 'учеников')}`;
+    if (hasPer) pr = hasGroups ? `до ${students} в группе` : `до ${students}`;
+  } else {
+    if (hasGroups) g = `${groups} ${groups === 1 ? 'group' : 'groups'}`;
+    const students = `up to ${per} ${per === 1 ? 'student' : 'students'}`;
+    if (hasPer) pr = hasGroups ? `${students} per group` : students.charAt(0).toUpperCase() + students.slice(1);
   }
-  if (lang === 'ru') {
-    const g = hasGroups ? `${groups} ${ruPlural(groups, 'группа', 'группы', 'групп')}` : '';
-    const p = hasPer ? `${per} ${ruPlural(per, 'ученик', 'ученика', 'учеников')}` : '';
-    if (g && p) return `${g} по ${p}`;
-    return g || (hasPer ? `до ${p}` : '');
-  }
-  const g = hasGroups ? `${groups} ${groups === 1 ? 'group' : 'groups'}` : '';
-  const p = hasPer ? `up to ${per} ${per === 1 ? 'student' : 'students'}` : '';
-  if (g && p) return `${g} of ${p}`;
-  if (p) return p.charAt(0).toUpperCase() + p.slice(1);
-  return g;
+  return [g, pr].filter(Boolean).join('\n');
 }
+
 
 // Total teaching hours a course is worth, in academic (45-minute) hours.
 // Returns null when either half of the sum is missing — a price per hour
@@ -272,34 +285,73 @@ function money(value) {
   return `${value} ${CURRENCY}`;
 }
 
-function formatPrice(f, lang, duration) {
-  const parts = [];
-  const fee = num(f.registrationFee);
-  if (fee != null && fee > 0) {
-    parts.push(
-      lang === 'he' ? `דמי הרשמה ${money(fee)}` :
-      lang === 'ru' ? `регистрационный взнос ${money(fee)}` :
-      `${money(fee)} registration fee`
-    );
-  }
-  const full = num(f.fullPrice);
-  if (full != null && full > 0) {
-    parts.push(
-      lang === 'he' ? `${money(full)} לקורס` :
-      lang === 'ru' ? `${money(full)} за курс` :
-      `${money(full)} for the course`
-    );
-  }
-  const per = pricePerHour(f, duration);
-  if (per) {
-    parts.push(
-      lang === 'he' ? `${money(per.value)} לשעה` :
-      lang === 'ru' ? `${money(per.value)} в час` :
-      `${money(per.value)} per hour`
-    );
-  }
-  return parts.join(' · ');
+// A "lesson" is the 45-minute academic hour, which is also what pricePerHour has
+// always computed — the label changed, the arithmetic did not. A "session" is
+// one meeting, so a 90-minute session is two lessons.
+function lessonsPerSession(duration) {
+  const minutes = num(duration && duration.sessionMinutes);
+  if (minutes == null || minutes <= 0) return null;
+  const lessons = minutes / ACADEMIC_MINUTES;
+  // Only when it divides cleanly. A 60-minute session is 1.33 lessons, and
+  // "10 sessions of 1.33 lessons" is arithmetic, not a sentence.
+  return Number.isInteger(lessons) && lessons > 0 ? lessons : null;
 }
+
+// Four lines, one number each, because that is what a parent compares. It was a
+// single ·-joined sentence, which made the registration fee and the course price
+// look like one figure and hid that they add up.
+//
+// Every line is conditional on the data behind it, so this is the shape for
+// EVERY activity, not a layout that only fits this one: an activity with just a
+// full price renders one line. The total appears only when there are two
+// numbers to add — otherwise it would repeat the line above it.
+//
+// Nothing here is typed. registrationFee and fullPrice are fields; per-lesson is
+// fullPrice ÷ academic hours (or perHourOverride); the "N sessions of M lessons"
+// qualifier and the total are both derived. Change either field and all four
+// lines stay consistent.
+function formatPrice(f, lang, duration) {
+  const lines = [];
+  const fee = num(f.registrationFee);
+  const full = num(f.fullPrice);
+  const hasFee = fee != null && fee > 0;
+  const hasFull = full != null && full > 0;
+
+  const L = {
+    he: { fee: 'דמי הרשמה', lesson: 'עלות לשיעור', term: 'עלות לסמסטר', total: 'סה״כ לסמסטר' },
+    en: { fee: 'Registration fee', lesson: 'Cost per lesson', term: 'Cost per semester', total: 'Total for the semester' },
+    ru: { fee: 'Регистрационный взнос', lesson: 'Стоимость урока', term: 'Стоимость семестра', total: 'Итого за семестр' }
+  }[lang] || null;
+  if (!L) return '';
+  const line = (label, value) => `${label} – ${value}`;
+
+  if (hasFee) lines.push(line(L.fee, money(fee)));
+
+  const per = pricePerHour(f, duration);
+  if (per) lines.push(line(L.lesson, money(per.value)));
+
+  if (hasFull) {
+    const sessions = num(duration && duration.sessionCount);
+    const lessons = lessonsPerSession(duration);
+    let term = L.term;
+    if (sessions != null && sessions > 0 && lessons != null) {
+      const detail =
+        lang === 'he'
+          ? `${sessions} ${sessions === 1 ? 'מפגש' : 'מפגשים'} של ${lessons} ${lessons === 1 ? 'שיעור' : 'שיעורים'}`
+          : lang === 'ru'
+          ? `${sessions} ${ruPlural(sessions, 'занятие', 'занятия', 'занятий')} по ${lessons} ${ruPlural(lessons, 'урок', 'урока', 'уроков')}`
+          : `${sessions} ${sessions === 1 ? 'session' : 'sessions'} of ${lessons} ${lessons === 1 ? 'lesson' : 'lessons'}`;
+      term = `${L.term}: ${detail}`;
+    }
+    lines.push(line(term, money(full)));
+  }
+
+  // Computed, never typed, so it cannot drift from the two numbers above it.
+  if (hasFee && hasFull) lines.push(line(L.total, money(fee + full)));
+
+  return lines.join('\n');
+}
+
 
 // --- the one entry point ---------------------------------------------------
 

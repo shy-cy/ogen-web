@@ -458,7 +458,11 @@ html[lang="he"] .fact-card-head h2{ text-transform:none; letter-spacing:0; font-
 .sidebar-facts li{ margin-bottom:11px; }
 .sidebar-facts li:last-child{ margin-bottom:0; }
 .sidebar-facts strong{ display:block; font-size:12px; font-weight:800; color: var(--navy); line-height:1.35; }
-.sidebar-facts span{ display:block; font-size:14px; font-weight:400; color: var(--ink); line-height:1.5; }
+/* pre-line, because several facts are built as more than one line: group size,
+   duration and the four-line price. The value stays plain ESCAPED text with a
+   newline in it rather than markup — nothing in a fact is ever interpreted as
+   HTML, and the sanitiser has one less place to matter. */
+.sidebar-facts span{ display:block; font-size:14px; font-weight:400; color: var(--ink); line-height:1.5; white-space:pre-line; }
 .sidebar-cta{
   display:block; width:100%; padding:14px; border-radius:999px; border:none;
   font-family:inherit; font-size:15.5px; font-weight:800; cursor:pointer; text-align:center;
