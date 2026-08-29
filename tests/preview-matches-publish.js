@@ -28,17 +28,19 @@ const H = require('./_helpers');
   const activity = {
     slug: 'preview-check',
     status: 'open',
-    spots: 3,
     motif: 'hatch',
     corner: 'br',
     ctaUrl: { he: '/#contact', en: '/en/#contact', ru: '' },
     title: { he: 'בדיקה', en: 'Preview check', ru: '' },
     about: { he: 'תיאור', en: 'Description with a & ampersand', ru: '' },
-    facts: { duration: { sessionCount: 30, sessionMinutes: 45 } },
-    facts: { ages: { he: '6-10', en: '6-10', ru: '' }, price: { he: '€90', en: '€90', ru: '' } },
-    included: [
-      { id: 'inc-a', text: { he: 'פריט', en: 'An item', ru: '' } },
-      { id: 'inc-b', text: { he: '', en: '', ru: '' } }
+    facts: {
+      ages: { min: 6, max: 10 },
+      duration: { sessionCount: 30, sessionMinutes: 45 },
+      price: { fullPrice: 90 }
+    },
+    faq: [
+      { id: 'faq-a', q: { he: 'שאלה', en: 'A question', ru: '' }, a: { he: 'תשובה', en: 'An answer', ru: '' } },
+      { id: 'faq-b', q: { he: '', en: '', ru: '' }, a: { he: '', en: '', ru: '' } }
     ],
     teachers: [{ id: 'tch-a', name: { he: 'מורה', en: 'A teacher', ru: '' } }],
     sponsors: []
@@ -92,8 +94,10 @@ const H = require('./_helpers');
        'the previewed Russian page shows the English fallback, escaped');
 
   console.log('\n[blank repeatable rows are dropped, not published]');
-  H.ok(!preview.body.html.he.includes('<li></li>'), 'the empty included row produced no empty <li>');
-  H.eq((preview.body.html.he.match(/<li>/g) || []).length, 1, 'exactly one bullet survives');
+  H.eq((preview.body.html.he.match(/class="faq-item"/g) || []).length, 1,
+       'exactly one FAQ entry survives — the blank row is not published');
+  H.ok(!preview.body.html.he.includes('<span class="faq-q"></span>'),
+       'and it left no empty question behind');
 
   H.done();
 })();

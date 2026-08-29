@@ -173,6 +173,15 @@ function migrate(record) {
   delete out.instructionLanguage;
   delete out.prerequisites;
 
+  // Retired fields. `spots` was a places-left count an admin typed and then had
+  // to remember to decrement — wrong the moment anyone registered — and comes
+  // back computed once registration exists. `included` was a bullet list that
+  // said what Schedule, Duration and Price now say properly. Dropping them here
+  // means a record stops carrying them from its next save, rather than keeping
+  // dead keys forever.
+  delete out.spots;
+  delete out.included;
+
   return out;
 }
 

@@ -63,9 +63,9 @@ const H = require('./_helpers');
   const restructured = JSON.parse(JSON.stringify(stored));
   restructured.status = 'cancelled';
   restructured.motif = 'book';
-  restructured.included = [restructured.included[0]];           // try to delete three bullets
+  restructured.faq = [restructured.faq[0]];                       // try to delete an FAQ entry
   restructured.teachers = [];                                    // try to remove every teacher
-  restructured.included[0].text.ru = 'изменённый пункт';
+  restructured.faq[0].a.ru = 'изменённый ответ';
 
   const second = await H.call(admin.handler, Object.assign({
     action: 'saveDraft', baseUpdatedAt: stored.isoUpdated, activity: restructured
@@ -73,12 +73,12 @@ const H = require('./_helpers');
   H.eq(second.status, 200, 'the second draft saves');
   const after = second.body.activity;
 
-  H.eq(after.included.length, seed.record.included.length,
-       'the bullet list still has every item — they cannot delete rows');
+  H.eq(after.faq.length, seed.record.faq.length,
+       'the FAQ still has every entry — they cannot delete rows');
   H.eq(after.teachers.length, seed.record.teachers.length,
        'the teachers are all still there');
   H.eq(after.motif, seed.record.motif, 'the motif is unchanged');
-  H.eq(after.included[0].text.ru, 'изменённый пункт',
+  H.eq(after.faq[0].a.ru, 'изменённый ответ',
        'but their Russian wording on the surviving row did apply');
 
   console.log('\n[a session with no access at all is refused outright]');

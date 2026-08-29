@@ -30,7 +30,7 @@ const LABELS = {
   he: {
     dir: 'rtl', sep: '&#8592;', home: 'בית', activities: 'פעילויות',
     siteName: 'מרכז עוגן', suffix: ' · מרכז עוגן',
-    about: 'על החוג', included: 'מה כלול', programLength: 'אורך התוכנית',
+    about: 'על החוג', programLength: 'אורך התוכנית',
     instructionLanguage: 'שפת ההוראה', prerequisites: 'דרישות קדם',
     whatToBring: 'מה להביא', faq: 'שאלות נפוצות',
     ages: 'גילאים', schedule: 'מועד', duration: 'משך', location: 'מיקום',
@@ -41,7 +41,7 @@ const LABELS = {
   en: {
     dir: 'ltr', sep: '&#8594;', home: 'Home', activities: 'Activities',
     siteName: 'Ogen Center', suffix: ' · Ogen Center',
-    about: 'About the class', included: "What's included", programLength: 'Program Length',
+    about: 'About the class', programLength: 'Program Length',
     instructionLanguage: 'Language of instruction', prerequisites: 'Prerequisites',
     whatToBring: 'What to bring', faq: 'Frequently asked questions',
     ages: 'Ages', schedule: 'When', duration: 'Duration', location: 'Location',
@@ -52,7 +52,7 @@ const LABELS = {
   ru: {
     dir: 'ltr', sep: '&#8594;', home: 'Главная', activities: 'Занятия',
     siteName: 'Центр Оген', suffix: ' · Центр Оген',
-    about: 'О занятиях', included: 'Что входит', programLength: 'Длина программы',
+    about: 'О занятиях', programLength: 'Длина программы',
     instructionLanguage: 'Язык преподавания', prerequisites: 'Требования к уровню',
     whatToBring: 'Что взять с собой', faq: 'Частые вопросы',
     ages: 'Возраст', schedule: 'Когда', duration: 'Продолжительность', location: 'Место',
@@ -180,22 +180,6 @@ function renderActivityPage(activity, lang) {
     ? `<img class="activity-hero-img" src="${esc(activity.heroImage)}" alt="${esc(heroAlt)}">`
     : `<div class="activity-hero-img" role="img" aria-label="${esc(heroAlt)}"></div>`;
 
-  // Blank rows are dropped, never published.
-  const included = (activity.included || [])
-    .map((item) => pick(item && item.text, lang))
-    .filter(Boolean)
-    .map((text) => `        <li>${esc(text)}</li>`)
-    .join('\n');
-
-  const includedBlock = included
-    ? `
-      <h2>${L.included}</h2>
-      <ul class="facts-list">
-${included}
-      </ul>
-`
-    : '';
-
   const faqItems = (activity.faq || [])
     .filter((item) => item && has(item.q, lang))
     .map(
@@ -246,8 +230,6 @@ ${JSON.stringify(credits, null, 2)}
     )
     .join('\n');
 
-  const spotsAttr = activity.spots != null && activity.spots !== ''
-    ? ` data-spots="${esc(activity.spots)}"` : '';
   // Per-language so the CTA lands in the reader's own tree (or an external
   // registration URL later). A plain string still works — pick() passes it through.
   const ctaUrl = pick(activity.ctaUrl, lang);
@@ -273,7 +255,7 @@ ${GENERATED_NOTE(`activities/${slug}.json`)}
   <h1>${esc(title)}</h1>
 </div>
 
-<article class="activity" data-status="${status}"${spotsAttr}${ctaAttr}>
+<article class="activity" data-status="${status}"${ctaAttr}>
   <div class="activity-layout">
     <div class="activity-main">
       ${hero}
@@ -281,7 +263,7 @@ ${GENERATED_NOTE(`activities/${slug}.json`)}
 
       <h2>${L.about}</h2>
       <p>${esc(pick(activity.about, lang))}</p>
-${includedBlock}${optionalBlock(
+${optionalBlock(
     L.whatToBring,
     pick(activity.whatToBring, lang)
   )}${faqBlock}${creditsBlock}    </div>

@@ -91,7 +91,6 @@ const FIELD_SCHEMA = {
   defaultVisibility: DEFAULT_VISIBILITY,
   academicMinutes: ACADEMIC_MINUTES,
   lists: [
-    { key: 'included', label: "What's included", itemFields: [{ key: 'text', label: 'Item' }] },
     { key: 'faq', label: 'FAQ', itemFields: [{ key: 'q', label: 'Question' }, { key: 'a', label: 'Answer', textarea: true }] },
     { key: 'teachers', label: 'Teachers', itemFields: [{ key: 'name', label: 'Name' }], image: 'photo' },
     { key: 'sponsors', label: 'Sponsors', itemFields: [{ key: 'name', label: 'Name' }], image: 'logo' }
@@ -313,7 +312,7 @@ function mergeByPermission(current, incoming, session) {
   // session that may edit every language. A restricted role gets the words
   // and not the structure.
   if (full) {
-    ['status', 'motif', 'corner', 'spots', 'heroImage'].forEach((k) => {
+    ['status', 'motif', 'corner', 'heroImage'].forEach((k) => {
       if (incoming[k] !== undefined) out[k] = incoming[k];
     });
     out.ctaUrl = langObject(incoming.ctaUrl !== undefined ? incoming.ctaUrl : out.ctaUrl);

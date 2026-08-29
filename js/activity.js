@@ -23,7 +23,7 @@
   const pick = (obj) => obj[lang] || obj.he;
 
   // Each entry: badge text, plus either a `cta` (button + optional note) or a
-  // `banner` (plain text, no action). `spots` is interpolated from data-spots.
+  // `banner` (plain text, no action).
   const STATUS = {
     draft: {
       badge:  { he:'טיוטה - לא גלוי לציבור', en:'Draft — not publicly visible', ru:'Черновик — не виден публично' },
@@ -36,8 +36,11 @@
     },
     open: {
       badge: { he:'פתוח לרישום', en:'Open for registration', ru:'Открыта запись' },
-      cta:   { he:'הרשמה לחוג', en:'Register', ru:'Записаться' },
-      note:  { he:'נותרו {spots} מקומות', en:'{spots} places left', ru:'Осталось мест: {spots}' }
+      cta:   { he:'הרשמה לחוג', en:'Register', ru:'Записаться' }
+      // No "places left" note. It was a number an admin typed and then had to
+      // remember to decrement, so it was wrong the moment anyone registered.
+      // It returns when registration exists to compute it: capacity minus
+      // actual sign-ups, not a hand-maintained guess.
     },
     waitlist: {
       badge: { he:'מלא - רשימת המתנה', en:'Full — waiting list', ru:'Мест нет — лист ожидания' },
@@ -94,11 +97,7 @@
       ctaSlot.innerHTML = `<button type="button" class="sidebar-cta is-${status}" disabled>${esc(pick(cfg.cta))}</button>`;
     } else {
       const href = root.dataset.ctaUrl || '#register';
-      const spots = root.dataset.spots;
-      // The spots note only makes sense when the page states a number.
-      const note = cfg.note && (!/\{spots\}/.test(pick(cfg.note)) || spots)
-        ? `<p class="sidebar-note">${esc(pick(cfg.note).replace('{spots}', spots))}</p>`
-        : '';
+      const note = cfg.note ? `<p class="sidebar-note">${esc(pick(cfg.note))}</p>` : '';
       ctaSlot.innerHTML =
         `<a class="sidebar-cta is-${status}" href="${esc(href)}">${esc(pick(cfg.cta))}</a>${note}`;
     }

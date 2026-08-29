@@ -311,9 +311,6 @@ html[lang="en"] .page-header h1, html[lang="ru"] .page-header h1{ font-weight:80
   width:100%; height:280px; border-radius:16px; object-fit:cover; display:block;
   background: linear-gradient(135deg, var(--stone), var(--camel)); margin-bottom:24px;
 }
-.facts-list{ list-style:none; }
-.facts-list li{ font-size:15.5px; color:#3f3f3a; padding-inline-start:26px; position:relative; margin-bottom:10px; }
-.facts-list li::before{ content:"\2713"; position:absolute; inset-inline-start:0; color: var(--terracotta); font-weight:800; }
 .faq-item{ margin-bottom:16px; }
 .faq-item p{ margin-bottom:0; }
 .faq-q{ font-weight:700; color: var(--navy); }

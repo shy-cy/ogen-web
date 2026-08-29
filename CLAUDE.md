@@ -161,7 +161,7 @@ deliberately **absent from `sitemap.xml`**. Flip both once real copy lands.
 **Activity page** — `.activity-layout`: `.activity-main` beside a sticky
 `.activity-sidebar` of facts.
 
-The main column reads About → What's included → What to bring → FAQ → credits.
+The main column reads About → What to bring → FAQ → credits.
 The sidebar is Ages → Schedule → Duration → Group size → Language of
 instruction → Prerequisites → Location → Price → CTA. The last three of those
 used to be sections in the main column; they are facts to scan, not prose.
@@ -197,8 +197,17 @@ Driven by three markup contracts:
    sidebar CTA from that one value, so they cannot disagree. The seven
    statuses are `draft`, `announcement`, `open`, `waitlist`, `closed`,
    `cancelled`, `completed`; badge/CTA/banner copy for all three languages
-   lives in the `STATUS` table in that file. `data-spots` feeds the "places
-   left" note (`open` only) and `data-cta-url` the button target.
+   lives in the `STATUS` table in that file, and `data-cta-url` is the button
+   target.
+
+   There is deliberately **no "places left"**. It was a number an admin typed
+   and then had to remember to decrement, so it was wrong the moment anyone
+   registered. It comes back when there is a registration system to compute it
+   from — capacity minus actual sign-ups — and not before. **"What's included"
+   is gone** for the same kind of reason: it was a hand-written bullet list
+   restating what Schedule, Duration and Price now say as structured data.
+   `migrate()` drops both keys, so a record stops carrying them from its next
+   save; old records holding them render fine in the meantime.
 2. **Teachers and sponsors are arrays**, in the page's
    `<script type="application/json" id="activity-credits">` block —
    `{ teachers: [{name, photo}], sponsors: [{name, logo}] }`. Any count
@@ -281,7 +290,7 @@ it. Every generated page says so in a comment at the top. If a fix is needed
 outside the admin, change `activities/<slug>.json` (the source) or
 `_activity-template.js` (the markup) and regenerate — never the HTML.
 
-**5. Repeatable items** (what's included, FAQ, teachers, sponsors) go through
+**5. Repeatable items** (FAQ, teachers, sponsors) go through
 `js/repeatable-items.js`, which enforces two rules that were bugs first: the form
 is read into the model before every redraw (or reordering eats whatever the admin
 just typed), and item ids are minted from the clock, never from list position (or

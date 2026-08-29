@@ -121,12 +121,6 @@
       tl: 'Top / start', tr: 'Top / end', bl: 'Bottom / start', br: 'Bottom / end'
     }));
 
-    var spots = el('input', { type: 'number', id: 'f-spots', min: '0', value: rec.spots == null ? '' : rec.spots });
-    box.appendChild(el('div', {}, [
-      el('label', { for: 'f-spots', text: 'Places left' }), spots,
-      el('div', { class: 'hint', text: 'Shown only when status is Open' })
-    ]));
-
     // Hero image
     var heroPreview = el('img', {
       src: S.images.hero || rec.heroImage || '',
@@ -539,8 +533,6 @@
     rec.status = $('f-status').value;
     rec.motif = $('f-motif').value;
     rec.corner = $('f-corner').value;
-    var spots = $('f-spots').value;
-    rec.spots = spots === '' ? null : Number(spots);
     rec.ctaUrl = readLangField('f-ctaUrl');
     if (S.images.hero) rec.heroImage = S.images.hero;
     else if (S.record.heroImage) rec.heroImage = S.record.heroImage;
@@ -685,8 +677,8 @@
   }
 
   function blankRecord() {
-    var rec = { slug: '', status: 'draft', motif: 'ring', corner: 'tl', spots: null,
-                facts: {}, included: [], faq: [], teachers: [], sponsors: [] };
+    var rec = { slug: '', status: 'draft', motif: 'ring', corner: 'tl',
+                facts: {}, faq: [], teachers: [], sponsors: [] };
     return rec;
   }
 

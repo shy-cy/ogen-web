@@ -101,6 +101,43 @@ const kept = migrate(Object.assign({}, legacy, { factVisibility: { price: 'membe
 H.eq(kept.factVisibility.price, 'members', 'an explicit flag survives migration');
 H.eq(migrate({ factVisibility: { ages: 'nonsense' } }).factVisibility.ages, 'public', 'a junk flag falls back to public');
 
+console.log('\n[retired fields are ignored, and stop being carried]');
+// "Places left" was a number an admin typed and then had to remember to
+// decrement, so it was wrong the moment anyone registered; it comes back
+// computed once registration exists. "What's included" was a bullet list saying
+// what Schedule, Duration and Price now say properly. Both were REMOVED while
+// two activities were published holding them — hebrew-for-kids had spots:4 and
+// four bullets — so the question is whether that old data breaks anything.
+const withRetired = legacyFixture('hebrew-for-kids');
+H.eq(withRetired.spots, 4, 'the fixture really does carry a places-left count');
+H.eq(withRetired.included.length, 4, 'and four bullet items');
+
+const cleaned = migrate(withRetired);
+H.ok(cleaned.spots === undefined, 'spots is dropped on the way through');
+H.ok(cleaned.included === undefined, 'and so is the bullet list');
+H.eq(JSON.stringify(migrate(cleaned)), JSON.stringify(cleaned), 'and it stays dropped on a second pass');
+
+// Nothing else about the record is disturbed by their removal.
+H.eq(cleaned.title.he, withRetired.title.he, 'the title is untouched');
+H.eq(cleaned.faq.length, withRetired.faq.length, 'the FAQ is untouched');
+H.eq(cleaned.teachers.length, withRetired.teachers.length, 'the teachers are untouched');
+H.eq(F.factText(cleaned, 'price', 'he'), withRetired.facts.price.he, 'the price row still reads as it did');
+
+// And a page built from the old record shows no trace of either.
+const tpl = require('../netlify/functions/_activity-template');
+const page = tpl.renderActivityPage(cleaned, 'he');
+H.ok(page.indexOf('data-spots') === -1, 'the rendered page has no places-left attribute');
+H.ok(page.indexOf('facts-list') === -1, 'no bullet list is rendered');
+H.ok(page.indexOf('מה כלול') === -1, "and no What's included heading");
+H.ok(page.indexOf('<h1>') !== -1, 'the page still renders');
+H.ok(page.indexOf(withRetired.faq[0].q.he) !== -1, 'the FAQ still renders');
+
+// An unmigrated record handed straight to the template must not break either —
+// the generated pages already committed still carry these fields.
+const raw = tpl.renderActivityPage(Object.assign({}, withRetired, { facts: {} }), 'he');
+H.ok(raw.indexOf('data-spots') === -1, 'even an unmigrated record renders no places-left attribute');
+H.ok(raw.indexOf('facts-list') === -1, 'and no bullet list');
+
 console.log('\n[a record with no facts at all does not crash]');
 const empty = migrate({ slug: 'x' });
 H.eq(F.sidebarRows(empty, 'he').length, 0, 'it just has an empty sidebar');
