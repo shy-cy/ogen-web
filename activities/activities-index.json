@@ -38,25 +38,5 @@
     },
     "heroImage": "/images/activities/hebrew4kids-hero.jpg",
     "isoUpdated": "2026-08-29T08:42:34.401Z"
-  },
-  {
-    "slug": "zz-timing",
-    "status": "announcement",
-    "langs": [
-      "he",
-      "en"
-    ],
-    "title": {
-      "he": "בדיקת זמן",
-      "en": "Timing check",
-      "ru": ""
-    },
-    "summary": {
-      "he": "בדיקה",
-      "en": "Check",
-      "ru": ""
-    },
-    "heroImage": "/images/activities/zz-timing-hero.jpg",
-    "isoUpdated": "2026-08-29T08:43:06.013Z"
   }
 ]
