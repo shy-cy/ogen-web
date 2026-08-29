@@ -144,11 +144,11 @@
       "logo": "/images/activities/hebrew4kids-sponsors-spo-mtd1o2lk-3.png"
     }
   ],
-  "isoUpdated": "2026-08-29T13:26:17.367Z",
+  "isoUpdated": "2026-08-29T14:32:10.839Z",
   "isoCreated": "2026-08-28T14:55:38.930Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
-  "lastPublishedAt": "2026-08-29T13:26:17.367Z",
+  "lastPublishedAt": "2026-08-29T14:32:10.839Z",
   "factVisibility": {
     "ages": "public",
     "schedule": "public",
@@ -160,10 +160,7 @@
     "address": "members",
     "price": "public"
   },
-  "cardImage": null,
+  "cardImage": "/images/activities/hebrew4kids-card-7bf3fbea.jpg",
   "shareImage": null,
-  "robots": "index",
-  "retiredImages": [
-    "images/activities/hebrew4kids-teachers-tea-mtd1nrnl-2-0cdf8508.png"
-  ]
+  "robots": "index"
 }
