@@ -183,14 +183,16 @@
   function numField(id, label, value, extra) {
     var input = el('input', Object.assign({ type: 'number', id: id, min: '0' }, extra || {}));
     input.value = (value === 0 || value) ? value : '';
-    input.addEventListener('input', function () { S.dirty = true; refreshPerHour(); });
+    input.addEventListener('input', function () {
+      S.dirty = true; refreshPerHour(); refreshLegacyNotes();
+    });
     return el('div', {}, [el('label', { for: id, text: label }), input]);
   }
 
   function dateField(id, label, value) {
     var input = el('input', { type: 'date', id: id });
     input.value = value || '';
-    input.addEventListener('input', function () { S.dirty = true; });
+    input.addEventListener('input', function () { S.dirty = true; refreshLegacyNotes(); });
     return el('div', {}, [el('label', { for: id, text: label }), input]);
   }
 
@@ -226,17 +228,56 @@
 
   // Words an admin typed before this fact was structured. They are still what
   // the public page shows, so they are displayed rather than quietly dropped.
-  function legacyNote(fact) {
+  // Does this fact have enough structured data to build a sentence from?
+  //
+  // The box below says "currently published as free text", and that is only
+  // true while this returns false — _activity-facts.js builds the sentence from
+  // the structured values and falls back to legacyText ONLY when it comes out
+  // empty. The thresholds here mirror that file's formatters, which is the
+  // authority; a count or a length of zero is not a value it will print.
+  function hasStructuredValue(kind, f) {
+    var pos = function (v) { return v != null && v !== '' && Number(v) > 0; };
+    if (kind === 'ages') return f.min != null || f.max != null;
+    if (kind === 'schedule') return (f.sessions || []).length > 0;
+    if (kind === 'duration') {
+      return !!f.startDate || !!f.endDate || pos(f.sessionCount) || pos(f.sessionMinutes);
+    }
+    if (kind === 'groupSize') return pos(f.groups) || pos(f.maxPerGroup);
+    if (kind === 'price') {
+      return pos(f.registrationFee) || pos(f.fullPrice) || f.perHourOverride != null;
+    }
+    if (kind === 'location') {
+      return S.schema.langs.some(function (l) { return ((f.text || {})[l] || '').trim(); });
+    }
+    return false;
+  }
+
+  // Show or hide each note against what is in the form RIGHT NOW, so it goes
+  // the moment the fields are filled rather than waiting for a save and reload.
+  function refreshLegacyNotes() {
+    if (!S.schema) return;
+    var facts = readFacts().facts;
+    S.schema.facts.forEach(function (d) {
+      var note = $('legacy-' + d.key);
+      if (note) note.hidden = hasStructuredValue(d.kind, facts[d.key] || {});
+    });
+  }
+
+  function legacyNote(d, fact) {
     var legacy = fact && fact.legacyText;
     if (!legacy) return null;
     var lines = ['he', 'en', 'ru']
       .filter(function (l) { return (legacy[l] || '').trim(); })
       .map(function (l) { return LANG_NAME[l] + ': ' + legacy[l]; });
     if (!lines.length) return null;
-    return el('div', { class: 'legacy-note' }, [
+    // Visibility is set by refreshLegacyNotes() once the form is drawn. The bug
+    // this replaces was showing the box whenever a fact HAD legacy text stored,
+    // which is a different question and stays true forever — hebrew4kids had
+    // all four fields filled in and all four boxes still showing.
+    return el('div', { class: 'legacy-note', id: 'legacy-' + d.key }, [
       el('b', { text: 'Currently published as free text' }),
       el('div', { text: lines.join('  ·  ') }),
-      el('div', { class: 'hint', text: 'Fill in the fields above and this is replaced. Leave them empty and this keeps showing.' })
+      el('div', { class: 'hint', text: 'This is what the public page shows. It disappears as soon as the fields above have values.' })
     ]);
   }
 
@@ -259,10 +300,10 @@
       DAY_NAMES.forEach(function (name, d) {
         daySel.appendChild(el('option', { value: String(d), text: name, selected: sess.day === d || null }));
       });
-      daySel.addEventListener('change', function () { S.dirty = true; });
+      daySel.addEventListener('change', function () { S.dirty = true; refreshLegacyNotes(); });
       var time = el('input', { type: 'time', id: 'fact-schedule-' + i + '-time' });
       time.value = sess.time || '';
-      time.addEventListener('input', function () { S.dirty = true; });
+      time.addEventListener('input', function () { S.dirty = true; refreshLegacyNotes(); });
 
       var row = el('div', { class: 'session-row' }, [daySel, time]);
       if (!wanted) {
@@ -356,7 +397,9 @@
           value: f.key, text: f.label, selected: f.key === (fact.frequency || 'weekly') || null
         }));
       });
-      freqSel.addEventListener('change', function () { syncSchedule(); S.dirty = true; redrawSchedule(); });
+      freqSel.addEventListener('change', function () {
+        syncSchedule(); S.dirty = true; redrawSchedule(); refreshLegacyNotes();
+      });
       body = el('div', {}, [
         el('div', { class: 'fact-grid' }, [
           el('div', {}, [el('label', { for: 'fact-schedule-frequency', text: 'How often' }), freqSel])
@@ -395,7 +438,7 @@
       ]),
       d.hint ? el('div', { class: 'hint', text: d.hint }) : null,
       body,
-      legacyNote(fact)
+      legacyNote(d, fact)
     ]);
   }
 
@@ -403,6 +446,7 @@
     $('facts').innerHTML = '';
     S.schema.facts.forEach(function (d) { $('facts').appendChild(factBlock(d)); });
     refreshPerHour();
+    refreshLegacyNotes();
   }
 
   function readFacts() {
