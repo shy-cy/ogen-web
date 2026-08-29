@@ -221,6 +221,12 @@ input:disabled,textarea:disabled,select:disabled{background:#f2f0ea;color:#8b8b8
   border:1px solid #eee7d8;background:#f4f2ec;overflow:hidden;
   display:flex;align-items:center;justify-content:center;}
 .card-image-frame img{width:100%;height:100%;object-fit:cover;display:block;}
+/* The share card is 1200x630, so its preview is that shape rather than a square:
+   the frame's job is to show the admin the crop they are actually getting. */
+.share-image-frame{flex:0 0 240px;width:240px;aspect-ratio:1200/630;border-radius:12px;
+  border:1px solid #eee7d8;background:#f4f2ec;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;}
+.share-image-frame img{width:100%;height:100%;object-fit:cover;display:block;}
 .card-image-empty{font-size:12px;font-weight:700;color:#a8a49a;}
 .card-image-controls{flex:1 1 240px;display:flex;flex-direction:column;gap:8px;align-items:flex-start;}
 .card-image-controls label{font-size:12.5px;font-weight:800;color:var(--navy);}

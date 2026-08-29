@@ -27,12 +27,18 @@
   var PROFILES = {
     hero:   { maxEdge: 1600, quality: 0.82 },
     credit: { maxEdge: 600,  quality: 0.85 },
-    // Listing and homepage cards. `square` crops to 1:1 rather than fitting
-    // inside a box: a card grid where one tile is 4:3 and the next is 16:9 is
-    // the thing the fixed ratio exists to prevent, so the ratio is guaranteed
-    // here, at upload, rather than asked for in a hint nobody reads. 800 covers
-    // a ~360px tile on a 2× screen.
-    card:   { maxEdge: 800,  quality: 0.82, square: true }
+    // `ratio` (width ÷ height) crops to a fixed shape rather than fitting inside
+    // a box. A card grid where one tile is 4:3 and the next is 16:9 is the thing
+    // a fixed ratio exists to prevent, so the shape is guaranteed here, at
+    // upload, rather than asked for in a hint nobody reads.
+    //
+    // card:  1:1, 800 covers a ~360px tile on a 2× screen.
+    // share: 1200×630, the size the page already declares in og:image:width and
+    //        og:image:height. Those two numbers were true only because every
+    //        activity used the site's own share image; cropping to the same
+    //        ratio is what keeps them true now that an activity can supply one.
+    card:   { maxEdge: 800,  quality: 0.82, ratio: 1 },
+    share:  { maxEdge: 1200, quality: 0.82, ratio: 1200 / 630 }
   };
 
   // Scale down to fit inside maxEdge, never up. An image already small enough
@@ -57,20 +63,38 @@
   // Centre is the only defensible automatic choice. A face is usually near the
   // middle and never reliably at an edge, and the alternative is asking an admin
   // to pick a focal point, which is a bigger feature than this one.
-  function squareCrop(width, height, maxEdge) {
-    var side = Math.min(width, height);
-    var out = Math.min(side, maxEdge);
+  function ratioCrop(width, height, ratio, maxEdge) {
+    if (!width || !height) return { sx: 0, sy: 0, sw: width, sh: height,
+                                    width: width, height: height, cropped: false, scaled: false };
+    // The largest rectangle of this ratio that fits inside the source.
+    var sw = width;
+    var sh = height;
+    if (width / height > ratio) sw = height * ratio;   // too wide: trim the sides
+    else sh = width / ratio;                           // too tall: trim top and bottom
+
+    var out = Math.min(Math.max(sw, sh), maxEdge);
+    var scale = out / Math.max(sw, sh);
     return {
-      sx: Math.round((width - side) / 2),
-      sy: Math.round((height - side) / 2),
-      sSide: side,
-      width: out,
-      height: out,
-      // Whether anything was actually cut away. A source that is already square
+      sx: Math.round((width - sw) / 2),
+      sy: Math.round((height - sh) / 2),
+      sw: Math.round(sw),
+      sh: Math.round(sh),
+      width: Math.max(1, Math.round(sw * scale)),
+      height: Math.max(1, Math.round(sh * scale)),
+      // Whether anything was actually cut away. A source already at this ratio
       // is not cropped, which is what makes it safe to hand the original back.
-      cropped: width !== height,
-      scaled: out < side
+      // Rounded, so a 1001×605 source counts as cropped but a 1200×630 does not.
+      cropped: Math.round(sw) !== Math.round(width) || Math.round(sh) !== Math.round(height),
+      scaled: scale < 1
     };
+  }
+
+  // The square case, kept by name because 1:1 is the one ratio worth reading as
+  // a word. `sSide` is the single source edge a square crop draws from.
+  function squareCrop(width, height, maxEdge) {
+    var c = ratioCrop(width, height, 1, maxEdge);
+    c.sSide = c.sw;
+    return c;
   }
 
   // A canvas keeps one frame. Flattening someone's animated GIF into a still
@@ -189,16 +213,16 @@
       return decode(file).then(function (source) {
         var sw = source.width || source.naturalWidth;
         var sh = source.height || source.naturalHeight;
-        var size = profile.square
-          ? squareCrop(sw, sh, profile.maxEdge)
+        var size = profile.ratio
+          ? ratioCrop(sw, sh, profile.ratio, profile.maxEdge)
           : targetSize(sw, sh, profile.maxEdge);
 
         var canvas = document.createElement('canvas');
         canvas.width = size.width;
         canvas.height = size.height;
         var ctx = canvas.getContext('2d');
-        if (profile.square) {
-          ctx.drawImage(source, size.sx, size.sy, size.sSide, size.sSide, 0, 0, size.width, size.height);
+        if (profile.ratio) {
+          ctx.drawImage(source, size.sx, size.sy, size.sw, size.sh, 0, 0, size.width, size.height);
         } else {
           ctx.drawImage(source, 0, 0, size.width, size.height);
         }
@@ -220,12 +244,12 @@
           // decoded into memory on a phone whatever it weighs on the wire.
           var muchTooBig = Math.max(sw, sh) > profile.maxEdge * 2;
           // Handing the original back is only safe when the canvas was not the
-          // point. For a square slot it usually IS the point: a 1000×600 upload
-          // that re-encodes larger must still come back cropped, or the one
-          // promise this profile makes is broken by the size check. So the
+          // point. For a fixed-ratio slot it usually IS the point: a 1000×600
+          // upload that re-encodes larger must still come back cropped, or the
+          // one promise this profile makes is broken by the size check. So the
           // bail-out is available only when nothing was cut away, which is to
-          // say when the source was already square.
-          var mustKeepCanvas = profile.square && size.cropped;
+          // say when the source was already at the ratio.
+          var mustKeepCanvas = profile.ratio && size.cropped;
           if (blob.size >= file.size && !muchTooBig && !mustKeepCanvas) {
             return asDataUrl(file).then(function (dataUrl) {
               return { dataUrl: dataUrl, before: file.size, after: file.size, width: sw, height: sh,
@@ -235,9 +259,9 @@
           }
           return asDataUrl(blob).then(function (dataUrl) {
             var note;
-            if (profile.square) {
+            if (profile.ratio) {
               note = size.cropped
-                ? 'cropped to a square ' + size.width + '×' + size.height
+                ? 'cropped to ' + size.width + '×' + size.height
                 : (size.scaled ? 'resized to ' + size.width + '×' + size.height : 're-encoded');
             } else {
               note = size.scaled ? 'resized to ' + size.width + '×' + size.height : 're-encoded';
@@ -262,6 +286,7 @@
     PROFILES: PROFILES,
     targetSize: targetSize,
     squareCrop: squareCrop,
+    ratioCrop: ratioCrop,
     isAnimatedGif: isAnimatedGif,
     chooseType: chooseType,
     isPassThrough: isPassThrough,

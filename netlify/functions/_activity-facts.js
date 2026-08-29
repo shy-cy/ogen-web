@@ -90,36 +90,45 @@ const ACADEMIC_MINUTES = 45;
 
 const FACT_ORDER = [
   'ages', 'schedule', 'duration', 'groupSize',
-  'instructionLanguage', 'prerequisites', 'location', 'price'
+  'instructionLanguage', 'prerequisites', 'location', 'address', 'price'
 ];
 
 // Facts that are plain translated text rather than structured values. They moved
 // out of the main column into the sidebar: they are things to scan, not to read.
 const TEXT_FACTS = ['instructionLanguage', 'prerequisites'];
 
-const STRUCTURED_FACTS = ['ages', 'schedule', 'duration', 'groupSize', 'location', 'price'];
+const STRUCTURED_FACTS = ['ages', 'schedule', 'duration', 'groupSize', 'location', 'address', 'price'];
 
-// Location is the one fact that is not really public: it is where children will
-// physically be. See VISIBILITY below.
-const DEFAULT_VISIBILITY = { location: 'members' };
+// Where an activity happens is two different facts with two different answers.
+// "Limassol" tells a family whether it is near them and belongs on a public
+// page. The street address is where children will physically be at a known
+// hour, and belongs only to people who have registered.
+//
+// So they are separate facts rather than one fact with a flag: a single field
+// forced a choice between publishing an address and publishing nothing, which
+// is why Location used to default to members-only and then get shown anyway.
+const DEFAULT_VISIBILITY = { address: 'members' };
 
 const visibilityOf = (activity, key) =>
   ((activity && activity.factVisibility) || {})[key] || DEFAULT_VISIBILITY[key] || 'public';
 
-// ⚠ MEMBERS-ONLY IS NOT ENFORCED YET — AND THIS IS THE ONLY PLACE THAT CHANGES.
+// MEMBERS-ONLY IS NOW ENFORCED, AND THIS IS STILL THE ONLY PLACE IT IS DECIDED.
 //
-// Every fact carries a visibility flag, and Location defaults to 'members'.
-// Nothing filters on it today, deliberately: there is no registration or
-// approval system, so there is nobody who could be a "member", and hiding the
-// address would hide it from everyone including the families who need it.
+// It used to return true for everything, deliberately: Location was the only
+// members-only fact, there was nobody who could be a "member", and hiding the
+// one location fact would have hidden it from the families who needed it.
 //
-// WHEN REGISTRATION SHIPS: return `visibility === 'public'` here. That alone
-// takes members-only facts out of the statically published HTML. The private
-// rows then need to be served by whatever authenticated view that system
-// provides — they must NOT be rendered into the static page and hidden with
-// CSS, because the file is public and anyone can read it.
-function isPubliclyVisible(/* visibility */) {
-  return true;
+// The exact address makes that trade-off unnecessary. The general location is
+// its own public fact now, so enforcing costs a reader nothing — and an address
+// is the one thing that must never be published by accident.
+//
+// Enforcing means OMITTING the row from the generated HTML, which is why this
+// is a filter in the render path rather than a CSS class. The file is public
+// and anyone can read it: rendering a private fact and hiding it visually would
+// publish it. When a members area exists, the private rows are served by that
+// authenticated view — they still never enter this file.
+function isPubliclyVisible(visibility) {
+  return visibility !== 'members';
 }
 
 // --- formatters ------------------------------------------------------------
@@ -309,7 +318,7 @@ function factText(activity, key, lang) {
   else if (key === 'schedule') text = formatSchedule(f, lang);
   else if (key === 'duration') text = formatDuration(f, lang);
   else if (key === 'groupSize') text = formatGroupSize(f, lang);
-  else if (key === 'location') text = pick(f.text, lang);
+  else if (key === 'location' || key === 'address') text = pick(f.text, lang);
   else if (key === 'price') text = formatPrice(f, lang, facts.duration);
 
   return text || pick(f.legacyText, lang);
@@ -338,7 +347,7 @@ function sidebarRows(activity, lang) {
 const FACT_GROUPS = [
   { key: 'participants', facts: ['ages', 'groupSize', 'prerequisites'] },
   { key: 'schedule',     facts: ['schedule', 'duration'] },
-  { key: 'practical',    facts: ['location', 'instructionLanguage', 'price'] }
+  { key: 'practical',    facts: ['location', 'address', 'instructionLanguage', 'price'] }
 ];
 
 (function assertEveryFactIsGroupedExactlyOnce() {

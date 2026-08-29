@@ -65,7 +65,7 @@ const LABELS = {
     about: 'על החוג', programLength: 'אורך התוכנית',
     instructionLanguage: 'שפת ההוראה', prerequisites: 'דרישות קדם',
     whatToBring: 'מה להביא', faq: 'שאלות נפוצות',
-    ages: 'גילאים', schedule: 'מועד', duration: 'משך', location: 'מיקום',
+    ages: 'גילאים', schedule: 'מועד', duration: 'משך', location: 'מיקום', address: 'כתובת',
     groupSize: 'גודל קבוצה', price: 'מחיר',
     // Group headings. Deliberately not the same word as any fact inside them:
     // the schedule group holds a fact already labelled "מועד", and a heading
@@ -80,7 +80,7 @@ const LABELS = {
     about: 'About the class', programLength: 'Program Length',
     instructionLanguage: 'Language of instruction', prerequisites: 'Prerequisites',
     whatToBring: 'What to bring', faq: 'Frequently asked questions',
-    ages: 'Ages', schedule: 'When', duration: 'Duration', location: 'Location',
+    ages: 'Ages', schedule: 'When', duration: 'Duration', location: 'Location', address: 'Address',
     groupSize: 'Group size', price: 'Price',
     gParticipants: 'Who it is for', gSchedule: 'Schedule', gPractical: 'Details',
     indexTitle: 'Our activities', indexLead: 'What you can find at Ogen Center',
@@ -92,7 +92,7 @@ const LABELS = {
     about: 'О занятиях', programLength: 'Длина программы',
     instructionLanguage: 'Язык преподавания', prerequisites: 'Требования к уровню',
     whatToBring: 'Что взять с собой', faq: 'Частые вопросы',
-    ages: 'Возраст', schedule: 'Когда', duration: 'Продолжительность', location: 'Место',
+    ages: 'Возраст', schedule: 'Когда', duration: 'Продолжительность', location: 'Место', address: 'Адрес',
     groupSize: 'Размер группы', price: 'Цена',
     gParticipants: 'Для кого', gSchedule: 'Расписание', gPractical: 'Подробности',
     indexTitle: 'Наши занятия', indexLead: 'Что можно найти в центре Оген',
@@ -296,10 +296,16 @@ ${items}
     description: metaDescription,
     canonical: pathFor(slug, lang),
     alternates,
-    // Activities have no picture of their own, so every share card is the
-    // site's branded one.
-    image: '/images/og-image.jpg',
-    robots: 'index, follow'
+    // An activity may carry its own share card. Without one, every activity
+    // shares the site's branded image, which is a reasonable default and not a
+    // reason to make each one source a picture. The 1200×630 in the head stays
+    // true because the upload is cropped to that ratio, not merely hinted at.
+    image: activity.shareImage || '/images/og-image.jpg',
+    // 'noindex, follow' rather than a bare 'noindex', matching /about: the page
+    // is kept out of search results, but the links on it are still worth
+    // crawling. A noindex activity is also left out of sitemap.xml — listing a
+    // page you have asked not to be indexed is a contradiction.
+    robots: activity.robots === 'noindex' ? 'noindex, follow' : 'index, follow'
   })}
 <body>
 <div id="page" dir="${L.dir}">

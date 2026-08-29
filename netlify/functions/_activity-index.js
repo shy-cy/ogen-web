@@ -61,7 +61,12 @@ function buildSitemap(activities) {
   blocks.push('  <!-- Activities listing -->');
   LANGS.forEach((l) => blocks.push(urlEntry(indexPathFor(l), listingAlts)));
 
-  const published = (activities || []).filter(isPublic);
+  // A noindex activity is still published and still listed on the site — that
+  // flag is an instruction to search engines, not to visitors. But it must not
+  // be advertised in the sitemap: the meta tag and the sitemap have to agree, or
+  // the sitemap invites a crawler to a page that turns it away. /about already
+  // pairs them the same way.
+  const published = (activities || []).filter(isPublic).filter((a) => a.robots !== 'noindex');
   if (published.length) {
     blocks.push('  <!-- Activity pages. A draft activity has no files and never appears here. -->');
     published.forEach((a) => {

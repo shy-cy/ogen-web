@@ -99,15 +99,29 @@ const filled = { facts: { groupSize: { groups: 2, maxPerGroup: 7, legacyText: { 
 H.eq(F.factText(filled, 'groupSize', 'he'), 'שתי קבוצות של עד 7 תלמידים',
      'once the numbers are in, the built sentence wins over the old text');
 
-console.log('\n[visibility is carried but not yet enforced]');
-// Location defaults to members-only. Nothing filters on it, deliberately:
-// there is no registration system, so nobody could be a member, and hiding the
-// address would hide it from the families who need it.
-H.eq(F.visibilityOf({}, 'location'), 'members', 'location defaults to members-only');
-H.eq(F.visibilityOf({}, 'ages'), 'public', 'everything else defaults to public');
+console.log('\n[visibility is carried AND enforced]');
+// Where an activity happens is two facts now. The general one is public, so a
+// family can tell whether it is near them; the exact address is members-only,
+// because it is where children will physically be at a known hour.
+//
+// This used to render members-only facts anyway, which was the honest thing to
+// do when Location was the only one: hiding it would have hidden it from
+// everyone. Splitting the field removes that trade-off, so the flag is now real.
+H.eq(F.visibilityOf({}, 'address'), 'members', 'the exact address defaults to members-only');
+H.eq(F.visibilityOf({}, 'location'), 'public', 'the general location is public');
+H.eq(F.visibilityOf({}, 'ages'), 'public', 'and so is everything else');
 H.eq(F.visibilityOf({ factVisibility: { ages: 'members' } }, 'ages'), 'members', 'an explicit flag is honoured');
-H.ok(F.isPubliclyVisible('members'), 'members-only still renders publicly for now');
+H.ok(!F.isPubliclyVisible('members'), 'a members-only fact is NOT publicly visible');
+H.ok(F.isPubliclyVisible('public'), 'a public one is');
 H.ok(F.sidebarRows(ACT, 'he').some((r) => r.key === 'location'),
-     'so the location is on the page despite its flag');
+     'so the general location is on the page');
+// Enforcement means OMISSION. Rendering it and hiding it with CSS would publish
+// it: the file is static and anyone can read it.
+const withAddress = JSON.parse(JSON.stringify(ACT));
+withAddress.facts.address = { text: { he: 'רחוב הרצל 5', en: '5 Herzl St', ru: '' } };
+const addrRows = F.sidebarRows(withAddress, 'he');
+H.ok(!addrRows.some((r) => r.key === 'address'), 'the exact address is not among the published rows');
+H.ok(F.factText(withAddress, 'address', 'he') === 'רחוב הרצל 5',
+     'even though the fact itself still reads back, for an authenticated view later');
 
 H.done();

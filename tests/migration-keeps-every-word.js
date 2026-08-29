@@ -103,11 +103,32 @@ H.ok(isLangObject(moved.facts.prerequisites), 'text facts stay lang objects, bec
 console.log('\n[visibility is filled in for every fact]');
 const vis = moved.factVisibility;
 H.eq(Object.keys(vis).length, F.FACT_ORDER.length, 'every fact has a flag');
-H.eq(vis.location, 'members', 'location defaults to members-only');
-H.eq(vis.price, 'public', 'and the rest to public');
-const kept = migrate(Object.assign({}, legacy, { factVisibility: { price: 'members' } }));
-H.eq(kept.factVisibility.price, 'members', 'an explicit flag survives migration');
-H.eq(migrate({ factVisibility: { ages: 'nonsense' } }).factVisibility.ages, 'public', 'a junk flag falls back to public');
+H.eq(vis.address, 'members', 'the exact address defaults to members-only');
+H.eq(vis.location, 'public', 'the general location is public');
+H.eq(vis.price, 'public', 'and so is the rest');
+
+// The changeover. Members-only became enforced at the same moment the address
+// field arrived — and records written before that carry flags nothing ever acted
+// on. hebrew4kids had BOTH Location and Price flagged members while showing both
+// on the live page. Enforcing without resetting them would have taken two rows
+// off a published page as a side effect of adding a field.
+const preChangeover = migrate(Object.assign({}, legacy, {
+  factVisibility: { price: 'members', location: 'members' }
+}));
+H.eq(preChangeover.factVisibility.price, 'public',
+     'a stale members flag is reset to what the page actually showed');
+H.eq(preChangeover.factVisibility.location, 'public', 'for the location too');
+H.eq(preChangeover.factVisibility.address, 'members', 'but the new address stays private');
+
+// After the changeover the flag means something, and is obeyed. The marker is
+// the record having an address fact at all.
+const afterChangeover = migrate({
+  facts: { address: { text: { he: '', en: '', ru: '' } }, price: {} },
+  factVisibility: { price: 'members' }
+});
+H.eq(afterChangeover.factVisibility.price, 'members', 'an explicit flag now survives migration');
+H.eq(migrate({ facts: { address: {} }, factVisibility: { ages: 'nonsense' } }).factVisibility.ages,
+     'public', 'a junk flag falls back to public');
 
 console.log('\n[retired fields are ignored, and stop being carried]');
 // "Places left" was a number an admin typed and then had to remember to

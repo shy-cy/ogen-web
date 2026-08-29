@@ -36,11 +36,14 @@ const adminJs = fs.readFileSync(path.join(R, 'js/activities-admin.js'), 'utf8');
 const adminHtml = fs.readFileSync(path.join(R, 'admin/activities.html'), 'utf8');
 
 console.log('[the profile exists and asks for a square]');
+// `square: true` became `ratio: 1` when the share image arrived wanting the same
+// guarantee at a different shape. One mechanism, two profiles — the alternative
+// was a second crop path that could drift from this one.
 H.ok(!!IO.PROFILES.card, 'there is a card profile');
-H.eq(IO.PROFILES.card.square, true, 'it is marked square');
+H.eq(IO.PROFILES.card.ratio, 1, 'it asks for a 1:1 crop');
 H.ok(IO.PROFILES.card.maxEdge > 0, 'it has a maximum edge');
-H.ok(!IO.PROFILES.hero.square && !IO.PROFILES.credit.square,
-  'and the other slots are untouched by it');
+H.ok(!IO.PROFILES.hero.ratio && !IO.PROFILES.credit.ratio,
+  'and the free-shape slots are untouched by it');
 
 console.log('\n[the crop is a centred square, whatever came in]');
 // Landscape: take the middle, lose the sides equally.
@@ -78,8 +81,8 @@ H.eq(c.width, c.height, 'and it is still square');
 console.log('\n[the size check cannot undo the crop]');
 // The specific line. If the bail-out ever stops excluding a cropped square, a
 // non-square original is handed back and the ratio silently stops holding.
-H.ok(/mustKeepCanvas\s*=\s*profile\.square\s*&&\s*size\.cropped/.test(src),
-  'a cropped square refuses the "return the original" path');
+H.ok(/mustKeepCanvas\s*=\s*profile\.ratio\s*&&\s*size\.cropped/.test(src),
+  'a cropped fixed-ratio image refuses the "return the original" path');
 H.ok(/if \(blob\.size >= file\.size && !muchTooBig && !mustKeepCanvas\)/.test(src),
   'and the size check honours it');
 // A source that was already square may still bail out, because the original is
@@ -129,7 +132,10 @@ console.log('\n[the activity page still has no image of its own]');
 const tpl = fs.readFileSync(path.join(R, 'netlify/functions/_activity-template.js'), 'utf8');
 H.ok(tpl.indexOf('cardImage') === -1,
   'the activity page does not render it: this field is for listing cards');
-H.ok(tpl.indexOf("image: '/images/og-image.jpg'") !== -1,
-  'and shared links still use the site share image');
+// Precise about WHICH image, now that an activity can carry its own share card:
+// the card image must never become the share image by accident, and an activity
+// with no share image of its own still falls back to the site's.
+H.ok(/image: activity\.shareImage \|\| '\/images\/og-image\.jpg'/.test(tpl),
+  'a shared link uses the activity share image, falling back to the site one');
 
 H.done();

@@ -73,6 +73,7 @@ const SHAPES = {
   }),
   groupSize: (f) => ({ groups: num(f.groups), maxPerGroup: num(f.maxPerGroup) }),
   location: (f) => ({ text: langObject(f.text) }),
+  address: (f) => ({ text: langObject(f.text) }),
   price: (f) => ({
     registrationFee: num(f.registrationFee),
     fullPrice: num(f.fullPrice),
@@ -102,14 +103,30 @@ function normaliseFacts(rawFacts) {
   return out;
 }
 
-function normaliseVisibility(raw) {
+// `preAddress` marks a record written before the exact address existed — which
+// is to say, before isPubliclyVisible() enforced anything.
+//
+// Those records carry members-only flags that were never acted on: hebrew4kids
+// has Location AND Price flagged members, and both are on the live page right
+// now. Enforcing without this would take two rows off a published page as a
+// side effect of adding a field, which is precisely the kind of silent blanking
+// the rest of this file exists to prevent.
+//
+// So a pre-changeover record is reset to what its page actually shows: public.
+// The flag starts meaning something from the next save, and an admin who wants
+// a fact private can now say so and be obeyed. `address` is exempt — it is new,
+// empty, and members-only from birth.
+function normaliseVisibility(raw, preAddress) {
   const given = raw && typeof raw === 'object' ? raw : {};
   const out = {};
   FACT_ORDER.forEach((key) => {
     const v = given[key];
-    out[key] = v === 'public' || v === 'members'
-      ? v
-      : (DEFAULT_VISIBILITY[key] || 'public');
+    const stated = v === 'public' || v === 'members' ? v : null;
+    if (preAddress && key !== 'address') {
+      out[key] = 'public';
+      return;
+    }
+    out[key] = stated || DEFAULT_VISIBILITY[key] || 'public';
   });
   return out;
 }
@@ -119,6 +136,9 @@ function normaliseVisibility(raw) {
 function migrate(record) {
   if (!record || typeof record !== 'object') return record;
   const out = JSON.parse(JSON.stringify(record));
+  // Read from the RAW record, before normaliseFacts() gives every record an
+  // (empty) address fact and the question becomes unanswerable.
+  const preAddress = !(record.facts && record.facts.address);
   const old = out.facts || {};
   const facts = {};
 
@@ -146,6 +166,11 @@ function migrate(record) {
   if (isLangObject(old.location)) facts.location = { text: langObject(old.location) };
   else facts.location = old.location;
 
+  // The exact address is new. It starts empty for every existing record: the
+  // words already in `location` are a general one ("לימסול"), and moving them
+  // into the address field would claim an activity has an address nobody typed.
+  facts.address = old.address;
+
   // duration is new. `programLength` fed it: in one record that was a date
   // range and in another a session length, which is exactly why it could not
   // be parsed and exactly why it is now four separate fields.
@@ -165,7 +190,7 @@ function migrate(record) {
   });
 
   out.facts = normaliseFacts(facts);
-  out.factVisibility = normaliseVisibility(out.factVisibility);
+  out.factVisibility = normaliseVisibility(out.factVisibility, preAddress);
 
   // One source of truth: now that these live in facts, the top-level copies go,
   // or the next save would resurrect the old values.

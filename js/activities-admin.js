@@ -51,6 +51,7 @@
     lists: {},
     images: {},        // per-item pending uploads, keyed by ITEM ID (never index)
     cardImage: undefined,  // pending square upload: undefined = untouched, null = removed
+    shareImage: undefined, // pending 1200x630 upload, same three states
     previewLang: 'he',
     scheduleSessions: [],
     dirty: false
@@ -199,7 +200,37 @@
       $('seo-fields').appendChild(fieldRow(d, langObj(rec[d.key]), 'f-' + d.key));
     });
     renderCardImage();
+    renderSeoOptions();
+    renderShareImage();
     renderFacts();
+  }
+
+  // ---------- search & sharing, the parts that are not words -------------
+  // One instruction for the page in all three languages, so it is a single
+  // control rather than the three column grid a translatable field gets.
+  function renderSeoOptions() {
+    var box = $('seo-options');
+    if (!box) return;
+    box.innerHTML = '';
+
+    var mayEdit = S.schema.langs.every(canEdit);
+    var sel = el('select', { id: 'f-robots', disabled: !mayEdit || null });
+    var LABELS = {
+      index: 'Indexed — normal, appears in search results',
+      noindex: 'Not indexed — hidden from search and left out of sitemap.xml'
+    };
+    (S.schema.robotsOptions || ['index', 'noindex']).forEach(function (o) {
+      sel.appendChild(el('option', {
+        value: o, text: LABELS[o] || o,
+        selected: o === (S.record.robots || 'index') || null
+      }));
+    });
+    sel.addEventListener('change', function () { S.dirty = true; });
+
+    box.appendChild(el('div', {}, [
+      el('label', { for: 'f-robots', text: 'Search engines' }), sel,
+      el('div', { class: 'hint', text: 'Choose "not indexed" for a page that is live but should not be found in search — a private group, or a draft you are sharing by link.' })
+    ]));
   }
 
   // ---------- card image ----------
@@ -210,8 +241,12 @@
   // list-item uploads: the data URL never goes into S.record, because the record
   // is what the server merges against and a data URL is not a path. collect()
   // puts it on the outgoing copy at save time.
-  function renderCardImage() {
-    var box = $('card-image');
+  // The card and the share card are the same control with a different frame and
+  // a different crop, so the widget is written once. Each caller keeps its own
+  // slot name at its own call site, because that string is what decides the
+  // ratio an upload is cropped to and it should be readable where it is chosen.
+  function imageSlotRow(cfg) {
+    var box = $(cfg.boxId);
     if (!box) return;
     box.innerHTML = '';
 
@@ -219,47 +254,77 @@
     // enforces this; disabling the input here just avoids offering an action
     // that would be discarded.
     var mayEdit = S.schema.langs.every(canEdit);
-    var current = S.cardImage || S.record.cardImage || '';
+    var current = cfg.current;
 
-    var frame = el('div', { class: 'card-image-frame' });
+    var frame = el('div', { class: cfg.frameClass });
     if (current) {
-      frame.appendChild(el('img', { src: current, alt: 'Card image preview' }));
+      frame.appendChild(el('img', { src: current, alt: cfg.alt }));
     } else {
       frame.appendChild(el('span', { class: 'card-image-empty', text: 'No image' }));
     }
 
     var input = el('input', {
-      type: 'file', id: 'f-cardImage', accept: 'image/*', disabled: !mayEdit || null
+      type: 'file', id: cfg.inputId, accept: 'image/*', disabled: !mayEdit || null
     });
-    input.addEventListener('change', function () {
-      readImage(input, 'card', function (dataUrl) {
-        S.cardImage = dataUrl;
-        S.dirty = true;
-        renderCardImage();
-      });
-    });
+    input.addEventListener('change', function () { cfg.onPick(input); });
 
     var controls = el('div', { class: 'card-image-controls' }, [
-      el('label', { for: 'f-cardImage', text: current ? 'Replace image' : 'Choose an image' }),
+      el('label', { for: cfg.inputId, text: current ? 'Replace image' : 'Choose an image' }),
       input,
       current && mayEdit
-        ? el('button', {
-            type: 'button', class: 'link-btn', text: 'Remove',
-            onclick: function () {
-              // null, not undefined: the server reads `incoming.cardImage !==
-              // undefined` to tell "cleared" from "not sent by a role that may
-              // not touch it", and publish then deletes the orphaned file.
-              S.cardImage = null;
-              S.record.cardImage = null;
-              S.dirty = true;
-              renderCardImage();
-            }
-          })
+        ? el('button', { type: 'button', class: 'link-btn', text: 'Remove', onclick: cfg.onRemove })
         : null,
-      !mayEdit ? el('div', { class: 'hint', text: 'Read-only for your role: the card image is shown in every language.' }) : null
+      !mayEdit ? el('div', { class: 'hint', text: cfg.readOnly }) : null
     ]);
 
     box.appendChild(el('div', { class: 'card-image-row' }, [frame, controls]));
+  }
+
+  function renderCardImage() {
+    imageSlotRow({
+      boxId: 'card-image', frameClass: 'card-image-frame', inputId: 'f-cardImage',
+      alt: 'Card image preview',
+      readOnly: 'Read-only for your role: the card image is shown in every language.',
+      current: S.cardImage || S.record.cardImage || '',
+      onPick: function (input) {
+        readImage(input, 'card', function (dataUrl) {
+          S.cardImage = dataUrl;
+          S.dirty = true;
+          renderCardImage();
+        });
+      },
+      onRemove: function () {
+        // null, not undefined: the server reads `incoming.cardImage !==
+        // undefined` to tell "cleared" from "not sent by a role that may not
+        // touch it", and publish then deletes the orphaned file.
+        S.cardImage = null;
+        S.record.cardImage = null;
+        S.dirty = true;
+        renderCardImage();
+      }
+    });
+  }
+
+  function renderShareImage() {
+    imageSlotRow({
+      boxId: 'share-image', frameClass: 'share-image-frame', inputId: 'f-shareImage',
+      alt: 'Share image preview',
+      readOnly: 'Read-only for your role: the share image is shown in every language.',
+      current: S.shareImage || S.record.shareImage || '',
+      onPick: function (input) {
+        readImage(input, 'share', function (dataUrl) {
+          S.shareImage = dataUrl;
+          S.dirty = true;
+          renderShareImage();
+        });
+      },
+      onRemove: function () {
+        S.shareImage = null;
+        S.record.shareImage = null;
+        S.dirty = true;
+        renderShareImage();
+      }
+    });
   }
 
   // ---------- sidebar facts ----------
@@ -471,7 +536,11 @@
     if (d.kind === 'text') {
       body = fieldRow({ label: 'Text', textarea: true }, langObj(fact), 'fact-' + d.key);
     } else if (d.kind === 'location') {
-      body = fieldRow({ label: 'Text' }, langObj(fact.text), 'fact-location');
+      // Keyed by the fact, not by the kind. There are two facts of this kind now
+      // — the general location and the exact address — and a hardcoded id gave
+      // them the same inputs: duplicate DOM ids, and a read-back that took the
+      // first match for both, so saving would copy the location over the address.
+      body = fieldRow({ label: 'Text' }, langObj(fact.text), 'fact-' + d.key);
     } else if (d.kind === 'ages') {
       body = el('div', { class: 'fact-grid' }, [
         numField('fact-ages-min', 'Youngest', fact.min),
@@ -547,7 +616,7 @@
       var previous = (S.record.facts || {})[d.key] || {};
       var out;
       if (d.kind === 'text') out = readLangField('fact-' + d.key);
-      else if (d.kind === 'location') out = { text: readLangField('fact-location') };
+      else if (d.kind === 'location') out = { text: readLangField('fact-' + d.key) };
       else if (d.kind === 'ages') out = { min: readNum('fact-ages-min'), max: readNum('fact-ages-max') };
       else if (d.kind === 'schedule') {
         out = {
@@ -668,6 +737,8 @@
     // path. S.cardImage is explicitly null after a Remove, and null must travel
     // so the server can tell "cleared" from "absent".
     rec.cardImage = S.cardImage !== undefined ? S.cardImage : (S.record.cardImage || null);
+    rec.shareImage = S.shareImage !== undefined ? S.shareImage : (S.record.shareImage || null);
+    rec.robots = ($('f-robots') && $('f-robots').value) || S.record.robots || 'index';
     var facts = readFacts();
     rec.facts = facts.facts;
     rec.factVisibility = facts.factVisibility;
@@ -778,6 +849,7 @@
     // different activity must forget a pending upload, not carry it across and
     // publish one activity's photograph onto another.
     S.cardImage = undefined;
+    S.shareImage = undefined;
     S.dirty = false;
     renderSettings();
     renderFields();

@@ -59,6 +59,10 @@ const json = (statusCode, payload) => ({
 
 // Translatable simple fields, and the repeatable lists. The client renders its
 // form from this, so adding a field is a one-line change here.
+// index is the default; noindex matches /about — kept out of search results but
+// its links still worth following.
+const ROBOTS = ['index', 'noindex'];
+
 const FIELD_SCHEMA = {
   simple: [
     { key: 'title', label: 'Title', required: true },
@@ -90,7 +94,10 @@ const FIELD_SCHEMA = {
     { key: 'groupSize', label: 'Group size', kind: 'groupSize' },
     { key: 'instructionLanguage', label: 'Language of instruction', kind: 'text' },
     { key: 'prerequisites', label: 'Prerequisites / level', kind: 'text' },
-    { key: 'location', label: 'Location', kind: 'location' },
+    { key: 'location', label: 'Location', kind: 'location',
+      hint: 'The general area — "Limassol". Shown to everyone' },
+    { key: 'address', label: 'Exact address', kind: 'location',
+      hint: 'Street address. Members-only: it is NOT published on the page, and will not be until a members area exists' },
     { key: 'price', label: 'Price', kind: 'price' }
   ],
   frequencies: FREQUENCIES,
@@ -105,6 +112,11 @@ const FIELD_SCHEMA = {
   statuses: STATUSES,
   motifs: MOTIFS,
   corners: CORNERS,
+  // Search and sharing, and structure rather than words: one instruction for the
+  // page in every language. `noindex` also drops the activity from sitemap.xml —
+  // see _activity-index.js, because a sitemap listing a page that asks not to be
+  // indexed contradicts itself.
+  robotsOptions: ROBOTS,
   langs: LANGS
 };
 
@@ -263,6 +275,13 @@ function extractImages(activity) {
     activity.cardImage = take(activity.cardImage, 'card') || null;
   }
 
+  // The share card, overriding the site's own og-image for this activity. Same
+  // fixed name for the same reason: one per activity, so re-uploading replaces
+  // the file rather than leaving a trail of attempts behind.
+  if (activity.shareImage && String(activity.shareImage).startsWith('data:')) {
+    activity.shareImage = take(activity.shareImage, 'share') || null;
+  }
+
   ['teachers', 'sponsors'].forEach((key) => {
     const imageField = LIST_BY_KEY[key].image;
     (activity[key] || []).forEach((item) => {
@@ -289,6 +308,7 @@ function imagePathsOf(activity) {
   };
   if (activity) {
     take(activity.cardImage);
+    take(activity.shareImage);
     (activity.teachers || []).forEach((t) => take(t && t.photo));
     (activity.sponsors || []).forEach((s) => take(s && s.logo));
   }
@@ -337,9 +357,18 @@ function mergeByPermission(current, incoming, session) {
     // words. A role that may only edit Russian must not be able to change the
     // image every language shows, exactly as it cannot change the price.
     if (incoming.cardImage !== undefined) out.cardImage = incoming.cardImage || null;
+    // The share image and the robots flag are one answer for all three
+    // languages, so they travel with the structure. A Russian-only role must
+    // not be able to deindex the Hebrew and English pages.
+    if (incoming.shareImage !== undefined) out.shareImage = incoming.shareImage || null;
+    if (incoming.robots !== undefined) {
+      out.robots = ROBOTS.indexOf(incoming.robots) !== -1 ? incoming.robots : 'index';
+    }
     out.ctaUrl = langObject(incoming.ctaUrl !== undefined ? incoming.ctaUrl : out.ctaUrl);
   } else {
     out.cardImage = (base && base.cardImage) || null;
+    out.shareImage = (base && base.shareImage) || null;
+    out.robots = (base && base.robots) || 'index';
     out.ctaUrl = langObject(out.ctaUrl);
   }
 

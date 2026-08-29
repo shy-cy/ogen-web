@@ -231,7 +231,11 @@ request.
 upload, the storage and the admin preview are. Nothing renders `cardImage` on a
 page.
 
-Sidebar facts are **structured values, not text**. `netlify/functions/_activity-facts.js`
+Sidebar facts are **structured values, not text**. Two of them are the same
+`kind: 'location'` — the public `location` and the members-only `address` — so
+the admin keys those inputs by the **fact key, never the kind**; a hardcoded id
+gave both facts the same DOM ids and the read-back copied the location over the
+address. `netlify/functions/_activity-facts.js`
 is the one place a fact becomes a sentence, built per language — so
 `{groups:2, maxPerGroup:7}` renders as "שתי קבוצות של עד 7 תלמידים" in Hebrew
 and "2 groups of up to 7 students" in English, and the three languages cannot
@@ -247,13 +251,29 @@ Two rules hold the change-over together:
   verbatim, and `factText()` publishes it until the structured fields are
   filled in. A half-migrated record never blanks a live page. `migrate()` runs
   on every read and is idempotent.
-- **`factVisibility` is built but not enforced.** Every fact carries
-  `public | members`, Location defaults to `members`, and
-  `isPubliclyVisible()` in `_activity-facts.js` returns `true` for everything
-  — deliberately, because there is no registration system yet and nobody could
-  be a member. That one function is what changes when it ships; the
-  members-only rows must then be served by the authenticated view, never
-  rendered into the static file and hidden with CSS.
+- **`factVisibility` is enforced, in one function.** Every fact carries
+  `public | members`, and `isPubliclyVisible()` in `_activity-facts.js` is the
+  only place that decides. It returns `visibility !== 'members'`, and
+  enforcement means the row is **omitted from the generated HTML** — never
+  rendered and then hidden with CSS, because the file is static and anyone can
+  read its source. When a members area exists, the private rows are served by
+  that authenticated view; they still never enter this file.
+
+  It used to return `true` for everything, which was the honest choice while
+  Location was the only members-only fact: hiding it would have hidden it from
+  the families who needed it. **Splitting location in two removed that
+  trade-off** — `location` is the general area ("Limassol") and is public,
+  `address` is the exact street address and defaults to `members`. So an
+  activity can say where it is without publishing where children will be.
+
+  The changeover needed a migration, and it is the interesting part.
+  hebrew4kids had Location *and* Price flagged `members` while showing both on
+  the live page, because nothing had ever acted on the flag. Enforcing alone
+  would have taken two rows off a published page as a side effect of adding a
+  field. So `normaliseVisibility()` resets a **pre-changeover** record — one
+  with no `facts.address` — to `public`, which is what its page actually
+  showed. The flag starts meaning something from the next save. `address` is
+  exempt: new, empty, and members-only from birth.
 
 Driven by three markup contracts:
 
@@ -327,6 +347,24 @@ Content, between "About this activity" and "What to bring", where they read as
 more body copy to write, which is how a meta description ends up being a
 paragraph. They are their own `seo` group now.
 
+That panel also carries the two fields that are **not** words, so they sit on
+the schema root rather than in `seo` (which feeds `SIMPLE_KEYS`, the
+translatable scalars):
+
+- **`robots`** — `index` (default) or `noindex`. A `noindex` activity renders
+  `noindex, follow`, matching `/about` rather than inventing a second
+  convention, **and is dropped from `sitemap.xml`** by `_activity-index.js`.
+  Those two must move together: a sitemap advertising a page that asks not to
+  be indexed contradicts itself. It stays on the activities listing, though —
+  robots is an instruction to search engines, not to visitors.
+- **`shareImage`** — a per-activity `og:image`, falling back to the site's
+  `og-image.jpg`. The page has always declared `og:image:width` 1200 and
+  `og:image:height` 630; those were true only because every activity shared one
+  file, so the upload is **cropped** to that ratio rather than asked for it.
+
+Both are one answer for all three languages, so both are merged as structure: a
+role that may only edit Russian cannot deindex the Hebrew page.
+
 Moving a field between groups touches **three** places that must stay in step:
 the client renders each group, the client **reads the form back** from the same
 groups, and the server merges `SIMPLE_KEYS`. The read-back is the dangerous one,
@@ -379,15 +417,16 @@ removing a row reissues an id and merges two items' state).
 **6. Uploads are shrunk in the browser, not on the server.** `js/image-optimize.js`
 resizes and re-encodes before a byte is sent — hero to 1600px on the long edge
 as JPEG, teacher/sponsor images to 600px, card images cropped to a centred
-square at 800px, transparency keeping them PNG, to match what the site already
-does by hand (`og-image.jpg` is 1200×630 at 72KB; `images/partners/*` are
+square at 800px, share images cropped to 1200×630, transparency keeping them
+PNG, to match what the site already does by hand (`og-image.jpg` is 1200×630 at 72KB; `images/partners/*` are
 19–51KB). Measured: an 865KB hero became 26KB, a 1.77MB logo 134KB.
 
-The `card` profile **crops rather than fits**, and that changes one rule. Every
+A profile with a **`ratio`** (`card` is `1`, `share` is `1200/630`) **crops
+rather than fits**, and that changes one rule. Every
 other slot may hand back the original file when re-encoding produced something
 larger, which is right: a 52KB partner logo becomes 59KB. But the original of a
 1000×600 upload is 1000×600, and returning it would silently break the only
-promise a square slot makes. So the bail-out is refused whenever anything was
+promise a fixed-ratio slot makes. So the bail-out is refused whenever anything was
 actually cut away — `mustKeepCanvas` in `optimize()`. A source that was already
 square may still take it, because the original is square too. Centre is the crop
 because a face is usually near the middle and never reliably at an edge; the
