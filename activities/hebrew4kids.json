@@ -3,7 +3,6 @@
   "status": "announcement",
   "motif": "ring",
   "corner": "tl",
-  "spots": 14,
   "heroImage": "/images/activities/hebrew4kids-hero.jpg",
   "ctaUrl": {
     "he": "לחץ להרשמה",
@@ -112,7 +111,6 @@
       }
     }
   },
-  "included": [],
   "faq": [],
   "teachers": [
     {
@@ -145,11 +143,11 @@
       "logo": "/images/activities/hebrew4kids-sponsors-spo-mtd1o2lk-3.png"
     }
   ],
-  "isoUpdated": "2026-08-29T09:40:42.837Z",
+  "isoUpdated": "2026-08-29T09:55:16.968Z",
   "isoCreated": "2026-08-28T14:55:38.930Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
-  "lastPublishedAt": "2026-08-29T09:40:42.837Z",
+  "lastPublishedAt": "2026-08-29T09:55:16.968Z",
   "factVisibility": {
     "ages": "public",
     "schedule": "public",
