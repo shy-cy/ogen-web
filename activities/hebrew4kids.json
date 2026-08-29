@@ -94,6 +94,13 @@
         "ru": "Limassol"
       }
     },
+    "address": {
+      "text": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      }
+    },
     "price": {
       "registrationFee": 50,
       "fullPrice": 300,
@@ -137,11 +144,11 @@
       "logo": "/images/activities/hebrew4kids-sponsors-spo-mtd1o2lk-3.png"
     }
   ],
-  "isoUpdated": "2026-08-29T11:08:59.408Z",
+  "isoUpdated": "2026-08-29T12:28:51.520Z",
   "isoCreated": "2026-08-28T14:55:38.930Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
-  "lastPublishedAt": "2026-08-29T11:08:59.408Z",
+  "lastPublishedAt": "2026-08-29T12:28:51.520Z",
   "factVisibility": {
     "ages": "public",
     "schedule": "public",
@@ -149,7 +156,11 @@
     "groupSize": "public",
     "instructionLanguage": "public",
     "prerequisites": "public",
-    "location": "members",
-    "price": "members"
-  }
+    "location": "public",
+    "address": "members",
+    "price": "public"
+  },
+  "cardImage": null,
+  "shareImage": null,
+  "robots": "index"
 }
