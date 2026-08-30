@@ -33,11 +33,6 @@
     "en": "Hebrew classes for children ages 6–10 at Ogen Center. Learn reading, writing and speaking while exploring Israeli culture, holidays and life in Israel.",
     "ru": "Уроки иврита для детей 6–10 лет в центре «Оген». Чтение, письмо и разговорный иврит, а также знакомство с Израилем, еврейскими праздниками и культурой."
   },
-  "whatToBring": {
-    "he": "<p>מחברת וקלמר</p>",
-    "en": "<p>Notebook and pencil case</p>",
-    "ru": "<p>Тетрадь и пенал</p>"
-  },
   "facts": {
     "ages": {
       "min": 6,

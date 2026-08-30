@@ -70,13 +70,15 @@ const FIELD_SCHEMA = {
     { key: 'summary', label: 'Card summary', hint: 'One line, shown on the activities listing' },
     { key: 'about', label: 'About this activity', textarea: true, rich: true, required: true }
   ],
-  optional: [
-    { key: 'whatToBring', label: 'What to bring', textarea: true, rich: true }
-  ],
+  // There is no `optional` group any more. It held exactly one field, "What to
+  // bring", and that field is retired — see migrate(). An empty group is a shape
+  // describing nothing, and the client would still have to render a container
+  // for it, so it goes rather than staying as a hollow.
+  //
   // Search and share. Its own group, and its own panel at the foot of the form,
   // because it is written once and then left alone, while everything above it is
-  // what an admin actually comes here to edit. Sitting between "About" and
-  // "What to bring" it read as another piece of body copy and got filled in with
+  // what an admin actually comes here to edit. Sitting in the middle of the
+  // content fields it read as another piece of body copy and got filled in with
   // one, which is how a meta description ends up being a paragraph.
   seo: [
     { key: 'metaTitle', label: 'Meta title', hint: 'Defaults to the title. Shown as the headline in search results' },
@@ -125,13 +127,11 @@ const FIELD_SCHEMA = {
 // question for the form, not for the record: an SEO field is saved, merged and
 // permission checked exactly like a content one.
 const SIMPLE_KEYS = FIELD_SCHEMA.simple
-  .concat(FIELD_SCHEMA.optional)
   .concat(FIELD_SCHEMA.seo)
   .map((f) => f.key);
 // Fields edited in the WYSIWYG, so their stored value is markup rather than
 // words. Derived from the schema, so marking a field `rich` is the whole change.
-const RICH_KEYS = FIELD_SCHEMA.simple.concat(FIELD_SCHEMA.optional)
-  .filter((f) => f.rich).map((f) => f.key);
+const RICH_KEYS = FIELD_SCHEMA.simple.filter((f) => f.rich).map((f) => f.key);
 
 // What an admin may write, and nothing else.
 //

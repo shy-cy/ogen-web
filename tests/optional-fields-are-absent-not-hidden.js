@@ -40,27 +40,38 @@ const base = {
   H.ok(bare.indexOf('activity-credits') === -1, 'and no empty credits JSON either');
   H.ok(bare.indexOf('facts-list') === -1, 'no bullet list when nothing is included');
 
-  console.log('\n[each optional field appears only when it has a value]');
-  const withOne = Object.assign({}, base, { whatToBring: { he: 'מחברת', en: '', ru: '' } });
-  const one = tpl.renderActivityPage(withOne, 'he');
-  H.ok(one.indexOf('מה להביא') !== -1, 'the populated field is rendered');
+  console.log('\n[the one optional block left appears only when it has a value]');
+  // Program length, language of instruction and prerequisites used to be
+  // optional blocks here; they are facts now. "What to bring" was the last
+  // optional TEXT field and is retired — one line on one activity, carried by
+  // a whole section, editor and form group. FAQ is what [data-optional] wraps
+  // now, and the rule it is wrapped for is unchanged.
+  const withFaq = Object.assign({}, base, {
+    faq: [{ id: 'q1', q: { he: 'מתי?', en: '', ru: '' }, a: { he: 'ברביעי', en: '', ru: '' } }]
+  });
+  const one = tpl.renderActivityPage(withFaq, 'he');
+  H.ok(one.indexOf('שאלות נפוצות') !== -1, 'the populated section is rendered');
   H.ok(one.indexOf('דרישות קדם') === -1, 'its unpopulated neighbours still are not');
   H.eq((one.match(/data-optional/g) || []).length, 1, 'exactly one optional block exists');
 
-  console.log('\n[an optional field blank in one language is absent from that language only]');
-  // Program length, language of instruction and prerequisites used to be
-  // optional blocks here. They are sidebar facts now, so what to bring is the
-  // main-column optional field this checks; the fallback rule is unchanged.
-  const mixed = Object.assign({}, base, {
-    title: { he: 'מעורב', en: 'Mixed', ru: 'Смешанный' },
-    whatToBring: { he: 'מחברת', en: '', ru: '' }
-  });
-  H.ok(tpl.renderActivityPage(mixed, 'he').indexOf('מה להביא') !== -1,
-       'Hebrew has it');
-  // en falls back to he, so it IS present in English — the fallback chain is
-  // deliberate and shared with preview. Russian falls back the same way.
-  H.ok(tpl.renderActivityPage(mixed, 'en').indexOf('What to bring') !== -1,
+  console.log('\n[a section blank in one language falls back rather than emptying]');
+  H.ok(tpl.renderActivityPage(withFaq, 'en').indexOf('Frequently asked questions') !== -1,
        'English shows the Hebrew fallback rather than an empty section');
+
+  console.log('\n[what to bring is gone from the template, not merely unused]');
+  // It has to be absent from the rendered page in every language, not just
+  // absent from the record: a stale LABELS entry plus a stale call site would
+  // keep publishing the heading for any record that still carries the key.
+  const stale = Object.assign({}, base, {
+    title: { he: 'ישן', en: 'Old', ru: 'Старый' },
+    whatToBring: { he: 'מחברת', en: 'Notebook', ru: 'Тетрадь' }
+  });
+  [['he', 'מה להביא'], ['en', 'What to bring'], ['ru', 'Что взять с собой']].forEach(([lang, label]) => {
+    const html = tpl.renderActivityPage(stale, lang);
+    H.ok(html.indexOf(label) === -1, lang + ': the heading is not published');
+    H.ok(html.indexOf('Notebook') === -1 && html.indexOf('מחברת') === -1,
+         lang + ': and neither is the value, even though the record still holds it');
+  });
 
   console.log('\n[structural invariants of the shipped template]');
   const full = tpl.renderActivityPage(Object.assign({}, base, {

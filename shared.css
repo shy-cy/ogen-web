@@ -325,17 +325,38 @@ html[lang="en"] .page-header h1, html[lang="ru"] .page-header h1{ font-weight:80
   max-width:1100px; margin:0 auto; padding:50px 24px 80px;
   display:grid; grid-template-columns:minmax(0,1fr) 320px;
   column-gap:48px; row-gap:18px; align-items:start;
+  /* The picture leads the trailing column, level with the fact cards, and the
+     price card sits directly under it: see the activity, see the cost, act.
+
+     The fact row SPANS the first two rows, and that span is what lets the two
+     columns behave as independent stacks — row 1 is then sized by the picture
+     alone, so the aside starts directly beneath it instead of waiting for the
+     cards to finish. grid-template-rows below is load-bearing for the same
+     reason; without it CSS grid shares a spanning item EQUALLY across auto
+     tracks, which inflates row 2 and opens a 117px hole under the picture.
+     That failure is silent — nothing overflows, nothing errors, there is just
+     a gap — so a test pins the value. */
+  grid-template-rows:min-content min-content auto auto;
   grid-template-areas:
-    "row  row"
-    "main pic"
-    "main aside";
+    "row     pic"
+    "row     aside"
+    "main    aside"
+    "credits credits";
 }
 .activity-card-image{ grid-area:pic; }
 .activity-main{ grid-area:main; min-width:0; }
 .activity-aside{ grid-area:aside; display:flex; flex-direction:column; gap:18px; }
-/* The two cards a reader scans first, across the full measure. */
-.fact-row{ grid-area:row; display:flex; gap:24px; align-items:stretch; margin-bottom:14px; }
-.fact-row > *{ flex:1 1 0; min-width:0; }
+/* Teachers and sponsors, across the full measure under everything else. */
+.activity-credits{ grid-area:credits; margin-top:22px; }
+/* The two cards a reader scans first.
+
+   They WRAP rather than switching on a viewport breakpoint: side by side while
+   each can hold 320px, stacked below that. One declaration covers the 684px
+   they get beside the picture on a desktop, the full width of a tablet, and a
+   phone — and it is the row itself that decides, from the space it actually
+   has, which is the same reasoning the fact cards use inside. */
+.fact-row{ grid-area:row; display:flex; flex-wrap:wrap; gap:16px 24px; align-items:stretch; }
+.fact-row > *{ flex:1 1 320px; min-width:0; }
 .activity-main h2{ font-size:22px; font-weight:700; color: var(--navy); margin:28px 0 12px; }
 .activity-main > *:first-child{ margin-top:0; }
 .activity-main p{ font-size:16px; color:#3f3f3a; margin-bottom:16px; }
@@ -390,6 +411,28 @@ html[lang="he"] .credit-group-label{ text-transform:none; letter-spacing:0; font
   background:#fff; border:1px solid var(--stone); padding:3px;
 }
 .credit-name{ display:block; font-size:14px; color: var(--navy); font-weight:700; min-width:0; overflow-wrap:anywhere; }
+/* Given the full measure, the credits card lays its two groups ACROSS instead
+   of stacking them, and halves in height doing it — 310px in a 320px column
+   becomes 160px across 1050. Decided by a container query on the card's OWN
+   inline size, the same mechanism the fact cards use, so the narrow rendering
+   is untouched and only the wide one is new. 520px rather than the facts' 360
+   because two labelled groups of photographs need more room to be worth
+   splitting than two lines of text do.
+
+   Nothing is pushed to an edge here either: the groups start at the leading
+   edge and the hairline between them is border-INLINE-start, so it lands on
+   the correct side in all three languages with no per-language override. */
+@container (min-width:520px){
+  .activity-credits .credit-block{ flex-direction:row; gap:0; align-items:stretch; }
+  .activity-credits .credit-group{ flex:1 1 260px; }
+  .activity-credits .credit-group + .credit-group{
+    margin-top:0; padding-top:0; border-top:none;
+    margin-inline-start:26px; padding-inline-start:26px;
+    border-inline-start:1px solid rgba(193,132,43,0.22);
+  }
+  .activity-credits .credit-items{ flex-direction:row; flex-wrap:wrap; gap:12px 26px; }
+  .activity-credits .credit-item{ flex:0 1 auto; }
+}
 
 /* Sticky facts sidebar. 112px = 96px nav + 16px breathing room. */
 /* No position:sticky here. It was `sticky; top:112px` and it had stopped doing
@@ -444,18 +487,24 @@ html[lang="he"] .credit-group-label{ text-transform:none; letter-spacing:0; font
 /* Hebrew has no case, so uppercase is a no-op and the tracking just loosens the
    word. Same treatment .credit-group-label already gets. */
 html[lang="he"] .fact-card-head h2{ text-transform:none; letter-spacing:0; font-size:13px; }
-/* A card wide enough lays its facts across instead of stacking them: a top-row
-   card is ~500px, and one narrow column of text in it would leave most of the
-   card empty. The card decides from ITS OWN width, not the viewport, so the same
-   component serves the full-width row and the 320px column with no variant.
+/* A card wide enough lays its facts across instead of stacking them. The card
+   decides from ITS OWN width, not the viewport, so one component serves every
+   place a card is put with no variant and no breakpoint of its own.
 
    TWO columns, not auto-fit. auto-fit packs as many 140px tracks as fit, which
    is three at ~500px — so four facts filled one row and left the fourth alone
    beside two empty tracks, and three facts put the date range in a third of the
    card where it could not hold one line. A fixed pair divides both counts:
    four land two-by-two, and three flow so that Location sits under When and
-   Duration keeps half the card. One declaration, both problems. */
-@container (min-width:360px){
+   Duration keeps half the card. One declaration, both problems.
+
+   500px, and the number is MEASURED rather than judged. Half a card has to hold
+   the longest fact value on one line, which is the date range: "October 2026 -
+   December 2026" needs 490px of card, Russian 470, Hebrew 410. Below the widest
+   of those the two columns are a downgrade — the date range wraps to a third
+   line, which is the exact thing splitting Location out of it was meant to fix.
+   English is the binding case; 500 gives it a little room. */
+@container (min-width:500px){
   .fact-card .sidebar-facts{
     display:grid; grid-template-columns:repeat(2,1fr); gap:16px 24px;
   }
@@ -520,13 +569,17 @@ html[lang="he"] .fact-card-head h2{ text-transform:none; letter-spacing:0; font-
      duplicated and nothing is display:none. */
   .activity-body{
     padding:36px 20px 60px; grid-template-columns:minmax(0,1fr); row-gap:28px;
+    grid-template-rows:none;
     grid-template-areas:
       "pic"
       "row"
       "main"
-      "aside";
+      "aside"
+      "credits";
   }
-  .fact-row{ flex-direction:column; gap:16px; margin-bottom:0; }
+  /* No .fact-row rule here any more. It wraps on its own from 320px per card,
+     so the two cards stay side by side on a tablet — which a viewport switch at
+     939px had been preventing — and stack once they genuinely cannot fit. */
   /* The picture stays SQUARE at every width. It used to flatten to 16:7 here,
      on the reasoning that a full-width square is enormous on a phone — which is
      true, and is a size problem rather than a ratio one. Cropping a 1:1 upload

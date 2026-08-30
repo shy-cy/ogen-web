@@ -164,10 +164,30 @@ the square picture (`.activity-card-image`), a `.fact-row` of two cards,
 status CTA. An activity with no `cardImage` renders no frame at all rather than
 an empty one.
 
-Above 939px the grid is `"row row" / "main pic" / "main aside"` — the two cards
-a reader scans first across the full measure, then the article with the picture
-at the head of the column beside it. Below, the areas become
-`"pic" / "row" / "main" / "aside"` and nothing else changes.
+Above 939px the grid is `"row pic" / "row aside" / "main aside" /
+"credits credits"` — the picture leads the trailing column, level with the fact
+cards, with the price card directly under it and the registration button under
+that: see the activity, see the cost, act. Below, the areas become
+`"pic" / "row" / "main" / "aside" / "credits"` and nothing else changes.
+
+**The fact row spans the first two rows, and that span is load-bearing.** It is
+what lets the two columns behave as independent stacks: row 1 is then sized by
+the picture alone, so the aside starts directly beneath it instead of waiting
+for the cards to finish. `grid-template-rows: min-content min-content auto auto`
+is load-bearing for the same reason — CSS grid shares a spanning item **equally**
+across auto tracks, so without the pin the fact row inflates row 2 and opens a
+117px hole under the picture. That failure is silent: nothing overflows, nothing
+errors, there is just a gap. A test pins both.
+
+**The fact row wraps rather than switching direction at a breakpoint.**
+`flex-wrap:wrap` with `flex:1 1 320px` per card: side by side while each card
+can hold 320px, stacked below that. One declaration covers the 684px the row
+gets beside the picture on a desktop, the full width of a tablet, and a phone —
+and it is the row that decides, from the space it actually has. It replaced a
+`flex-direction:column` inside the 939px media query, which was forcing two
+cards to stack on a tablet that had room for both. Note the row is only 584px
+between about 940 and 1080px, so the cards stack there; that is the wrap working,
+not a bug.
 
 That is the whole point of using areas: **the picture exists once in the
 markup** and sits in two places. Rendering it twice and hiding one would drift,
@@ -214,9 +234,16 @@ The card image is **not** the share image. `shareImage` is a separate field with
 its own 1200×630 crop, and falls back to the site's `og-image.jpg`, never to the
 card.
 
-The main column reads About → What to bring → FAQ. Three of the facts used to be
-sections in it; they are facts to scan, not prose. Credits used to end it and are
-a card now.
+The main column reads About → FAQ. Three of the facts used to be sections in it;
+they are facts to scan, not prose. Credits used to end it and are a card now.
+
+**"What to bring" is retired.** It was one line on the one activity that had it,
+carried by a whole optional section, a rich-text editor, a form group and a
+`FIELD_SCHEMA.optional` group that held nothing else. `migrate()` drops the key,
+so a record stops carrying it from its next save; the words are in git history.
+The `optional` group is gone rather than left empty — an empty group is a shape
+describing nothing, and the client would still have to render a container for
+it. FAQ is now the only `[data-optional]` block.
 
 **The facts are four cards in two placements, not eight label/value rows.** Each
 is an icon, a heading, and its contents stacked underneath, ported from the
@@ -224,10 +251,10 @@ Shirat HaYam event sidebar (`.sidebar-detail`) onto Ogen tokens:
 
 | Placement | Card | Contents, in this order |
 |---|---|---|
-| Top row | Who it is for | Ages, Group size, Prerequisites, Language of instruction |
-| Top row | When & where | When, Duration, Location |
+| Above the article | Who it is for | Ages, Group size, Prerequisites, Language of instruction |
+| Above the article | When & where | When, Duration, Location |
 | Side column | Price | its four derived rows |
-| Side column | Staff & sponsors | Teachers, then sponsors |
+| Full-width band | Staff & sponsors | Teachers, then sponsors |
 
 The grouping answers the questions a parent asks in the order they ask them — is
 this for my child, when and where is it, what does it cost — and then who
@@ -237,8 +264,12 @@ except not fitting elsewhere. Language of instruction is a prerequisite in
 practice, a reader asking when also asks where, and a number a family decides on
 should not be the last line of a mixed list. Details is gone, not emptied.
 
-Price **leads the side column**, directly above the registration button: read
-what it costs, then press the thing that acts on it.
+Price is **alone in the side column**, directly above the registration button:
+read what it costs, then press the thing that acts on it. Staff & sponsors is a
+**full-width band under everything**, where the measure lets it lay its two
+groups across and halve in height — 310px in a 320px column becomes 160px across
+1050. That is a container query on the card's own inline size at 520px, the same
+mechanism the fact cards use, so the narrow rendering is untouched.
 
 A card wide enough lays its facts **across** rather than stacked, decided by a
 container query on the card's own inline size — so the same component serves the
@@ -248,6 +279,14 @@ things: four facts land two-by-two instead of leaving the fourth beside two
 empty tracks, and three flow so **Location sits under When** while Duration
 keeps half the card — the width its date range needs to hold one line. Put
 `auto-fit` back and both regress silently.
+
+The threshold is **500px, and it is measured rather than judged**: half a card
+has to hold the date range on one line, which needs 490px of card in English,
+470 in Russian, 410 in Hebrew. Below the widest of those, two columns are a
+*downgrade* — the date range wraps to a third line, which is the exact thing
+splitting Location out of it was meant to fix. It used to be 360px, which was
+fine while the cards ran the full measure and became wrong the moment they
+shared it with the picture's column.
 
 The **price card is the one exception**, one column at every width. Every other
 card holds facts a reader scans in any order; the price is four numbers that add
@@ -291,7 +330,7 @@ is still declared exactly once, on the article.
 
 **The article comes before the side column in the source**, and that single fact
 decides two things that look unrelated. On a phone it is what puts About and
-What to bring ahead of Price and Staff. On a desktop it is why the column sits
+ahead of Price and Staff. On a desktop it is why the column sits
 at the **trailing** edge — left in Hebrew, right in EN/RU — because a grid row
 places its first item at the leading edge. They cannot be changed independently:
 keeping the column on the leading edge would need `order` or `column-reverse`,
@@ -460,9 +499,9 @@ Driven by three markup contracts:
 3. **Optional fields.** Wrap each in `<div data-optional>`. The rule is to
    **delete the block** when an activity has nothing to say there. As a
    safety net `js/activity.js` removes any `[data-optional]` that ends up
-   with only a heading in it, so no orphaned label survives. Optional blocks
-   are: program length, language of instruction, prerequisites, what to
-   bring, FAQ.
+   with only a heading in it, so no orphaned label survives. Program length,
+   language of instruction and prerequisites became facts, and what to bring
+   is retired, so **FAQ is the only one left**.
 
 `draft` deserves a warning: `js/activity.js` redirects a draft page to
 `/404.html` (bypass with `?preview=1`), but the site is static with no auth,
@@ -501,16 +540,16 @@ js/image-optimize.js   resizes + re-encodes every upload IN THE BROWSER
 
 The form is a **projection of `FIELD_SCHEMA`**, one panel per group, in the
 order an activity is actually filled in: **Settings** (slug, status, motif,
-corner, card image), **Content** (title, summary, about, what to bring),
-**Teachers**, **Sponsors**, **Activity facts** (the facts, then the registration
-button link — the button sits directly under them on the page), **FAQ**, then
-**Search & sharing** last.
+corner, card image), **Content** (title, summary, about), **Teachers**,
+**Sponsors**, **Activity facts** (the facts, then the registration button link),
+**FAQ**, then **Search & sharing** last.
 
-**About and What to bring are written in Quill** — the same editor and version
-the Shirat HaYam admin uses, loaded from a CDN because this project has no build
-step, with the three languages **stacked** rather than in the three-column grid
-the short fields use: those are a comparison task, a paragraph of prose is not.
-`rich: true` on the descriptor is the whole switch.
+**About is written in Quill** — the same editor and version the Shirat HaYam
+admin uses, loaded from a CDN because this project has no build step, with the
+three languages **stacked** rather than in the three-column grid the short
+fields use: those are a comparison task, a paragraph of prose is not.
+`rich: true` on the descriptor is the whole switch, and About is now the only
+field carrying it.
 
 That makes the stored value HTML, and `richText()` in the template prints it as
 markup. Three things hold that together: `sanitiseRich()` on the server runs on
@@ -521,10 +560,10 @@ blurb — or a search result reads `&lt;p&gt;במרכז עוגן…`; and a valu
 **not** start with a block tag is treated as the plain text it is and escaped, so
 records written before the editor need no migration and read exactly as before.
 Without Quill the field falls back to the plain textarea, so a CDN outage costs
-formatting rather than the ability to edit. Meta title and meta description used to sit in
-Content, between "About this activity" and "What to bring", where they read as
-more body copy to write, which is how a meta description ends up being a
-paragraph. They are their own `seo` group now.
+formatting rather than the ability to edit. Meta title and meta description used
+to sit in the middle of the content fields, where they read as more body copy to
+write, which is how a meta description ends up being a paragraph. They are their
+own `seo` group now.
 
 That panel also carries the two fields that are **not** words, so they sit on
 the schema root rather than in `seo` (which feeds `SIMPLE_KEYS`, the
@@ -544,7 +583,9 @@ translatable scalars):
 Both are one answer for all three languages, so both are merged as structure: a
 role that may only edit Russian cannot deindex the Hebrew page.
 
-Moving a field between groups touches **three** places that must stay in step:
+Retiring one touches the same places, which is why "What to bring" leaving took
+the `optional` group with it in all three. Moving a field between groups touches
+**three** places that must stay in step:
 the client renders each group, the client **reads the form back** from the same
 groups, and the server merges `SIMPLE_KEYS`. The read-back is the dangerous one,
 because nothing about it looks wrong — the field renders, the admin types into

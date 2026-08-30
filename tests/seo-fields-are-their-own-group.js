@@ -1,10 +1,9 @@
 // What this defends against:
 //
 // Meta title and meta description sat in the middle of the content fields,
-// between "About this activity" and "What to bring". Read in that order they
-// look like more body copy to write, which is how a meta description ends up
-// being a paragraph. They are now their own group, rendered in their own panel
-// at the foot of the form.
+// among the body copy. Read in that order they look like more body copy to
+// write, which is how a meta description ends up being a paragraph. They are
+// now their own group, rendered in their own panel at the foot of the form.
 //
 // Regrouping a field in a form built from a schema is the kind of change that
 // looks purely cosmetic and is not. The form is a projection of the schema in
@@ -43,7 +42,6 @@ H.ok(Array.isArray(SCHEMA.seo), 'there is a seo group');
 SEO_KEYS.forEach((k) => {
   H.ok(SCHEMA.seo.some((f) => f.key === k), k + ' is in it');
   H.ok(!SCHEMA.simple.some((f) => f.key === k), k + ' has left the content fields');
-  H.ok(!SCHEMA.optional.some((f) => f.key === k), k + ' is not in the optional group either');
 });
 H.ok(SCHEMA.seo.every((f) => f.label), 'every SEO field is labelled');
 
@@ -51,12 +49,19 @@ console.log('\n[content fields kept theirs]');
 ['title', 'summary', 'about'].forEach((k) => {
   H.ok(SCHEMA.simple.some((f) => f.key === k), k + ' is still a content field');
 });
-H.ok(SCHEMA.optional.some((f) => f.key === 'whatToBring'), 'the optional group is unchanged');
+// There is no `optional` group any anymore: it held only "What to bring", which
+// is retired. An empty group would still need a container rendered for it, so
+// it was removed rather than left as a hollow — and that removal has to reach
+// the client's read-back and the server's SIMPLE_KEYS too, which is exactly the
+// three-places problem this suite exists for.
+H.ok(SCHEMA.optional === undefined, 'the optional group is gone, not left empty');
+H.ok(!Object.keys(SCHEMA).some((g) => Array.isArray(SCHEMA[g]) &&
+     SCHEMA[g].some((f) => f && f.key === 'whatToBring')), 'and no group still lists whatToBring');
 
 console.log('\n[the server still saves them]');
 // A field can be perfectly grouped in the form and still be dropped on save.
 // SIMPLE_KEYS is what the merge walks; grouping is a question for the form only.
-const keys = SCHEMA.simple.concat(SCHEMA.optional, SCHEMA.seo).map((f) => f.key);
+const keys = SCHEMA.simple.concat(SCHEMA.seo).map((f) => f.key);
 SEO_KEYS.forEach((k) => {
   H.ok(keys.indexOf(k) !== -1, k + ' is among the translatable scalars');
 });
@@ -78,9 +83,11 @@ H.ok(/\(S\.schema\.seo \|\| \[\]\)\.forEach/.test(adminJs),
   'from the schema, so adding an SEO field stays a one-line server change');
 
 console.log('\n[and reads it back, which is the one that fails silently]');
-H.ok(/S\.schema\.simple\.concat\(S\.schema\.optional, S\.schema\.seo \|\| \[\]\)/.test(adminJs),
+H.ok(/S\.schema\.simple\.concat\(S\.schema\.seo \|\| \[\]\)/.test(adminJs),
   'readForm walks the SEO group too');
-// The shape of the bug: rendering from three groups but reading back from two.
+// The shape of the bug: rendering from more groups than are read back. This is
+// the assertion that matters and it is written generically, so retiring the
+// optional group could not slip past it.
 const readForm = adminJs.slice(adminJs.indexOf('function readForm'));
 const renderFields = adminJs.slice(adminJs.indexOf('function renderFields'), adminJs.indexOf('function renderCardImage'));
 const renderedGroups = (renderFields.match(/S\.schema\.(simple|optional|seo)/g) || []).sort();

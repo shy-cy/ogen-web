@@ -70,11 +70,16 @@ console.log('\n[a wide card is two columns, and that is what places two facts]')
 //     sits UNDER When, and Duration keeps half the card, which is the width its
 //     date range needs to stay on one line.
 //
+// The 500px threshold is measured, not judged: half a card must hold the date
+// range on one line, which needs 490px of card in English, 470 in Russian, 410
+// in Hebrew. Lower it and two columns become a downgrade — the date range wraps
+// to a third line, which is what splitting Location out of it was meant to fix.
+//
 // Put auto-fit back and both regress silently: nothing overflows, nothing
 // errors, the cards just go ragged and Duration wraps to three lines.
-const cqAt = css.indexOf('@container (min-width:360px)');
+const cqAt = css.indexOf('@container (min-width:500px)');
 const cq = css.slice(cqAt, css.indexOf('\n.sidebar-facts{', cqAt));
-H.ok(cq.length > 60, 'found the container query');
+H.ok(cq.length > 60, 'found the container query at 500px, the measured English minimum');
 H.ok(/grid-template-columns:\s*repeat\(2,\s*1fr\)/.test(cq), 'a wide card is exactly two columns');
 H.ok(cq.indexOf('auto-fit') === -1, 'not auto-fit, which gave three and left a ragged shelf');
 // The card decides from ITS OWN width, so one component serves the ~500px row

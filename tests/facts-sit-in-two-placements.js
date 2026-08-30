@@ -1,8 +1,9 @@
 // What this defends against:
 //
-// The facts were one panel in one column. They are four cards in TWO places
-// now: "Who it is for" and "When & where" run across the full measure above the
-// article, and "Price" and "Staff & sponsors" sit in a column beside it.
+// The facts were one panel in one column. They are four cards in THREE places
+// now: "Who it is for" and "When & where" sit above the article, "Price" sits
+// in the column beside the picture, and "Staff & sponsors" is a full-width band
+// under everything.
 //
 // Splitting one thing into two is where content goes missing, so this pins
 // which card lands where, and that the set is still complete.
@@ -43,12 +44,22 @@ LANGS.forEach((lang) => {
   const aside = (html.match(/<div class="activity-aside">[\s\S]*?\n    <\/div>/) || [])[0] || '';
   const groupsIn = (chunk) => (chunk.match(/data-group="(\w+)"/g) || []).map((m) => m.slice(12, -1));
 
+  const band = (html.match(/<div class="activity-credits">[\s\S]*?\n    <\/div>/) || [])[0] || '';
+
   H.eq(groupsIn(row).join(','), 'participants,schedule',
     lang + ': the top row is who it is for, then when & where');
-  // Price LEADS the column, directly above the registration button: a family
-  // reads what it costs and then presses the thing that acts on it.
-  H.eq(groupsIn(aside).join(','), 'price,credits',
-    lang + ': the side column is price, then staff & sponsors');
+  // Price is ALONE in the column, directly above the registration button, so
+  // the column reads picture, price, act.
+  H.eq(groupsIn(aside).join(','), 'price',
+    lang + ': the side column is the price card and nothing else');
+  H.eq(groupsIn(band).join(','), 'credits',
+    lang + ': staff & sponsors is its own band');
+  // The band is a SIBLING of the aside, not nested in it — nesting would put it
+  // back in a 320px column while still passing a naive "is it present" check.
+  H.ok(aside.indexOf('data-group="credits"') === -1,
+    lang + ': and is not inside the column it left');
+  H.ok(at(html, 'activity-aside') < at(html, 'activity-credits'),
+    lang + ': it comes after the column in the source, which is its mobile order too');
 
   // Nothing lost in the split: every group the record has is somewhere.
   const all = (html.match(/data-group="(\w+)"/g) || []).length;
@@ -68,12 +79,10 @@ LANGS.forEach((lang) => {
     H.ok(/aria-hidden="true"/.test((html.match(/<figure[^>]*>/) || [''])[0]),
     lang + ': it is decorative, which is what allows the grid to move it');
 });
-// Two placements, from area names alone.
-H.ok(/grid-template-areas:\s*\n?\s*"row\s+row"/.test(css), 'the desktop grid names a full-width row');
-H.ok(/"main pic"/.test(css) && /"main aside"/.test(css),
-  'with the article beside the picture and the column under it');
-H.ok(/"pic"\s*\n\s*"row"\s*\n\s*"main"\s*\n\s*"aside"/.test(css),
-  'and the stacked grid puts the picture first');
+// The stacked grid, from area names alone. The desktop map is asserted further
+// down, where the two rules it depends on are.
+H.ok(/"pic"\s*\n\s*"row"\s*\n\s*"main"\s*\n\s*"aside"\s*\n\s*"credits"/.test(css),
+  'the stacked grid puts the picture first and the credits band last');
 // Scoped to the elements the layout places, not to a slice of the stylesheet:
 // an unrelated `.status-badge:empty{display:none}` sits between them and made a
 // broader check pass for the wrong reason.
@@ -86,7 +95,7 @@ console.log('\n[the article precedes the side column — mobile order and edge a
 LANGS.forEach((lang) => {
   const html = template.renderActivityPage(record, lang);
   H.ok(at(html, 'activity-main') < at(html, 'activity-aside'),
-    lang + ': article first, so Price and Staff follow it on a phone');
+    lang + ': article first, so Price and the button follow it on a phone');
 });
 // A flex/grid row places the first item at the leading edge, so article-first
 // IS column-at-the-trailing-edge. No CSS may quietly undo it.
@@ -95,6 +104,35 @@ H.ok(!/\border\s*:\s*-?\d/.test(body), 'no CSS order property reshuffling the co
 H.ok(!/row-reverse|column-reverse/.test(body), 'and no reversed flex direction doing it the other way');
 H.ok(body.indexOf('[dir=') === -1, 'no directional selector anywhere in the layout');
 H.ok(!/\b(margin|padding)-(left|right)\s*:/.test(body), 'no physical margin or padding');
+
+console.log('\n[the two rules that fail as a gap rather than an error]');
+// 1. The fact row spans the first TWO grid rows. That span is what lets the two
+//    columns behave as independent stacks: row 1 is sized by the picture alone,
+//    so the price card starts directly beneath it rather than waiting for the
+//    cards to finish.
+const areas = (body.match(/grid-template-areas:([\s\S]*?);/) || [])[1] || '';
+H.ok(/"row\s+pic"/.test(areas), 'the picture shares row 1 with the fact cards');
+H.ok(/"row\s+aside"/.test(areas), 'and the fact row spans into row 2, where the aside starts');
+H.ok(/"main\s+aside"/.test(areas), 'the article sits below the cards, beside the aside');
+H.ok(/"credits\s+credits"/.test(areas), 'and the credits band spans both columns');
+
+// 2. Without pinning the first two tracks, CSS grid shares a spanning item
+//    EQUALLY across auto tracks — which inflates row 2 and opens a 117px hole
+//    under the picture. Nothing overflows and nothing errors; there is just a
+//    gap. So the value is pinned here, on comment-stripped CSS, because the
+//    comment above the rule says the words this searches for.
+H.ok(/grid-template-rows:\s*min-content min-content auto auto/.test(body),
+  'the first two grid rows are pinned to min-content');
+
+// 3. The fact row WRAPS from a per-card basis instead of switching direction at
+//    a viewport width. That is what keeps the two cards side by side on a
+//    tablet, which a 939px switch to column had been preventing.
+const factRow = css.slice(css.indexOf('.fact-row{'), css.indexOf('.activity-main h2{'));
+H.ok(/flex-wrap:\s*wrap/.test(factRow), 'the fact row wraps');
+H.ok(/flex:\s*1 1 320px/.test(factRow), 'from a 320px basis per card, not from a breakpoint');
+const stacked = css.slice(css.indexOf('@media (max-width:939px)'));
+H.ok(!/\.fact-row\s*\{[^}]*flex-direction/.test(stacked),
+  'and no media query forces it back into a column');
 
 console.log('\n[the cards are one plain surface, told apart by their icon]');
 const card = css.slice(css.indexOf('.fact-card{'), css.indexOf('.fact-card-head{'));

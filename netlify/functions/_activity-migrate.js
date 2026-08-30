@@ -207,6 +207,12 @@ function migrate(record) {
   delete out.spots;
   delete out.included;
 
+  // "What to bring" goes the same way. It was one line on the one activity that
+  // used it, and a whole optional section, editor and form group existed to
+  // carry it. Dropping it here means a record stops holding it from its next
+  // save rather than keeping a dead key forever; the words are in git history.
+  delete out.whatToBring;
+
   // The hero image is gone too. Activities are described by their words and
   // their facts; the one picture on the page was a decorative band that every
   // activity would have needed sourcing for. `heroAlt` goes with it — there is

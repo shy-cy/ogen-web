@@ -145,8 +145,8 @@
       }).join('');
   }
 
-  // Quill writes '<p><br></p>' for an empty editor. Storing that would make an
-  // empty optional section render as an empty paragraph instead of vanishing.
+  // Quill writes '<p><br></p>' for an empty editor. Storing that would publish
+  // an empty paragraph instead of nothing at all.
   function editorHtml(q) {
     if (!q) return '';
     var html = q.root.innerHTML;
@@ -366,10 +366,6 @@
     $('fields').innerHTML = '';
     S.schema.simple.forEach(function (d) {
       $('fields').appendChild(contentRow(d, langObj(rec[d.key]), 'f-' + d.key));
-    });
-    $('optional-fields').innerHTML = '';
-    S.schema.optional.forEach(function (d) {
-      $('optional-fields').appendChild(contentRow(d, langObj(rec[d.key]), 'f-' + d.key));
     });
     // Its own panel at the foot of the form. Read from the schema like every
     // other group, so adding an SEO field stays a one line change on the server.
@@ -919,7 +915,7 @@
     // Every translatable scalar, in whichever panel it was drawn. Missing the
     // SEO group here would read the form back without it and silently blank a
     // meta description on the next save.
-    S.schema.simple.concat(S.schema.optional, S.schema.seo || []).forEach(function (d) {
+    S.schema.simple.concat(S.schema.seo || []).forEach(function (d) {
       rec[d.key] = readLangField('f-' + d.key);
     });
 

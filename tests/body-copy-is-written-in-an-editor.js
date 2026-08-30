@@ -33,18 +33,20 @@ const R = path.join(__dirname, '..');
 const adminJs = fs.readFileSync(path.join(R, 'js/activities-admin.js'), 'utf8');
 const adminHtml = fs.readFileSync(path.join(R, 'admin/activities.html'), 'utf8');
 
-const activity = (about, bring) => ({
+const activity = (about) => ({
   slug: 'purim', status: 'open',
   title: { he: 'כותרת', en: 'Title', ru: '' },
   about: { he: about, en: '', ru: '' },
-  whatToBring: bring ? { he: bring, en: '', ru: '' } : undefined,
   facts: {}, teachers: [], sponsors: [], faq: []
 });
 
 console.log('[which fields are rich comes from the schema]');
-H.eq(JSON.stringify(RICH_KEYS), '["about","whatToBring"]', 'about and what to bring, and nothing else');
-H.ok(FIELD_SCHEMA.simple.concat(FIELD_SCHEMA.optional).filter((f) => f.rich).length === 2,
-     'marked on the descriptors, so the client learns it from the schema like everything else');
+// "What to bring" was the second rich field and is retired, so About is the
+// only one left. Derived from the schema rather than listed, so marking a field
+// `rich` stays the whole change.
+H.eq(JSON.stringify(RICH_KEYS), '["about"]', 'about, and nothing else');
+H.ok(FIELD_SCHEMA.simple.filter((f) => f.rich).length === 1,
+     'marked on the descriptor, so the client learns it from the schema like everything else');
 H.ok(!FIELD_SCHEMA.simple.filter((f) => f.key === 'title')[0].rich, 'a title is not rich — it is one line');
 
 console.log('\n[the server sanitises on every save, because the page prints it raw]');
@@ -68,11 +70,10 @@ const merged = mergeByPermission(null, activity('<p onclick="x">hi</p>'),
 H.eq(merged.about.he, '<p>hi</p>', 'a hostile request body is cleaned server-side');
 
 console.log('\n[the page prints the markup]');
-const rich = tpl.renderActivityPage(activity('<p>שלום</p><h2>כותרת</h2><ul><li>פריט</li></ul>', '<p>מחברת</p>'), 'he');
+const rich = tpl.renderActivityPage(activity('<p>שלום</p><h2>כותרת</h2><ul><li>פריט</li></ul>'), 'he');
 H.ok(rich.indexOf('<h2>כותרת</h2>') !== -1, 'a heading is a heading');
 H.ok(rich.indexOf('<li>פריט</li>') !== -1, 'a list item is a list item');
 H.ok(rich.indexOf('&lt;p&gt;') === -1, 'and nothing is escaped into visible tags');
-H.ok(rich.indexOf('<p>מחברת</p>') !== -1, 'what to bring is rich too');
 
 console.log('\n[a record written before the editor still reads as it did]');
 // Nothing was migrated. Plain text is recognised by not starting with a tag.

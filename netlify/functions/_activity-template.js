@@ -73,7 +73,7 @@ const LABELS = {
     siteName: 'מרכז עוגן', suffix: ' · מרכז עוגן',
     about: 'על החוג', programLength: 'אורך התוכנית',
     instructionLanguage: 'שפת ההוראה', prerequisites: 'דרישות קדם',
-    whatToBring: 'מה להביא', faq: 'שאלות נפוצות',
+    faq: 'שאלות נפוצות',
     ages: 'גילאים', schedule: 'מועד', duration: 'משך', location: 'מיקום', address: 'כתובת',
     groupSize: 'גודל קבוצה', price: 'מחיר',
     // Group headings. Deliberately not the same word as any fact inside them —
@@ -88,7 +88,7 @@ const LABELS = {
     siteName: 'Ogen Center', suffix: ' · Ogen Center',
     about: 'About the class', programLength: 'Program Length',
     instructionLanguage: 'Language of instruction', prerequisites: 'Prerequisites',
-    whatToBring: 'What to bring', faq: 'Frequently asked questions',
+    faq: 'Frequently asked questions',
     ages: 'Ages', schedule: 'When', duration: 'Duration', location: 'Location', address: 'Address',
     groupSize: 'Group size', price: 'Price',
     gParticipants: 'Who it is for', gSchedule: 'When &amp; where', gPrice: 'Price', gCredits: 'Staff &amp; sponsors',
@@ -100,7 +100,7 @@ const LABELS = {
     siteName: 'Центр Оген', suffix: ' · Центр Оген',
     about: 'О занятиях', programLength: 'Длина программы',
     instructionLanguage: 'Язык преподавания', prerequisites: 'Требования к уровню',
-    whatToBring: 'Что взять с собой', faq: 'Частые вопросы',
+    faq: 'Частые вопросы',
     ages: 'Возраст', schedule: 'Когда', duration: 'Продолжительность', location: 'Место', address: 'Адрес',
     groupSize: 'Размер группы', price: 'Цена',
     gParticipants: 'Для кого', gSchedule: 'Когда и где', gPrice: 'Цена', gCredits: 'Педагоги и партнёры',
@@ -251,19 +251,6 @@ function richText(value) {
     .join('\n');
 }
 
-// An optional block renders only when it has content. Absent means absent —
-// no empty heading is emitted for js/activity.js to clean up afterwards.
-function optionalBlock(heading, value) {
-  const body = richText(value);
-  if (!body) return '';
-  return `
-      <div data-optional>
-        <h2>${heading}</h2>
-${body}
-      </div>
-`;
-}
-
 // --- the activity page -----------------------------------------------------
 
 function renderActivityPage(activity, lang) {
@@ -381,17 +368,19 @@ ${JSON.stringify(credits, null, 2)}
         </script>`)
       : '';
 
-  // Two placements. The two cards a reader scans first — who it is for, and
-  // when and where — run across the full measure above the article; price and
-  // credits sit in a column beside it. A group with no facts is already dropped
-  // by sidebarGroups, so an activity that has filled in neither of the top two
-  // gets no row at all rather than an empty one.
+  // THREE placements. The two cards a reader scans first — who it is for, and
+  // when and where — sit above the article; price sits in the column beside the
+  // picture, directly above the registration button, so the column reads see
+  // the activity, see the cost, act. Teachers and sponsors close the page as a
+  // band under everything, where the full measure lets them lay out across.
+  //
+  // A group with no facts is already dropped by sidebarGroups, so an activity
+  // that has filled in neither of the top two gets no row at all rather than an
+  // empty one.
   const topCards = [cards.participants, cards.schedule].filter(Boolean).join('\n');
   const factRow = topCards ? `    <div class="fact-row">\n${topCards}\n    </div>\n` : '';
-  // Price leads the column, directly above the registration button: a family
-  // reads what it costs and then presses the thing that acts on it. Staff and
-  // sponsors follow, because who teaches it is what you read after deciding.
-  const asideCards = [cards.price, creditsCard].filter(Boolean).join('\n');
+  const asideCards = [cards.price].filter(Boolean).join('\n');
+  const creditsBand = creditsCard ? `    <div class="activity-credits">\n${creditsCard}\n    </div>\n` : '';
 
   // The activity's own picture, at the head of the aside column with the facts
   // panel beneath it — two stacked cards rather than one. It is the same square
@@ -464,16 +453,13 @@ ${GENERATED_NOTE(`activities/${slug}.json`)}
 ${cardImageBlock}${factRow}    <div class="activity-main">
       <h2>${L.about}</h2>
 ${richText(pick(activity.about, lang))}
-${optionalBlock(
-    L.whatToBring,
-    pick(activity.whatToBring, lang)
-  )}${faqBlock}    </div>
+${faqBlock}    </div>
 
     <div class="activity-aside">
 ${asideCards}
       <div data-status-cta></div>
     </div>
-  </div>
+${creditsBand}  </div>
 </article>
 
 <script src="/js/nav.js"></script>
