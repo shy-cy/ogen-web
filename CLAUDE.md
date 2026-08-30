@@ -30,6 +30,10 @@ Three parallel language trees. Hebrew is the default and lives at the root.
 | `/activities/<slug>` | `activities/<slug>.html` | `he` | `rtl` |
 | `/en/activities/<slug>` | `en/activities/<slug>.html` | `en` | `ltr` |
 | `/ru/activities/<slug>` | `ru/activities/<slug>.html` | `ru` | `ltr` |
+| `/privacy` | `privacy.html` | `he` | `rtl` |
+| `/en/privacy`, `/ru/privacy` | `{en,ru}/privacy.html` | | |
+| `/terms` | `terms.html` | `he` | `rtl` |
+| `/en/terms`, `/ru/terms` | `{en,ru}/terms.html` | | |
 | `/confirmation` | `confirmation.html` | `he` | `rtl` |
 | `/en/confirmation` | `en/confirmation.html` | `en` | `ltr` |
 | `/ru/confirmation` | `ru/confirmation.html` | `ru` | `ltr` |
@@ -530,6 +534,50 @@ anyone who asks for it. Until an admin backend exists, a genuinely
 unpublished activity should not be committed or deployed at all, and must
 stay out of `sitemap.xml`.
 
+## ⚠ Legal pages gate registration
+
+`/privacy` and `/terms` exist in all three languages and are **placeholders**.
+They use the same inner-page shell as `/about`, carry `noindex`, are absent from
+`sitemap.xml`, and show a visible draft banner (`.status-banner.is-draft`,
+reused rather than a new rule). **Nothing links to them yet** — a footer link to
+a page reading `[content needed]` is worse than no link.
+
+Each page carries a machine-readable marker:
+
+```html
+<meta name="ogen-legal-status" content="placeholder">
+```
+
+**`tests/registration-waits-for-real-legal-pages.js` reads that marker and is
+the safeguard.** It passes quietly today. The moment any registration surface
+appears — a function named `member-*` / `account-*` / `participant-*` /
+`guardian-*` / `registration-*`, a `requireStore`/`optionalStore` call opening
+one of the people stores, or a `registrations` entry in `_roles.js` `TOOLS` —
+the suite **fails the build** until every legal page is marked `final`.
+
+This exists because the placeholder looks finished: proper URL, breadcrumb, site
+typography, real headings. The reason the pages were created early is exactly
+the reason nobody would notice they are still empty. Ogen has never stored a
+person's name; the registration system stores a **minor's name and date of
+birth, in the EU**. Shipping that against `[content needed]` is not a
+documentation gap, it is collecting a child's data with no lawful basis
+published.
+
+Flipping to `final` means **four things in one change**, and the test asserts
+all four move together:
+
+1. `ogen-legal-status` → `final`, on **all six pages at once** (a reviewed
+   English policy beside an untranslated Hebrew one is not "partly done" —
+   Hebrew is this site's default language and the Hebrew reader is the one who
+   cannot read what they agreed to);
+2. the `noindex` meta removed;
+3. the draft banner element deleted, and no `[content needed]` left;
+4. `/privacy` and `/terms` added to `STATIC_ROUTES` in `_activity-index.js`, so
+   the sitemap and the meta tag agree — the same pairing `/about` already has.
+
+Real legal content is expected to be written through an inner-page editor
+modelled on Shirat HaYam's, which does not exist here yet.
+
 ## Admin backend (Activities)
 
 A browser CMS at `/admin/` whose Netlify Functions render static HTML and commit
@@ -804,6 +852,9 @@ share image, Formspree wiring, domain) is done. Open items:
   and has not been proofread, including the status strings in `js/activity.js`.
 - **`/about` is placeholder copy** (`[content needed]`), hence `noindex` and no
   sitemap entry.
+- **`/privacy` and `/terms` are placeholders** in all three languages, and they
+  **block the registration system** — see the Legal pages gate above. Nothing
+  links to them yet.
 - **Nothing in the nav links to `/about` or `/activities`** yet.
 - **Registration is not built.** The `open` CTA points at the contact section.
 - **Rotate the setup credentials.** The GitHub PAT and Netlify token were pasted

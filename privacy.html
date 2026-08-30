@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>מדיניות פרטיות · מרכז עוגן</title>
+<meta name="description" content="מדיניות הפרטיות של מרכז עוגן.">
+
+<!-- PLACEHOLDER LEGAL PAGE.
+     This page exists so the routes are real and linkable during development.
+     It is NOT a legal document and must not be treated as one.
+
+     ogen-legal-status is machine-readable and load-bearing:
+     tests/registration-waits-for-real-legal-pages.js reads it, and refuses to
+     let a registration system ship while any legal page still says
+     "placeholder". Flip it to "final" ONLY when the reviewed text is in place,
+     and in the same change: drop the noindex below, delete the draft banner in
+     the body, and add these routes to STATIC_ROUTES in
+     netlify/functions/_activity-index.js so the sitemap agrees with the meta
+     tag. The test checks all four move together. -->
+<meta name="ogen-legal-status" content="placeholder">
+<meta name="robots" content="noindex, follow">
+<link rel="canonical" href="https://www.ogen.cy/privacy">
+
+<!-- Language alternates -->
+<link rel="alternate" hreflang="he" href="https://www.ogen.cy/privacy">
+<link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/privacy">
+<link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru/privacy">
+<link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/privacy">
+
+<link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/images/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/images/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;700;800&family=Heebo:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared.css">
+</head>
+<body>
+<div id="page" dir="rtl">
+
+<!-- INNER PAGE TEMPLATE — the same shell /about uses. -->
+<div class="page-header" data-motif="hatch" data-corner="tr">
+  <nav class="breadcrumb" aria-label="מדיניות פרטיות">
+    <a href="/">בית</a><span class="sep">&#8592;</span>מדיניות פרטיות
+  </nav>
+  <h1>מדיניות פרטיות</h1>
+</div>
+
+<div class="inner-body">
+  <!-- Reuses .status-banner.is-draft rather than adding a rule: this IS a draft
+       notice, and the component already says so in the site's own voice. Delete
+       this element when the real text lands. -->
+  <p class="status-banner is-draft">טיוטה - העמוד הזה עדיין אינו מדיניות פרטיות. הנוסח המשפטי המלא ייכתב וייבדק לפני שייאסף מידע כלשהו.</p>
+
+  <h2>איזה מידע אנחנו אוספים</h2>
+  <p>[content needed]</p>
+
+  <h2>למה אנחנו אוספים אותו</h2>
+  <p>[content needed]</p>
+
+  <h2>מי יכול לראות אותו</h2>
+  <p>[content needed]</p>
+
+  <h2>כמה זמן אנחנו שומרים אותו</h2>
+  <p>[content needed]</p>
+
+  <h2>מידע על ילדים</h2>
+  <p>[content needed]</p>
+
+  <h2>הזכויות שלכם</h2>
+  <p>[content needed]</p>
+
+  <h2>יצירת קשר</h2>
+  <p>[content needed]</p>
+</div>
+
+<script src="/js/nav.js"></script>
+<script src="/js/footer.js"></script>
+<script src="/js/motifs.js"></script>
+</div>
+</body>
+</html>
