@@ -212,6 +212,26 @@ survive. Below the cap the picture is simply full width;
 `margin-inline:auto` centres it once it stops filling the column — symmetric,
 so there is nothing directional to get wrong in any of the three languages.
 
+**The side column is capped the same way, one size up.** Full width, the stacked
+aside is an ~860px track holding a price card whose content is about 300px wide
+— and the price card is deliberately one column at every width, because its four
+numbers add up and in two columns the total lands beside the semester price
+instead of under the figures it sums. So it cannot fill the space it is given,
+and the answer is to stop giving it the space: `max-width:480px` with
+`margin-inline:auto`, in the same media query.
+
+480 rather than the picture's 360, because **the picture is not what sits above
+it**. The stacked order is picture → cards → article → price → button, so the
+block directly above the price card is the full-width article, and against that
+a wider block reads better than one narrowed to match something several blocks
+up the page.
+
+`width:100%` on that rule is **load-bearing**. `max-width` plus auto margins is
+enough for the picture because a `<figure>` is a block; `.activity-aside` is a
+**flex container**, and a flex container that is a grid item with auto inline
+margins sizes *shrink-to-fit* rather than filling its track — the two
+declarations alone collapsed it to 90px. A test pins it.
+
 That pairing is the trap. `height="800"` on the `<img>` is a presentational
 hint, so **`height:auto` and `aspect-ratio` have to travel together** — restate
 one in a media query without the other and the attribute wins, the ratio is

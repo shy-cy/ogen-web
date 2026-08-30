@@ -600,6 +600,28 @@ html[lang="he"] .fact-card-head h2{ text-transform:none; letter-spacing:0; font-
      without the other is exactly how height="800" wins and the picture renders
      800px tall. */
   .activity-card-image{ max-width:360px; margin-inline:auto; }
+  /* The price card and the button take the same treatment for the same reason,
+     one size up. Full width, this column is an 860px track holding a card whose
+     content is about 300px wide — the price card is deliberately ONE column at
+     every width, because its four numbers add up and in two columns the total
+     lands beside the semester price instead of under the figures it sums. So it
+     cannot fill the space it is given, and the answer is to stop giving it the
+     space.
+
+     480 rather than the picture's 360: the picture is not what sits above this.
+     The stacked order is picture, cards, article, price, button — so the thing
+     directly above the price card is the full-width article, and against that
+     the wider block reads better than one narrowed to match something several
+     blocks up the page.
+
+     width:100% is LOAD-BEARING. max-width plus auto margins is enough for the
+     picture because a <figure> is a block, but .activity-aside is a flex
+     container, and a flex container that is a grid item with auto inline margins
+     sizes shrink-to-fit rather than filling its track — these two declarations
+     alone collapsed it to 90px. margin-inline is symmetric, so there is nothing
+     directional here and no per-language rule; below the cap the aside fills the
+     column and the auto margins simply have nothing to do. */
+  .activity-aside{ width:100%; max-width:480px; margin-inline:auto; }
 }
 @media (max-width:780px){
   .page-header h1{ font-size:28px; }

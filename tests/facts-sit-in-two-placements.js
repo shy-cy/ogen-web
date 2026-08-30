@@ -134,6 +134,23 @@ const stacked = css.slice(css.indexOf('@media (max-width:939px)'));
 H.ok(!/\.fact-row\s*\{[^}]*flex-direction/.test(stacked),
   'and no media query forces it back into a column');
 
+console.log('\n[the stacked column is capped, and width:100% is what makes it work]');
+// Below 940px the aside becomes an 860px grid track holding a card whose content
+// is ~300px wide, so it is capped and centred like the picture above it.
+//
+// The interesting half is width:100%. max-width plus auto margins is enough for
+// the picture because a <figure> is a block; .activity-aside is a FLEX container,
+// and a flex container that is a grid item with auto inline margins sizes
+// shrink-to-fit rather than filling its track. Without width:100% the same two
+// declarations collapse it to 90px — which is how it was first built.
+const narrow = css.slice(css.indexOf('@media (max-width:939px)'));
+const asideCap = (narrow.match(/\.activity-aside\s*\{[^}]*\}/) || [''])[0];
+H.ok(/max-width:\s*480px/.test(asideCap), 'the stacked aside is capped at 480px');
+H.ok(/width:\s*100%/.test(asideCap), 'and given an explicit width, or it collapses to shrink-to-fit');
+H.ok(/margin-inline:\s*auto/.test(asideCap), 'centred with a symmetric margin');
+// Symmetric on purpose: nothing here may be directional.
+H.ok(!/margin-(left|right)/.test(asideCap), 'and no physical margin doing it per-language');
+
 console.log('\n[the cards are one plain surface, told apart by their icon]');
 const card = css.slice(css.indexOf('.fact-card{'), css.indexOf('.fact-card-head{'));
 H.ok(/background:\s*var\(--paper\)/.test(card), 'one paper ground for all four');
