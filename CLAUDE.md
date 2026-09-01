@@ -791,6 +791,61 @@ reintroduce a per-file `await` in a loop here.
 is hostile. A role that may only edit Russian gets its Hebrew and English edits
 discarded server-side, and cannot add, remove or reorder items at all.
 
+### Email (Resend)
+
+Infrastructure only — there are no templates yet; the registration and account
+messages are still being designed.
+
+```
+netlify/functions/
+  _email.js          the ONE send path, settle(), and the ICS builder
+  _email-log.js      ogen-email-log; every send, and what became of it
+  resend-webhook.js  /api/resend-webhook — Svix signature check, status updates
+```
+
+Three rules, each a bug somewhere before it was a rule:
+
+1. **Send first, log second.** An email sent and not logged is a gap in a
+   record; an email not sent because the log failed is a person left waiting.
+   `logSend()` cannot throw.
+2. **The send path is singular.** `resend.emails.send` appears exactly once, in
+   `_email.js`, so "log after send" is a property of the code rather than a
+   discipline every call site has to remember. A test asserts no other function
+   talks to Resend.
+3. **An email failure never blocks the action it accompanies.** `settle(what,
+   who, thunk)` swallows and logs. An account is created, a registration is
+   approved, and the message about it is best effort.
+
+**Delivery status is a ladder plus a floor.** `PROGRESS` (sent → delivered →
+opened → clicked) only goes up, because Resend does not promise order and
+out-of-order is normal. `FINAL` (bounced, complained, failed, suppressed) always
+wins and is **never overwritten** — a bounce is the one status an admin has to
+act on, and a later "delivered" would hide it. `supersedes()` is the only place
+that decides.
+
+The log is keyed `log-<encoded recipient>__<ISO>__<random>` with an
+`rid-<resend id>` pointer beside it, so the webhook is one read rather than a
+scan of the store.
+
+**The webhook returns 2xx unless the signature itself fails.** An event matching
+nothing is an email sent before the store existed, or a dashboard test;
+answering 500 makes Resend retry for days and then disable the endpoint.
+
+**The ICS builder takes instants and emits UTC.** Ogen's session times are local
+wall clock in `Asia/Nicosia`, and resolving wall clock to an instant is the
+**caller's** job — doing it inside the builder would bake half a timezone
+conversion into infrastructure that cannot see which zone the caller meant.
+Lines fold at 75 **octets**, not characters, because Hebrew and Russian are two
+bytes a character. Every VEVENT gets its own UID, or a calendar treats a ten
+session course as nine edits of one event.
+
+| Var | For |
+|---|---|
+| `RESEND_API_KEY` | Sending-only key. Resend key permissions cannot be changed after creation, so a Full-access key is set only for a backfill and unset afterwards |
+| `RESEND_FROM` | `Ogen <noreply@ogen.cy>` |
+| `RESEND_REPLY_TO` / `ADMIN_NOTIFY_EMAIL` | a real inbox |
+| `RESEND_WEBHOOK_SECRET` | `whsec_…`, generated when the endpoint is created in Resend — so it cannot be set before the endpoint exists |
+
 ### ⚠ Blobs namespacing
 
 Every store name is prefixed `ogen-` in `_blobs.js`. This is not decorative:

@@ -51,7 +51,19 @@ function makeBlobs() {
       async setJSON(key, value) { data.set(key, JSON.stringify(value)); },
       async set(key, value) { data.set(key, String(value)); },
       async delete(key) { data.delete(key); },
-      async list() { return { blobs: Array.from(data.keys()).map((key) => ({ key })) }; }
+      // Honours `prefix`, because the real one does and because almost every
+      // store in this project is READ BY PREFIX — a member's email log, an
+      // activity's registrations, one participant's guardian links. Ignoring it
+      // here made those scans look correct while returning the whole store, so
+      // a test could pass against a query that matched everything.
+      async list(opts) {
+        const prefix = (opts && opts.prefix) || '';
+        return {
+          blobs: Array.from(data.keys())
+            .filter((key) => key.indexOf(prefix) === 0)
+            .map((key) => ({ key }))
+        };
+      }
     };
   };
   return {
