@@ -286,6 +286,25 @@ html[lang="en"] .page-header h1, html[lang="ru"] .page-header h1{ font-weight:80
 .inner-body h2{ font-size:26px; font-weight:700; color: var(--navy); margin:36px 0 16px; }
 .inner-body h2:first-child{ margin-top:0; }
 .inner-body p{ font-size:16.5px; color:#3f3f3a; margin-bottom:18px; }
+
+/* Legal pages brought sub-headings, lists and one table into the inner-page
+   shell for the first time. Everything below is direction-agnostic on purpose:
+   padding-inline-start and text-align:start flip between Hebrew and EN/RU with
+   no per-language override, which is the same rule the rest of the site follows
+   for anything positioned relative to a side. */
+.inner-body h3{ font-size:19px; font-weight:700; color: var(--ink); margin:26px 0 10px; }
+.inner-body ul{ margin:0 0 18px; padding-inline-start:1.35em; }
+.inner-body li{ font-size:16.5px; color:#3f3f3a; margin-bottom:9px; line-height:1.6; }
+.inner-body li:last-child{ margin-bottom:0; }
+.inner-body .table-wrap{ overflow-x:auto; margin:0 0 22px; }
+.inner-body table{ border-collapse:collapse; width:100%; min-width:420px; font-size:15.5px; }
+.inner-body th, .inner-body td{
+  text-align:start; padding:10px 14px; border-bottom:1px solid var(--stone);
+  vertical-align:top; color:#3f3f3a;
+}
+.inner-body th{ color: var(--navy); font-weight:700; background: var(--paper); }
+.inner-body tr:last-child td{ border-bottom:0; }
+.inner-body .legal-updated{ font-size:14.5px; color: var(--camel); margin-bottom:26px; }
 .pullquote{ border-inline-start:4px solid var(--terracotta); padding:6px 22px; margin:30px 0; font-size:18px; font-weight:700; color: var(--olive); }
 .inner-image{ width:100%; border-radius:14px; margin:28px 0; display:block; }
 .placeholder-img{
