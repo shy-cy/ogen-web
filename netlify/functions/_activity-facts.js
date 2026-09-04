@@ -52,6 +52,43 @@ const DAYS = {
   }
 };
 
+// Russian ordinals agree in gender with the weekday they qualify, and the stored
+// weekday names use all three: воскресенье is NEUTER, which is the case a
+// masculine/feminine pair would silently get wrong. Indexed by day number.
+const RU_DAY_GENDER = ['n', 'm', 'm', 'f', 'm', 'f', 'f'];   // Sun..Sat
+
+// Which week of the month a monthly activity meets in. "last" is the clamp: a
+// month with only four of a weekday uses the last one rather than inventing a
+// fifth, so it is a real option and not an error state.
+const WEEK_ORDINALS = {
+  // שבוע is masculine, so Hebrew needs one list and the day name in front of it
+  // substitutes with nothing else changing. That is the advantage of the
+  // week-based phrasing the reviewer approved over the literal "third Monday",
+  // which in Hebrew collides with the weekday names, themselves ordinals:
+  // "יום שני השני" says the same word twice.
+  he: ['בשבוע הראשון', 'בשבוע השני', 'בשבוע השלישי', 'בשבוע הרביעי', 'בשבוע החמישי'],
+  en: ['First', 'Second', 'Third', 'Fourth', 'Fifth'],
+  ru: {
+    m: ['первый', 'второй', 'третий', 'четвёртый', 'пятый'],
+    f: ['первая', 'вторая', 'третья', 'четвёртая', 'пятая'],
+    n: ['первое', 'второе', 'третье', 'четвёртое', 'пятое']
+  }
+};
+const WEEK_LAST = { he: 'בשבוע האחרון', en: 'Last', ru: { m: 'последний', f: 'последняя', n: 'последнее' } };
+const MONTH_OF = { he: 'של החודש', en: 'of each month', ru: 'каждого месяца' };
+
+// The session table. The caption is a heading rather than a date range, and it
+// is not a word-for-word translation in the three languages, because each
+// language's natural heading for a table of dated meetings is its own. Russian
+// is "Расписание занятий" on the reviewer's answer: for a planned schedule of
+// lessons with dates, in a table, that is always the form, and "Даты занятий"
+// reads as general information still to be detailed.
+const SESSION_TABLE = {
+  he: { caption: 'מועדי המפגשים', row: 'מפגש', cols: ['מפגש', 'יום', 'תאריך'] },
+  en: { caption: 'Session dates', row: 'Session', cols: ['Session', 'Day', 'Date'] },
+  ru: { caption: 'Расписание занятий', row: 'Занятие', cols: ['Занятие', 'День', 'Дата'] }
+};
+
 const MONTHS = {
   he: ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט',
        'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'],
@@ -147,20 +184,90 @@ function formatAges(f, lang) {
   return '';
 }
 
+// Which grammatical number the weekday takes is NOT a property of the frequency
+// alone, which is the trap in adding biweekly. English and Hebrew take the
+// SINGULAR day ("Every other Wednesday", "אחת לשבועיים, יום רביעי"); Russian
+// takes the PLURAL ("раз в две недели, по средам"), because the natural Russian
+// for a recurring weekday is the "по + dative plural" form the table already
+// stores, and "раз в две недели, среда" is not how anyone says it. So this is a
+// lookup on (frequency, language), not on frequency.
+const PLURAL_DAY = {
+  he: { weekly: true, 'twice-weekly': true },
+  en: { weekly: true, 'twice-weekly': true },
+  ru: { weekly: true, 'twice-weekly': true, biweekly: true }
+};
+
+function weekOrdinal(nth, lang, day) {
+  const last = nth === 'last' || nth === 'Last';
+  const idx = Number(nth) - 1;
+  if (lang === 'ru') {
+    const g = RU_DAY_GENDER[day] || 'm';
+    return last ? WEEK_LAST.ru[g] : (WEEK_ORDINALS.ru[g][idx] || WEEK_ORDINALS.ru[g][0]);
+  }
+  const table = WEEK_ORDINALS[lang] || WEEK_ORDINALS.en;
+  return last ? (WEEK_LAST[lang] || WEEK_LAST.en) : (table[idx] || table[0]);
+}
+
 function formatSchedule(f, lang) {
   const sessions = Array.isArray(f.sessions) ? f.sessions : [];
-  const once = f.frequency === 'one-time';
+  const freq = String(f.frequency || '').trim();
   const names = DAYS[lang] || DAYS.en;
+  const plural = !!((PLURAL_DAY[lang] || PLURAL_DAY.en)[freq]);
+
   const parts = sessions
     .map((s) => {
       const day = num(s && s.day);
       const time = String((s && s.time) || '').trim();
-      const dayName = day != null && day >= 0 && day <= 6 ? (once ? names.one[day] : names.many[day]) : '';
-      if (dayName && time) return `${dayName}, ${time}`;
-      return dayName || time;
+      if (day == null || day < 0 || day > 6) return time;
+      const name = plural ? names.many[day] : names.one[day];
+
+      if (freq === 'monthly') {
+        const ord = weekOrdinal(f.weekOfMonth == null || f.weekOfMonth === '' ? 1 : f.weekOfMonth, lang, day);
+        // Hebrew puts the day first and the week second, per review:
+        // "יום רביעי, בשבוע השני של החודש". English and Russian lead with the
+        // ordinal, which is where the gender agreement lands in Russian.
+        const phrase = lang === 'he'
+          ? `${name}, ${ord} ${MONTH_OF.he}`
+          : `${ord} ${name} ${MONTH_OF[lang] || MONTH_OF.en}`;
+        return time ? `${phrase}, ${time}` : phrase;
+      }
+
+      if (freq === 'biweekly') {
+        const phrase = lang === 'he' ? `אחת לשבועיים, ${name}`
+                     : lang === 'ru' ? `раз в две недели, ${name}`
+                     : `Every other ${name}`;
+        return time ? `${phrase}, ${time}` : phrase;
+      }
+
+      return time ? `${name}, ${time}` : name;
     })
     .filter(Boolean);
   return parts.join(' · ');
+}
+
+// One row per session that actually happens. Excluded dates are not rendered as
+// "no class" rows, they are simply absent: the exclusion is an admin concept
+// from end to end, and a reader has no use for a meeting that is not happening.
+function sessionRows(f, lang) {
+  const rows = Array.isArray(f && f.sessionDates) ? f.sessionDates : [];
+  const names = (DAYS[lang] || DAYS.en).one;
+  const months = MONTHS[lang] || MONTHS.en;
+  const label = (SESSION_TABLE[lang] || SESSION_TABLE.en).row;
+  const out = [];
+  rows.forEach((r) => {
+    if (!r || !r.date || r.status === 'excluded') return;
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(r.date);
+    if (!m) return;
+    const day = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay();
+    const mi = +m[2] - 1;
+    const dayNum = String(+m[3]);
+    // Hebrew prefixes the month with ב; Russian needs the genitive.
+    const date = lang === 'he' ? `${dayNum} ב${months[mi]}`
+               : lang === 'ru' ? `${dayNum} ${MONTHS_RU_GEN[mi]}`
+               : `${dayNum} ${months[mi]}`;
+    out.push({ n: out.length + 1, label: `${label} ${out.length + 1}`, day: names[day], date: date });
+  });
+  return out;
 }
 
 function monthYear(iso, lang) {
@@ -476,7 +583,8 @@ module.exports = {
   FACT_ORDER, TEXT_FACTS, STRUCTURED_FACTS, DEFAULT_VISIBILITY,
   ACADEMIC_MINUTES, CURRENCY,
   num, pick, ruPlural, monthYear,
-  formatAges, formatSchedule, formatDuration, formatGroupSize, formatPrice,
+  formatAges, formatSchedule, formatDuration, sessionRows, weekOrdinal,
+  SESSION_TABLE, WEEK_ORDINALS, RU_DAY_GENDER, formatGroupSize, formatPrice,
   priceRows, factPriceRows,
   academicHours, pricePerHour,
   visibilityOf, isPubliclyVisible, factText, sidebarRows,
