@@ -296,14 +296,11 @@ html[lang="en"] .page-header h1, html[lang="ru"] .page-header h1{ font-weight:80
 .inner-body ul{ margin:0 0 18px; padding-inline-start:1.35em; }
 .inner-body li{ font-size:16.5px; color:#3f3f3a; margin-bottom:9px; line-height:1.6; }
 .inner-body li:last-child{ margin-bottom:0; }
-.inner-body .table-wrap{ overflow-x:auto; margin:0 0 22px; }
-.inner-body table{ border-collapse:collapse; width:100%; min-width:420px; font-size:15.5px; }
-.inner-body th, .inner-body td{
-  text-align:start; padding:10px 14px; border-bottom:1px solid var(--stone);
-  vertical-align:top; color:#3f3f3a;
-}
-.inner-body th{ color: var(--navy); font-weight:700; background: var(--paper); }
-.inner-body tr:last-child td{ border-bottom:0; }
+/* Bare `a` is color:inherit;text-decoration:none site-wide, which is right for
+   the nav and the cards but leaves a link inside a paragraph invisible. The
+   legal pages are the first inner pages with links in their prose (the privacy
+   contact address), so they are where the rule is needed. */
+.inner-body a{ color: var(--terracotta); text-decoration:underline; text-underline-offset:2px; }
 .inner-body .legal-updated{ font-size:14.5px; color: var(--camel); margin-bottom:26px; }
 .pullquote{ border-inline-start:4px solid var(--terracotta); padding:6px 22px; margin:30px 0; font-size:18px; font-weight:700; color: var(--olive); }
 .inner-image{ width:100%; border-radius:14px; margin:28px 0; display:block; }
