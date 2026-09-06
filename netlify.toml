@@ -48,6 +48,44 @@
   [headers.values]
     Cache-Control = "public, max-age=300, must-revalidate"
 
+# The admin's own assets are NEVER cached.
+#
+# Netlify's default for static files is four hours, and that default applied to
+# the admin: a change to the form shipped, deployed, and then did not reach the
+# person using it for up to four hours, because their browser had stopped
+# asking. It looked exactly like the feature had not been built -- three of them
+# were reported missing while the server was already serving them.
+#
+# The trade is nothing worth keeping. These files are small, they are fetched by
+# one or two people rather than by visitors, and no-cache still revalidates to a
+# cheap 304 when the file has not moved. Correctness matters more here than
+# bytes: an admin publishing to a live site must be running the code that was
+# deployed, not the code that was deployed this morning.
+[[headers]]
+  for = "/admin/*"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/js/activities-admin.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/js/admin-session.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/js/repeatable-items.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/js/image-optimize.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
 # Friendly function routes. Must come BEFORE the catch-all 404 rule.
 [[redirects]]
   from = "/api/*"

@@ -559,27 +559,29 @@
     return isFinite(n) ? n : null;
   }
 
-  // The visibility flag every fact carries. Nothing enforces it yet — there is
-  // no registration system, so there is nobody who could be a member — but the
-  // shape is here so switching it on later is a config change, not a rebuild.
-  // The same "build the shape now, enforce later" move as draft status.
+  // The visibility flag every fact carries. Public is the default and by far the
+  // common case, so it is the UNCHECKED state of one checkbox rather than one of
+  // two options in a dropdown: a select needs a label, a box and a hint, and it
+  // was costing a 170px column on every fact to express a boolean that is almost
+  // always false.
+  //
+  // This IS enforced. A members-only fact is omitted from the generated HTML
+  // altogether, not hidden with CSS, because the file is public and anyone can
+  // read its source. The hint here used to say the opposite -- "everything is
+  // published for now" -- which was true when the flag was inert and became
+  // wrong the day isPubliclyVisible() started acting on it. An admin reading it
+  // would have believed ticking this box did nothing.
   function visibilityControl(key) {
     var current = (S.record.factVisibility || {})[key] ||
                   (S.schema.defaultVisibility || {})[key] || 'public';
-    var sel = el('select', { id: 'fact-vis-' + key, class: 'vis-select' });
-    (S.schema.visibilities || ['public', 'members']).forEach(function (v) {
-      sel.appendChild(el('option', {
-        value: v,
-        text: v === 'public' ? 'Public' : 'Members only',
-        selected: v === current || null
-      }));
-    });
-    sel.addEventListener('change', function () { S.dirty = true; });
-    return el('div', { class: 'fact-vis' }, [
-      el('label', { for: 'fact-vis-' + key, text: 'Visibility' }),
-      sel,
-      el('div', { class: 'hint', text: 'Everything is published for now — there is no members area yet.' })
-    ]);
+    var box = el('input', { type: 'checkbox', id: 'fact-vis-' + key });
+    box.checked = current === 'members';
+    box.addEventListener('change', function () { S.dirty = true; });
+    return el('label', {
+      class: 'fact-vis',
+      for: 'fact-vis-' + key,
+      title: 'Members only: this fact is left out of the published page entirely.'
+    }, [box, el('span', { text: 'Members only' })]);
   }
 
   // Words an admin typed before this fact was structured. They are still what
@@ -704,9 +706,54 @@
   // Price per academic hour, recomputed as you type. Same arithmetic as the
   // server, with the 45-minute basis taken FROM the server so there is one
   // source of truth for it rather than a copy that can drift.
+  // What the price card will actually contain. The total is derived rather than
+  // typed, so without a preview the only way to check it was to publish.
+  function priceCardPreview() {
+    var fee = readNum('fact-price-registrationFee');
+    var full = readNum('fact-price-fullPrice');
+    var parts = [];
+    if (fee != null && fee > 0) parts.push('Yearly registration fee ' + fee + ' €');
+    if (readBool('fact-price-showPerLesson')) {
+      var per = perLessonValue();
+      if (per != null) parts.push('Cost per lesson ' + per + ' €');
+    }
+    if (full != null && full > 0) parts.push('Cost per semester ' + full + ' €');
+    if (fee != null && fee > 0 && full != null && full > 0) parts.push('Total ' + (fee + full) + ' €');
+    return parts;
+  }
+
+  function perLessonValue() {
+    var override = readNum('fact-price-perHourOverride');
+    if (override != null) return override;
+    var full = readNum('fact-price-fullPrice');
+    var count = readNum('fact-duration-sessionCount');
+    var mins = readNum('fact-duration-sessionMinutes');
+    var basis = (S.schema && S.schema.academicMinutes) || 45;
+    if (full == null || count == null || mins == null || full <= 0 || count <= 0 || mins <= 0) return null;
+    var hours = count * mins / basis;
+    return hours > 0 ? Math.round((full / hours) * 100) / 100 : null;
+  }
+
   function refreshPerHour() {
     var note = $('perhour-note');
     if (!note) return;
+
+    var rows = priceCardPreview();
+    var card = $('price-preview');
+    if (card) {
+      card.textContent = rows.length
+        ? 'The page will show: ' + rows.join('  ·  ')
+        : 'No price is published until a registration fee or a full price is set.';
+      card.className = rows.length ? 'perhour is-ok' : 'perhour is-idle';
+    }
+
+    // Per-lesson is off by default, so the per-hour working below is only worth
+    // showing when the row it explains is actually going to be published.
+    if (!readBool('fact-price-showPerLesson')) {
+      note.className = 'perhour is-idle';
+      note.textContent = 'Cost per lesson is off, so no per-lesson figure is published. Tick the box above to show it.';
+      return;
+    }
     var override = readNum('fact-price-perHourOverride');
     if (override != null) {
       note.className = 'perhour is-override';
@@ -791,6 +838,7 @@
         ]),
         checkField('fact-price-showPerLesson', 'Show cost per lesson', fact.showPerLesson === true,
                    'Off by default. The other price lines are unaffected either way.'),
+        el('div', { class: 'perhour is-ok', id: 'price-preview' }),
         el('div', { class: 'perhour is-idle', id: 'perhour-note' })
       ]);
     } else {
@@ -819,7 +867,7 @@
     var facts = {};
     var visibility = {};
     S.schema.facts.forEach(function (d) {
-      visibility[d.key] = (($('fact-vis-' + d.key) || {}).value) || 'public';
+      visibility[d.key] = readBool('fact-vis-' + d.key) ? 'members' : 'public';
       var previous = (S.record.facts || {})[d.key] || {};
       var out;
       if (d.kind === 'text') out = readLangField('fact-' + d.key);
