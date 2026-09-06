@@ -1,7 +1,7 @@
 {
   "slug": "hebrew4kids",
   "status": "announcement",
-  "motif": "ring",
+  "motif": "leaf",
   "corner": "tl",
   "ctaUrl": {
     "he": "https://www.ogen.cy/",
@@ -66,6 +66,7 @@
     "groupSize": {
       "groups": 2,
       "maxPerGroup": 7,
+      "overrideText": "",
       "legacyText": {
         "he": "שתי קבוצות של 7 תלמידים",
         "en": "",
@@ -100,6 +101,7 @@
       "registrationFee": 50,
       "fullPrice": 300,
       "perHourOverride": null,
+      "showPerLesson": false,
       "legacyText": {
         "he": "דמי הרשמה של 50 אירו + 360 אירו ל-12 שיעורים",
         "en": "",
@@ -112,9 +114,9 @@
     {
       "id": "tea-mtcyrd47-1",
       "name": {
-        "he": "דורית",
-        "en": "Dorit ",
-        "ru": "Dorit"
+        "he": "דורית זונטג-קורמן",
+        "en": "Dorit Zontag Kurman",
+        "ru": "Dorit Zontag Kurman"
       },
       "photo": "/images/activities/hebrew4kids-teachers-tea-mtcyrd47-1.png"
     },
@@ -139,11 +141,11 @@
       "logo": "/images/activities/hebrew4kids-sponsors-spo-mtd1o2lk-3.png"
     }
   ],
-  "isoUpdated": "2026-08-29T16:09:23.569Z",
+  "isoUpdated": "2026-09-06T13:55:21.576Z",
   "isoCreated": "2026-08-28T14:55:38.930Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
-  "lastPublishedAt": "2026-08-29T16:09:23.569Z",
+  "lastPublishedAt": "2026-09-06T13:55:21.576Z",
   "factVisibility": {
     "ages": "public",
     "schedule": "public",
@@ -157,9 +159,5 @@
   },
   "cardImage": "/images/activities/hebrew4kids-card-a1f8d75e.jpg",
   "shareImage": "/images/activities/hebrew4kids-share-d8c7f629.jpg",
-  "robots": "index",
-  "retiredImages": [
-    "images/activities/hebrew4kids-card-fcbd83a8.jpg",
-    "images/activities/hebrew4kids-share-216b0217.jpg"
-  ]
+  "robots": "index"
 }
