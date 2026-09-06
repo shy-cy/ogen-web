@@ -754,6 +754,27 @@ headers to error responses, so a transient 404 under a long immutable cache
 becomes permanent. Uploads do not need `immutable` to cache well — the content
 hash means anything unchanged keeps its URL and revalidates to a 304.
 
+⚠ **Cloudflare currently overrides all of this, and the rule above is not in
+force at the edge.** `www.ogen.cy` is proxied through Cloudflare, whose Browser
+Cache TTL raises any origin header shorter than four hours to exactly four
+hours. Measured origin against edge: `/images/activities/*` leaves Netlify as
+`max-age=300` and reaches a browser as `max-age=14400`; `/shared.css` leaves as
+`max-age=0` and arrives the same way; `no-cache` on the admin scripts arrives as
+`max-age=14400` too. Anything **longer** than four hours survives, which is why
+`immutable` on `/images/*` still holds, and HTML is untouched, which is why
+`/admin/*.html` keeps its `no-cache`.
+
+So the transient-404 window is four hours rather than five minutes, and a
+stylesheet change takes up to four hours to reach a returning visitor. The fix
+is one setting in Cloudflare, not in this repo: **Caching → Configuration →
+Browser Cache TTL → "Respect Existing Headers"**. Until that changes, do not
+trust a `Cache-Control` shorter than four hours to mean anything for a visitor,
+and measure cache behaviour against `www.ogen.cy`, not against the origin.
+
+The paragraph above used to end by saying this rule was "verified against the
+deployed site, not assumed from the documentation". It had been verified against
+Netlify, which is not the deployed site. There is a CDN in front of it.
+
 Existing un-hashed files are left alone: `take()` only runs for a `data:` URL,
 so a record that already holds a path keeps it, and nothing is renamed behind
 anyone's back. A file gets a hashed name the next time that picture is replaced.
