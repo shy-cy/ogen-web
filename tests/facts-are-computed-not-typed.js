@@ -112,21 +112,21 @@ F.FACT_ORDER.forEach((key) => {
 const D12 = { sessionCount: 12, sessionMinutes: 90 };
 H.eq(JSON.stringify(F.priceRows(ACT.facts.price, 'he', D12)),
   JSON.stringify([
-    { label: 'דמי הרשמה', note: '', value: '50 €' },
+    { label: 'דמי הרשמה לשנה', note: '', value: '50 €' },
     { label: 'עלות לשיעור', note: '', value: '15 €' },
     { label: 'עלות לסמסטר', note: '(12 מפגשים × 2 שיעורים)', value: '360 €' },
     { label: 'סה״כ לסמסטר', note: '', value: '410 €' }
   ]), 'price in Hebrew, four rows');
 H.eq(JSON.stringify(F.priceRows(ACT.facts.price, 'en', D12)),
   JSON.stringify([
-    { label: 'Registration fee', note: '', value: '50 €' },
+    { label: 'Yearly registration fee', note: '', value: '50 €' },
     { label: 'Cost per lesson', note: '', value: '15 €' },
     { label: 'Cost per semester', note: '(12 sessions × 2 lessons)', value: '360 €' },
     { label: 'Total for the semester', note: '', value: '410 €' }
   ]), 'price in English');
 H.eq(JSON.stringify(F.priceRows(ACT.facts.price, 'ru', D12)),
   JSON.stringify([
-    { label: 'Регистрационный взнос', note: '', value: '50 €' },
+    { label: 'Годовой регистрационный взнос', note: '', value: '50 €' },
     { label: 'Стоимость урока', note: '', value: '15 €' },
     { label: 'Стоимость семестра', note: '(12 занятий × 2 урока)', value: '360 €' },
     { label: 'Итого за семестр', note: '', value: '410 €' }
@@ -144,7 +144,7 @@ H.eq(JSON.stringify(F.priceRows(ACT.facts.price, 'ru', D12)),
 // The string form is DERIVED from the rows, so a page and a caller with no room
 // for rows cannot disagree about the price.
 H.eq(text('price', 'en'),
-  'Registration fee - 50 €\nCost per lesson - 15 €\n' +
+  'Yearly registration fee - 50 €\nCost per lesson - 15 €\n' +
   'Cost per semester (12 sessions × 2 lessons) - 360 €\nTotal for the semester - 410 €',
   'and the one-string form says the same thing');
 
@@ -181,7 +181,7 @@ const offRows = F.priceRows(OFF, 'en', D12);
 H.eq(offRows.length, 3, 'three rows by default, not four');
 H.ok(!offRows.some((r) => r.label === 'Cost per lesson'), 'and cost per lesson is not one of them');
 H.eq(offRows.map((r) => r.label).join(' | '),
-     'Registration fee | Cost per semester | Total for the semester',
+     'Yearly registration fee | Cost per semester | Total for the semester',
      'the other three are untouched, in order');
 H.eq(offRows.slice(-1)[0].value, '410 €', 'and the total still adds up');
 H.eq(F.priceRows(Object.assign({ showPerLesson: true }, OFF), 'en', D12).length, 4, 'opting in restores it');
@@ -189,21 +189,25 @@ H.eq(F.priceRows(Object.assign({ showPerLesson: 'yes' }, OFF), 'en', D12).length
      'only a real true counts, so a stray string does not switch it on');
 H.eq(F.showPerLesson({}), false, 'absent is off');
 
-console.log('\n[a waived registration fee is shown at zero, not omitted]');
-// Omitting it would make the card indistinguishable from an activity that never
-// had a fee, so a family could not tell whether it was waived or the price
-// changed -- and it would take the total with it, since the total only appears
-// when there are two numbers to add, leaving one line repeating the row above.
-const waived = F.priceRows(OFF, 'en', D12, { feeWaived: true });
-H.eq(waived.length, 3, 'the same three rows, none removed');
-H.eq(waived[0].label, 'Registration fee', 'the fee row is still there');
-H.eq(waived[0].value, '0 €', 'at zero');
-H.eq(waived[0].note, 'already paid this year', 'saying why');
-H.eq(waived.slice(-1)[0].value, '360 €', 'and the total drops by exactly the fee, so the arithmetic reads');
-H.eq(F.priceRows(OFF, 'he', D12, { feeWaived: true })[0].note, 'שולמו כבר השנה', 'in Hebrew');
-H.eq(F.priceRows(OFF, 'ru', D12, { feeWaived: true })[0].note, 'уже оплачен в этом году', 'and Russian');
-H.eq(F.priceRows(OFF, 'en', D12).slice(-1)[0].value, '410 €',
-     'waiving is an argument, not a field: the public card is unchanged by it');
+console.log('\n[the public card prices the activity, never a person]');
+// Pricing is public and the page is one static file served to everyone, so it
+// cannot know who is reading it. "Already paid this year" is a fact about one
+// participant, knowable only after login; a card that tried to reflect it could
+// only ever be wrong for somebody. It belongs to the registration flow.
+H.eq(F.priceRows.length, 3, 'priceRows takes no per-family argument at all');
+H.eq(JSON.stringify(F.priceRows(OFF, 'en', D12, { feeWaived: true })),
+     JSON.stringify(F.priceRows(OFF, 'en', D12)),
+     'and passing one anyway changes nothing, so it cannot creep back in unnoticed');
+['he', 'en', 'ru'].forEach((lang) => {
+  const rows = F.priceRows(OFF, lang, D12);
+  H.eq(rows.length, 3, lang + ': the standard fee and the semester fee, plus the total');
+  H.ok(rows[0].note === '' && rows[0].value === '50 €',
+       lang + ': the yearly fee is shown plainly, with no note qualifying who pays it');
+});
+H.eq(F.priceRows(OFF, 'en', D12)[0].label, 'Yearly registration fee',
+     'and the label says the fee is annual, which is the part a family cannot infer');
+H.eq(F.priceRows(OFF, 'he', D12)[0].label, 'דמי הרשמה לשנה',
+     'Hebrew says "per year" rather than שנתיים, which reads first as "two years"');
 
 console.log('\n[group size takes a free-text override, like price already does]');
 H.eq(F.formatGroupSize({ groups: 2, maxPerGroup: 7, overrideText: 'One mixed-age group' }, 'en'),
