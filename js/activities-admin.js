@@ -527,6 +527,24 @@
     return el('div', {}, [el('label', { for: id, text: label }), input]);
   }
 
+  function plainField(id, label, value, placeholder) {
+    var input = el('input', { type: 'text', id: id, placeholder: placeholder || '' });
+    input.value = value || '';
+    input.addEventListener('input', function () { S.dirty = true; refreshLegacyNotes(); });
+    return el('div', {}, [el('label', { for: id, text: label }), input]);
+  }
+
+  function checkField(id, label, value, hint) {
+    var input = el('input', { type: 'checkbox', id: id });
+    input.checked = value === true;
+    input.addEventListener('change', function () { S.dirty = true; refreshPerHour(); });
+    var row = el('label', { for: id, class: 'check-row' }, [input, el('span', { text: label })]);
+    return el('div', {}, hint ? [row, el('div', { class: 'hint', text: hint })] : [row]);
+  }
+
+  function readText(id) { var n = $(id); return n ? String(n.value || '').trim() : ''; }
+  function readBool(id) { var n = $(id); return !!(n && n.checked); }
+
   function dateField(id, label, value) {
     var input = el('input', { type: 'date', id: id });
     input.value = value || '';
@@ -580,7 +598,7 @@
     if (kind === 'duration') {
       return !!f.startDate || !!f.endDate || pos(f.sessionCount) || pos(f.sessionMinutes);
     }
-    if (kind === 'groupSize') return pos(f.groups) || pos(f.maxPerGroup);
+    if (kind === 'groupSize') return pos(f.groups) || pos(f.maxPerGroup) || !!String(f.overrideText || '').trim();
     if (kind === 'price') {
       return pos(f.registrationFee) || pos(f.fullPrice) || f.perHourOverride != null;
     }
@@ -756,9 +774,13 @@
         numField('fact-duration-sessionMinutes', 'Minutes per session', fact.sessionMinutes)
       ]);
     } else if (d.kind === 'groupSize') {
-      body = el('div', { class: 'fact-grid' }, [
-        numField('fact-groupSize-groups', 'Number of groups', fact.groups),
-        numField('fact-groupSize-maxPerGroup', 'Max per group', fact.maxPerGroup)
+      body = el('div', {}, [
+        el('div', { class: 'fact-grid' }, [
+          numField('fact-groupSize-groups', 'Number of groups', fact.groups),
+          numField('fact-groupSize-maxPerGroup', 'Max per group', fact.maxPerGroup)
+        ]),
+        plainField('fact-groupSize-overrideText', 'Free-text override', fact.overrideText,
+                   'Leave blank to use the numbers above')
       ]);
     } else if (d.kind === 'price') {
       body = el('div', {}, [
@@ -767,6 +789,8 @@
           numField('fact-price-fullPrice', 'Full course price (€)', fact.fullPrice),
           numField('fact-price-perHourOverride', 'Per hour — manual override (€)', fact.perHourOverride)
         ]),
+        checkField('fact-price-showPerLesson', 'Show cost per lesson', fact.showPerLesson === true,
+                   'Off by default. The other price lines are unaffected either way.'),
         el('div', { class: 'perhour is-idle', id: 'perhour-note' })
       ]);
     } else {
@@ -814,12 +838,14 @@
           sessionMinutes: readNum('fact-duration-sessionMinutes')
         };
       } else if (d.kind === 'groupSize') {
-        out = { groups: readNum('fact-groupSize-groups'), maxPerGroup: readNum('fact-groupSize-maxPerGroup') };
+        out = { groups: readNum('fact-groupSize-groups'), maxPerGroup: readNum('fact-groupSize-maxPerGroup'),
+                overrideText: readText('fact-groupSize-overrideText') };
       } else if (d.kind === 'price') {
         out = {
           registrationFee: readNum('fact-price-registrationFee'),
           fullPrice: readNum('fact-price-fullPrice'),
-          perHourOverride: readNum('fact-price-perHourOverride')
+          perHourOverride: readNum('fact-price-perHourOverride'),
+          showPerLesson: readBool('fact-price-showPerLesson')
         };
       } else out = {};
 

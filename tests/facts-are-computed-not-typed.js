@@ -45,7 +45,9 @@ const ACT = {
     duration: DURATION,
     groupSize: { groups: 2, maxPerGroup: 7 },
     location: { text: { he: 'לימסול', en: 'Limassol', ru: 'Лимасол' } },
-    price: { registrationFee: 50, fullPrice: 360 },
+    // showPerLesson opts this fixture in, so the assertions below keep
+    // exercising the full four-row shape. Default-off is covered on its own.
+    price: { registrationFee: 50, fullPrice: 360, showPerLesson: true },
     instructionLanguage: { he: 'עברית', en: 'Hebrew', ru: 'Иврит' },
     prerequisites: { he: 'מתחילים', en: 'Beginners', ru: 'Начинающие' }
   }
@@ -169,6 +171,48 @@ H.eq(JSON.stringify(F.factPriceRows(ACT, 'en')),
      'factPriceRows finds the duration itself');
 H.eq(JSON.stringify(F.factPriceRows({ facts: { price: { legacyText: { en: '50 euro' } } } }, 'en')), '[]',
      'a price that is still free text has no rows, so it renders as an ordinary fact');
+
+console.log('\n[cost per lesson is OFF unless the activity opts in]');
+// It was the one row that invited arithmetic rather than answering a question.
+// Default off means an absent key is off, so no existing record starts showing
+// a row nobody configured, and only an explicit true turns it on.
+const OFF = { registrationFee: 50, fullPrice: 360 };
+const offRows = F.priceRows(OFF, 'en', D12);
+H.eq(offRows.length, 3, 'three rows by default, not four');
+H.ok(!offRows.some((r) => r.label === 'Cost per lesson'), 'and cost per lesson is not one of them');
+H.eq(offRows.map((r) => r.label).join(' | '),
+     'Registration fee | Cost per semester | Total for the semester',
+     'the other three are untouched, in order');
+H.eq(offRows.slice(-1)[0].value, '410 €', 'and the total still adds up');
+H.eq(F.priceRows(Object.assign({ showPerLesson: true }, OFF), 'en', D12).length, 4, 'opting in restores it');
+H.eq(F.priceRows(Object.assign({ showPerLesson: 'yes' }, OFF), 'en', D12).length, 3,
+     'only a real true counts, so a stray string does not switch it on');
+H.eq(F.showPerLesson({}), false, 'absent is off');
+
+console.log('\n[a waived registration fee is shown at zero, not omitted]');
+// Omitting it would make the card indistinguishable from an activity that never
+// had a fee, so a family could not tell whether it was waived or the price
+// changed -- and it would take the total with it, since the total only appears
+// when there are two numbers to add, leaving one line repeating the row above.
+const waived = F.priceRows(OFF, 'en', D12, { feeWaived: true });
+H.eq(waived.length, 3, 'the same three rows, none removed');
+H.eq(waived[0].label, 'Registration fee', 'the fee row is still there');
+H.eq(waived[0].value, '0 €', 'at zero');
+H.eq(waived[0].note, 'already paid this year', 'saying why');
+H.eq(waived.slice(-1)[0].value, '360 €', 'and the total drops by exactly the fee, so the arithmetic reads');
+H.eq(F.priceRows(OFF, 'he', D12, { feeWaived: true })[0].note, 'שולמו כבר השנה', 'in Hebrew');
+H.eq(F.priceRows(OFF, 'ru', D12, { feeWaived: true })[0].note, 'уже оплачен в этом году', 'and Russian');
+H.eq(F.priceRows(OFF, 'en', D12).slice(-1)[0].value, '410 €',
+     'waiving is an argument, not a field: the public card is unchanged by it');
+
+console.log('\n[group size takes a free-text override, like price already does]');
+H.eq(F.formatGroupSize({ groups: 2, maxPerGroup: 7, overrideText: 'One mixed-age group' }, 'en'),
+     'One mixed-age group', 'a filled override replaces the computed sentence outright');
+H.eq(F.formatGroupSize({ groups: 2, maxPerGroup: 7, overrideText: '   ' }, 'en'),
+     F.formatGroupSize({ groups: 2, maxPerGroup: 7 }, 'en'),
+     'whitespace is blank, so it falls through rather than publishing an empty fact');
+H.eq(F.formatGroupSize({ overrideText: 'קבוצה אחת מעורבת' }, 'he'), 'קבוצה אחת מעורבת',
+     'and it works with no numbers at all behind it');
 
 console.log('\n[the sidebar, in order, with empties dropped]');
 const rows = F.sidebarRows(ACT, 'he');

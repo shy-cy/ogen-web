@@ -254,3 +254,9 @@ input:disabled,textarea:disabled,select:disabled{background:#f2f0ea;color:#8b8b8
 .quill-wrap.lang-locked .ql-editor,
 .quill-wrap.lang-locked .ql-toolbar{ background:var(--stone); color:#7a766c; cursor:not-allowed; }
 .quill-wrap.lang-locked .ql-toolbar button{ pointer-events:none; opacity:.45; }
+
+/* A checkbox and its words are one target: the label wraps the input so the
+   text is clickable, which a separate <label for> beside it is not on a
+   touch screen. Baseline rather than centre, or a two-line label floats. */
+.check-row{ display:flex; align-items:baseline; gap:8px; cursor:pointer; font-weight:600; }
+.check-row input{ width:auto; margin:0; flex:none; }

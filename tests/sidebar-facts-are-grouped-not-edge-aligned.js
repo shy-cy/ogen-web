@@ -123,7 +123,10 @@ console.log('\n[what actually renders]');
   const multi = rendered.filter((k, i) => rendered.indexOf(k) !== i);
   H.eq(Array.from(new Set(multi)).join(','), 'price',
     lang + ': and the price is the only fact that renders as more than one row');
-  H.eq(rendered.filter((k) => k === 'price').length, 4, lang + ': as four rows');
+  // Three, not four: cost per lesson is off unless an activity opts in, and the
+  // live record does not. The count is asserted rather than left loose so that
+  // turning it on somewhere is a visible decision.
+  H.eq(rendered.filter((k) => k === 'price').length, 3, lang + ': as three rows');
 
   // A group with no facts would render as an icon and a heading labelling
   // nothing. Every group present must carry at least one fact.

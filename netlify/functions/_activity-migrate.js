@@ -71,13 +71,17 @@ const SHAPES = {
     sessionCount: num(f.sessionCount),
     sessionMinutes: num(f.sessionMinutes)
   }),
-  groupSize: (f) => ({ groups: num(f.groups), maxPerGroup: num(f.maxPerGroup) }),
+  groupSize: (f) => ({ groups: num(f.groups), maxPerGroup: num(f.maxPerGroup),
+                       overrideText: String(f.overrideText || '').trim() }),
   location: (f) => ({ text: langObject(f.text) }),
   address: (f) => ({ text: langObject(f.text) }),
   price: (f) => ({
     registrationFee: num(f.registrationFee),
     fullPrice: num(f.fullPrice),
-    perHourOverride: num(f.perHourOverride)
+    perHourOverride: num(f.perHourOverride),
+    // Absent means off. Normalised to a real boolean so the checkbox has
+    // something to bind to and a save cannot write undefined back.
+    showPerLesson: f.showPerLesson === true
   })
 };
 

@@ -335,6 +335,13 @@ function formatDuration(f, lang) {
 }
 
 function formatGroupSize(f, lang) {
+  // A filled-in override replaces the computed sentence outright, the same shape
+  // perHourOverride already has on price: some groupings are not "N groups of up
+  // to M" and no amount of number-formatting makes them so. Blank falls through
+  // to the computed form, so this costs nothing when it is not used.
+  const override = String((f && f.overrideText) || '').trim();
+  if (override) return override;
+
   const groups = num(f.groups);
   const per = num(f.maxPerGroup);
   const hasGroups = groups != null && groups > 0;
@@ -426,26 +433,49 @@ function lessonsPerSession(duration) {
 // fullPrice ÷ academic hours (or perHourOverride); the "N sessions × M lessons"
 // qualifier and the total are both derived. Change either field and all four
 // rows stay consistent.
-function priceRows(f, lang, duration) {
+// opts.feeWaived marks the registration fee as already paid this year. It is an
+// ARGUMENT rather than a field on the activity, because it is a property of one
+// participant's registration, not of the activity: the same course waives it for
+// a returning family and charges it for a new one. Phase 4 passes it; the
+// activity page never does, so the public card keeps showing the fee a new
+// family would actually pay.
+// Default OFF. An absent key is off, so no existing record starts showing a row
+// it was never configured for; only an explicit true opts in.
+function showPerLesson(price) { return (price && price.showPerLesson) === true; }
+
+function priceRows(f, lang, duration, opts) {
   const rows = [];
   const fee = num(f.registrationFee);
   const full = num(f.fullPrice);
   const hasFee = fee != null && fee > 0;
   const hasFull = full != null && full > 0;
 
+  const waived = !!(opts && opts.feeWaived);
+
   const L = {
     he: { fee: 'דמי הרשמה', lesson: 'עלות לשיעור', term: 'עלות לסמסטר', total: 'סה״כ לסמסטר',
-          session: ['מפגש', 'מפגשים'], unit: ['שיעור', 'שיעורים'] },
+          session: ['מפגש', 'מפגשים'], unit: ['שיעור', 'שיעורים'], paid: 'שולמו כבר השנה' },
     en: { fee: 'Registration fee', lesson: 'Cost per lesson', term: 'Cost per semester', total: 'Total for the semester',
-          session: ['session', 'sessions'], unit: ['lesson', 'lessons'] },
-    ru: { fee: 'Регистрационный взнос', lesson: 'Стоимость урока', term: 'Стоимость семестра', total: 'Итого за семестр' }
+          session: ['session', 'sessions'], unit: ['lesson', 'lessons'], paid: 'already paid this year' },
+    ru: { fee: 'Регистрационный взнос', lesson: 'Стоимость урока', term: 'Стоимость семестра', total: 'Итого за семестр',
+          paid: 'уже оплачен в этом году' }
   }[lang] || null;
   if (!L) return [];
   const row = (label, value, note) => ({ label, note: note || '', value });
 
-  if (hasFee) rows.push(row(L.fee, money(fee)));
+  // A waived fee is SHOWN AT ZERO with a note, not omitted. Omitting it makes
+  // the card silently indistinguishable from an activity that never had a
+  // registration fee, so a family cannot tell whether it was waived or whether
+  // the price changed -- and it would take the total row with it, since the
+  // total only appears when there are two numbers to add, leaving a card whose
+  // single line repeats the row above it. Showing it at zero keeps the
+  // arithmetic visible and explains itself.
+  if (hasFee) rows.push(waived ? row(L.fee, money(0), L.paid) : row(L.fee, money(fee)));
 
-  const per = pricePerHour(f, duration);
+  // Cost per lesson is OFF unless the activity opts in. It was the one row that
+  // invited arithmetic rather than answering a question, and a teacher reading
+  // the card does not price a course by the academic hour.
+  const per = showPerLesson(f) ? pricePerHour(f, duration) : null;
   if (per) rows.push(row(L.lesson, money(per.value)));
 
   if (hasFull) {
@@ -466,7 +496,8 @@ function priceRows(f, lang, duration) {
   }
 
   // Computed, never typed, so it cannot drift from the two numbers above it.
-  if (hasFee && hasFull) rows.push(row(L.total, money(fee + full)));
+  // A waived fee contributes zero, so the total still adds up to what is shown.
+  if (hasFee && hasFull) rows.push(row(L.total, money((waived ? 0 : fee) + full)));
 
   return rows;
 }
@@ -583,7 +614,7 @@ module.exports = {
   FACT_ORDER, TEXT_FACTS, STRUCTURED_FACTS, DEFAULT_VISIBILITY,
   ACADEMIC_MINUTES, CURRENCY,
   num, pick, ruPlural, monthYear,
-  formatAges, formatSchedule, formatDuration, sessionRows, weekOrdinal,
+  formatAges, formatSchedule, formatDuration, sessionRows, weekOrdinal, showPerLesson,
   SESSION_TABLE, WEEK_ORDINALS, RU_DAY_GENDER, formatGroupSize, formatPrice,
   priceRows, factPriceRows,
   academicHours, pricePerHour,
