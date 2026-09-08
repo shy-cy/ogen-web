@@ -460,11 +460,11 @@ function priceRows(f, lang, duration) {
   const hasFull = full != null && full > 0;
 
   const L = {
-    he: { fee: 'דמי הרשמה לשנה', lesson: 'עלות לשיעור', term: 'עלות לסמסטר', total: 'סה״כ לסמסטר',
+    he: { fee: 'דמי הרשמה לשנה', lesson: 'עלות לשיעור', term: 'עלות לסמסטר',
           session: ['מפגש', 'מפגשים'], unit: ['שיעור', 'שיעורים'] },
-    en: { fee: 'Yearly registration fee', lesson: 'Cost per lesson', term: 'Cost per semester', total: 'Total for the semester',
+    en: { fee: 'Yearly registration fee', lesson: 'Cost per lesson', term: 'Cost per semester',
           session: ['session', 'sessions'], unit: ['lesson', 'lessons'] },
-    ru: { fee: 'Годовой регистрационный взнос', lesson: 'Стоимость урока', term: 'Стоимость семестра', total: 'Итого за семестр' }
+    ru: { fee: 'Годовой регистрационный взнос', lesson: 'Стоимость урока', term: 'Стоимость семестра' }
   }[lang] || null;
   if (!L) return [];
   const row = (label, value, note) => ({ label, note: note || '', value });
@@ -494,9 +494,12 @@ function priceRows(f, lang, duration) {
     rows.push(row(L.term, money(full), note));
   }
 
-  // Computed, never typed, so it cannot drift from the two numbers above it.
-  if (hasFee && hasFull) rows.push(row(L.total, money(fee + full)));
-
+  // There is deliberately NO total. The two numbers are on different cycles --
+  // the registration fee is charged once a YEAR and the course fee once a
+  // semester -- so adding them produces a figure nobody is ever billed. A family
+  // joining in the spring pays 300, not 350, having paid the fee in the autumn.
+  // The sum was only ever right for a first-semester registration, which is the
+  // one case where a reader can also do the addition themselves.
   return rows;
 }
 

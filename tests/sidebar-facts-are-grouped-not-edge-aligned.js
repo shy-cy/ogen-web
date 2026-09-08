@@ -117,16 +117,18 @@ console.log('\n[what actually renders]');
     .map((m) => m.slice(11, -1));
   H.eq(Array.from(new Set(rendered)).sort().join(','), expected.slice().sort().join(','),
     lang + ': and nothing else appears');
-  // One fact is one row, with ONE exception: the price is four numbers a family
-  // compares, so it renders its derived rows individually. Asserted rather than
-  // tolerated, so a second multi-row fact has to be a decision.
+  // One fact is one row, with ONE exception: the price is several numbers a
+  // family compares, so it renders its derived rows individually. Asserted
+  // rather than tolerated, so a second multi-row fact has to be a decision.
   const multi = rendered.filter((k, i) => rendered.indexOf(k) !== i);
   H.eq(Array.from(new Set(multi)).join(','), 'price',
     lang + ': and the price is the only fact that renders as more than one row');
-  // Three, not four: cost per lesson is off unless an activity opts in, and the
-  // live record does not. The count is asserted rather than left loose so that
-  // turning it on somewhere is a visible decision.
-  H.eq(rendered.filter((k) => k === 'price').length, 3, lang + ': as three rows');
+  // Two: the yearly registration fee and the semester fee. Cost per lesson is
+  // off unless an activity opts in, and the live record does not; there is no
+  // total, because two figures on different billing cycles do not add up to
+  // anything a family pays. The count is asserted rather than left loose so
+  // that a third row anywhere is a visible decision.
+  H.eq(rendered.filter((k) => k === 'price').length, 2, lang + ': as two rows');
 
   // A group with no facts would render as an icon and a heading labelling
   // nothing. Every group present must carry at least one fact.

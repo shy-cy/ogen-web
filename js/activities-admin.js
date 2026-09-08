@@ -701,8 +701,10 @@
   // Price per academic hour, recomputed as you type. Same arithmetic as the
   // server, with the 45-minute basis taken FROM the server so there is one
   // source of truth for it rather than a copy that can drift.
-  // What the price card will actually contain. The total is derived rather than
-  // typed, so without a preview the only way to check it was to publish.
+  // What the price card will actually contain, without publishing to find out.
+  // It mirrors priceRows() on the server, including what that function does NOT
+  // emit: there is no total, because the yearly fee and the semester fee are
+  // charged on different cycles and their sum is a number nobody is billed.
   function priceCardPreview() {
     var fee = readNum('fact-price-registrationFee');
     var full = readNum('fact-price-fullPrice');
@@ -713,7 +715,6 @@
       if (per != null) parts.push('Cost per lesson ' + per + ' €');
     }
     if (full != null && full > 0) parts.push('Cost per semester ' + full + ' €');
-    if (fee != null && fee > 0 && full != null && full > 0) parts.push('Total ' + (fee + full) + ' €');
     return parts;
   }
 

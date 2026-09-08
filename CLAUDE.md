@@ -410,16 +410,25 @@ en or em dash**; the date range joins its two months with a plain hyphen, the
 same character the age range uses, and a test asserts every generated fact in
 every language is free of both.
 
-**The price is four derived rows and nothing is typed twice:**
+**The price is derived rows and nothing is typed twice:**
 
 | Row | Where it comes from |
 |---|---|
 | Yearly registration fee | `registrationFee` |
-| Cost per lesson | `fullPrice ÷ (sessionCount × sessionMinutes ÷ 45)`, or `perHourOverride` |
+| Cost per lesson | `fullPrice ÷ (sessionCount × sessionMinutes ÷ 45)`, or `perHourOverride`; **off unless `showPerLesson`** |
 | Cost per semester | `fullPrice`, qualified by "(N sessions × M lessons)" |
-| Total for the semester | **`registrationFee + fullPrice`, computed** |
 
-Rows, not four lines in one value: the price is its own card now, and a card
+**There is deliberately no total.** The card used to end with one, computed
+rather than typed so it could not drift from the two numbers above it — but
+computing it was never the problem, adding those two numbers at all was. The
+registration fee is charged once a **year** and the course fee once a
+**semester**, so their sum is a figure nobody is ever billed: a family joining in
+the spring, having paid the fee in the autumn, pays 300, not 350. The total was
+right only for a first-semester registration, which is also the one case where a
+reader can do the addition unaided. A test asserts the sum appears nowhere, in
+any language, under any label.
+
+Rows, not lines in one value: the price is its own card now, and a card
 headed "Price" whose single fact is also labelled "Price" says it twice.
 `priceRows()` returns `{label, note, value}` and is the single builder —
 `formatPrice()` derives the one-string form from it, so a page and a caller with
@@ -429,21 +438,20 @@ glued onto either it reads as a second label or as part of the figure.
 
 A "lesson" is the 45-minute academic hour; a "session" is one meeting, so a
 90-minute session is two lessons. That is the same number per-hour always
-computed — the label changed, the arithmetic did not. The **total is never a
-field**, so it cannot drift from the two numbers above it.
+computed — the label changed, the arithmetic did not.
 
 Every line is conditional on the data behind it, so this is the shape for every
 activity rather than a layout that fits one: an activity with only a full price
-renders a single row, and the total appears only when there are two numbers to
-add, since otherwise it would repeat the row above it. The "(N sessions × M
-lessons)" qualifier appears only when a session divides into whole lessons — a
-60-minute session is 1.33 lessons, which is arithmetic, not a sentence.
+renders a single row. The "(N sessions × M lessons)" qualifier appears only when
+a session divides into whole lessons — a 60-minute session is 1.33 lessons,
+which is arithmetic, not a sentence.
 
 **Cost per lesson is off by default**, behind `price.showPerLesson`. It is a
 number a teacher reads as a rate to be compared against other schools, and it
 is a division of two figures that are both already on the card. The other three
-rows are unaffected either way, and the admin's live preview shows exactly the
-rows a save would publish, so the toggle is checked without publishing.
+other rows are unaffected either way, and the admin's live preview mirrors
+`priceRows()` exactly — the same rows, and the same absent total — so the toggle
+is checked without publishing to find out.
 
 The registration fee is **annual, and the label says so** — "Yearly
 registration fee" / `דמי הרשמה לשנה` / `Годовой регистрационный взнос`. It is

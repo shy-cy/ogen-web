@@ -102,34 +102,31 @@ F.FACT_ORDER.forEach((key) => {
   });
 });
 
-// FOUR ROWS, one number each. They were a single ·-joined sentence, which made
-// the registration fee and the course price read as one figure and hid that they
-// add up. Rows rather than lines because the price is its own card now: a card
-// headed "Price" whose one fact is also labelled "Price" says it twice.
+// ONE NUMBER PER ROW. They were a single ·-joined sentence, which made the
+// registration fee and the course price read as one figure. Rows rather than
+// lines because the price is its own card now: a card headed "Price" whose one
+// fact is also labelled "Price" says it twice.
 //
 // Nothing here is typed: the fee and the full price are fields, per-lesson is
-// fullPrice ÷ academic hours, and the qualifier and the total are derived.
+// fullPrice ÷ academic hours, and the qualifier is derived.
 const D12 = { sessionCount: 12, sessionMinutes: 90 };
 H.eq(JSON.stringify(F.priceRows(ACT.facts.price, 'he', D12)),
   JSON.stringify([
     { label: 'דמי הרשמה לשנה', note: '', value: '50 €' },
     { label: 'עלות לשיעור', note: '', value: '15 €' },
-    { label: 'עלות לסמסטר', note: '(12 מפגשים × 2 שיעורים)', value: '360 €' },
-    { label: 'סה״כ לסמסטר', note: '', value: '410 €' }
-  ]), 'price in Hebrew, four rows');
+    { label: 'עלות לסמסטר', note: '(12 מפגשים × 2 שיעורים)', value: '360 €' }
+  ]), 'price in Hebrew, three rows');
 H.eq(JSON.stringify(F.priceRows(ACT.facts.price, 'en', D12)),
   JSON.stringify([
     { label: 'Yearly registration fee', note: '', value: '50 €' },
     { label: 'Cost per lesson', note: '', value: '15 €' },
-    { label: 'Cost per semester', note: '(12 sessions × 2 lessons)', value: '360 €' },
-    { label: 'Total for the semester', note: '', value: '410 €' }
+    { label: 'Cost per semester', note: '(12 sessions × 2 lessons)', value: '360 €' }
   ]), 'price in English');
 H.eq(JSON.stringify(F.priceRows(ACT.facts.price, 'ru', D12)),
   JSON.stringify([
     { label: 'Годовой регистрационный взнос', note: '', value: '50 €' },
     { label: 'Стоимость урока', note: '', value: '15 €' },
-    { label: 'Стоимость семестра', note: '(12 занятий × 2 урока)', value: '360 €' },
-    { label: 'Итого за семестр', note: '', value: '410 €' }
+    { label: 'Стоимость семестра', note: '(12 занятий × 2 урока)', value: '360 €' }
   ]), 'price in Russian');
 
 // The qualifier is its OWN field, not glued onto the label. It renders as a
@@ -145,16 +142,29 @@ H.eq(JSON.stringify(F.priceRows(ACT.facts.price, 'ru', D12)),
 // for rows cannot disagree about the price.
 H.eq(text('price', 'en'),
   'Yearly registration fee - 50 €\nCost per lesson - 15 €\n' +
-  'Cost per semester (12 sessions × 2 lessons) - 360 €\nTotal for the semester - 410 €',
+  'Cost per semester (12 sessions × 2 lessons) - 360 €',
   'and the one-string form says the same thing');
 
-// The total is COMPUTED, so it cannot drift from the two numbers above it.
-const bumped = { registrationFee: 80, fullPrice: 360 };
-H.eq(F.priceRows(bumped, 'en', D12).slice(-1)[0].value, '440 €',
-     'change the fee and the total follows');
-// And it only appears when there are two numbers to add.
-H.ok(!F.priceRows({ fullPrice: 360 }, 'en', {}).some((r) => r.label.indexOf('Total') === 0),
-     'a price with nothing to add shows no total repeating the row above it');
+// THERE IS NO TOTAL, and this is the assertion that keeps it that way.
+//
+// The card used to end with "Total for the semester - 410 €", computed from the
+// two numbers above it. Computing it was never the problem; adding those two
+// numbers at all was. The registration fee is charged once a YEAR and the course
+// fee once a SEMESTER, so their sum is a figure nobody is ever billed: a family
+// joining in the spring, having paid the fee in the autumn, pays 360. The total
+// was right only for a first-semester registration -- which is also the one case
+// where the reader can do the addition unaided.
+const TOTAL_LABELS = ['Total for the semester', 'סה״כ לסמסטר', 'Итого за семестр'];
+['he', 'en', 'ru'].forEach((lang) => {
+  const rows = F.priceRows({ registrationFee: 50, fullPrice: 360 }, lang, D12);
+  H.eq(rows.length, 2, lang + ': a fee and a semester price are two rows, not three');
+  H.ok(!rows.some((r) => TOTAL_LABELS.indexOf(r.label) !== -1),
+       lang + ': and neither of them is a total');
+  H.ok(!rows.some((r) => r.value === '410 €'),
+       lang + ': the sum appears nowhere, under any label');
+});
+H.ok(F.formatPrice({ registrationFee: 50, fullPrice: 360 }, 'en', D12).indexOf('410') === -1,
+     'nor in the one-string form, which is derived from the same rows');
 // Every row is conditional, so this is the shape for every activity.
 H.eq(JSON.stringify(F.priceRows({ fullPrice: 360 }, 'en', {})),
      JSON.stringify([{ label: 'Cost per semester', note: '', value: '360 €' }]),
@@ -178,14 +188,13 @@ console.log('\n[cost per lesson is OFF unless the activity opts in]');
 // a row nobody configured, and only an explicit true turns it on.
 const OFF = { registrationFee: 50, fullPrice: 360 };
 const offRows = F.priceRows(OFF, 'en', D12);
-H.eq(offRows.length, 3, 'three rows by default, not four');
+H.eq(offRows.length, 2, 'two rows by default, not three');
 H.ok(!offRows.some((r) => r.label === 'Cost per lesson'), 'and cost per lesson is not one of them');
 H.eq(offRows.map((r) => r.label).join(' | '),
-     'Yearly registration fee | Cost per semester | Total for the semester',
-     'the other three are untouched, in order');
-H.eq(offRows.slice(-1)[0].value, '410 €', 'and the total still adds up');
-H.eq(F.priceRows(Object.assign({ showPerLesson: true }, OFF), 'en', D12).length, 4, 'opting in restores it');
-H.eq(F.priceRows(Object.assign({ showPerLesson: 'yes' }, OFF), 'en', D12).length, 3,
+     'Yearly registration fee | Cost per semester',
+     'the other two are untouched, in order');
+H.eq(F.priceRows(Object.assign({ showPerLesson: true }, OFF), 'en', D12).length, 3, 'opting in restores it');
+H.eq(F.priceRows(Object.assign({ showPerLesson: 'yes' }, OFF), 'en', D12).length, 2,
      'only a real true counts, so a stray string does not switch it on');
 H.eq(F.showPerLesson({}), false, 'absent is off');
 
@@ -200,7 +209,7 @@ H.eq(JSON.stringify(F.priceRows(OFF, 'en', D12, { feeWaived: true })),
      'and passing one anyway changes nothing, so it cannot creep back in unnoticed');
 ['he', 'en', 'ru'].forEach((lang) => {
   const rows = F.priceRows(OFF, lang, D12);
-  H.eq(rows.length, 3, lang + ': the standard fee and the semester fee, plus the total');
+  H.eq(rows.length, 2, lang + ': the standard yearly fee and the semester fee, separately');
   H.ok(rows[0].note === '' && rows[0].value === '50 €',
        lang + ': the yearly fee is shown plainly, with no note qualifying who pays it');
 });
