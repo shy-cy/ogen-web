@@ -71,8 +71,14 @@ const SHAPES = {
     sessionCount: num(f.sessionCount),
     sessionMinutes: num(f.sessionMinutes)
   }),
+  // The override is WORDS, so it is a { he, en, ru } bag like every other
+  // sentence on this site — the numbers beside it render in three languages and
+  // the text replacing them has to as well. langObject() puts a bare string in
+  // `he`, which is what a pre-trilingual override was: one line typed by a
+  // Hebrew-first admin. The other two fall back to the computed sentence, which
+  // is the honest reading of "this has not been translated yet".
   groupSize: (f) => ({ groups: num(f.groups), maxPerGroup: num(f.maxPerGroup),
-                       overrideText: String(f.overrideText || '').trim() }),
+                       overrideText: langObject(f.overrideText) }),
   location: (f) => ({ text: langObject(f.text) }),
   address: (f) => ({ text: langObject(f.text) }),
   price: (f) => ({

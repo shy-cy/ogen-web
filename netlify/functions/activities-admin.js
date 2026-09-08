@@ -454,6 +454,13 @@ function mergeByPermission(current, incoming, session) {
   // legacy sentence) merge per language, and the NUMBERS are structure that
   // only a full-access session may touch. A Russian reviewer can translate
   // "Limassol"; they cannot change the price.
+  // Which sub-keys of a structured fact are words, listed rather than tested for
+  // one at a time. `address` was missing from the if-chain this replaces, so a
+  // Russian-only role could never translate the address — the numbers path took
+  // it from the stored record and the merge never ran. A list makes forgetting
+  // one a visible omission instead of a silent read-only field.
+  const LANG_SUBKEYS = { location: ['text'], address: ['text'], groupSize: ['overrideText'] };
+
   const baseFacts = (base && base.facts) || {};
   const incFacts = incoming.facts || {};
   const facts = {};
@@ -466,7 +473,9 @@ function mergeByPermission(current, incoming, session) {
       return;
     }
     const merged = SHAPES[key] ? SHAPES[key](full ? inc : cur) : {};
-    if (key === 'location') merged.text = mergeLang(cur.text, inc.text);
+    (LANG_SUBKEYS[key] || []).forEach((sub) => {
+      merged[sub] = mergeLang(cur[sub], inc[sub]);
+    });
     const legacy = mergeLang(cur.legacyText, inc.legacyText);
     if (LANGS.some((l) => String(legacy[l] || '').trim())) merged.legacyText = legacy;
     facts[key] = merged;

@@ -81,6 +81,37 @@ const H = require('./_helpers');
   H.eq(after.faq[0].a.ru, 'изменённый ответ',
        'but their Russian wording on the surviving row did apply');
 
+  console.log('\n[the words INSIDE a structured fact merge the same way]');
+  // A fact is part numbers and part sentences, and the sentences are still
+  // words. The group-size override and the exact address are both translatable
+  // text living beside integers — `address` was reachable only by a full-access
+  // session for a while, not by decision but because the merge tested for one
+  // fact by name and the second one was added later.
+  const factEdit = JSON.parse(JSON.stringify(after));
+  factEdit.facts.groupSize = {
+    groups: 9, maxPerGroup: 9,
+    overrideText: { he: 'HEBREW TAMPERED', en: 'ENGLISH TAMPERED', ru: 'Одна смешанная группа' }
+  };
+  factEdit.facts.address = { text: { he: 'HEBREW TAMPERED', en: 'ENGLISH TAMPERED', ru: 'улица Ленина, 1' } };
+
+  const third = await H.call(admin.handler, Object.assign({
+    action: 'saveDraft', baseUpdatedAt: after.isoUpdated, activity: factEdit
+  }, asRu));
+  H.eq(third.status, 200, 'the third draft saves');
+  const facts = third.body.activity.facts;
+
+  H.eq(facts.groupSize.overrideText.ru, 'Одна смешанная группа',
+       'their Russian override applied');
+  H.eq(facts.groupSize.overrideText.he, '',
+       'the Hebrew override is as it was — empty here, and their edit was dropped');
+  H.eq(facts.groupSize.overrideText.en, '', 'so is the English');
+  H.eq(facts.groupSize.groups, null,
+       'and the numbers beside it did not move, because a count is structure');
+
+  H.eq(facts.address.text.ru, 'улица Ленина, 1',
+       'the address translates too — words are words even in a members-only fact');
+  H.eq(facts.address.text.he, '', 'without letting them touch the Hebrew');
+
   console.log('\n[a session with no access at all is refused outright]');
   const nobody = await H.installSession(blobs, H.superAdminSession({
     token: 'nobody', email: 'nobody@ogen.cy', name: 'Nobody',

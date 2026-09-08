@@ -527,13 +527,6 @@
     return el('div', {}, [el('label', { for: id, text: label }), input]);
   }
 
-  function plainField(id, label, value, placeholder) {
-    var input = el('input', { type: 'text', id: id, placeholder: placeholder || '' });
-    input.value = value || '';
-    input.addEventListener('input', function () { S.dirty = true; refreshLegacyNotes(); });
-    return el('div', {}, [el('label', { for: id, text: label }), input]);
-  }
-
   function checkField(id, label, value, hint) {
     var input = el('input', { type: 'checkbox', id: id });
     input.checked = value === true;
@@ -542,7 +535,6 @@
     return el('div', {}, hint ? [row, el('div', { class: 'hint', text: hint })] : [row]);
   }
 
-  function readText(id) { var n = $(id); return n ? String(n.value || '').trim() : ''; }
   function readBool(id) { var n = $(id); return !!(n && n.checked); }
 
   function dateField(id, label, value) {
@@ -595,18 +587,21 @@
   // authority; a count or a length of zero is not a value it will print.
   function hasStructuredValue(kind, f) {
     var pos = function (v) { return v != null && v !== '' && Number(v) > 0; };
+    var anyLang = function (v) {
+      return S.schema.langs.some(function (l) { return String((v || {})[l] || '').trim(); });
+    };
     if (kind === 'ages') return f.min != null || f.max != null;
     if (kind === 'schedule') return (f.sessions || []).length > 0;
     if (kind === 'duration') {
       return !!f.startDate || !!f.endDate || pos(f.sessionCount) || pos(f.sessionMinutes);
     }
-    if (kind === 'groupSize') return pos(f.groups) || pos(f.maxPerGroup) || !!String(f.overrideText || '').trim();
+    if (kind === 'groupSize') {
+      return pos(f.groups) || pos(f.maxPerGroup) || anyLang(f.overrideText);
+    }
     if (kind === 'price') {
       return pos(f.registrationFee) || pos(f.fullPrice) || f.perHourOverride != null;
     }
-    if (kind === 'location') {
-      return S.schema.langs.some(function (l) { return ((f.text || {})[l] || '').trim(); });
-    }
+    if (kind === 'location') return anyLang(f.text);
     return false;
   }
 
@@ -821,13 +816,26 @@
         numField('fact-duration-sessionMinutes', 'Minutes per session', fact.sessionMinutes)
       ]);
     } else if (d.kind === 'groupSize') {
+      // Three languages, through the same fieldRow the location fact uses, so
+      // the override obeys the same per-language permissions: a Russian-only
+      // role gets the Russian box and two read-only ones. A single input could
+      // not express that, and whatever it held would have been published in all
+      // three languages by whoever last typed in it.
+      var override = fieldRow({
+        label: 'Free-text override',
+        hint: 'Leave blank to use the numbers above. Filled in, it replaces the whole line for that language.'
+      }, langObj(fact.overrideText), 'fact-groupSize-overrideText');
+      // fieldRow marks the form dirty but knows nothing about the legacy note,
+      // which keys off whether this fact has a value yet.
+      Array.prototype.forEach.call(override.querySelectorAll('input, textarea'), function (n) {
+        n.addEventListener('input', refreshLegacyNotes);
+      });
       body = el('div', {}, [
         el('div', { class: 'fact-grid' }, [
           numField('fact-groupSize-groups', 'Number of groups', fact.groups),
           numField('fact-groupSize-maxPerGroup', 'Max per group', fact.maxPerGroup)
         ]),
-        plainField('fact-groupSize-overrideText', 'Free-text override', fact.overrideText,
-                   'Leave blank to use the numbers above')
+        override
       ]);
     } else if (d.kind === 'price') {
       body = el('div', {}, [
@@ -887,7 +895,7 @@
         };
       } else if (d.kind === 'groupSize') {
         out = { groups: readNum('fact-groupSize-groups'), maxPerGroup: readNum('fact-groupSize-maxPerGroup'),
-                overrideText: readText('fact-groupSize-overrideText') };
+                overrideText: readLangField('fact-groupSize-overrideText') };
       } else if (d.kind === 'price') {
         out = {
           registrationFee: readNum('fact-price-registrationFee'),

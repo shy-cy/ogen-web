@@ -339,7 +339,14 @@ function formatGroupSize(f, lang) {
   // perHourOverride already has on price: some groupings are not "N groups of up
   // to M" and no amount of number-formatting makes them so. Blank falls through
   // to the computed form, so this costs nothing when it is not used.
-  const override = String((f && f.overrideText) || '').trim();
+  // pick() rather than a bare string: the override is per-language and follows
+  // the same FALLBACK chain every other sentence does, so an override typed in
+  // Hebrew alone shows in Hebrew on all three pages until it is translated.
+  // That is deliberately NOT "fall back to the computed line" — untranslated
+  // text says the same thing in the wrong language, whereas the computed line
+  // would have the English page making a different claim about the grouping
+  // than the Hebrew one, which is the failure this override exists to avoid.
+  const override = pick(f && f.overrideText, lang);
   if (override) return override;
 
   const groups = num(f.groups);

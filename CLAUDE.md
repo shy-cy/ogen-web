@@ -414,7 +414,7 @@ every language is free of both.
 
 | Row | Where it comes from |
 |---|---|
-| Registration fee | `registrationFee` |
+| Yearly registration fee | `registrationFee` |
 | Cost per lesson | `fullPrice ÷ (sessionCount × sessionMinutes ÷ 45)`, or `perHourOverride` |
 | Cost per semester | `fullPrice`, qualified by "(N sessions × M lessons)" |
 | Total for the semester | **`registrationFee + fullPrice`, computed** |
@@ -438,6 +438,37 @@ renders a single row, and the total appears only when there are two numbers to
 add, since otherwise it would repeat the row above it. The "(N sessions × M
 lessons)" qualifier appears only when a session divides into whole lessons — a
 60-minute session is 1.33 lessons, which is arithmetic, not a sentence.
+
+**Cost per lesson is off by default**, behind `price.showPerLesson`. It is a
+number a teacher reads as a rate to be compared against other schools, and it
+is a division of two figures that are both already on the card. The other three
+rows are unaffected either way, and the admin's live preview shows exactly the
+rows a save would publish, so the toggle is checked without publishing.
+
+The registration fee is **annual, and the label says so** — "Yearly
+registration fee" / `דמי הרשמה לשנה` / `Годовой регистрационный взнос`. It is
+the one thing about the fee a family cannot infer from the number. The public
+card carries **no waiver logic at all**: whether a particular participant
+already paid this year is a question about a person, and the page is static and
+has no idea who is reading it. That check belongs at the point of payment,
+behind a login, and lives in the registration flow rather than here.
+
+**A fact can be overridden with words, and the words are trilingual.**
+`groupSize.overrideText` is a `{he, en, ru}` bag, and a filled-in language
+replaces the computed sentence outright — not every grouping is "N groups of up
+to M" and no amount of number-formatting makes one so. It shipped as a single
+string for a day, which meant whoever typed it published their language on all
+three pages. Half-translated, it still overrides in all three via the usual
+FALLBACK chain: the same sentence in the wrong language beats two pages making
+different claims about how the activity is grouped.
+
+That split — numbers are structure, sentences are words — is enforced in the
+merge, so a Russian-only role can translate an override or an address without
+being able to change a count. `LANG_SUBKEYS` in `activities-admin.js` lists
+which sub-keys of a structured fact are words. It is a list rather than a test
+per fact because the version that tested per fact named `location` and was
+never updated when `address` was split out of it, so the exact address was
+silently read-only for every restricted role. A test pins both.
 
 Two rules hold the change-over together:
 

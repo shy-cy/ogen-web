@@ -210,13 +210,44 @@ H.eq(F.priceRows(OFF, 'he', D12)[0].label, 'דמי הרשמה לשנה',
      'Hebrew says "per year" rather than שנתיים, which reads first as "two years"');
 
 console.log('\n[group size takes a free-text override, like price already does]');
-H.eq(F.formatGroupSize({ groups: 2, maxPerGroup: 7, overrideText: 'One mixed-age group' }, 'en'),
+// The override started life as ONE string, and that string was published on all
+// three pages: an English-speaking admin typing "One mixed-age group" put those
+// English words on the Hebrew and Russian pages, where every other sentence in
+// the same card was translated. It is words, so it is a { he, en, ru } bag.
+const OVERRIDE = { he: 'קבוצה אחת מעורבת', en: 'One mixed-age group', ru: 'Одна смешанная группа' };
+H.eq(F.formatGroupSize({ groups: 2, maxPerGroup: 7, overrideText: OVERRIDE }, 'en'),
      'One mixed-age group', 'a filled override replaces the computed sentence outright');
-H.eq(F.formatGroupSize({ groups: 2, maxPerGroup: 7, overrideText: '   ' }, 'en'),
+H.eq(F.formatGroupSize({ groups: 2, maxPerGroup: 7, overrideText: OVERRIDE }, 'he'),
+     'קבוצה אחת מעורבת', 'and each language gets its own words, not the first one typed');
+H.eq(F.formatGroupSize({ groups: 2, maxPerGroup: 7, overrideText: OVERRIDE }, 'ru'),
+     'Одна смешанная группа', 'including Russian, which the single-string version could never reach');
+H.eq(F.formatGroupSize({ groups: 2, maxPerGroup: 7, overrideText: { he: '   ', en: '', ru: '' } }, 'en'),
      F.formatGroupSize({ groups: 2, maxPerGroup: 7 }, 'en'),
      'whitespace is blank, so it falls through rather than publishing an empty fact');
-H.eq(F.formatGroupSize({ overrideText: 'קבוצה אחת מעורבת' }, 'he'), 'קבוצה אחת מעורבת',
+H.eq(F.formatGroupSize({ overrideText: OVERRIDE }, 'he'), 'קבוצה אחת מעורבת',
      'and it works with no numbers at all behind it');
+
+// An override half-translated shows the words that ARE there rather than the
+// computed line. Two pages saying the same thing in one language beats two
+// pages making different claims about how the activity is grouped.
+const HE_ONLY = { he: 'קבוצה אחת מעורבת', en: '', ru: '' };
+['he', 'en', 'ru'].forEach((lang) => {
+  H.eq(F.formatGroupSize({ groups: 2, maxPerGroup: 7, overrideText: HE_ONLY }, lang),
+       'קבוצה אחת מעורבת',
+       lang + ': an untranslated override still overrides, following the site-wide fallback');
+});
+
+// A record written before the field was split still holds a bare string, and
+// migrate() is what turns it into a bag. Both halves are pinned: the formatter
+// reads a legacy string directly, and the migration puts it where Hebrew is.
+H.eq(F.formatGroupSize({ overrideText: 'קבוצה אחת מעורבת' }, 'he'), 'קבוצה אחת מעורבת',
+     'a pre-split single string is still published, so no page blanks mid-migration');
+const migratedOverride = require('../netlify/functions/_activity-migrate')
+  .migrate({ slug: 'x', facts: { groupSize: { overrideText: 'קבוצה אחת מעורבת' } } })
+  .facts.groupSize.overrideText;
+H.eq(migratedOverride.he, 'קבוצה אחת מעורבת', 'and migrating it lands the words in Hebrew');
+H.eq(migratedOverride.en + migratedOverride.ru, '',
+     'never copied into the other two, which would claim a translation that was never made');
 
 console.log('\n[the sidebar, in order, with empties dropped]');
 const rows = F.sidebarRows(ACT, 'he');
