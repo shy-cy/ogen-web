@@ -65,7 +65,7 @@
     },
     "groupSize": {
       "groups": 2,
-      "maxPerGroup": 7,
+      "maxPerGroup": 10,
       "overrideText": "",
       "legacyText": {
         "he": "שתי קבוצות של 7 תלמידים",
@@ -123,9 +123,9 @@
     {
       "id": "tea-mtd1nrnl-2",
       "name": {
-        "he": "עירית",
-        "en": "Irit",
-        "ru": "Irit"
+        "he": "עירית ברגר-רוז׳נסקי",
+        "en": "Irit Berger-Rozanski",
+        "ru": "Irit Berger-Rozanski"
       },
       "photo": "/images/activities/hebrew4kids-teachers-tea-mtd1nrnl-2-d7d689bb.gif"
     }
@@ -134,18 +134,18 @@
     {
       "id": "spo-mtd1o2lk-3",
       "name": {
-        "he": "היסתדרות הציונית",
-        "en": "",
-        "ru": ""
+        "he": "ההסתדרות הציוניות העולמית",
+        "en": "World Zionist Organization",
+        "ru": "Всемирная сионистская организация"
       },
       "logo": "/images/activities/hebrew4kids-sponsors-spo-mtd1o2lk-3.png"
     }
   ],
-  "isoUpdated": "2026-09-06T13:55:21.576Z",
+  "isoUpdated": "2026-09-08T15:23:41.401Z",
   "isoCreated": "2026-08-28T14:55:38.930Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
-  "lastPublishedAt": "2026-09-06T13:55:21.576Z",
+  "lastPublishedAt": "2026-09-08T15:23:41.401Z",
   "factVisibility": {
     "ages": "public",
     "schedule": "public",
