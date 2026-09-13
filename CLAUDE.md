@@ -793,22 +793,28 @@ headers to error responses, so a transient 404 under a long immutable cache
 becomes permanent. Uploads do not need `immutable` to cache well — the content
 hash means anything unchanged keeps its URL and revalidates to a 304.
 
-⚠ **Cloudflare currently overrides all of this, and the rule above is not in
-force at the edge.** `www.ogen.cy` is proxied through Cloudflare, whose Browser
-Cache TTL raises any origin header shorter than four hours to exactly four
-hours. Measured origin against edge: `/images/activities/*` leaves Netlify as
-`max-age=300` and reaches a browser as `max-age=14400`; `/shared.css` leaves as
-`max-age=0` and arrives the same way; `no-cache` on the admin scripts arrives as
-`max-age=14400` too. Anything **longer** than four hours survives, which is why
-`immutable` on `/images/*` still holds, and HTML is untouched, which is why
-`/admin/*.html` keeps its `no-cache`.
+⚠ **`www.ogen.cy` is proxied through Cloudflare, so measure cache behaviour
+against the domain, never against `ogen-web.netlify.app`.** A CDN sits between
+this repo's headers and a visitor, and for a while it was rewriting them:
+Cloudflare's Browser Cache TTL raises any origin header shorter than its setting
+up to that setting, and at the four-hour default `/images/activities/*` left
+Netlify as `max-age=300` and reached a browser as `max-age=14400`, `/shared.css`
+left as `max-age=0` and arrived the same way, and `no-cache` on the admin scripts
+arrived as `max-age=14400`. Only headers **longer** than four hours survived.
 
-So the transient-404 window is four hours rather than five minutes, and a
-stylesheet change takes up to four hours to reach a returning visitor. The fix
-is one setting in Cloudflare, not in this repo: **Caching → Configuration →
-Browser Cache TTL → "Respect Existing Headers"**. Until that changes, do not
-trust a `Cache-Control` shorter than four hours to mean anything for a visitor,
-and measure cache behaviour against `www.ogen.cy`, not against the origin.
+Browser Cache TTL is now **"Respect Existing Headers"** and all five paths were
+re-measured origin against edge: every one arrives unchanged, with
+`server: cloudflare` and a `cf-ray` still on the response, so this is the proxy
+passing headers through rather than the proxy being gone. The five-minute
+transient-404 window on `/images/activities/*` is real again, and a stylesheet
+change reaches a returning visitor immediately.
+
+That setting is one click and is not in this repository, so it can be changed
+back without anything here failing. Re-measure both hosts before trusting a
+short `Cache-Control`, and note the edge keeps its own copy independently of
+this — `cf-cache-status` and `age` describe Cloudflare's cache, not the
+browser's, and `max-age=0, must-revalidate` correctly shows as `REVALIDATED`
+rather than as a miss.
 
 The paragraph above used to end by saying this rule was "verified against the
 deployed site, not assumed from the documentation". It had been verified against
