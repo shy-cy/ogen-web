@@ -1,6 +1,8 @@
 [
   {
     "slug": "hebrew4kids",
+    "activityId": "act-ac164520eacd1b92",
+    "type": "course",
     "status": "announcement",
     "langs": [
       "he",

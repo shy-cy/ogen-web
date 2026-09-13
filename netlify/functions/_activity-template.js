@@ -14,7 +14,7 @@
 // bare string. Section headings and sidebar labels are NOT admin-editable —
 // they are fixed per language and live in LABELS below.
 
-const { sidebarGroups, factPriceRows } = require('./_activity-facts');
+const { sidebarGroups, factPriceRows, sessionRows, SESSION_TABLE } = require('./_activity-facts');
 
 // Sidebar group icons. Lucide, drawn white inside a solid circle, which is the
 // site's icon rule. The circle is 34px rather than the 56px used for section
@@ -382,6 +382,43 @@ ${JSON.stringify(credits, null, 2)}
   const asideCards = [cards.price].filter(Boolean).join('\n');
   const creditsBand = creditsCard ? `    <div class="activity-credits">\n${creditsCard}\n    </div>\n` : '';
 
+  // THE SESSION CALENDAR. The schedule card says "Wednesdays, 16:00" and goes on
+  // saying it; what it cannot say is WHICH Wednesdays, and a family planning a
+  // term needs the dates.
+  //
+  // One source, two readers: this is the same facts.duration.sessionDates the
+  // cancellation arithmetic divides by, so the table cannot disagree with what a
+  // refund is priced against. There is no second calculation anywhere.
+  //
+  // Excluded dates are not here at all — no marked row, no "no class", no gap
+  // acknowledged. The page says when the class meets, not when it does not, and
+  // that also makes this list EXACTLY the one the credit arithmetic uses: if
+  // nothing skipped is shown, nothing skipped can take a number, so session 3 is
+  // the third row and the third meeting with no rule saying so.
+  //
+  // An activity with no calendar renders no table, the same as the card image
+  // and for the same reason: an empty frame is worse than no frame. A one-off,
+  // a custom schedule written as prose, or an activity nobody has finished
+  // configuring all fall through to the summary in the fact card.
+  const sessionList = sessionRows((activity.facts || {}).duration, lang);
+  const T = SESSION_TABLE[lang] || SESSION_TABLE.en;
+  const sessionsBand = sessionList.length
+    ? `    <div class="activity-sessions">
+      <div class="fact-card session-columns" data-group="sessions">
+        <div class="session-split">
+          <table class="session-table">
+            <caption>${esc(T.caption)}</caption>
+            <thead><tr>${T.cols.map((c) => `<th scope="col">${esc(c)}</th>`).join('')}</tr></thead>
+            <tbody>
+${sessionList.map((r) => `              <tr><td>${esc(String(r.n))}</td><td>${esc(r.day)}</td><td>${esc(r.date)}</td></tr>`).join('\n')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+`
+    : '';
+
   // The activity's own picture, at the head of the aside column with the facts
   // panel beneath it — two stacked cards rather than one. It is the same square
   // image the listing cards use, so an activity is recognisable from the listing
@@ -459,7 +496,7 @@ ${faqBlock}    </div>
 ${asideCards}
       <div data-status-cta></div>
     </div>
-${creditsBand}  </div>
+${sessionsBand}${creditsBand}  </div>
 </article>
 
 <script src="/js/nav.js"></script>

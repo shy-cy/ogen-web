@@ -15,6 +15,8 @@
 // already-migrated record returns the same record.
 
 const { FACT_ORDER, TEXT_FACTS, DEFAULT_VISIBILITY, num } = require('./_activity-facts');
+const sessionsModule = require('./_activity-sessions');
+const registration = require('./_activity-registration');
 
 const LANGS = ['he', 'en', 'ru'];
 
@@ -58,18 +60,52 @@ function parseAgeRange(langObj) {
 
 const SHAPES = {
   ages: (f) => ({ min: num(f.min), max: num(f.max) }),
-  schedule: (f) => ({
-    frequency: ['one-time', 'weekly', 'twice-weekly', 'custom'].indexOf(f.frequency) !== -1
-      ? f.frequency : 'weekly',
-    sessions: (Array.isArray(f.sessions) ? f.sessions : [])
-      .map((s) => ({ day: num(s && s.day), time: String((s && s.time) || '').trim() }))
-      .filter((s) => s.day != null || s.time)
-  }),
+  // The frequency list is taken FROM the calendar module rather than repeated
+  // here. It was repeated, and it fell behind: biweekly and monthly could be
+  // enumerated and rendered, and a save coerced either of them back to weekly,
+  // silently changing what the page said the moment an admin pressed publish.
+  schedule: (f) => {
+    const out = {
+      frequency: sessionsModule.FREQUENCIES.indexOf(f.frequency) !== -1 ? f.frequency : 'weekly',
+      sessions: (Array.isArray(f.sessions) ? f.sessions : [])
+        .map((s) => ({ day: num(s && s.day), time: String((s && s.time) || '').trim() }))
+        .filter((s) => s.day != null || s.time)
+    };
+    // Which week of the month a monthly activity meets in. 'last' is a real
+    // option rather than an error state: a month with only four of a weekday
+    // uses the last one instead of inventing a fifth.
+    if (out.frequency === 'monthly') {
+      out.weekOfMonth = f.weekOfMonth === 'last' ? 'last' : (num(f.weekOfMonth) || 1);
+    }
+    return out;
+  },
   duration: (f) => ({
     startDate: isoDate(f.startDate),
     endDate: isoDate(f.endDate),
     sessionCount: num(f.sessionCount),
-    sessionMinutes: num(f.sessionMinutes)
+    sessionMinutes: num(f.sessionMinutes),
+    // THE CALENDAR SURVIVES A SAVE. This shape is applied to every record on
+    // every read and every save, so a key missing from it is a key deleted the
+    // next time an admin presses save. sessionDates was missing: the calendar
+    // module could generate it, the facts module could render it, and any save
+    // silently threw it away.
+    //
+    // `reason` is an admin note on an excluded date and is deliberately never
+    // published — the page lists the sessions that are happening and nothing
+    // else, so a reason has no reader on the public side.
+    sessionDates: (Array.isArray(f.sessionDates) ? f.sessionDates : [])
+      .map((r) => {
+        const date = isoDate(r && r.date);
+        if (!date) return null;
+        const row = { date: date, status: (r && r.status) === 'excluded' ? 'excluded' : 'scheduled' };
+        const time = String((r && r.time) || '').trim();
+        if (time) row.time = time;
+        const reason = String((r && r.reason) || '').trim();
+        if (reason) row.reason = reason.slice(0, 200);
+        return row;
+      })
+      .filter(Boolean)
+      .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
   }),
   // The override is WORDS, so it is a { he, en, ru } bag like every other
   // sentence on this site — the numbers beside it render in three languages and
@@ -77,14 +113,38 @@ const SHAPES = {
   // `he`, which is what a pre-trilingual override was: one line typed by a
   // Hebrew-first admin. The other two fall back to the computed sentence, which
   // is the honest reading of "this has not been translated yet".
-  groupSize: (f) => ({ groups: num(f.groups), maxPerGroup: num(f.maxPerGroup),
-                       overrideText: langObject(f.overrideText) }),
+  groupSize: (f) => {
+    const out = { groups: num(f.groups), maxPerGroup: num(f.maxPerGroup),
+                  overrideText: langObject(f.overrideText) };
+    // Named groups are OPT-IN. Absent or empty means the pooled model, exactly
+    // as before, and nothing anywhere asks about groups. Present, `groups` and
+    // the capacity become derived from this list — see formatGroupSize().
+    //
+    // The name is a { he, en, ru } bag because it is words a family reads: a
+    // role permitted to edit only Russian must be able to translate "Advanced"
+    // and must not be able to change its capacity from ten to twenty. Putting
+    // the list inside the fact draws that line by where the field sits rather
+    // than by a rule someone has to remember.
+    const named = (Array.isArray(f.named) ? f.named : [])
+      .map((g) => ({
+        groupId: String((g && g.groupId) || '').trim().slice(0, 40),
+        name: langObject(g && g.name),
+        capacity: num(g && g.capacity)
+      }))
+      .filter((g) => g.groupId);
+    if (named.length) out.named = named;
+    return out;
+  },
   location: (f) => ({ text: langObject(f.text) }),
   address: (f) => ({ text: langObject(f.text) }),
   price: (f) => ({
     registrationFee: num(f.registrationFee),
     fullPrice: num(f.fullPrice),
     perHourOverride: num(f.perHourOverride),
+    // What one session costs on a pay-per-session activity. It is the drop-in
+    // counterpart of fullPrice, not an extra line beside it: a course quotes
+    // the term and derives the per-lesson cost, a drop-in quotes the session.
+    perSessionPrice: num(f.perSessionPrice),
     // Absent means off. Normalised to a real boolean so the checkbox has
     // something to bind to and a save cannot write undefined back.
     showPerLesson: f.showPerLesson === true
@@ -143,9 +203,46 @@ function normaliseVisibility(raw, preAddress) {
 
 // --- the migration ---------------------------------------------------------
 
-function migrate(record) {
+// MINTING AN ID INSIDE A PURE FUNCTION, without making it impure.
+//
+// The design says migrate() mints an activityId for any record lacking one,
+// idempotently. Those two words pull against each other: an id is random, and a
+// function that invents a random value returns something different every time it
+// is called on the same input, which is the opposite of idempotent — and this
+// module's whole contract is that it is pure and safe to run on every read.
+//
+// So the randomness is injected. migrate(record) leaves a record without an id
+// exactly as it found it; migrate(record, { mintId }) fills one in. The caller
+// that saves passes a real minter, every other caller passes nothing, and
+// running migrate twice over the SAME record is still a no-op because the second
+// pass finds the id the first one wrote.
+//
+// Nothing reads activityId yet. It exists now because minting it while there are
+// no registrations costs one field, and minting it afterwards costs a migration
+// across every store that points at an activity.
+function migrate(record, options) {
   if (!record || typeof record !== 'object') return record;
   const out = JSON.parse(JSON.stringify(record));
+  const mintId = options && typeof options.mintId === 'function' ? options.mintId : null;
+
+  // The slug is the filename, the URL and the sitemap entry, so today it is the
+  // activity's identity — and renaming one would orphan everything attached to
+  // it. This is the same failure email-as-identity causes on the sister project,
+  // where it is being unpicked across five migration phases.
+  //
+  // Never editable and never regenerated: an existing id is left exactly as it
+  // is, whatever an incoming request claims. Delete-and-recreate deliberately
+  // produces a NEW id, because that is a different activity and old
+  // registrations should not silently attach to it.
+  const existingId = String(out.activityId || '').trim();
+  if (existingId) out.activityId = existingId;
+  else if (mintId) out.activityId = mintId();
+  else delete out.activityId;
+
+  // One answer for all three languages, like robots and shareImage. Absent
+  // means course, which is what every activity written before this field
+  // existed was.
+  out.type = registration.normaliseType(out.type);
   // Read from the RAW record, before normaliseFacts() gives every record an
   // (empty) address fact and the question becomes unanswerable.
   const preAddress = !(record.facts && record.facts.address);
@@ -201,6 +298,11 @@ function migrate(record) {
 
   out.facts = normaliseFacts(facts);
   out.factVisibility = normaliseVisibility(out.factVisibility, preAddress);
+
+  // Registration settings. Normalised AFTER the facts, because the drop-in
+  // branch of the shape reads `type` and nothing here may depend on a fact that
+  // has not been canonicalised yet.
+  out.registration = registration.normaliseRegistration(out.registration, out.type);
 
   // One source of truth: now that these live in facts, the top-level copies go,
   // or the next save would resurrect the old values.

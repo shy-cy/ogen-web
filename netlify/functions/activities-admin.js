@@ -36,15 +36,43 @@ const {
   num, pricePerHour
 } = require('./_activity-facts');
 const { migrate, normaliseFacts, normaliseVisibility, SHAPES } = require('./_activity-migrate');
+const SESSIONS = require('./_activity-sessions');
+const REG = require('./_activity-registration');
 
 // How many day+time rows a frequency asks for. 'custom' means "as many as the
 // admin adds", so it has no fixed count.
+// Every frequency the calendar module can enumerate, plus custom, which it
+// cannot — `custom` is whatever the admin typed, which is why it has no
+// generator and why prorated cancellation has to refuse it.
+//
+// `generates` says whether "Generate sessions" can build a calendar from this.
+// It is read from _activity-sessions rather than repeated, because a list of
+// frequencies repeated in two files is a list that falls out of step, and this
+// one already had: biweekly and monthly could be enumerated and rendered while
+// this array coerced both back to weekly on save.
 const FREQUENCIES = [
   { key: 'one-time', label: 'One time', sessions: 1 },
   { key: 'weekly', label: 'Weekly', sessions: 1 },
+  { key: 'biweekly', label: 'Every other week', sessions: 1 },
   { key: 'twice-weekly', label: 'Twice weekly', sessions: 2 },
+  { key: 'monthly', label: 'Monthly', sessions: 1 },
   { key: 'custom', label: 'Custom', sessions: null }
+].map((f) => Object.assign({ generates: SESSIONS.GENERATED.indexOf(f.key) !== -1 }, f));
+
+// Which week of the month a monthly activity meets in. 'last' clamps rather
+// than failing on a month with only four of that weekday.
+const WEEKS_OF_MONTH = [
+  { key: 1, label: 'First week' }, { key: 2, label: 'Second week' },
+  { key: 3, label: 'Third week' }, { key: 4, label: 'Fourth week' },
+  { key: 5, label: 'Fifth week' }, { key: 'last', label: 'Last week' }
 ];
+
+// act- so it is recognisable at a glance beside the a- and p- prefixes the
+// account and participant ids will use, with no lookup needed to tell what a
+// key refers to. Sixteen hex characters from the system CSPRNG: this is an
+// identifier rather than a secret, but it is also permanent and public, and
+// Math.random() collides far sooner than its output length suggests.
+const mintActivityId = () => 'act-' + require('crypto').randomBytes(8).toString('hex');
 
 const TOOL = 'activities';
 const DRAFT_STORE = 'activity-drafts';
@@ -103,7 +131,44 @@ const FIELD_SCHEMA = {
       hint: 'Street address. Members-only: it is NOT published on the page, and will not be until a members area exists' },
     { key: 'price', label: 'Price', kind: 'price' }
   ],
+  // The Registration panel, between Activity facts and Search & sharing. None
+  // of these is words: one answer serves all three languages, exactly like
+  // robots and shareImage, so they merge as STRUCTURE and must never enter
+  // SIMPLE_KEYS — that list is the translatable scalars, and a role permitted
+  // to edit only Russian must not be able to move a cutoff date on the Hebrew
+  // page.
+  //
+  // `types` says which activity types draw a field. A group the form did not
+  // draw is not read back and is not merged, so switching a course to a drop-in
+  // and back does not clear the term price — absent must mean "this type did
+  // not send it", never "the admin emptied it".
+  registration: [
+    { key: 'autoApprove', kind: 'check', label: 'Approve registrations automatically',
+      hint: 'Off means every request waits for an admin. An out-of-range age always waits, whatever this says.' },
+    { key: 'pendingExpiryDays', kind: 'days', label: 'Unanswered requests expire after',
+      unit: 'days',
+      hint: 'Counted from each family\'s own submission. Leave blank to use the site default (' +
+            REG.DEFAULT_EXPIRY_DAYS + ' days).' },
+    { key: 'registrationFeeCutoffDate', kind: 'cutoff', types: ['course'],
+      label: 'Registration fee stops being creditable on',
+      hint: 'One date, the same for every family however late they registered. Pre-filled to ' +
+            REG.FEE_CUTOFF_DAYS + ' days before the start date.' },
+    { key: 'cancellationPolicy.mode', kind: 'mode', types: ['course'],
+      label: 'How a cancellation is credited',
+      hint: 'Flat credits a fixed share. Prorated divides the sessions remaining by the sessions total, and needs a session calendar.' },
+    { key: 'cancellationPolicy.cancellationCutoffDate', kind: 'cutoff', types: ['course'],
+      label: 'Nothing is creditable after',
+      hint: 'Pre-filled to the date of session ' + Math.round(REG.CANCEL_FRACTION * 100) + '% of the way through.' },
+    { key: 'sessionCancelHours', kind: 'days', types: ['dropin'], unit: 'hours',
+      label: 'A session can be cancelled up to',
+      hint: 'Before it starts. Leave blank to allow cancelling right up to the start time.' }
+  ],
+  types: REG.TYPES,
+  cancellationModes: REG.CANCELLATION_MODES,
+  cutoffOff: REG.OFF,
+  defaultExpiryDays: REG.DEFAULT_EXPIRY_DAYS,
   frequencies: FREQUENCIES,
+  weeksOfMonth: WEEKS_OF_MONTH,
   visibilities: ['public', 'members'],
   defaultVisibility: DEFAULT_VISIBILITY,
   academicMinutes: ACADEMIC_MINUTES,
@@ -433,13 +498,29 @@ function mergeByPermission(current, incoming, session) {
     if (incoming.robots !== undefined) {
       out.robots = ROBOTS.indexOf(incoming.robots) !== -1 ? incoming.robots : 'index';
     }
+    // Which kind of activity this is, and everything the registration system
+    // will read off it. Structure, so a restricted role keeps the stored values
+    // below rather than sending them.
+    if (incoming.type !== undefined) out.type = REG.normaliseType(incoming.type);
+    if (incoming.registration !== undefined) {
+      out.registration = REG.normaliseRegistration(incoming.registration, REG.normaliseType(out.type));
+    }
     out.ctaUrl = langObject(incoming.ctaUrl !== undefined ? incoming.ctaUrl : out.ctaUrl);
   } else {
     out.cardImage = (base && base.cardImage) || null;
     out.shareImage = (base && base.shareImage) || null;
     out.robots = (base && base.robots) || 'index';
     out.ctaUrl = langObject(out.ctaUrl);
+    out.type = REG.normaliseType(base && base.type);
+    out.registration = REG.normaliseRegistration(base && base.registration, out.type);
   }
+
+  // NEVER from the incoming request, at any permission level. The id is the
+  // thing registrations will point at, so a client able to change it is a client
+  // able to reattach one activity's registrations to another. It is minted once
+  // by stamp() and only ever copied forward from the stored record.
+  if (base && base.activityId) out.activityId = base.activityId;
+  else delete out.activityId;
 
   SIMPLE_KEYS.forEach((k) => { out[k] = mergeLang(base && base[k], incoming[k]); });
   // The rich fields are markup, and the page prints that markup as markup.
@@ -550,6 +631,10 @@ function validate(activity) {
         "It is not the button's wording — the status decides that.");
     }
   });
+  // The registration settings, refused on save rather than accepted and found
+  // to be unusable at the moment a family is cancelling.
+  REG.validateRegistration(activity).forEach((m) => errors.push(m));
+
   if (errors.length) {
     const err = new Error(errors[0]);
     err.validation = errors;
@@ -671,11 +756,21 @@ exports.handler = async (event) => {
     return json(403, { error: 'Your role does not have access to Activities' });
   }
 
+  // The single place a save marks a record, which makes it the single place the
+  // two things a save must do to the registration block can live.
   const stamp = (record) => {
     record.isoUpdated = new Date().toISOString();
     record.isoCreated = record.isoCreated || record.isoUpdated;
     record.lastEditedBy = session.email;
     record.lastEditedByName = session.name;
+    // Minted here rather than in migrate(), which is pure and must stay so: an
+    // id is random, and a pure function that invents one is not idempotent.
+    // Only ever filled in when absent.
+    if (!record.activityId) record.activityId = mintActivityId();
+    // Fill a blank cutoff, never overwrite a value that is there. On save
+    // rather than on create, because at create time the dates these are
+    // computed from have usually not been typed yet.
+    record.registration = REG.defaultIfBlank(record);
     return record;
   };
 

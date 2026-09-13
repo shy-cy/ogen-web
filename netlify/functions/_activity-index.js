@@ -29,6 +29,15 @@ const STATIC_ROUTES = [
 function indexEntry(a) {
   return {
     slug: a.slug,
+    // The public registration form will know only the slug, from the URL, and
+    // registrations key off the id. Publishing it here makes slug -> id a
+    // lookup in a file the page already fetches rather than a round trip to a
+    // function. It is an opaque identifier, not a secret: it names an activity
+    // that is already public and grants nothing on its own.
+    activityId: a.activityId || null,
+    // What KIND of activity, so a listing or a form can tell a semester course
+    // from a pay-per-session one without opening the record.
+    type: a.type || 'course',
     status: a.status,
     langs: langsPresent(a),
     title: a.title,

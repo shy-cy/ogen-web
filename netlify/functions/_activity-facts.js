@@ -265,8 +265,18 @@ function sessionRows(f, lang) {
     const date = lang === 'he' ? `${dayNum} ב${months[mi]}`
                : lang === 'ru' ? `${dayNum} ${MONTHS_RU_GEN[mi]}`
                : `${dayNum} ${months[mi]}`;
-    out.push({ n: out.length + 1, label: `${label} ${out.length + 1}`, day: names[day], date: date });
+    out.push({ n: out.length + 1, label: `${label} ${out.length + 1}`, day: names[day],
+               date: date, year: m[1] });
   });
+  // No year in the rows, because the date range is already on the page two
+  // blocks up as the duration fact, and a second place to print the same two
+  // dates is a second place for one of them to be wrong. The exception is a
+  // course running December into January, where a bare "6 January" genuinely
+  // does not say which year — so the year appears only when the sessions span
+  // more than one.
+  const years = out.map((r) => r.year).filter((y, i, a) => a.indexOf(y) === i);
+  if (years.length > 1) out.forEach((r) => { r.date = `${r.date} ${r.year}`; });
+  out.forEach((r) => { delete r.year; });
   return out;
 }
 
@@ -334,6 +344,43 @@ function formatDuration(f, lang) {
   return [range, rest].filter(Boolean).join('\n');
 }
 
+// The groups an activity has named, if any. Empty means the pooled model, which
+// is what every activity had before this existed and what most still want: two
+// groups meeting at the same hour, and which one a child lands in is the
+// teacher's business. Named groups are for the case where the family chooses.
+function namedGroups(f) {
+  const list = f && Array.isArray(f.named) ? f.named : [];
+  return list.filter((g) => g && g.groupId);
+}
+
+// "Beginners, up to 7". A group with no capacity is still named — the name is
+// the part a family chooses by, and an unfilled number should not delete it.
+function namedGroupLine(g, lang) {
+  const name = pick(g.name, lang);
+  if (!name) return '';
+  const cap = num(g.capacity);
+  if (cap == null || cap <= 0) return name;
+  if (lang === 'he') return `${name}, עד ${cap} תלמידים`;
+  if (lang === 'ru') return `${name}, до ${cap} ${ruPlural(cap, 'ученика', 'учеников', 'учеников')}`;
+  return `${name}, up to ${cap} ${cap === 1 ? 'student' : 'students'}`;
+}
+
+// How many places an activity has in total. The product for a pooled activity,
+// the sum of the named capacities when it has them. Null means uncapped, which
+// is deliberately NOT zero: defaulting a missing number to zero would silently
+// refuse every registration for an activity nobody had finished filling in.
+function totalCapacity(f) {
+  const named = namedGroups(f);
+  if (named.length) {
+    const caps = named.map((g) => num(g.capacity)).filter((c) => c != null && c > 0);
+    return caps.length === named.length ? caps.reduce((a, b) => a + b, 0) : null;
+  }
+  const groups = num(f && f.groups);
+  const per = num(f && f.maxPerGroup);
+  if (groups == null || per == null || groups <= 0 || per <= 0) return null;
+  return groups * per;
+}
+
 function formatGroupSize(f, lang) {
   // A filled-in override replaces the computed sentence outright, the same shape
   // perHourOverride already has on price: some groupings are not "N groups of up
@@ -348,6 +395,17 @@ function formatGroupSize(f, lang) {
   // than the Hebrew one, which is the failure this override exists to avoid.
   const override = pick(f && f.overrideText, lang);
   if (override) return override;
+
+  // NAMED GROUPS, when an activity has them, replace the counted sentence
+  // rather than being appended to it. "2 groups / up to 7 per group" and
+  // "Beginners, up to 7 · Advanced, up to 10" are the same fact told two ways,
+  // and maxPerGroup stops meaning anything the moment two groups differ.
+  //
+  // This is the single place a group size becomes words, the way priceRows() is
+  // for money, so the derived form costs nothing downstream: no arithmetic
+  // reads `groups`, the price does not, and capacity is the one consumer.
+  const named = namedGroups(f);
+  if (named.length) return named.map((g) => namedGroupLine(g, lang)).filter(Boolean).join('\n');
 
   const groups = num(f.groups);
   const per = num(f.maxPerGroup);
@@ -397,10 +455,16 @@ function academicHours(duration) {
 function pricePerHour(price, duration) {
   const override = num(price && price.perHourOverride);
   if (override != null) return { value: override, source: 'override' };
+  // A drop-in has no term price, so the academic-hour cost comes from the
+  // session price instead. Same function, one more source: the arithmetic is
+  // "what one meeting costs, divided by the lessons in it" either way, and the
+  // only thing that differs is which figure was typed and which was derived.
   const full = num(price && price.fullPrice);
-  const hours = academicHours(duration);
-  if (full == null || full <= 0 || hours == null || hours <= 0) return null;
-  const raw = full / hours;
+  const per = num(price && price.perSessionPrice);
+  const hours = full != null && full > 0 ? academicHours(duration) : lessonsPerSession(duration);
+  const basis = full != null && full > 0 ? full : per;
+  if (basis == null || basis <= 0 || hours == null || hours <= 0) return null;
+  const raw = basis / hours;
   // Two decimals at most, and no trailing ".00" on a round number.
   return { value: Math.round(raw * 100) / 100, source: 'computed' };
 }
@@ -460,11 +524,13 @@ function priceRows(f, lang, duration) {
   const hasFull = full != null && full > 0;
 
   const L = {
-    he: { fee: 'דמי הרשמה לשנה', lesson: 'עלות לשיעור', term: 'עלות לסמסטר',
+    he: { fee: 'דמי הרשמה לשנה', lesson: 'עלות לשיעור', term: 'עלות לסמסטר', perSession: 'עלות למפגש',
           session: ['מפגש', 'מפגשים'], unit: ['שיעור', 'שיעורים'] },
     en: { fee: 'Yearly registration fee', lesson: 'Cost per lesson', term: 'Cost per semester',
+          perSession: 'Cost per session',
           session: ['session', 'sessions'], unit: ['lesson', 'lessons'] },
-    ru: { fee: 'Годовой регистрационный взнос', lesson: 'Стоимость урока', term: 'Стоимость семестра' }
+    ru: { fee: 'Годовой регистрационный взнос', lesson: 'Стоимость урока', term: 'Стоимость семестра',
+          perSession: 'Стоимость занятия' }
   }[lang] || null;
   if (!L) return [];
   const row = (label, value, note) => ({ label, note: note || '', value });
@@ -476,6 +542,19 @@ function priceRows(f, lang, duration) {
   // the card does not price a course by the academic hour.
   const per = showPerLesson(f) ? pricePerHour(f, duration) : null;
   if (per) rows.push(row(L.lesson, money(per.value)));
+
+  // A pay-per-session activity quotes the meeting. It is the drop-in
+  // counterpart of the term price rather than an extra line beside one, so it
+  // sits in the same slot and carries no "(N sessions × M lessons)" qualifier:
+  // that hangs off fullPrice, which a drop-in does not have, so it disappears
+  // on its own without being told to.
+  //
+  // Nothing here asks what TYPE the activity is. The row is conditional on the
+  // figure behind it, exactly like every other row, so an activity renders
+  // whichever prices it actually carries. That is why a second content type was
+  // not needed: the price card was already built this way.
+  const perSession = num(f.perSessionPrice);
+  if (perSession != null && perSession > 0) rows.push(row(L.perSession, money(perSession)));
 
   if (hasFull) {
     const sessions = num(duration && duration.sessionCount);
@@ -612,6 +691,7 @@ function sidebarGroups(activity, lang) {
 }
 
 module.exports = {
+  namedGroups, namedGroupLine, totalCapacity,
   FACT_ORDER, TEXT_FACTS, STRUCTURED_FACTS, DEFAULT_VISIBILITY,
   ACADEMIC_MINUTES, CURRENCY,
   num, pick, ruPlural, monthYear,

@@ -81,7 +81,9 @@ LANGS.forEach((lang) => {
 });
 // The stacked grid, from area names alone. The desktop map is asserted further
 // down, where the two rules it depends on are.
-H.ok(/"pic"\s*\n\s*"row"\s*\n\s*"main"\s*\n\s*"aside"\s*\n\s*"credits"/.test(css),
+// Source order is picture, cards, article, price, sessions, credits — and on a
+// phone the grid does not reorder it, which is the whole point of the areas.
+H.ok(/"pic"\s*\n\s*"row"\s*\n\s*"main"\s*\n\s*"aside"\s*\n\s*"sessions"\s*\n\s*"credits"/.test(css),
   'the stacked grid puts the picture first and the credits band last');
 // Scoped to the elements the layout places, not to a slice of the stylesheet:
 // an unrelated `.status-badge:empty{display:none}` sits between them and made a
@@ -114,6 +116,7 @@ const areas = (body.match(/grid-template-areas:([\s\S]*?);/) || [])[1] || '';
 H.ok(/"row\s+pic"/.test(areas), 'the picture shares row 1 with the fact cards');
 H.ok(/"row\s+aside"/.test(areas), 'and the fact row spans into row 2, where the aside starts');
 H.ok(/"main\s+aside"/.test(areas), 'the article sits below the cards, beside the aside');
+H.ok(/"sessions\s+sessions"/.test(areas), 'the session calendar is a full-width band of its own');
 H.ok(/"credits\s+credits"/.test(areas), 'and the credits band spans both columns');
 
 // 2. Without pinning the first two tracks, CSS grid shares a spanning item
@@ -121,8 +124,15 @@ H.ok(/"credits\s+credits"/.test(areas), 'and the credits band spans both columns
 //    under the picture. Nothing overflows and nothing errors; there is just a
 //    gap. So the value is pinned here, on comment-stripped CSS, because the
 //    comment above the rule says the words this searches for.
-H.ok(/grid-template-rows:\s*min-content min-content auto auto/.test(body),
+H.ok(/grid-template-rows:\s*min-content min-content auto auto auto/.test(body),
   'the first two grid rows are pinned to min-content');
+// The row list has to GROW with the areas. A fifth area with only four track
+// values reopens the same 117px hole, in the same silent way — so the count is
+// asserted rather than just the prefix, or the pin above would keep passing
+// while the thing it protects had quietly broken.
+const rowCount = ((body.match(/grid-template-rows:([^;]*);/) || ['', ''])[1].trim().split(/\s+/)).length;
+const areaCount = (areas.match(/"/g) || []).length / 2;
+H.eq(rowCount, areaCount, 'one grid-template-rows value per area row (' + areaCount + ' areas)');
 
 // 3. The fact row WRAPS from a per-card basis instead of switching direction at
 //    a viewport width. That is what keeps the two cards side by side on a
