@@ -263,3 +263,13 @@ input:disabled,textarea:disabled,select:disabled{background:#f2f0ea;color:#8b8b8
    touch screen. Baseline rather than centre, or a two-line label floats. */
 .check-row{ display:flex; align-items:baseline; gap:8px; cursor:pointer; font-weight:600; }
 .check-row input{ width:auto; margin:0; flex:none; }
+
+/* The session calendar. A date is not editable — it is generated — so it reads
+   as a value rather than sitting in a box that invites typing into it. */
+.session-date{
+  font-variant-numeric:tabular-nums; font-weight:600; padding:9px 0;
+}
+/* A date switched off keeps its place in the list, so it has to be legible as
+   "still here, not happening" rather than looking deleted. */
+.item.is-off{ opacity:.62; }
+.item.is-off .session-date{ text-decoration:line-through; }

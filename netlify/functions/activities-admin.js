@@ -142,27 +142,7 @@ const FIELD_SCHEMA = {
   // draw is not read back and is not merged, so switching a course to a drop-in
   // and back does not clear the term price — absent must mean "this type did
   // not send it", never "the admin emptied it".
-  registration: [
-    { key: 'autoApprove', kind: 'check', label: 'Approve registrations automatically',
-      hint: 'Off means every request waits for an admin. An out-of-range age always waits, whatever this says.' },
-    { key: 'pendingExpiryDays', kind: 'days', label: 'Unanswered requests expire after',
-      unit: 'days',
-      hint: 'Counted from each family\'s own submission. Leave blank to use the site default (' +
-            REG.DEFAULT_EXPIRY_DAYS + ' days).' },
-    { key: 'registrationFeeCutoffDate', kind: 'cutoff', types: ['course'],
-      label: 'Registration fee stops being creditable on',
-      hint: 'One date, the same for every family however late they registered. Pre-filled to ' +
-            REG.FEE_CUTOFF_DAYS + ' days before the start date.' },
-    { key: 'cancellationPolicy.mode', kind: 'mode', types: ['course'],
-      label: 'How a cancellation is credited',
-      hint: 'Flat credits a fixed share. Prorated divides the sessions remaining by the sessions total, and needs a session calendar.' },
-    { key: 'cancellationPolicy.cancellationCutoffDate', kind: 'cutoff', types: ['course'],
-      label: 'Nothing is creditable after',
-      hint: 'Pre-filled to the date of session ' + Math.round(REG.CANCEL_FRACTION * 100) + '% of the way through.' },
-    { key: 'sessionCancelHours', kind: 'days', types: ['dropin'], unit: 'hours',
-      label: 'A session can be cancelled up to',
-      hint: 'Before it starts. Leave blank to allow cancelling right up to the start time.' }
-  ],
+  registration: REG.FIELDS,
   types: REG.TYPES,
   cancellationModes: REG.CANCELLATION_MODES,
   cutoffOff: REG.OFF,
@@ -502,8 +482,11 @@ function mergeByPermission(current, incoming, session) {
     // will read off it. Structure, so a restricted role keeps the stored values
     // below rather than sending them.
     if (incoming.type !== undefined) out.type = REG.normaliseType(incoming.type);
+    // Field by field, keeping whatever this type's form did not draw. See
+    // mergeRegistration — absent must mean "this type did not send it".
     if (incoming.registration !== undefined) {
-      out.registration = REG.normaliseRegistration(incoming.registration, REG.normaliseType(out.type));
+      out.registration = REG.mergeRegistration(
+        base && base.registration, incoming.registration, out.type);
     }
     out.ctaUrl = langObject(incoming.ctaUrl !== undefined ? incoming.ctaUrl : out.ctaUrl);
   } else {
@@ -553,7 +536,11 @@ function mergeByPermission(current, incoming, session) {
       facts[key] = mergeLang(cur, inc);
       return;
     }
-    const merged = SHAPES[key] ? SHAPES[key](full ? inc : cur) : {};
+    // The same undrawn-field rule the registration block has, for the two price
+    // fields that are type-scoped: a course draws the term price and a drop-in
+    // draws the session price, and the one that was not drawn has to survive.
+    const incFact = full ? REG.keepUndrawnFactKeys(key, cur, inc, out.type) : cur;
+    const merged = SHAPES[key] ? SHAPES[key](incFact) : {};
     (LANG_SUBKEYS[key] || []).forEach((sub) => {
       merged[sub] = mergeLang(cur[sub], inc[sub]);
     });
@@ -738,6 +725,21 @@ async function generate(input, { commit, session, message, previous }) {
   return result;
 }
 
+// Does the generated calendar actually reach the stated end date? Returns a
+// sentence when it does not, and null when there is nothing to say.
+function reachesEnd(dates, duration) {
+  const end = duration && duration.endDate;
+  if (!dates.length || !end) return null;
+  const last = dates[dates.length - 1];
+  const typed = Number(duration.sessionCount);
+  if (last < end && typed > 0 && dates.length >= typed) {
+    return `The ${dates.length} sessions run out on ${last}, but the end date says ${end}. ` +
+      'Either the count is low, the end date is late, or there is a break week — worth ' +
+      'settling now rather than when a refund is being calculated.';
+  }
+  return null;
+}
+
 // --- handler ---------------------------------------------------------------
 
 exports.handler = async (event) => {
@@ -831,6 +833,40 @@ exports.handler = async (event) => {
         const merged = mergeByPermission(record, body.activity || {}, session);
         const out = await generate(merged, { commit: false, session });
         return json(200, { ok: true, dryRun: true, ...out });
+      }
+
+      // Generate the session calendar. A round trip rather than the same
+      // enumeration written again in the browser: the dates the admin edits
+      // here are the dates the page publishes and the dates a refund is priced
+      // against, and two implementations of that is one of them being wrong.
+      //
+      // It COMMITS NOTHING. The rows come back, the admin edits them, and they
+      // are saved with the rest of the record like any other field — so
+      // "generate once, then edit by hand" is literally what happens.
+      case 'sessions': {
+        const schedule = (body.schedule && typeof body.schedule === 'object') ? body.schedule : {};
+        const duration = (body.duration && typeof body.duration === 'object') ? body.duration : {};
+        const dates = SESSIONS.enumerate({
+          frequency: schedule.frequency,
+          sessions: schedule.sessions,
+          weekOfMonth: schedule.weekOfMonth,
+          startDate: duration.startDate,
+          endDate: duration.endDate,
+          // The typed count is a CAP, not the answer. An admin who says ten
+          // sessions and a span holding eleven gets ten; the calendar is then
+          // the source of truth and the count is derived from it.
+          limit: duration.sessionCount
+        });
+        return json(200, {
+          ok: true,
+          sessionDates: SESSIONS.mergeExclusions(dates, duration.sessionDates),
+          // Surfaced rather than silently resolved. hebrew4kids already says
+          // ten sessions across a span holding eleven, and nothing has ever
+          // read those two fields against each other — under prorated
+          // cancellation the disagreement decides how much money a family gets
+          // back, so it is shown to an admin while one is present.
+          note: reachesEnd(dates, duration)
+        });
       }
 
       case 'saveDraft': {

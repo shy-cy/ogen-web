@@ -265,10 +265,111 @@ function validateRegistration(activity) {
   return errors;
 }
 
+// --- the Registration panel ------------------------------------------------
+//
+// The panel descriptor lives HERE rather than in activities-admin.js, because
+// two things need to agree about which fields a type draws: the form, and the
+// merge that protects the fields it did not draw. Two lists would be one list
+// that falls out of step, and the way it would fail is silent — see
+// mergeRegistration below.
+//
+// `types` absent means every type draws it.
+const FIELDS = [
+    { key: 'autoApprove', kind: 'check', label: 'Approve registrations automatically',
+      hint: 'Off means every request waits for an admin. An out-of-range age always waits, whatever this says.' },
+    { key: 'pendingExpiryDays', kind: 'days', label: 'Unanswered requests expire after',
+      unit: 'days',
+      hint: 'Counted from each family\'s own submission. Leave blank to use the site default (' +
+            DEFAULT_EXPIRY_DAYS + ' days).' },
+    { key: 'registrationFeeCutoffDate', kind: 'cutoff', types: ['course'],
+      label: 'Registration fee stops being creditable on',
+      hint: 'One date, the same for every family however late they registered. Pre-filled to ' +
+            FEE_CUTOFF_DAYS + ' days before the start date.' },
+    { key: 'cancellationPolicy.mode', kind: 'mode', types: ['course'],
+      label: 'How a cancellation is credited',
+      hint: 'Flat credits a fixed share. Prorated divides the sessions remaining by the sessions total, and needs a session calendar.' },
+    { key: 'cancellationPolicy.cancellationCutoffDate', kind: 'cutoff', types: ['course'],
+      label: 'Nothing is creditable after',
+      hint: 'Pre-filled to the date of session ' + Math.round(CANCEL_FRACTION * 100) + '% of the way through.' },
+    { key: 'sessionCancelHours', kind: 'days', types: ['dropin'], unit: 'hours',
+      label: 'A session can be cancelled up to',
+      hint: 'Before it starts. Leave blank to allow cancelling right up to the start time.' }
+  ];
+
+// Does this type draw this field?
+const draws = (field, type) => !field.types || field.types.indexOf(normaliseType(type)) !== -1;
+
+// Which stored keys a field owns. The two nested ones are written with a dotted
+// key so the form can address them; this is the one place that mapping lives.
+function fieldPath(key) { return String(key).split('.'); }
+
+function getPath(obj, key) {
+  return fieldPath(key).reduce((o, k) => (o == null ? undefined : o[k]), obj);
+}
+function setPath(obj, key, value) {
+  const parts = fieldPath(key);
+  let node = obj;
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (!node[parts[i]] || typeof node[parts[i]] !== 'object') node[parts[i]] = {};
+    node = node[parts[i]];
+  }
+  node[parts[parts.length - 1]] = value;
+}
+
+// A GROUP THE FORM DID NOT DRAW IS NOT READ BACK AND IS NOT MERGED.
+//
+// This is the trap conditional panels bring, and it is a new version of one this
+// codebase already documents: the field renders, the admin types into it, the
+// save succeeds, and the value is gone. Here it is worse, because nobody typed
+// anything — switch an activity from course to drop-in, and the term cutoff
+// dates sit in a panel the form no longer draws, so the read-back sends nothing
+// for them and "nothing" would be merged as "cleared".
+//
+// Absent must mean "this type did not send it", never "the admin emptied it" —
+// the same distinction cardImage already draws, where a cleared image travels as
+// null and an unsent one is simply absent. Decided from the TYPE server-side
+// rather than from a list the client sends, so it needs no trust.
+//
+// Switch a course to a drop-in and back, and the term settings are still there.
+function mergeRegistration(base, incoming, type) {
+  const t = normaliseType(type);
+  const from = normaliseRegistration(base, t);
+  const to = normaliseRegistration(incoming, t);
+  const out = normaliseRegistration(base, t);
+  FIELDS.forEach((f) => {
+    if (draws(f, t)) setPath(out, f.key, getPath(to, f.key));
+    else setPath(out, f.key, getPath(from, f.key));
+  });
+  // Not a form field: it is stamped by defaultIfBlank and only ever read.
+  out.defaultBasis = from.defaultBasis || to.defaultBasis || null;
+  return normaliseRegistration(out, t);
+}
+
+// The same rule, for the two price fields that are type-scoped. A course quotes
+// the term and a drop-in quotes the session, so the form draws one of them —
+// and the other has to survive being undrawn exactly as the cutoffs do.
+const TYPE_SCOPED_FACT_KEYS = {
+  price: { fullPrice: ['course'], perSessionPrice: ['dropin'] }
+};
+
+// Patch an incoming fact with the stored value of anything this type does not
+// draw, before the canonical shape is applied.
+function keepUndrawnFactKeys(factKey, current, incoming, type) {
+  const scoped = TYPE_SCOPED_FACT_KEYS[factKey];
+  if (!scoped) return incoming;
+  const t = normaliseType(type);
+  const out = Object.assign({}, incoming || {});
+  Object.keys(scoped).forEach((k) => {
+    if (scoped[k].indexOf(t) === -1) out[k] = (current || {})[k];
+  });
+  return out;
+}
+
 module.exports = {
   TYPES, DEFAULT_TYPE, CANCELLATION_MODES, DEFAULT_MODE,
   DEFAULT_EXPIRY_DAYS, FEE_CUTOFF_DAYS, CANCEL_FRACTION, OFF,
   normaliseType, normaliseRegistration, validateRegistration,
   defaultIfBlank, basisChanged, resolveExpiryDays,
-  thirtyPercentPoint, minusDays, cutoff
+  thirtyPercentPoint, minusDays, cutoff,
+  FIELDS, draws, mergeRegistration, keepUndrawnFactKeys, TYPE_SCOPED_FACT_KEYS
 };

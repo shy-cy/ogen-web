@@ -236,6 +236,26 @@
       el('div', { class: 'hint', text: isNew ? 'lower-case-words-with-hyphens' : 'Fixed once published' })
     ]));
 
+    // What KIND of activity. It decides which price field is drawn, which
+    // registration settings appear, and nothing else — the page, the listing and
+    // the share card never ask.
+    //
+    // Changing it REDRAWS three panels, and the form is read into the model
+    // first: a redraw that has not captured what the admin just typed eats it,
+    // which is the same rule the repeatable lists learned the hard way.
+    var typeSel = select('f-type', 'Kind of activity', S.schema.types || ['course'],
+      rec.type || 'course', { course: 'Course (paid per term)', dropin: 'Drop-in (paid per session)' });
+    typeSel.querySelector('select').addEventListener('change', function (e) {
+      var read = readFacts();
+      S.record.facts = read.facts;
+      S.record.factVisibility = read.factVisibility;
+      S.record.registration = readRegistration();
+      S.record.type = e.target.value;
+      S.dirty = true;
+      renderFacts();
+      renderRegistration();
+    });
+    box.appendChild(typeSel);
     box.appendChild(select('f-status', 'Status', S.schema.statuses, rec.status || 'draft', STATUS_SELECT));
     box.appendChild(select('f-motif', 'Header motif', S.schema.motifs, rec.motif || 'ring'));
     box.appendChild(select('f-corner', 'Motif corner', S.schema.corners, rec.corner || 'tl', {
@@ -260,6 +280,194 @@
       hint: 'The web address the button opens — a full https:// link, or a path on this site such as /#contact. ' +
             'Not the button\'s wording: the status decides that. Leave empty and it points at the contact form.'
     }, langObj(S.record.ctaUrl), 'f-ctaUrl'));
+  }
+
+  // ---------- the Registration panel -----------------------------------------
+  //
+  // Drawn from S.schema.registration, which is the SAME list the server merges
+  // by. One list: the form and the merge have to agree about which fields a type
+  // draws, and two copies of that is one copy falling out of step in a way that
+  // silently clears a value nobody touched.
+  //
+  // Nothing here is per-language. These are structure, like the robots flag —
+  // one answer for all three — so a restricted role sees them disabled rather
+  // than translated three times.
+  function currentType() {
+    var node = $('f-type');
+    return (node && node.value) || S.record.type || 'course';
+  }
+  function drawsField(d, type) {
+    return !d.types || d.types.indexOf(type) !== -1;
+  }
+  function regId(key) { return 'reg-' + String(key).replace(/\./g, '-'); }
+  function regGet(reg, key) {
+    return String(key).split('.').reduce(function (o, k) {
+      return o == null ? undefined : o[k];
+    }, reg || {});
+  }
+  function regSet(obj, key, value) {
+    var parts = String(key).split('.');
+    var node = obj;
+    for (var i = 0; i < parts.length - 1; i++) {
+      if (!node[parts[i]] || typeof node[parts[i]] !== 'object') node[parts[i]] = {};
+      node = node[parts[i]];
+    }
+    node[parts[parts.length - 1]] = value;
+  }
+
+  // A cutoff is one field with three states: a date, "none", or never set. The
+  // checkbox writes "none" — so a switched-off cutoff is a VALUE and the server
+  // does not refill it on the next save, which is the whole reason the field is
+  // shaped this way rather than as a date beside a disabled flag.
+  function cutoffField(d, value) {
+    var offValue = S.schema.cutoffOff || 'none';
+    var isOff = value === offValue;
+    var date = el('input', { type: 'date', id: regId(d.key), disabled: isOff || null });
+    date.value = isOff ? '' : (value || '');
+    date.addEventListener('input', function () { S.dirty = true; });
+
+    var box = el('input', { type: 'checkbox', id: regId(d.key) + '-off' });
+    box.checked = isOff;
+    box.addEventListener('change', function () {
+      date.disabled = box.checked;
+      S.dirty = true;
+    });
+    return el('div', {}, [
+      el('label', { for: regId(d.key), text: d.label }),
+      date,
+      el('label', { for: regId(d.key) + '-off', class: 'check-row' },
+        [box, el('span', { text: 'No cutoff — always creditable' })]),
+      d.hint ? el('div', { class: 'hint', text: d.hint }) : null
+    ]);
+  }
+
+  function regField(d, reg) {
+    var value = regGet(reg, d.key);
+    if (d.kind === 'cutoff') return cutoffField(d, value);
+    if (d.kind === 'check') {
+      var cb = el('input', { type: 'checkbox', id: regId(d.key) });
+      cb.checked = value === true;
+      cb.addEventListener('change', function () { S.dirty = true; });
+      return el('div', {}, [
+        el('label', { for: regId(d.key), class: 'check-row' }, [cb, el('span', { text: d.label })]),
+        d.hint ? el('div', { class: 'hint', text: d.hint }) : null
+      ]);
+    }
+    if (d.kind === 'mode') {
+      var sel = el('select', { id: regId(d.key) });
+      (S.schema.cancellationModes || []).forEach(function (m) {
+        sel.appendChild(el('option', { value: m, selected: m === value || null,
+          text: m === 'flat' ? 'Flat — a fixed share' : 'Prorated — by sessions remaining' }));
+      });
+      sel.addEventListener('change', function () { S.dirty = true; });
+      return el('div', {}, [el('label', { for: regId(d.key), text: d.label }), sel,
+        d.hint ? el('div', { class: 'hint', text: d.hint }) : null]);
+    }
+    // 'days' — a number and a unit. The label ends in "after" and the unit
+    // follows the box, which is what keeps it from being read as the other
+    // fourteen on this panel: pendingExpiryDays counts from each family's own
+    // submission, the fee cutoff is one date shared by everyone.
+    var input = el('input', { type: 'number', min: '1', step: '1', id: regId(d.key),
+                              placeholder: d.key === 'pendingExpiryDays'
+                                ? String(S.schema.defaultExpiryDays || 14) : '' });
+    input.value = value == null ? '' : value;
+    input.addEventListener('input', function () { S.dirty = true; });
+    return el('div', {}, [
+      el('label', { for: regId(d.key), text: d.label + (d.unit ? ' … ' + d.unit : '') }),
+      input,
+      d.hint ? el('div', { class: 'hint', text: d.hint }) : null
+    ]);
+  }
+
+  function renderRegistration() {
+    var box = $('registration-fields');
+    if (!box || !S.schema.registration) return;
+    box.innerHTML = '';
+    var type = currentType();
+    var reg = S.record.registration || {};
+    var grid = el('div', { class: 'fact-grid' });
+    S.schema.registration.forEach(function (d) {
+      if (drawsField(d, type)) grid.appendChild(regField(d, reg));
+    });
+    box.appendChild(grid);
+
+    // Detect it, offer it, never apply it. An activity postponed by a month
+    // keeps two cutoff dates computed from where it used to be, and both are
+    // then wrong in the direction that costs families money — but a formula
+    // that quietly re-evaluates would rewrite terms after they were agreed.
+    var basis = reg.defaultBasis;
+    if (basis && type === 'course') {
+      var nowStart = ((S.record.facts || {}).duration || {}).startDate || '';
+      var nowCount = scheduledCount();
+      if (String(basis.startDate || '') !== String(nowStart) ||
+          Number(basis.sessionCount || 0) !== Number(nowCount)) {
+        var btn = el('button', { type: 'button', class: 'add-btn',
+          text: 'Recompute both dates from the current schedule' });
+        btn.addEventListener('click', function () {
+          var d = ((S.record.facts || {}).duration || {});
+          regSetInput('registrationFeeCutoffDate', minusDaysLocal(d.startDate, 14));
+          regSetInput('cancellationPolicy.cancellationCutoffDate', thirtyPercentLocal());
+          S.dirty = true;
+          message('ok', 'Both dates recomputed. Nothing is saved until you save.');
+        });
+        box.appendChild(el('div', { class: 'legacy-note' }, [
+          el('b', { text: 'The dates these were computed from have changed' }),
+          el('div', { text: 'Computed from a start of ' + (basis.startDate || '—') + ' and ' +
+                            basis.sessionCount + ' sessions. It is now ' + (nowStart || '—') +
+                            ' and ' + nowCount + '.' }),
+          el('div', { class: 'hint', text: 'Nothing has changed on its own. Recomputing is a decision, ' +
+                      'because a family who has already registered keeps the terms they were given.' }),
+          btn
+        ]));
+      }
+    }
+  }
+
+  function regSetInput(key, value) {
+    var node = $(regId(key));
+    if (node && value) { node.value = value; node.disabled = false; }
+    var off = $(regId(key) + '-off');
+    if (off && value) off.checked = false;
+  }
+  function scheduledCount() {
+    return ((((S.record.facts || {}).duration || {}).sessionDates) || [])
+      .filter(function (r) { return r && r.date && r.status !== 'excluded'; }).length;
+  }
+  // Local copies of two date sums, for the recompute BUTTON only. The stored
+  // values still come from the server on save; this is what the admin sees
+  // before deciding, so it has to answer without a round trip.
+  function minusDaysLocal(iso, days) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(iso || ''))) return '';
+    var t = Date.parse(iso + 'T00:00:00Z') - days * 86400000;
+    return new Date(t).toISOString().slice(0, 10);
+  }
+  function thirtyPercentLocal() {
+    var rows = ((((S.record.facts || {}).duration || {}).sessionDates) || [])
+      .filter(function (r) { return r && r.date && r.status !== 'excluded'; });
+    if (!rows.length) return '';
+    return rows[Math.min(Math.ceil(0.3 * rows.length), rows.length) - 1].date;
+  }
+
+  // Read back ONLY what was drawn. A field this type does not draw is left out
+  // of the object entirely, and the server keeps the stored value for it — so
+  // switching a course to a drop-in does not clear its cutoff dates.
+  function readRegistration() {
+    var type = currentType();
+    var out = {};
+    var offValue = S.schema.cutoffOff || 'none';
+    (S.schema.registration || []).forEach(function (d) {
+      if (!drawsField(d, type)) return;
+      var node = $(regId(d.key));
+      if (d.kind === 'check') { regSet(out, d.key, !!(node && node.checked)); return; }
+      if (d.kind === 'cutoff') {
+        var off = $(regId(d.key) + '-off');
+        regSet(out, d.key, off && off.checked ? offValue : ((node && node.value) || null));
+        return;
+      }
+      if (d.kind === 'mode') { regSet(out, d.key, (node && node.value) || 'flat'); return; }
+      regSet(out, d.key, node && node.value !== '' ? Number(node.value) : null);
+    });
+    return out;
   }
 
   // Every upload is resized and re-encoded in the browser first — see
@@ -378,6 +586,7 @@
     renderSeoOptions();
     renderShareImage();
     renderFacts();
+    renderRegistration();
     // Last: Quill attaches to nodes that must already be in the document.
     mountEditors();
   }
@@ -803,18 +1012,40 @@
       freqSel.addEventListener('change', function () {
         syncSchedule(); S.dirty = true; redrawSchedule(); refreshLegacyNotes();
       });
+      // Which week of the month, for a monthly activity only. 'last' is a real
+      // option rather than an error state: a month with only four of that
+      // weekday uses the last one instead of inventing a fifth.
+      var weekCell = el('div', { id: 'week-of-month-cell' });
+      var drawWeek = function () {
+        weekCell.innerHTML = '';
+        if (((freqSel && freqSel.value) || fact.frequency) !== 'monthly') return;
+        var wsel = el('select', { id: 'fact-schedule-weekOfMonth' });
+        (S.schema.weeksOfMonth || []).forEach(function (w) {
+          wsel.appendChild(el('option', { value: String(w.key), text: w.label,
+            selected: String(w.key) === String(fact.weekOfMonth == null ? 1 : fact.weekOfMonth) || null }));
+        });
+        wsel.addEventListener('change', function () { S.dirty = true; refreshLegacyNotes(); });
+        weekCell.appendChild(el('label', { for: 'fact-schedule-weekOfMonth', text: 'Which week' }));
+        weekCell.appendChild(wsel);
+      };
+      drawWeek();
+      freqSel.addEventListener('change', drawWeek);
       body = el('div', {}, [
         el('div', { class: 'fact-grid' }, [
-          el('div', {}, [el('label', { for: 'fact-schedule-frequency', text: 'How often' }), freqSel])
+          el('div', {}, [el('label', { for: 'fact-schedule-frequency', text: 'How often' }), freqSel]),
+          weekCell
         ]),
         scheduleRows(fact)
       ]);
     } else if (d.kind === 'duration') {
-      body = el('div', { class: 'fact-grid' }, [
-        dateField('fact-duration-startDate', 'Starts', fact.startDate),
-        dateField('fact-duration-endDate', 'Ends', fact.endDate),
-        numField('fact-duration-sessionCount', 'Number of sessions', fact.sessionCount),
-        numField('fact-duration-sessionMinutes', 'Minutes per session', fact.sessionMinutes)
+      body = el('div', {}, [
+        el('div', { class: 'fact-grid' }, [
+          dateField('fact-duration-startDate', 'Starts', fact.startDate),
+          dateField('fact-duration-endDate', 'Ends', fact.endDate),
+          numField('fact-duration-sessionCount', 'Number of sessions', fact.sessionCount),
+          numField('fact-duration-sessionMinutes', 'Minutes per session', fact.sessionMinutes)
+        ]),
+        sessionCalendar(fact)
       ]);
     } else if (d.kind === 'groupSize') {
       // Three languages, through the same fieldRow the location fact uses, so
@@ -836,13 +1067,21 @@
           numField('fact-groupSize-groups', 'Number of groups', fact.groups),
           numField('fact-groupSize-maxPerGroup', 'Max per group', fact.maxPerGroup)
         ]),
-        override
+        override,
+        namedGroupsEditor(fact)
       ]);
     } else if (d.kind === 'price') {
+      // A course quotes the term, a drop-in quotes the session, and only one of
+      // the two is drawn. The undrawn one is KEPT rather than cleared — see
+      // keepUndrawnFactKeys on the server — so switching type and back does not
+      // lose a price nobody touched.
+      var isDropin = currentType() === 'dropin';
       body = el('div', {}, [
         el('div', { class: 'fact-grid' }, [
-          numField('fact-price-registrationFee', 'Registration fee (€)', fact.registrationFee),
-          numField('fact-price-fullPrice', 'Full course price (€)', fact.fullPrice),
+          numField('fact-price-registrationFee', 'Yearly registration fee (€)', fact.registrationFee),
+          isDropin
+            ? numField('fact-price-perSessionPrice', 'Price per session (€)', fact.perSessionPrice)
+            : numField('fact-price-fullPrice', 'Full course price (€)', fact.fullPrice),
           numField('fact-price-perHourOverride', 'Per hour — manual override (€)', fact.perHourOverride)
         ]),
         checkField('fact-price-showPerLesson', 'Show cost per lesson', fact.showPerLesson === true,
@@ -863,6 +1102,233 @@
       body,
       legacyNote(d, fact)
     ]);
+  }
+
+  // ---------- the session calendar ---------------------------------------------
+  //
+  // GENERATE ONCE, THEN EDIT. The dates are a real stored field, not a formula
+  // re-evaluated on read: generating fills the list from the frequency and the
+  // dates, and after that it is edited by hand like any other value. That is
+  // what lets an admin drop a holiday and have it stay dropped.
+  //
+  // The enumeration happens on the SERVER, through the same module the page and
+  // the credit arithmetic use. Writing it again here would be a second
+  // implementation of the one list that decides both what a family reads and
+  // what they are refunded, and the two would eventually disagree.
+  //
+  // An excluded date keeps its place in the list rather than being deleted, so
+  // it can be put back, it survives a regeneration, and the reason is there for
+  // whoever asks next year. None of that reaches the page: the published table
+  // lists the sessions that are happening and nothing else.
+  function sessionCalendar(fact) {
+    S.sessionDates = (fact.sessionDates || []).map(function (r) {
+      return { date: r.date, status: r.status === 'excluded' ? 'excluded' : 'scheduled',
+               reason: r.reason || '' };
+    });
+    var box = el('div', { id: 'session-calendar', style: 'margin-top:18px;' });
+    drawSessionCalendar(box);
+    return box;
+  }
+
+  function drawSessionCalendar(box) {
+    box.innerHTML = '';
+    var rows = S.sessionDates || [];
+    var live = rows.filter(function (r) { return r.status !== 'excluded'; }).length;
+
+    box.appendChild(el('div', { class: 'field-label', text: 'Session dates' }));
+    box.appendChild(el('div', { class: 'hint', text: rows.length
+      ? live + ' of ' + rows.length + ' dates are going ahead. This list is what the page prints ' +
+        'and what a cancellation is priced against, so the session count is taken from it rather ' +
+        'than from the number typed above.'
+      : 'Generate the dates from the schedule and the start date, then edit them by hand. ' +
+        'Without a calendar the page shows no session table and prorated cancellation cannot be used.' }));
+
+    var gen = el('button', { type: 'button', class: 'add-btn',
+      text: rows.length ? 'Regenerate from the schedule' : 'Generate sessions',
+      disabled: !canEditAll() || null });
+    gen.addEventListener('click', function () { generateSessions(box); });
+    box.appendChild(gen);
+
+    if (!rows.length) return;
+
+    var list = el('div', { class: 'items', style: 'margin-top:12px;' });
+    rows.forEach(function (r, i) {
+      var off = r.status === 'excluded';
+      var cb = el('input', { type: 'checkbox', id: 'sess-' + i + '-off', disabled: !canEditAll() || null });
+      cb.checked = off;
+      var why = el('input', { type: 'text', id: 'sess-' + i + '-why', placeholder: 'Why (admin only)',
+                              disabled: !canEditAll() || !off || null });
+      why.value = r.reason || '';
+      why.addEventListener('input', function () { S.dirty = true; });
+      cb.addEventListener('change', function () {
+        syncSessionCalendar();
+        S.sessionDates[i].status = cb.checked ? 'excluded' : 'scheduled';
+        S.dirty = true;
+        drawSessionCalendar(box);
+      });
+      list.appendChild(el('div', { class: 'item' + (off ? ' is-off' : '') }, [
+        el('div', { class: 'fact-grid' }, [
+          el('div', {}, [el('label', { text: 'Date' }),
+            el('div', { class: 'session-date', text: r.date })]),
+          el('div', {}, [el('label', { for: 'sess-' + i + '-off', class: 'check-row' },
+            [cb, el('span', { text: 'No class this date' })]), why])
+        ])
+      ]));
+    });
+    box.appendChild(list);
+    box.appendChild(el('div', { class: 'hint', text:
+      'A date switched off keeps its place here so it can be switched back, and it survives a ' +
+      'regeneration. It does not appear on the page at all — neither the date nor the reason.' }));
+  }
+
+  function syncSessionCalendar() {
+    S.sessionDates = (S.sessionDates || []).map(function (r, i) {
+      var cb = $('sess-' + i + '-off');
+      var why = $('sess-' + i + '-why');
+      return {
+        date: r.date,
+        status: cb ? (cb.checked ? 'excluded' : 'scheduled') : r.status,
+        reason: why ? why.value : (r.reason || '')
+      };
+    });
+    return S.sessionDates;
+  }
+
+  function generateSessions(box) {
+    syncSessionCalendar();
+    syncSchedule();
+    var freqNode = $('fact-schedule-frequency');
+    send({
+      action: 'sessions',
+      schedule: {
+        frequency: (freqNode && freqNode.value) || 'weekly',
+        sessions: S.scheduleSessions || [],
+        weekOfMonth: ($('fact-schedule-weekOfMonth') || {}).value
+      },
+      duration: {
+        startDate: ($('fact-duration-startDate') || {}).value || '',
+        endDate: ($('fact-duration-endDate') || {}).value || '',
+        sessionCount: readNum('fact-duration-sessionCount'),
+        sessionDates: S.sessionDates
+      }
+    }).then(function (res) {
+      if (!res.ok) { message('err', failure(res, 'generate the sessions')); return; }
+      var rows = res.data.sessionDates || [];
+      if (!rows.length) {
+        message('err', 'Nothing to generate. A calendar needs a start date, a day of the week, ' +
+          'and either an end date or a number of sessions — and a custom frequency cannot be ' +
+          'generated at all, because it is whatever you typed.');
+        return;
+      }
+      S.sessionDates = rows.map(function (r) {
+        return { date: r.date, status: r.status, reason: r.reason || '' };
+      });
+      S.dirty = true;
+      drawSessionCalendar(box);
+      // The disagreement between a typed count and the span it is supposed to
+      // cover, surfaced while an admin is here to settle it. hebrew4kids has
+      // had it since before any of this was built.
+      message(res.data.note ? 'warn' : 'ok',
+        res.data.note || (rows.length + ' dates generated. Nothing is saved until you save.'));
+    });
+  }
+
+  // ---------- named groups ----------------------------------------------------
+  //
+  // OPT-IN. Absent, an activity behaves exactly as it always has: one pool of
+  // groups × maxPerGroup, and which group a child lands in is the teacher's
+  // business. Named groups are for the case where the FAMILY has to choose —
+  // Beginners and Advanced — and then the choice has to be recorded and counted.
+  //
+  // The names are per-language because they are words a family reads. The
+  // capacities are not. That split is drawn by where the field sits rather than
+  // by a rule anyone has to remember: a Russian-only role gets three name boxes
+  // it may edit and a capacity it may not.
+  //
+  // Ids are minted from the clock, never from list position — the same rule the
+  // repeatable lists learned when removing a row reissued an id and merged two
+  // items' state. Here it would be worse: a group id is what a registration
+  // points at, so a reused one attaches a child to the wrong group.
+  function mintGroupId() {
+    return 'g-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+
+  function namedGroupsEditor(fact) {
+    S.namedGroups = (fact.named || []).map(function (g) {
+      return { groupId: g.groupId || mintGroupId(), name: langObj(g.name), capacity: g.capacity };
+    });
+    var box = el('div', { id: 'named-groups', style: 'margin-top:18px;' });
+    drawNamedGroups(box);
+    return box;
+  }
+
+  function drawNamedGroups(box) {
+    box.innerHTML = '';
+    box.appendChild(el('div', { class: 'field-label', text: 'Named groups (optional)' }));
+    box.appendChild(el('div', { class: 'hint', text: S.namedGroups.length
+      ? 'The numbers above are ignored while this list has entries: the group count is the ' +
+        'length of the list and the capacity is the sum of these. A family chooses one when they register.'
+      : 'Leave empty unless a family has to CHOOSE which group — Beginners or Advanced. ' +
+        'Two groups meeting at the same hour do not need this.' }));
+
+    S.namedGroups.forEach(function (g, i) {
+      var row = el('div', { class: 'item', 'data-group-id': g.groupId });
+      row.appendChild(fieldRow({ label: 'Group name' }, g.name, 'grp-' + g.groupId + '-name'));
+      var cap = el('input', { type: 'number', min: '1', step: '1', id: 'grp-' + g.groupId + '-cap',
+                              disabled: !canEditAll() || null });
+      cap.value = g.capacity == null ? '' : g.capacity;
+      cap.addEventListener('input', function () { S.dirty = true; });
+      var remove = el('button', { type: 'button', class: 'add-btn', text: 'Remove this group',
+                                  disabled: !canEditAll() || null });
+      remove.addEventListener('click', function () {
+        syncNamedGroups();
+        S.namedGroups.splice(i, 1);
+        S.dirty = true;
+        drawNamedGroups(box);
+      });
+      row.appendChild(el('div', { class: 'fact-grid' }, [
+        el('div', {}, [el('label', { for: 'grp-' + g.groupId + '-cap', text: 'Places in this group' }), cap]),
+        el('div', {}, [el('label', { text: '\u00a0' }), remove])
+      ]));
+      box.appendChild(row);
+    });
+
+    var add = el('button', { type: 'button', class: 'add-btn', text: '+ Add a named group',
+                             disabled: !canEditAll() || null });
+    add.addEventListener('click', function () {
+      // Read the form into the model BEFORE redrawing, or adding a row eats
+      // whatever was typed into the row above it.
+      syncNamedGroups();
+      S.namedGroups.push({ groupId: mintGroupId(), name: { he: '', en: '', ru: '' }, capacity: null });
+      S.dirty = true;
+      drawNamedGroups(box);
+    });
+    box.appendChild(add);
+  }
+
+  // A restricted role gets the words and not the structure, here as everywhere.
+  function canEditAll() {
+    return ['he', 'en', 'ru'].every(function (l) { return canEdit(l); });
+  }
+
+  function syncNamedGroups() {
+    S.namedGroups = (S.namedGroups || []).map(function (g) {
+      var capNode = $('grp-' + g.groupId + '-cap');
+      return {
+        groupId: g.groupId,
+        name: readLangField('grp-' + g.groupId + '-name'),
+        capacity: capNode && capNode.value !== '' ? Number(capNode.value) : null
+      };
+    });
+    return S.namedGroups;
+  }
+
+  // A group with no name in any language is dropped rather than saved as a
+  // nameless choice a family would be asked to make.
+  function readNamedGroups() {
+    return syncNamedGroups().filter(function (g) {
+      return ['he', 'en', 'ru'].some(function (l) { return String(g.name[l] || '').trim(); });
+    });
   }
 
   function renderFacts() {
@@ -887,23 +1353,36 @@
           frequency: ($('fact-schedule-frequency') || {}).value || 'weekly',
           sessions: syncSchedule().filter(function (x) { return x.day != null || x.time; })
         };
+        var wom = $('fact-schedule-weekOfMonth');
+        if (out.frequency === 'monthly' && wom) {
+          out.weekOfMonth = wom.value === 'last' ? 'last' : Number(wom.value);
+        }
       } else if (d.kind === 'duration') {
         out = {
           startDate: ($('fact-duration-startDate') || {}).value || '',
           endDate: ($('fact-duration-endDate') || {}).value || '',
           sessionCount: readNum('fact-duration-sessionCount'),
-          sessionMinutes: readNum('fact-duration-sessionMinutes')
+          sessionMinutes: readNum('fact-duration-sessionMinutes'),
+          // The calendar is the source of truth for what the page prints and
+          // what a refund is divided by, so it travels with every save. It was
+          // absent from the canonical shape once and every save deleted it.
+          sessionDates: S.sessionDates || previous.sessionDates || []
         };
       } else if (d.kind === 'groupSize') {
         out = { groups: readNum('fact-groupSize-groups'), maxPerGroup: readNum('fact-groupSize-maxPerGroup'),
                 overrideText: readLangField('fact-groupSize-overrideText') };
+        var named = readNamedGroups();
+        if (named.length) out.named = named;
       } else if (d.kind === 'price') {
         out = {
           registrationFee: readNum('fact-price-registrationFee'),
-          fullPrice: readNum('fact-price-fullPrice'),
           perHourOverride: readNum('fact-price-perHourOverride'),
           showPerLesson: readBool('fact-price-showPerLesson')
         };
+        // Only the one that was drawn. Sending the other as null is how a term
+        // price gets cleared by an admin who only changed the type.
+        if (currentType() === 'dropin') out.perSessionPrice = readNum('fact-price-perSessionPrice');
+        else out.fullPrice = readNum('fact-price-fullPrice');
       } else out = {};
 
       // Carry the legacy sentence through untouched. It is what the page still
@@ -1011,6 +1490,10 @@
     var facts = readFacts();
     rec.facts = facts.facts;
     rec.factVisibility = facts.factVisibility;
+    // Structure, like robots: one answer for all three languages. Only the
+    // fields THIS type drew are in here; the server keeps the rest.
+    rec.type = ($('f-type') && $('f-type').value) || S.record.type || 'course';
+    rec.registration = readRegistration();
 
     S.schema.lists.forEach(function (spec) {
       // sync() captures pending input without redrawing.

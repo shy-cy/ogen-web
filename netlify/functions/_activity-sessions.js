@@ -157,11 +157,18 @@ function mergeExclusions(dates, previous) {
   const was = Object.create(null);
   (Array.isArray(previous) ? previous : []).forEach((row) => {
     const d = row && (typeof row === 'string' ? row : row.date);
-    if (d && row && row.status === 'excluded') was[d] = true;
+    // The REASON travels with the status, not just the fact of exclusion. An
+    // admin writes "Hanukkah" once, and it has to be there for whoever asks
+    // next year why there was no class that week — including after a
+    // regeneration, which is exactly when it would be easiest to lose.
+    if (d && row && row.status === 'excluded') was[d] = String(row.reason || '');
   });
-  return (Array.isArray(dates) ? dates : []).map((d) => ({
-    date: d, status: was[d] ? 'excluded' : 'scheduled'
-  }));
+  return (Array.isArray(dates) ? dates : []).map((d) => {
+    if (was[d] === undefined) return { date: d, status: 'scheduled' };
+    const row = { date: d, status: 'excluded' };
+    if (was[d]) row.reason = was[d];
+    return row;
+  });
 }
 
 // Only these reach the published table, the derived count, and the money. One

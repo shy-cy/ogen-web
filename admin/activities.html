@@ -90,6 +90,21 @@
         <div id="cta-field" style="margin-top:24px;"></div>
       </div>
 
+      <!-- What a registration system will read off this activity. None of it is
+           words: one answer serves all three languages, exactly like the robots
+           flag and the share image, so a role permitted to edit only Russian
+           cannot move a cutoff date on the Hebrew page.
+
+           Which fields appear depends on the activity TYPE, and the fields a
+           type does not draw are kept rather than cleared — see
+           mergeRegistration on the server. Switch a course to a drop-in and back
+           and the term settings are still there. -->
+      <div class="panel" id="registration-panel">
+        <h2>Registration</h2>
+        <p class="hint" style="margin:-8px 0 14px;">Nothing here is published on the page. It is what the registration system will read when it exists. Changing any of it applies to registrations taken afterwards only &mdash; everything already submitted keeps the terms it was given.</p>
+        <div id="registration-fields"></div>
+      </div>
+
       <div class="panel" id="list-faq-panel">
         <h2>FAQ</h2>
         <div class="items" id="list-faq"></div>
