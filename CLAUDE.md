@@ -573,6 +573,135 @@ anyone who asks for it. Until an admin backend exists, a genuinely
 unpublished activity should not be committed or deployed at all, and must
 stay out of `sitemap.xml`.
 
+### An activity has an id, a kind, and registration settings
+
+Three root-level fields, all **structure** — one answer for all three languages,
+merged like `robots` and `shareImage`, so a role that may only edit Russian
+cannot touch any of them.
+
+**`activityId`** (`act-` + 16 hex) is minted once and is **never editable, at any
+permission level**. The slug is the filename, the URL and the sitemap entry, so
+today it is the identity — and renaming one would orphan every registration
+attached to it. Minting it now, with nothing to migrate, costs one field.
+Delete-and-recreate deliberately produces a **new** id: that is a different
+activity, and old registrations must not silently attach to it. It joins
+`indexEntry()`, so a public form can resolve slug → id from a file the page
+already fetches.
+
+The design said `migrate()` mints it "idempotently", and those two words pull
+against each other — a pure function that invents a random value returns
+something different every call, and this module's whole contract is that it is
+safe to run on every read. **So the randomness is injected.** `migrate(record)`
+leaves a record without an id exactly as it found it; `migrate(record, {mintId})`
+fills one in, and the second pass finds what the first wrote. The real minting
+happens in `stamp()`, the one place a save marks a record.
+
+**`type`** is `course` or `dropin`, and it is a flag rather than a second content
+type. The two differ in exactly three respects — how money is quoted, how it is
+collected, and what cancelling means — and are identical in every other respect
+the site has: same URL space, same template, same listing, same publish pipeline,
+same permissions. A second content type would have duplicated all of that. The
+page, the listing, the sitemap and the image pipeline **never ask what type an
+activity is**; `priceRows()` was already built out of "if there is a fee", "if
+there is a term price", so a drop-in is one more conditional row.
+
+**`registration`** is what a registration system will read: `autoApprove`,
+`pendingExpiryDays`, `registrationFeeCutoffDate`, `cancellationPolicy.{mode,
+cancellationCutoffDate}`, and `sessionCancelHours` on a drop-in. It lives in
+`_activity-registration.js`, which is **pure and does not arm the legal gate** —
+the gate matches a filename *starting* with `registration`, and this module holds
+nobody's data. Do not rename it to something that begins with that word.
+
+**A cutoff is one field with three states**: a date, `"none"`, or `null`. Not a
+date beside a `disabled` boolean, because two fields can contradict each other
+and something then has to decide which wins — here the contradiction is not
+representable. `defaultIfBlank()` runs on save and fills only `null`, so a cutoff
+an admin switched off stays off. The two defaults are the start date minus 14
+calendar days, and the date of session `ceil(30% × count)` — **counted in
+sessions, not days**, because the credit formula divides sessions remaining by
+sessions total and a day-based cutoff would have the two halves of one policy
+disagreeing. For hebrew4kids that is 28 Oct rather than the calendar's 4 Nov.
+
+`defaultBasis` records what those dates were computed from, so the form can
+**notice the inputs have moved and offer to recompute**. Never so anything
+recomputes on its own: an activity postponed by a month keeps the dates it was
+given, because a formula re-evaluating would rewrite terms already agreed.
+
+### Conditional panels, and the trap they bring
+
+**A group the form did not draw is not read back and is not merged.** Switch a
+course to a drop-in and the term price and both cutoff dates sit in panels the
+form no longer draws — so the read-back sends nothing for them, and "nothing"
+merged as "cleared" destroys three configured values as a side effect of changing
+a dropdown. Nobody typed anything, which is what makes it worse than the
+read-back bug this file already describes.
+
+Absent must mean "this type did not send it", never "the admin emptied it" — the
+same distinction `cardImage` draws. `mergeRegistration()` and
+`keepUndrawnFactKeys()` enforce it, and both decide from the **type**,
+server-side, rather than from a list of drawn fields the client sends: the client
+is hostile by assumption, so a rule depending on it telling the truth about what
+it rendered is not a rule. `REG.FIELDS` is the single list the form draws from
+and the merge reads, because two copies fall out of step.
+
+### The session calendar
+
+`facts.duration.sessionDates` is `[{date, status, reason?}]` and is the source of
+truth: `sessionCount` is derived from it, not read beside it. `_activity-sessions.js`
+enumerates it from the frequency; the admin then edits it by hand. **Generate
+once, then edit.**
+
+It was already half-built and **silently lossy**: `SHAPES.duration` is applied to
+every record on every read and every save and did not list `sessionDates`, so the
+calendar could be generated, stored and rendered, and the next save deleted it.
+The frequency list had the same shape of bug — repeated rather than read from the
+calendar module, so `biweekly` and `monthly` were enumerable and renderable while
+a save coerced both back to `weekly`.
+
+Generation goes through a **server action** (`action: 'sessions'`) rather than a
+second enumeration in the browser. It commits nothing. The action also reports
+when the generated dates do not reach the stated end date — which on hebrew4kids
+says ten sessions run out on 16 December against an end date of 23 December, a
+disagreement that has been in the record since before any of this existed and
+that nothing has ever read.
+
+**An excluded date keeps its place in the record** so it can be put back and so
+it survives a regeneration, and its `reason` travels with it. None of that
+reaches the page: the published table lists the sessions that are happening and
+nothing else — no marked row, no "no class". That also makes the numbering free.
+If nothing skipped is shown, nothing skipped can take a number, so session 3 is
+the third row and the third meeting with no rule saying so, and the table is
+**exactly** the list the credit arithmetic divides by.
+
+The table is a full-width band between the article and the credits, `"sessions
+sessions"` in the grid. **The row list grows with the areas** — five areas, five
+`grid-template-rows` values, or the 117px hole under the picture reopens just as
+silently as before. A test now asserts the two counts are equal rather than
+matching a fixed prefix. No year in the rows, because the date range is already
+on the page as the duration fact; the exception is a term spanning two calendar
+years, where a bare "6 January" is ambiguous.
+
+### Named groups, and the second price
+
+Both **opt-in, absent by default**, and both add a branch that will sit
+unexercised — which is why `tests/_fixtures.js` builds every activity in pairs:
+course and drop-in, pooled and named.
+
+`facts.groupSize.named[]` is `{groupId, name:{he,en,ru}, capacity}`. Absent means
+the pooled model, unchanged. Present, `groups` and the capacity become derived —
+the length of the list and the sum of the capacities — and `formatGroupSize()`
+builds a different sentence. It lives inside the fact rather than in
+`registration` because **a group name is words a family reads and a capacity is
+not**: putting it there draws the permission line by where the field sits rather
+than by a rule someone has to remember. `totalCapacity()` returns `null` for
+uncapped, deliberately not zero, since zero would silently refuse every
+registration for an activity nobody had finished setting up.
+
+`facts.price.perSessionPrice` is the drop-in counterpart of `fullPrice`, not an
+extra line beside it. It carries no "(N sessions × M lessons)" qualifier, because
+that hangs off `fullPrice` and disappears on its own. `pricePerHour()` gained one
+more source rather than a branch.
+
 ## ⚠ Legal pages gate registration
 
 `/privacy` and `/terms` exist in all three languages and are **placeholders**.
@@ -627,6 +756,9 @@ lives in git. Blobs holds everything that is not content.**
 netlify/functions/
   _activity-facts.js     structured facts → one sentence per language; PURE
   _activity-migrate.js   old free-text facts → structured, losing nothing; PURE
+  _activity-sessions.js  the session calendar: which dates an activity meets on; PURE
+  _activity-registration.js  registration SETTINGS on an activity — no person, no
+                         store, no gate. See the naming warning at its top; PURE
   _blobs.js              the only place a Blobs store is opened; ALL store names
                          are prefixed `ogen-` (see the warning below)
   _user-store.js         ogen-admin-users, bcrypt @12
@@ -646,10 +778,10 @@ js/image-optimize.js   resizes + re-encodes every upload IN THE BROWSER
 ```
 
 The form is a **projection of `FIELD_SCHEMA`**, one panel per group, in the
-order an activity is actually filled in: **Settings** (slug, status, motif,
+order an activity is actually filled in: **Settings** (kind, slug, status, motif,
 corner, card image), **Content** (title, summary, about), **Teachers**,
 **Sponsors**, **Activity facts** (the facts, then the registration button link),
-**FAQ**, then **Search & sharing** last.
+**Registration**, **FAQ**, then **Search & sharing** last.
 
 **About is written in Quill** — the same editor and version the Shirat HaYam
 admin uses, loaded from a CDN because this project has no build step, with the
@@ -978,5 +1110,11 @@ share image, Formspree wiring, domain) is done. Open items:
   links to them yet.
 - **Nothing in the nav links to `/about` or `/activities`** yet.
 - **Registration is not built.** The `open` CTA points at the contact section.
+  **Phase 1 of it is** — the activity side: `activityId`, `type`, the
+  registration settings block, the session calendar and its table on the page,
+  named groups and `perSessionPrice`. All of it ships to the live site and none
+  of it touches a person, so the legal gate is correctly not armed. Phases 2-7
+  (accounts, family, registration, money, the family area, pay-per-session) are
+  gate-blocked until all six legal pages are `final`.
 - **Rotate the setup credentials.** The GitHub PAT and Netlify token were pasted
   into a chat transcript during setup.
