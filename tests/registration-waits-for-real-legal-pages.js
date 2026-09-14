@@ -100,7 +100,15 @@ const NAME_RE = /^_?(member|account|participant|guardian|registration)/i;
 // "participants" and tripped on FACT_GROUPS in _activity-facts.js, where
 // `participants` is the key of the "Who it is for" card. Matching the call is
 // both narrower and more honest about what it is looking for.
-const STORE_RE = /(?:requireStore|optionalStore)\(\s*['"](accounts|participants|guardian-links|guardian-invites|registrations|member-sessions|member-tokens)['"]/;
+// Two ways a people store gets opened, because the first one is not enough.
+// A call site passing a LITERAL is caught by the first pattern; one passing a
+// constant — `optionalStore(ACCOUNTS)`, which is how _account-store.js actually
+// does it — is invisible to it, and was. Both signals now fire, and the second
+// catches the name wherever it is declared.
+const PEOPLE_STORES = 'accounts|participants|guardian-links|guardian-invites|registrations|member-sessions|member-tokens';
+const STORE_RE = new RegExp(
+  '(?:requireStore|optionalStore)\\(\\s*[\'"](?:' + PEOPLE_STORES + ')[\'"]' +
+  '|=\\s*[\'"](?:' + PEOPLE_STORES + ')[\'"]\\s*;');
 const TOOLS_RE = /TOOLS\s*=\s*\[[^\]]*registrations/;
 
 const signals = [];

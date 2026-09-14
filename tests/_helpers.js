@@ -129,7 +129,9 @@ function makeGithub(seedFiles) {
 function loadWithStubs({ github, blobs, modules }) {
   [ '_github', '_blobs', '_activity-template', '_activity-index', '_activity-index',
     '_session-store', '_user-store', '_roles', '_audit', 'activities-admin',
-    'admin-login', 'admin-users' ].forEach((m) => {
+    'admin-login', 'admin-users',
+    '_account-store', '_member-session', '_account-email', '_email', '_email-log',
+    'account-auth' ].forEach((m) => {
     try { delete require.cache[fnPath(m)]; } catch (err) { /* not all exist in every test */ }
   });
 

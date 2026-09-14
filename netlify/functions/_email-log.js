@@ -36,7 +36,18 @@ const STORE = 'email-log';
 // template is recorded rather than refused, because losing the record of a
 // send is worse than recording one under a name this table has not learnt yet.
 const TEMPLATES = {
-  'infrastructure-test': { label: 'Infrastructure test', resend: true }
+  'infrastructure-test': { label: 'Infrastructure test', resend: true },
+
+  // Account messages. Resendability is a judgement about the COPY, not a
+  // permission: a verification link and a reset link are both things a person
+  // may legitimately need again, and both mint a fresh token when they are
+  // re-sent, so nothing stale is re-delivered.
+  'verify-email': { label: 'Verify your email', resend: true },
+  'password-reset': { label: 'Password reset link', resend: true },
+  // NOT resendable. It describes a moment that has passed — "your password was
+  // changed" — and arriving a second time a fortnight later it reads as a second
+  // change nobody made, which is alarming in exactly the wrong direction.
+  'password-changed': { label: 'Password changed', resend: false }
 };
 
 function templateLabel(t) { return (TEMPLATES[t] && TEMPLATES[t].label) || String(t || 'Email'); }

@@ -1095,6 +1095,72 @@ reintroduce a per-file `await` in a loop here.
 is hostile. A role that may only edit Russian gets its Hebrew and English edits
 discarded server-side, and cannot add, remove or reorder items at all.
 
+## Accounts (Phase 2)
+
+The first thing this project has ever built that stores a person's name, and the
+people are guardians of children.
+
+```
+netlify/functions/
+  _account-store.js    ogen-accounts + ogen-account-emails; bcrypt @12
+  _member-session.js   ogen-member-sessions + ogen-member-tokens; 7-day sliding
+  _account-email.js    the three account messages, in three languages
+  account-auth.js      /api/account-auth
+```
+
+**Identity is an id, not an email**, diverging from the sister project on
+purpose. It keys members by email and its own source says what that costs —
+"change my email address has never been safely buildable" — and carries a
+five-phase migration to escape it. Ogen starts where that migration is trying to
+arrive: `acct-<accountId>` holds the record, `email-<encoded>` is a one-line
+pointer, and **the pointer store is the entire login index**. Changing an address
+is three writes with no transaction, and the worst outcome is two pointers
+resolving to one account, which is recoverable — rather than an identity split
+across seven stores. The pointer is written **last** on create, so a crash
+leaves an account nobody can sign in to rather than a pointer to nothing.
+
+**⚠ THE SESSION STORES ARE SEPARATE, AND THAT IS THE SECURITY BOUNDARY.**
+`ogen-admin-sessions` is keyed `sess-`, `ogen-member-sessions` is keyed `msess-`.
+A guardian token handed to an admin function is not found, because it is not
+there. The tempting shape — one store with a role on the record — makes the
+boundary a *check*, and a check can be forgotten at one call site out of thirty,
+and the one that forgets is a publish endpoint authenticated by a parent's
+cookie. Do not merge them. A test cross-feeds the tokens both ways.
+
+Guardian sessions run **7 days on a sliding window**, refreshed on each
+validated read (skipped unless the session is over an hour old, or every request
+rewrites a blob to move a timestamp). Long enough for a parent who visits monthly
+not to be signed out mid-term; short enough that a session on a shared family
+laptop dies within a week. **Admin sessions stay at 8 hours** because they carry
+publish rights — the two numbers must not be unified.
+
+**Nothing reveals whether an address has an account.** Sign-in answers
+identically for a wrong password and an address nobody has used — including the
+bcrypt cost, which is paid against a throwaway hash when there is no account, or
+the timing difference leaks the same fact more slowly. A reset request answers
+identically whether or not it sent anything. On the admin this would be
+tidiness; here, an attacker who learns `dana@example.com` has an Ogen account has
+learned she has children attending and roughly where they are on a Wednesday
+afternoon. Sign-up is the one unavoidable exception, and it is the loudest and
+most rate-limitable action.
+
+**A reset ends every other session.** A reset exists because somebody may have
+lost control of the account; leaving other sessions alive would lock out the
+owner and leave whoever took it signed in. `changePassword` spares only the
+session doing it. One-time tokens are **deleted before the handler returns**, so
+a link followed twice — by a person and then by a mail scanner — works once.
+
+**An account cannot exist without accepting the terms**, and `termsAcceptedAt` is
+stored. That is the tie to the legal pages: they are final, published and linked
+from the footer, so there is a document to point at.
+
+The failed-sign-in throttle (8 attempts, 15-minute lock) is **best effort by
+construction** — Blobs has no compare-and-swap, so two simultaneous failures can
+lose a count. It is weaker than the number suggests and better than nothing; real
+rate limiting belongs at the edge, which is Cloudflare, already in front.
+
+No cached balance on the account, now or ever by default — see the ledger note.
+
 ### Email (Resend)
 
 Infrastructure only — there are no templates yet; the registration and account
@@ -1226,5 +1292,9 @@ share image, Formspree wiring, domain) is done. Open items:
   gate-blocked until all six legal pages are `final`. **Phase 5's `creditFor()`
   is also done** — it was the one other piece that needed no store and no
   person. Nothing calls it yet.
+  **Phase 2 (accounts) is done**: sign up, sign in, sign out, password reset,
+  email verification, profile. Server-side only — there is no page in front of
+  it yet, deliberately, so the family area stays a rendering job. Phases 3, 4, 6
+  and 7 remain.
 - **Rotate the setup credentials.** The GitHub PAT and Netlify token were pasted
   into a chat transcript during setup.
