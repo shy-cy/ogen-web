@@ -1,5 +1,6 @@
 // Shared footer for Ogen. Injects <footer> with the tagline logo, partner
-// logos, and copyright into #page. Language is detected from the URL tree.
+// logos, the legal links and copyright into #page. Language is detected from
+// the URL tree.
 //
 // The wave and book accents are declared with data-motif and drawn by
 // js/motifs.js, which pages load after this script.
@@ -16,11 +17,28 @@
   const home = lang === 'he' ? '/' : '/' + lang;
   const logo = `/images/logos/logo-${lang}.svg`;
 
+  // The legal links were held back while /privacy and /terms were placeholders —
+  // a footer link to a page reading "[content needed]" is worse than no link.
+  // They carry real reviewed text now, so the links go in: a policy nobody can
+  // reach from the site is not published in any sense that matters, and
+  // registration is about to ask people to agree to them.
+  //
+  // Paths are per-language, built from the same tree the rest of this file uses,
+  // so a Hebrew reader lands on the Hebrew policy rather than on a language
+  // switch.
   const L = {
-    he: { alt:'עוגן - חינוך, תרבות וקהילה', partners:'תודה לשותפינו', copy:'© 2026 עוגן · חינוך · תרבות · קהילה' },
-    en: { alt:'Ogen - Education, Culture and Community', partners:'Thanks to our partners', copy:'© 2026 Ogen · Education · Culture · Community' },
-    ru: { alt:'Оген - Образование, Культура и Община', partners:'Благодарим наших партнёров', copy:'© 2026 Оген · Образование · Культура · Община' }
+    he: { alt:'עוגן - חינוך, תרבות וקהילה', partners:'תודה לשותפינו',
+          privacy:'מדיניות פרטיות', terms:'תנאי שימוש',
+          copy:'© 2026 עוגן · חינוך · תרבות · קהילה' },
+    en: { alt:'Ogen - Education, Culture and Community', partners:'Thanks to our partners',
+          privacy:'Privacy Policy', terms:'Terms of Use',
+          copy:'© 2026 Ogen · Education · Culture · Community' },
+    ru: { alt:'Оген - Образование, Культура и Община', partners:'Благодарим наших партнёров',
+          privacy:'Политика конфиденциальности', terms:'Условия использования',
+          copy:'© 2026 Оген · Образование · Культура · Община' }
   }[lang];
+
+  const base = lang === 'he' ? '' : '/' + lang;
 
   const footerHTML = `
 <footer>
@@ -39,6 +57,11 @@
       <div class="partner-slot"><img src="/images/partners/kehilot.png" alt="Kehilot Institute"></div>
     </div>
   </div>
+  <nav class="foot-legal" aria-label="${L.privacy} / ${L.terms}">
+    <a href="${base}/privacy">${L.privacy}</a>
+    <span class="sep" aria-hidden="true">·</span>
+    <a href="${base}/terms">${L.terms}</a>
+  </nav>
   <div class="foot-line">${L.copy}</div>
 </footer>`;
 

@@ -264,6 +264,15 @@ html[lang="he"] .partners-label{ font-family: var(--font-he); letter-spacing:0; 
 .partners-row{ display:flex; align-items:center; justify-content:center; gap:44px; flex-wrap:wrap; }
 .partner-slot{ height:76px; display:flex; align-items:center; justify-content:center; }
 .partner-slot img{ max-height:76px; max-width:200px; width:auto; object-fit:contain; }
+/* The legal links, directly above the copyright. Quiet by design — they are
+   there to be found rather than to be read, and a footer that shouts about its
+   terms of use is a footer nobody trusts. They sit inside the centred footer, so
+   nothing here is told which edge is which and the row flips per language on its
+   own. */
+footer .foot-legal{ font-size:13px; margin-bottom:10px; }
+footer .foot-legal a{ color: var(--olive); text-decoration:underline; text-underline-offset:2px; }
+footer .foot-legal a:hover{ color: var(--terracotta); }
+footer .foot-legal .sep{ color: var(--camel); margin-inline:8px; }
 footer .foot-line{ font-size:13px; color: var(--olive); }
 
 /* ============================== PAGE HEADER ==============================
