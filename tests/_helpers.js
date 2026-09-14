@@ -130,8 +130,12 @@ function loadWithStubs({ github, blobs, modules }) {
   [ '_github', '_blobs', '_activity-template', '_activity-index', '_activity-index',
     '_session-store', '_user-store', '_roles', '_audit', 'activities-admin',
     'admin-login', 'admin-users',
-    '_account-store', '_member-session', '_account-email', '_email', '_email-log',
-    'account-auth' ].forEach((m) => {
+    '_account-store', '_member-session', '_account-email', '_email-shell', '_email',
+    '_email-log', 'account-auth',
+    '_participant-store', '_guardian-store', 'account-family', 'admin-family',
+    '_registration', '_registration-store', '_registration-email',
+    '_registration-sweep', 'account-registrations', 'admin-registrations',
+    'registration-sweep' ].forEach((m) => {
     try { delete require.cache[fnPath(m)]; } catch (err) { /* not all exist in every test */ }
   });
 
@@ -150,7 +154,8 @@ function superAdminSession(overrides) {
     role: 'super-admin', roleName: 'Super Admin',
     permissions: {
       activities: { access: true, edit: ['he', 'en', 'ru'], publish: true },
-      users: { access: true }, roles: { access: true }, family: { access: true }
+      users: { access: true }, roles: { access: true }, family: { access: true },
+      registrations: { access: true, approve: true, cancel: true }
     },
     expiresAt: Date.now() + 3600e3
   }, overrides || {});
@@ -162,7 +167,8 @@ function ruReviewerSession() {
     role: 'ru-reviewer', roleName: 'Russian Reviewer',
     permissions: {
       activities: { access: true, edit: ['ru'], publish: false },
-      users: { access: false }, roles: { access: false }, family: { access: false }
+      users: { access: false }, roles: { access: false }, family: { access: false },
+      registrations: { access: false, approve: false, cancel: false }
     }
   });
 }

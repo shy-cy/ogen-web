@@ -8,6 +8,15 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
+# The pending-registration sweep. It rewrites requests nobody answered to
+# `expired` and emails the family; the CAPACITY numbers do not depend on it,
+# because holdsASpot() in _registration.js already treats a lapsed hold as
+# holding nothing. So a missed run costs a stale queue, never a double-booked
+# place. 06:00 UTC is early morning in Cyprus — before anyone is working, and
+# the messages land at the start of the day rather than in the middle of a night.
+[functions."registration-sweep"]
+  schedule = "0 6 * * *"
+
 [build.processing.html]
   pretty_urls = true
 

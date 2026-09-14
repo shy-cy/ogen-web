@@ -114,11 +114,25 @@ function editLangs(session, tool) {
 function canEditLang(session, tool, lang) {
   return editLangs(session, tool).indexOf(lang) !== -1;
 }
+// The `registrations` tool's two extra axes. Written here beside canPublish
+// rather than inline in the handler, because a permission test that lives at
+// the call site is a permission test one call site can forget.
+//
+// Both require `access` as well as their own flag: a role that may not open the
+// queue may not act on something in it either, however the client asked.
+function canApprove(session) {
+  const p = toolPerm(session, 'registrations');
+  return !!(p && p.access && p.approve);
+}
+function canCancel(session) {
+  const p = toolPerm(session, 'registrations');
+  return !!(p && p.access && p.cancel);
+}
 function isSuperAdmin(session) {
   return !!(session && session.role === 'super-admin');
 }
 
 module.exports = {
   TTL_MS, createSession, getSession, destroySession, authenticate, legacySession,
-  canAccess, canPublish, editLangs, canEditLang, isSuperAdmin
+  canAccess, canPublish, editLangs, canEditLang, canApprove, canCancel, isSuperAdmin
 };

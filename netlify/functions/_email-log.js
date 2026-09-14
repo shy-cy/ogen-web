@@ -50,7 +50,18 @@ const TEMPLATES = {
   'password-changed': { label: 'Password changed', resend: false },
   // Re-sending mints a NEW token and revokes the old one, so the resend here is
   // a fresh invitation rather than a second copy of a link already in an inbox.
-  'guardian-invite': { label: 'Invitation to join a child\'s record', resend: true }
+  'guardian-invite': { label: 'Invitation to join a child\'s record', resend: true },
+
+  // Registration messages. Only the confirmation is resendable, and the reason
+  // is the copy in each case rather than a policy: a family legitimately loses
+  // "you have a place" and needs it again, whereas "we have your request",
+  // "we cannot offer a place" and "we did not answer in time" all describe a
+  // moment that has passed. Re-delivering a refusal a fortnight later is the
+  // clearest case in this table of a resend doing harm.
+  'registration-received': { label: 'Registration request received', resend: false },
+  'registration-approved': { label: 'Registration confirmed', resend: true },
+  'registration-rejected': { label: 'Registration not offered', resend: false },
+  'registration-expired': { label: 'Registration request expired', resend: false }
 };
 
 function templateLabel(t) { return (TEMPLATES[t] && TEMPLATES[t].label) || String(t || 'Email'); }

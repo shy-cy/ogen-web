@@ -18,7 +18,16 @@ const ALL_LANGS = ['he', 'en', 'ru'];
 // who may publish pages is not thereby an admin who may read a child's date of
 // birth. It is granted to Super Admin only — a Content Editor edits copy, and
 // there is nothing about that job that needs a family record.
-const TOOLS = ['activities', 'users', 'roles', 'family'];
+// `registrations` is the first tool whose axes are not {access, edit, publish}.
+// Approving a registration is none of those three, so it carries {access,
+// approve, cancel} instead — and the file's own claim, that adding a tool should
+// be "a key, not a redesign", is what that tests.
+//
+// CANCEL IS A THIRD AXIS RATHER THAN PART OF APPROVE, because cancelling moves
+// money: it writes a credit a family can spend. Approving costs nothing and can
+// be undone by rejecting; cancelling cannot be undone at all, only compensated.
+// Two powers that differ that much should not share one flag.
+const TOOLS = ['activities', 'users', 'roles', 'family', 'registrations'];
 
 const BUILTIN_ROLES = [
   {
@@ -29,7 +38,8 @@ const BUILTIN_ROLES = [
       activities: { access: true, edit: ALL_LANGS.slice(), publish: true },
       users: { access: true },
       roles: { access: true },
-      family: { access: true }
+      family: { access: true },
+      registrations: { access: true, approve: true, cancel: true }
     }
   },
   {
@@ -40,7 +50,11 @@ const BUILTIN_ROLES = [
       activities: { access: true, edit: ALL_LANGS.slice(), publish: true },
       users: { access: false },
       roles: { access: false },
-      family: { access: false }
+      family: { access: false },
+      // A Content Editor edits copy. Reading the approval queue means reading
+      // children's names and dates of birth, which is the same line `family`
+      // draws and is drawn here for the same reason.
+      registrations: { access: false, approve: false, cancel: false }
     }
   },
   {
@@ -53,7 +67,8 @@ const BUILTIN_ROLES = [
       activities: { access: true, edit: ['ru'], publish: false },
       users: { access: false },
       roles: { access: false },
-      family: { access: false }
+      family: { access: false },
+      registrations: { access: false, approve: false, cancel: false }
     }
   }
 ];

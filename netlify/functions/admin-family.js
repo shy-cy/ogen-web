@@ -20,6 +20,7 @@ const { authenticate, canAccess } = require('./_session-store');
 const accounts = require('./_account-store');
 const participants = require('./_participant-store');
 const guardians = require('./_guardian-store');
+const registrations = require('./_registration-store');
 const { recordAudit } = require('./_audit');
 
 // The family tool, not the activities one. An admin who may publish pages is
@@ -38,16 +39,36 @@ const displayName = (account) => {
   return [p.firstName, p.lastName].filter(Boolean).join(' ') || (account && account.email) || '';
 };
 
-// PHASE 5 SEAM. Unlinking a guardian who still owes money is a question, not a
-// rule: the admin is shown what is owed and must choose to reassign it to the
-// remaining guardian or write it off, with no default and no "skip".
+// Unlinking a guardian who still owes money is a question, not a rule: the admin
+// is shown what is owed and must choose to reassign it to the remaining guardian
+// or write it off, with no default and no "skip".
 //
-// Registrations do not exist yet, so there is nothing to owe and this returns
-// an empty list. It is written as a function rather than left out so that the
-// ORDER is already right — see unlinkGuardian, where the last-guardian refusal
-// deliberately comes first.
-async function debtsFor(/* participantId, accountId */) {
-  return [];
+// Registrations now exist, so this reads them — but MONEY does not, so it still
+// returns nothing. payment.owedCents is null on every record until Phase 5
+// decides what a registration is billed, which is not a property of the activity
+// alone: the registration fee is charged once a year per family, so a second
+// child owes the course price and not the fee. A debt cannot be reported before
+// something can say what it is.
+//
+// Reading the registrations anyway, rather than returning [] unconditionally, is
+// what makes the shape right: the filter is already the one Phase 5 needs, and
+// the ORDER is already right — see unlinkGuardian, where the last-guardian
+// refusal deliberately comes first, so an admin is never shown a debt prompt for
+// an action that was never going to complete.
+async function debtsFor(participantId, accountId) {
+  const regs = await registrations.forParticipant(participantId);
+  return regs
+    .filter((r) => r.accountId === accountId)
+    .filter((r) => r.payment && r.payment.status === 'owed')
+    .map((r) => ({
+      key: r.participantId + '__' + r.activityId,
+      activityId: r.activityId,
+      title: r.frozen.activityTitle,
+      status: r.status,
+      owedCents: r.payment.owedCents,
+      paidCents: r.payment.paidCents
+    }))
+    .filter((r) => r.owedCents != null && r.owedCents > r.paidCents);
 }
 
 exports.handler = async (event) => {
@@ -192,6 +213,10 @@ exports.handler = async (event) => {
         if (String(body.confirmName || '').trim() !== p.firstName) {
           return json(400, { error: 'Type the participant\'s first name to confirm.' });
         }
+        // The registrations go too. One left behind is a row in an approval
+        // queue that resolves to nothing — and it carries a child's name and
+        // date of birth in its frozen block, which is the half that matters.
+        await registrations.removeForParticipant(p.participantId);
         await guardians.removeAllLinks(p.participantId);
         await participants.deleteParticipant(p.participantId);
         await recordAudit(session, 'family.deleteParticipant', p.participantId, 'ok', { detail: p.firstName + ' ' + (p.lastName || '') });

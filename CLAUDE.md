@@ -1228,14 +1228,178 @@ invalid. One name, one meaning.
 **`family` is its own admin tool**, granted to Super Admin only. An admin who may
 publish pages is not thereby an admin who may read a child's date of birth.
 
-The debt disposition on unlink is **Phase 5** and `debtsFor()` is a stub — but
-the ORDER is already right: the last-guardian refusal comes first, so an admin is
+The debt disposition on unlink is **Phase 5**. `debtsFor()` now reads the
+registrations and still returns nothing, because `payment.owedCents` is null on
+every record until something can say what a registration is billed — and the
+ORDER was already right: the last-guardian refusal comes first, so an admin is
 never shown a debt prompt for an action that was never going to complete.
+
+## Registration (Phase 4)
+
+An admin can now run a term. Server-side only, like Phases 2 and 3 — there is no
+page in front of it, deliberately, so the family area stays a rendering job.
+
+```
+netlify/functions/
+  _registration.js        what a registration IS, and every rule needing no storage; PURE
+  _registration-store.js  ogen-registrations; reg-<participantId>__<activityId>
+  _registration-email.js  the four messages, in three languages
+  _registration-sweep.js  run(); the nightly pass, shared by the schedule and the admin
+  registration-sweep.js   the scheduled entry point — see netlify.toml
+  account-registrations.js  /api/account-registrations — guardian session
+  admin-registrations.js    /api/admin-registrations   — ADMIN session, separate on purpose
+```
+
+**A SPOT IS COUNTED, NEVER DECREMENTED**, and everything else follows from it.
+
+```
+holdsASpot(reg, now) = reg.status === 'approved'
+                    || (reg.status === 'pending' && now < reg.expiresAt)
+```
+
+Capacity calls that, never the stored status. So rejection, expiry and
+cancellation are **one mechanism rather than three**: writing `cancelled` makes
+the next count one lower, and there is no hold to release, no counter to fix and
+no window in which the number is wrong. A counter blob would have been cheaper to
+read and would have needed a decrement that can be **lost without trace** on a
+store with no compare-and-swap — and a lost decrement is invisible, where an
+extra registration record is at least visible and reversible. Cancellation
+arrived free because rejection and expiry had already paid for it.
+
+Two consequences worth stating plainly:
+
+- **An expired hold frees its place the instant it lapses**, whether or not the
+  nightly sweep has run. The derived rule is authoritative and the job is
+  cosmetic — a broken schedule costs a stale queue, never a number. A pending
+  record with no `expiresAt` stamped **keeps** its place, because an unstamped
+  record is a bug in the writer and reading it as expired would free a place a
+  family is waiting on.
+- **Over-capacity is reported, not prevented.** Two submissions arriving together
+  both read "one place left" and both write; the window is a few hundred
+  milliseconds and there is no atomic increment. The queue says "23 / 20 — over
+  capacity" and an admin rejects the surplus.
+
+Capacity is `facts.groupSize` and no new field: the product when pooled, the sum
+of the named capacities when an activity names its groups, and **null means
+uncapped, deliberately not zero** — a blank must never read as a restriction.
+Named groups bucket the same count with no extra read. A place taken while the
+activity was still pooled carries `groupId: null`, so it counts towards the
+activity and belongs to no row; the rows deliberately do not sum to the total.
+
+**There is no waitlist.** The place is simply gone and the next submission takes
+it, first come. A waitlist has to choose who gets a freed place, tell them, and
+give them a deadline before it moves on again, and none of that is decided. The
+counting model supports one without change.
+
+**`expiresAt` is stamped at submission**, with `expiryDays` and `expirySource`
+beside it. Computing `submittedAt + N` on read would make every change
+retroactive — lowering the number would expire a batch of live registrations the
+moment it deployed, and raising it would revive ones already released. Three
+levels resolve it: the activity, then `PENDING_EXPIRY_DAYS`, then 14.
+
+**Auto-approve stops at an age it cannot confirm**, which is one step past what
+the design settled. The design's rule was that an out-of-range age falls through
+to manual review — `autoApprove` means "this activity has no gate a human needs
+to apply", and an out-of-range age is exactly a case where a human has something
+to decide. The case it did not name is an age that cannot be checked **at all**,
+so the rule is written as *a stated range must be positively satisfied* rather
+than *inRange must not be false*: reading a blank as a pass makes the one case
+nobody can verify the one case nobody looks at. An activity with no stated range
+has nothing to satisfy and auto-approves in full. **Falling through is not a
+rejection** — the request waits for a person, and the person may well say yes.
+Nothing in this system is rejected by a machine, which is what makes the binary
+approval model genuinely binary.
+
+**The age is measured at the activity's start**, not at submission, where there
+is a start date. A child who turns seven the week before a 7-10 class begins is
+seven for that class.
+
+**The frozen block is the only thing standing between a Blobs record and a git
+record an admin edits daily.** It captures the inputs to the decision — name,
+date of birth, the age range as it read, the price, the group's *name*, and the
+cancellation terms from `freezeCancellation()` — so a price edit in March cannot
+rewrite what a family agreed to in January, and a group renamed from "Advanced"
+to "Level 3" cannot rewrite what they chose. `activitySlugAtSubmission` is audit
+only; if it later disagrees with the activity's slug, that is a rename working.
+
+**One record per participant per activity**, keyed `reg-<participantId>__<activityId>`.
+Two siblings are two blobs that know nothing about each other, so approving one
+is a write to one key — an `attendees[]` array has one outcome to give, and on a
+store with no compare-and-swap two admins working the queue at once would
+silently undo each other. A re-request after a refusal lands in the same blob and
+**carries the earlier history forward**, so an admin can see the first attempt.
+
+**Five statuses, and cancellation is not a sixth.** A guardian's cancellation and
+an admin's are the same thing to capacity, the queue and the reminders; what
+differs is who did it, so that lands in `cancelSource`. What a decision may be
+taken **from** is a table in `admin-registrations.js`, and its interesting
+entries are `rejected -> approved` (an admin who rejects by mistake must be able
+to undo it — "approving is undone by rejecting" only holds both ways) and
+`expired -> approved` (the request lapsed because *we* did not answer; answering
+late is the right outcome). `cancelled -> anything` is refused: the family
+withdrew, and reinstating them without their asking is not an admin's to do.
+
+**`registrations` is the first tool whose axes are not `{access, edit, publish}`.**
+It carries `{access, approve, cancel}`, and **cancel is a third axis** because
+cancelling moves money — it writes a credit a family can spend and cannot be
+undone at all, only compensated. `access` is its own gate for the same reason
+`family` is: opening the queue means reading children's names and dates of birth.
+Super Admin only.
+
+**The credit ledger does not exist, and both cancel paths refuse rather than
+round down.** `creditFor()` is computed on every cancellation; if it comes to
+more than zero, the request is refused with `requires: 'credit-ledger'`. That
+branch is unreachable today — nothing collects money, so `paidCents` is zero
+everywhere and a family who has paid nothing is owed nothing, which is also why
+the design writes no ledger entry in that case at all. It is a refusal so that
+the day payments arrive, a cancellation cannot quietly drop what a family is
+owed. The **admin's** cancellation is never refused by the hard cutoff, only
+credited nothing: a child has to be removable in week nine for a reason that is
+not about money.
+
+**`payment.owedCents` is null, on purpose.** What a registration is billed is not
+a property of the activity alone — the registration fee is charged once a *year*
+per family, so a second child owes the course price and not the fee. That is a
+question about an account and a calendar year, and the ledger that could answer
+it is Phase 5. ⚠ It interacts with `splitPaid()` in `_credit.js`, which takes the
+fee off the top of whatever was paid: right when the fee was billed on this
+registration, wrong when it was waived. The payment flow has to record which.
+
+**The sweep is the cosmetic half and says so.** `[functions."registration-sweep"]`
+in `netlify.toml`, 06:00 UTC daily. It rewrites lapsed `pending` to `expired`,
+stamps the reason, and mails the family. Two things about Netlify's scheduler
+that look like bugs: it invokes the function as a **POST carrying
+`{"next_run":…}`**, so a handler treating a request body as proof of a human has
+it backwards; and the edge answers **403 to every external HTTP request** to a
+scheduled function, which is why the admin's "run now" calls `run()` directly
+rather than fetching the endpoint. Running it twice finds nothing the second
+time — it only ever rewrites what the derived rule already released.
+
+**The expiry email apologises.** The thing that expired is a request *we* did not
+answer, so "your request expired" — which reads as the family having let
+something lapse — is the wrong sentence. Four messages in
+`_registration-email.js`, and only the confirmation is resendable: a family
+legitimately loses "you have a place", whereas re-delivering a refusal a
+fortnight later is the clearest case in that table of a resend doing harm.
+
+**`_email-shell.js`** was lifted out of `_account-email.js` when these arrived.
+That file had said from the beginning that there is one shell "so they cannot
+drift apart visually", and a second family of messages was the moment that either
+became a shared module or became two copies. The lift is byte-identical.
+
+**Not built, and deliberately:** the public "places left" count (an
+unauthenticated endpoint returning a number, never a list), and
+`memberVisibleRows()` — the authenticated view that serves the members-only
+address to a guardian with an approved participant. Both are rendering-side and
+belong with Phase 6, and the second must never be reached by
+`_activity-template.js`: `isPubliclyVisible()` keeps its exact current meaning
+and its only caller.
 
 ### Email (Resend)
 
-Infrastructure only — there are no templates yet; the registration and account
-messages are still being designed.
+The infrastructure, plus the account, invite and registration messages that now
+run on it. `_email.js` is still the one send path; `_email-shell.js` is the one
+visual shell.
 
 ```
 netlify/functions/
@@ -1342,8 +1506,9 @@ Site is live and launched. Everything that was once a pre-launch blocker (OG
 share image, Formspree wiring, domain) is done. Open items:
 
 - **Russian copy has never been reviewed by a native speaker** — the homepage,
-  and now the About and activity pages too. Flagged inline at the top of each
-  `/ru/` file.
+  the About and activity pages, and every string in `_account-email.js` and
+  `_registration-email.js`. Flagged inline at the top of each `/ru/` file and at
+  the top of both mail modules.
 - **English activity copy** is a first-pass translation of the approved Hebrew
   and has not been proofread, including the status strings in `js/activity.js`.
 - **`/about` is placeholder copy** (`[content needed]`), hence `noindex` and no
@@ -1354,20 +1519,27 @@ share image, Formspree wiring, domain) is done. Open items:
   are still awaiting a native-speaker review**; `ogen-legal-review` is `pending`
   and gates public registration until it is done. See the Legal pages section.
 - **Nothing in the nav links to `/about` or `/activities`** yet.
-- **Registration is not built.** The `open` CTA points at the contact section.
-  **Phase 1 of it is** — the activity side: `activityId`, `type`, the
+- **Registration has no page.** The API is built; nothing on the public site
+  reaches it, and the `open` CTA still points at the contact section. Wiring is
+  Phase 6's, and `ogen-legal-review` has to be `complete` before a public
+  surface may ship at all.
+  **Phase 1 is done** — the activity side: `activityId`, `type`, the
   registration settings block, the session calendar and its table on the page,
-  named groups and `perSessionPrice`. All of it ships to the live site and none
-  of it touches a person, so the legal gate is correctly not armed. Phases 2-7
-  (accounts, family, registration, money, the family area, pay-per-session) are
-  gate-blocked until all six legal pages are `final`. **Phase 5's `creditFor()`
-  is also done** — it was the one other piece that needed no store and no
-  person. Nothing calls it yet.
+  named groups and `perSessionPrice`. All of it ships to the live site.
+  **Phase 5's `creditFor()` is done** and is now called on every cancellation,
+  from both sides; the ledger it would write to is not built, which is why both
+  paths refuse a cancellation earning more than zero.
   **Phase 2 (accounts) is done**: sign up, sign in, sign out, password reset,
-  email verification, profile. Server-side only — there is no page in front of
-  it yet, deliberately, so the family area stays a rendering job. Phases 3, 4, 6
-  and 7 remain.
+  email verification, profile.
   **Phase 3 (the family) is done**: participants, guardian links, the invite
   flow, the admin override, and unlink with its last-guardian refusal.
+  **Phase 4 (registration) is done**: submission, the approval queue, capacity
+  counted rather than decremented, auto-approve with its fall-through, the
+  expiry sweep, and the `registrations` tool with `{access, approve, cancel}`.
+  All three are **server-side only** — there is no page in front of any of it
+  yet, deliberately, so the family area stays a rendering job. **Phases 5, 6 and
+  7 remain**: the credit ledger and the money (both cancel paths already refuse
+  rather than silently dropping a credit), the family-facing area, and
+  pay-per-session.
 - **Rotate the setup credentials.** The GitHub PAT and Netlify token were pasted
   into a chat transcript during setup.
