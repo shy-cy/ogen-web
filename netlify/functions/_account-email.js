@@ -190,6 +190,59 @@ function changedMessage(account) {
   return { to: account.email, subject: T.subject, html: html, text: strip(html) };
 }
 
+// --- an invitation to become a second guardian -----------------------------
+//
+// It lives in this file rather than its own because it shares the shell and the
+// plain-text twin, and two shells drift. It is the one message here sent to
+// somebody who may have no account at all, so it has to make sense cold.
+
+const INVITE = {
+  he: {
+    subject: (child) => `הזמנה להצטרף לרשומה של ${child} · מרכז עוגן`,
+    heading: 'הזמנה להצטרף',
+    body: (inviter, child) =>
+      `${inviter} הזמין אתכם להצטרף כאפוטרופוס נוסף לרשומה של ${child} במרכז עוגן.`,
+    what: 'אפוטרופוס נוסף יכול לראות את הפרטים, לרשום לפעילויות ולנהל את ההרשמות.',
+    button: 'קבלת ההזמנה',
+    bound: 'יש לקבל את ההזמנה מהחשבון עם כתובת הדוא״ל הזו. אם יש לכם חשבון בכתובת אחרת, פנו אלינו ונקשר אתכם ידנית.',
+    expires: 'ההזמנה תקפה ל-30 יום.'
+  },
+  en: {
+    subject: (child) => `An invitation to join ${child}'s record · Merkaz Ogen`,
+    heading: 'An invitation to join',
+    body: (inviter, child) =>
+      `${inviter} has invited you to be a second guardian on ${child}'s record at Merkaz Ogen.`,
+    what: 'A second guardian can see the details, register for activities and manage those registrations.',
+    button: 'Accept the invitation',
+    bound: 'Accept it from the account using this email address. If your account uses a different one, contact us and we will link you directly.',
+    expires: 'The invitation is valid for 30 days.'
+  },
+  ru: {
+    subject: (child) => `Приглашение присоединиться к записи ${child} · Центр Оген`,
+    heading: 'Приглашение присоединиться',
+    body: (inviter, child) =>
+      `${inviter} приглашает вас стать вторым опекуном в записи ${child} в центре Оген.`,
+    what: 'Второй опекун может видеть данные, записывать на занятия и управлять записями.',
+    button: 'Принять приглашение',
+    bound: 'Примите приглашение из учётной записи с этим адресом электронной почты. Если ваша учётная запись использует другой адрес, свяжитесь с нами, и мы добавим вас вручную.',
+    expires: 'Приглашение действительно 30 дней.'
+  }
+};
+
+// The language is the INVITER's, because the invited person may have no account
+// and therefore no stated preference. It is a guess, and the alternative is no
+// message at all.
+function inviteMessage(invite, inviterName, childName, inviterLang) {
+  const l = lang(inviterLang);
+  const T = INVITE[l];
+  const href = pathFor(l, '/account/guardian-invite?token=' + encodeURIComponent(invite.token));
+  const html = shell(l, T.heading, [
+    esc(T.body(inviterName || 'A guardian', childName)),
+    esc(T.what), esc(T.bound), esc(T.expires)
+  ], { href: href, label: T.button });
+  return { to: invite.invitedEmail, subject: T.subject(childName), html: html, text: strip(html) };
+}
+
 // --- sending ---------------------------------------------------------------
 //
 // settle() swallows and logs. An email failure never blocks the action it
@@ -211,8 +264,13 @@ const sendPasswordChanged = (account) =>
     email.send(changedMessage(account),
       { template: 'password-changed', lang: lang(account.profile && account.profile.preferredLanguage) }));
 
+const sendGuardianInvite = (invite, inviterName, childName, inviterLang) =>
+  email.settle('guardian-invite', invite.invitedEmail, () =>
+    email.send(inviteMessage(invite, inviterName, childName, inviterLang),
+      { template: 'guardian-invite', lang: lang(inviterLang) }));
+
 module.exports = {
-  sendVerify, sendReset, sendPasswordChanged,
-  verifyMessage, resetMessage, changedMessage,
-  VERIFY, RESET, CHANGED, pathFor
+  sendVerify, sendReset, sendPasswordChanged, sendGuardianInvite,
+  verifyMessage, resetMessage, changedMessage, inviteMessage,
+  VERIFY, RESET, CHANGED, INVITE, pathFor
 };

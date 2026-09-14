@@ -150,7 +150,7 @@ function superAdminSession(overrides) {
     role: 'super-admin', roleName: 'Super Admin',
     permissions: {
       activities: { access: true, edit: ['he', 'en', 'ru'], publish: true },
-      users: { access: true }, roles: { access: true }
+      users: { access: true }, roles: { access: true }, family: { access: true }
     },
     expiresAt: Date.now() + 3600e3
   }, overrides || {});
@@ -162,7 +162,7 @@ function ruReviewerSession() {
     role: 'ru-reviewer', roleName: 'Russian Reviewer',
     permissions: {
       activities: { access: true, edit: ['ru'], publish: false },
-      users: { access: false }, roles: { access: false }
+      users: { access: false }, roles: { access: false }, family: { access: false }
     }
   });
 }

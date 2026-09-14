@@ -47,7 +47,10 @@ const TEMPLATES = {
   // NOT resendable. It describes a moment that has passed — "your password was
   // changed" — and arriving a second time a fortnight later it reads as a second
   // change nobody made, which is alarming in exactly the wrong direction.
-  'password-changed': { label: 'Password changed', resend: false }
+  'password-changed': { label: 'Password changed', resend: false },
+  // Re-sending mints a NEW token and revokes the old one, so the resend here is
+  // a fresh invitation rather than a second copy of a link already in an inbox.
+  'guardian-invite': { label: 'Invitation to join a child\'s record', resend: true }
 };
 
 function templateLabel(t) { return (TEMPLATES[t] && TEMPLATES[t].label) || String(t || 'Email'); }

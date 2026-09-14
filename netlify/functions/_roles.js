@@ -14,7 +14,11 @@
 const { optionalStore, requireStore } = require('./_blobs');
 
 const ALL_LANGS = ['he', 'en', 'ru'];
-const TOOLS = ['activities', 'users', 'roles'];
+// `family` is its own tool, and separate from `activities` on purpose: an admin
+// who may publish pages is not thereby an admin who may read a child's date of
+// birth. It is granted to Super Admin only — a Content Editor edits copy, and
+// there is nothing about that job that needs a family record.
+const TOOLS = ['activities', 'users', 'roles', 'family'];
 
 const BUILTIN_ROLES = [
   {
@@ -24,7 +28,8 @@ const BUILTIN_ROLES = [
     permissions: {
       activities: { access: true, edit: ALL_LANGS.slice(), publish: true },
       users: { access: true },
-      roles: { access: true }
+      roles: { access: true },
+      family: { access: true }
     }
   },
   {
@@ -34,7 +39,8 @@ const BUILTIN_ROLES = [
     permissions: {
       activities: { access: true, edit: ALL_LANGS.slice(), publish: true },
       users: { access: false },
-      roles: { access: false }
+      roles: { access: false },
+      family: { access: false }
     }
   },
   {
@@ -46,7 +52,8 @@ const BUILTIN_ROLES = [
     permissions: {
       activities: { access: true, edit: ['ru'], publish: false },
       users: { access: false },
-      roles: { access: false }
+      roles: { access: false },
+      family: { access: false }
     }
   }
 ];

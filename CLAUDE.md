@@ -1161,6 +1161,77 @@ rate limiting belongs at the edge, which is Cloudflare, already in front.
 
 No cached balance on the account, now or ever by default — see the ledger note.
 
+## The family (Phase 3)
+
+```
+netlify/functions/
+  _participant-store.js  ogen-participants; age DERIVED, never stored
+  _guardian-store.js     ogen-guardian-links + ogen-guardian-invites
+  account-family.js      /api/account-family   — guardian session
+  admin-family.js        /api/admin-family     — ADMIN session, separate on purpose
+```
+
+**A participant, not a child.** A guardian must be able to register themselves,
+which leaves two shapes: a second entity for adults, or one that happens usually
+to be a child. One entity, making no claim about age — so the age flag, the
+freeze and the capacity count all work with no `attendeeType` branch anywhere
+except wording.
+
+**It is its own record**, which is the sharpest divergence from the sister
+project, where household members are an array inside the member record and
+"linked to two guardians" is literally unrepresentable. Here the link is its own
+record precisely so it can be.
+
+**Age is derived, never stored.** `ageAt()` counts birthdays rather than
+dividing by 365.25 — off by a day near the end of February, and "11 not 12" is
+exactly the difference an age flag turns on. **The flag is advisory and never a
+gate**: any age can be submitted, `ageFlag()` annotates the approval queue, the
+admin decides. A missing date of birth and an activity with no stated range are
+the same answer (`inRange: null`), not two special cases — and a missing date
+stops being a blocker, which is what the earlier design had to choose against.
+
+**`link-<participantId>__<accountId>`, participant first**, and that ordering is
+load-bearing: "who are this participant's guardians" is a prefix scan, and that
+is the query the max-of-two rule is enforced with. The other direction is one
+`list()` filtered by key suffix, which returns keys without reading blobs.
+**Primacy is not on the link** — `primaryAccountId` is one field on the
+participant, so "exactly one primary" has a single writer rather than being an
+invariant across two blobs with no transaction.
+
+**⚠ A PARTICIPANT IS NEVER LEFT WITH NO GUARDIAN.** It would be a record no
+account can see, reachable only by an admin who goes looking, invisible to the
+family it is about. Refused from all three directions: a guardian cannot leave
+when they are the only one, an admin cannot unlink the last one, and a
+participant whose creator-link write fails is deleted rather than kept. The
+refusal also **dissolves** the reassign-with-no-target edge — a permitted unlink
+implies a remaining guardian by definition.
+
+**Primacy moves in the same write as the unlink**, to the remaining guardian.
+Not a prompt, since there is one possible answer, but it must not be forgotten:
+primacy authorises inviting, so a participant whose primary is no longer linked
+could never gain a second guardian again.
+
+**The invite is bound to the address it was sent to.** The token is a bearer
+secret sitting in an inbox; without the binding, a forwarded link hands a
+stranger a child's record. The cost is real — a guardian whose account is under
+another address cannot accept — and `admin-family.js` is the escape hatch that
+cost was accepted against. Re-sending **mints a new token and revokes the old
+one**, so a forwarded copy of the previous link dies. Invites run 30 days rather
+than a registration's 14, and expire **lazily on read**: no link exists until
+acceptance, so an unaccepted invite grants nothing and needs no sweep.
+
+**`token` authenticates; an invite is `inviteToken`.** `sessions.authenticate()`
+reads `body.token`, so an invite action reading the same key hands a session
+token to `acceptInvite()` — which then reports a perfectly valid link as
+invalid. One name, one meaning.
+
+**`family` is its own admin tool**, granted to Super Admin only. An admin who may
+publish pages is not thereby an admin who may read a child's date of birth.
+
+The debt disposition on unlink is **Phase 5** and `debtsFor()` is a stub — but
+the ORDER is already right: the last-guardian refusal comes first, so an admin is
+never shown a debt prompt for an action that was never going to complete.
+
 ### Email (Resend)
 
 Infrastructure only — there are no templates yet; the registration and account
@@ -1296,5 +1367,7 @@ share image, Formspree wiring, domain) is done. Open items:
   email verification, profile. Server-side only — there is no page in front of
   it yet, deliberately, so the family area stays a rendering job. Phases 3, 4, 6
   and 7 remain.
+  **Phase 3 (the family) is done**: participants, guardian links, the invite
+  flow, the admin override, and unlink with its last-guardian refusal.
 - **Rotate the setup credentials.** The GitHub PAT and Netlify token were pasted
   into a chat transcript during setup.
