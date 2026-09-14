@@ -594,11 +594,12 @@ function priceRows(f, lang, duration) {
   }
 
   // There is deliberately NO total. The two numbers are on different cycles --
-  // the registration fee is charged once a YEAR and the course fee once a
-  // semester -- so adding them produces a figure nobody is ever billed. A family
-  // joining in the spring pays 300, not 350, having paid the fee in the autumn.
-  // The sum was only ever right for a first-semester registration, which is the
-  // one case where a reader can also do the addition themselves.
+  // the registration fee is charged once a YEAR, per participant per activity,
+  // and the course fee once a semester -- so adding them produces a figure
+  // nobody is ever billed. A child returning for the spring pays 300, not 350,
+  // having paid the fee for this activity in the autumn. The sum was only ever
+  // right for a first-semester registration, which is the one case where a
+  // reader can also do the addition themselves.
   return rows;
 }
 

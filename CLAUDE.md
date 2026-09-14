@@ -422,8 +422,9 @@ every language is free of both.
 rather than typed so it could not drift from the two numbers above it — but
 computing it was never the problem, adding those two numbers at all was. The
 registration fee is charged once a **year** and the course fee once a
-**semester**, so their sum is a figure nobody is ever billed: a family joining in
-the spring, having paid the fee in the autumn, pays 300, not 350. The total was
+**semester**, so their sum is a figure nobody is ever billed: a child returning
+for the spring, having paid the fee for this activity in the autumn, pays 300,
+not 350. The total was
 right only for a first-semester registration, which is also the one case where a
 reader can do the addition unaided. A test asserts the sum appears nowhere, in
 any language, under any label.
@@ -455,11 +456,14 @@ is checked without publishing to find out.
 
 The registration fee is **annual, and the label says so** — "Yearly
 registration fee" / `דמי הרשמה לשנה` / `Годовой регистрационный взнос`. It is
-the one thing about the fee a family cannot infer from the number. The public
-card carries **no waiver logic at all**: whether a particular participant
-already paid this year is a question about a person, and the page is static and
-has no idea who is reading it. That check belongs at the point of payment,
-behind a login, and lives in the registration flow rather than here.
+the one thing about the fee a family cannot infer from the number. What the
+label cannot carry is the scope: the fee is **per participant per activity per
+year**, so a sibling pays it again and so does the same child in a second
+activity. The public card therefore carries **no waiver logic at all** — whether
+a particular participant already paid it for this activity this year is a
+question about a person, and the page is static and has no idea who is reading
+it. That check belongs at the point of payment, behind a login, and lives in the
+registration flow. See the Phase 4 section for the scope rule in full.
 
 **A fact can be overridden with words, and the words are trilingual.**
 `groupSize.overrideText` is a `{he, en, ru}` bag, and a filled-in language
@@ -1357,13 +1361,54 @@ owed. The **admin's** cancellation is never refused by the hard cutoff, only
 credited nothing: a child has to be removable in week nine for a reason that is
 not about money.
 
-**`payment.owedCents` is null, on purpose.** What a registration is billed is not
-a property of the activity alone — the registration fee is charged once a *year*
-per family, so a second child owes the course price and not the fee. That is a
-question about an account and a calendar year, and the ledger that could answer
-it is Phase 5. ⚠ It interacts with `splitPaid()` in `_credit.js`, which takes the
-fee off the top of whatever was paid: right when the fee was billed on this
-registration, wrong when it was waived. The payment flow has to record which.
+**`payment.owedCents` is null, on purpose**, because the registration fee is
+waived in exactly one case and the schema cannot yet express that case.
+
+**THE FEE IS SCOPED TO ONE PARTICIPANT, ONE ACTIVITY, ONE YEAR.**
+
+| | Fee |
+|---|---|
+| Same child, same activity, second semester | **not** charged again |
+| Same child, a different activity | charged |
+| A sibling, same or different activity | charged |
+
+Not per family and not per account. Two children in one activity pay two fees;
+one child in two activities pays two fees. The only thing that suppresses it is
+that *this participant* has already paid it for *this activity* this year.
+
+That scope is what makes the waiver answerable **from `ogen-registrations`
+alone** — a prefix scan of `reg-<participantId>__` filtered to the same activity
+and year. No account aggregate, no cross-store join, nothing to reconcile
+against a ledger. It is strictly cheaper than the family-level rule this file
+previously described, which would have had to resolve every participant linked
+to an account before it could price a single registration.
+
+⚠ **What it waits on is not the ledger, it is a term.** The key is
+`reg-<participantId>__<activityId>`, one record per pair with no semester in it,
+so the one case the waiver exists for — the same child in the same activity next
+semester — **has nowhere to go**. `submit` answers 409 "already has a place". Two
+ways out, and it has to be chosen before `owedCents` can be computed:
+
+- **Each semester is its own activity record**, which is what the data looks like
+  today: hebrew4kids runs 14 Oct to 16 Dec and `fullPrice` is labelled *per
+  semester*. Then the spring term is a different `activityId`, the registration
+  key already works unchanged, and what is missing is a way to say two activity
+  records are the same activity — one more structure field on the schema root,
+  defaulting to the record's own id, so nothing existing changes meaning.
+- **The registration key gains a term.** Truthful, and it moves every prefix scan
+  written so far plus a migration of live records. Worth it only if a term turns
+  out to be a thing the system needs for more than the fee.
+
+The first is recommended: no key change, no migration, and it matches how the
+activity is already published — one page per semester, with its own dates, its
+own calendar and its own price.
+
+⚠ **It also changes `splitPaid()` in `_credit.js`**, which takes the fee off the
+top of whatever was paid. On a waived registration **nothing paid is fee**, so
+the first €50 of a course payment would be credited back as one — inflating the
+fee credit and deflating the course credit on a cancellation. The frozen block
+has to record whether the fee was **charged on this registration**, not only what
+the fee was.
 
 **The sweep is the cosmetic half and says so.** `[functions."registration-sweep"]`
 in `netlify.toml`, 06:00 UTC daily. It rewrites lapsed `pending` to `expired`,

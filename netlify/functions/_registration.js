@@ -304,17 +304,37 @@ function newRegistration({ activity, participant, accountId, groupId, now, env }
     payment: {
       // PHASE 5 FILLS THIS, and it is null rather than a number on purpose.
       //
-      // What a registration is billed is not a property of the activity alone:
-      // the registration fee is charged once a YEAR per family, so a second
-      // child, or a second semester, owes the course price and not the fee. That
-      // is a question about an account and a calendar year, and the ledger that
-      // could answer it does not exist yet. A number written now would be wrong
-      // for the second child and would look authoritative.
+      // What a registration is billed is not a property of the activity alone,
+      // because the registration fee is waived in one case and one case only:
       //
-      // ⚠ It interacts with splitPaid() in _credit.js, which takes the fee off
-      // the top of whatever was paid. That is right when the fee was billed on
-      // this registration and wrong when it was waived, so the payment flow has
-      // to record which — see the Phase 5 note in CLAUDE.md.
+      //   THE FEE IS SCOPED TO ONE PARTICIPANT, ONE ACTIVITY, ONE YEAR.
+      //
+      //   same child, same activity, second semester  -> NOT charged again
+      //   same child, a different activity            -> charged
+      //   a sibling, any activity                     -> charged
+      //
+      // Not per family and not per account: two children in the same activity
+      // pay two fees, and one child in two activities pays two fees. The only
+      // thing that suppresses it is that this participant has already paid it
+      // for THIS activity this year.
+      //
+      // That scope is what makes the waiver answerable HERE rather than from a
+      // ledger: it is a question about this participant's own registrations for
+      // this activity, which is a prefix scan of reg-<participantId>__ — no
+      // account aggregate, no cross-store join, nothing to reconcile. The rule
+      // is strictly cheaper than a family-level one would have been.
+      //
+      // ⚠ WHAT IT STILL WAITS ON is not the ledger, it is a TERM. The key is
+      // reg-<participantId>__<activityId>, one record per pair with no semester
+      // in it, so the one case the waiver exists for — the same child in the
+      // same activity next semester — has nowhere to go. See the Phase 5 note in
+      // CLAUDE.md; that has to be settled before owedCents can be computed.
+      //
+      // ⚠ AND IT CHANGES splitPaid() in _credit.js, which takes the fee off the
+      // top of whatever was paid. On a waived registration nothing paid is fee,
+      // so the first 50 euros of a course payment would be credited as one. The
+      // frozen block has to record whether the fee was CHARGED on this
+      // registration, not only what the fee was.
       owedCents: null,
       paidCents: 0,
       currency: CURRENCY,

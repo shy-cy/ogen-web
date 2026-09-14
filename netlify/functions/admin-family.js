@@ -44,11 +44,16 @@ const displayName = (account) => {
 // or write it off, with no default and no "skip".
 //
 // Registrations now exist, so this reads them — but MONEY does not, so it still
-// returns nothing. payment.owedCents is null on every record until Phase 5
-// decides what a registration is billed, which is not a property of the activity
-// alone: the registration fee is charged once a year per family, so a second
-// child owes the course price and not the fee. A debt cannot be reported before
-// something can say what it is.
+// returns nothing. payment.owedCents is null on every record until Phase 5 can
+// say what a registration is billed, which is not a property of the activity
+// alone: the registration fee is scoped to one participant, one activity, one
+// year, so the same child in the same activity next semester owes the course
+// price and not the fee. A debt cannot be reported before something can say what
+// it is.
+//
+// Note the scope is per PARTICIPANT, which is also why this filters by account
+// rather than aggregating one: a guardian being unlinked owes for the
+// registrations they submitted, and a sibling's fee was never theirs to share.
 //
 // Reading the registrations anyway, rather than returning [] unconditionally, is
 // what makes the shape right: the filter is already the one Phase 5 needs, and
