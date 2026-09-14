@@ -702,6 +702,83 @@ extra line beside it. It carries no "(N sessions × M lessons)" qualifier, becau
 that hangs off `fullPrice` and disappears on its own. `pricePerHour()` gained one
 more source rather than a branch.
 
+### `creditFor()` — what a cancellation credits
+
+`netlify/functions/_credit.js`. The first piece of Phase 5, written before
+anything depends on it because it is pure and needs no fixtures. It opens no
+store and names no person, so it does not arm the legal gate; the ledger it
+feeds does, and is not built.
+
+**It reads one registration and one timestamp, and nothing else** — no activity
+lookup, no GitHub call, no live schedule, no `Date.now()`. That is not style: the
+cancellation policy is **frozen onto the registration at submission**, so an
+admin who switches an activity from flat to prorated in March cannot change what
+a family who registered in January is owed. Once the terms are frozen, the
+calculation has nothing to reach that could have moved. The failure mode to watch
+for is somebody later "simplifying" it by reading the activity — which gives the
+same answer almost always.
+
+Two properties follow: it is testable with no fixtures, and re-running it against
+the same record and timestamp returns the same figure a year later. That second
+one is what `basisFor()` sells — a family credited 150 out of 350 will ask why,
+and the ledger entry carries the mode, both dates, sessions remaining over
+sessions total, and the two figures that were added.
+
+**Three thresholds, and they are not one timeline.** The fee answers to its own
+date and to nothing else; the course answers to the first session and to the hard
+cutoff. The fee's cutoff can fall before registration closes or after the course
+ends, so there is no ordering between them to rely on.
+
+| | Course | Fee |
+|---|---|---|
+| Before the first session | 100% | — |
+| After it | 50% flat, or remaining ÷ total | — |
+| Before `registrationFeeCutoffDate` | — | 100% |
+| After it | — | 0% |
+| After `cancellationCutoffDate` | 0% | 0% |
+
+Four rules carry the weight:
+
+- **The generous default is one line, not three branches.** All three dates
+  default to null and every null resolves towards the family, because
+  `past(null)` is false and an empty session list cannot have started. A missing
+  date is an activity nobody finished configuring, and reading a blank as "the
+  cutoff has passed" keeps a family's money on the strength of an empty field.
+  Same rule capacity follows, where a missing group size is uncapped, not zero.
+- **A cutoff is the END of its day, in `Asia/Nicosia`.** Midnight would cost the
+  family the last day; UTC would move the deadline by the two or three hours
+  Cyprus runs ahead, refusing 01:00 local on the final day as late. Both errors
+  point the same way, which is how they survive review. The offset comes from
+  `Intl` rather than a table, resolved on **whole seconds** with the `.999` added
+  after — `formatToParts` has no millisecond field, so resolving an instant
+  already carrying `.999` came back a second short and put the end of the day one
+  second inside the next one.
+- **Flat is proration with a fixed ratio.** `share(cents, 1, 2)` versus
+  `share(cents, remaining, total)` — one division, one guard, one rounding rule,
+  rounded **up**. Two formulas can round differently, and the difference surfaces
+  when two families compare receipts.
+- **The fee is split off, never stored.** `splitPaid()` takes the fee first,
+  capped at the frozen fee; the remainder is the course. Two stored fields would
+  need `paidFee + paidCourse === paidCents` to hold on a store with no
+  transaction, and a broken invariant in a money field is found by a family
+  rather than by a test. It assumes **the payment flow bills the fee first** —
+  true in practice today, a requirement once payments exist.
+
+`freezeCancellation()` builds the frozen block and lives beside the function that
+reads it, so the two shapes cannot drift. It freezes **only the sessions that are
+happening** — an excluded date never enters the list — which is what lets
+`creditFor()` stay ignorant of exclusions entirely, and means a holiday appears
+in neither the numerator nor the denominator. The denominator is the **length of
+that list**, never a stored count: hebrew4kids has had a typed session count
+disagreeing with its own calendar since before any of this was built, and this
+is the one place that disagreement would have decided money.
+
+The hard cutoff governs **entitlement, not the ability to end a registration**.
+It refuses the guardian's own cancel button (`reason: 'cancellation-closed'`,
+carrying the date so a 409 can name it); an admin cancelling in week nine for a
+safety reason still goes through and credits nothing. `creditFor()` therefore
+says nothing at all about admin cancellation.
+
 ## ⚠ Legal pages gate registration
 
 `/privacy` and `/terms` exist in all three languages and are **placeholders**.
@@ -759,6 +836,8 @@ netlify/functions/
   _activity-sessions.js  the session calendar: which dates an activity meets on; PURE
   _activity-registration.js  registration SETTINGS on an activity — no person, no
                          store, no gate. See the naming warning at its top; PURE
+  _credit.js             what a cancellation credits; reads one registration and
+                         one timestamp, and nothing else; PURE
   _blobs.js              the only place a Blobs store is opened; ALL store names
                          are prefixed `ogen-` (see the warning below)
   _user-store.js         ogen-admin-users, bcrypt @12
@@ -1115,6 +1194,8 @@ share image, Formspree wiring, domain) is done. Open items:
   named groups and `perSessionPrice`. All of it ships to the live site and none
   of it touches a person, so the legal gate is correctly not armed. Phases 2-7
   (accounts, family, registration, money, the family area, pay-per-session) are
-  gate-blocked until all six legal pages are `final`.
+  gate-blocked until all six legal pages are `final`. **Phase 5's `creditFor()`
+  is also done** — it was the one other piece that needed no store and no
+  person. Nothing calls it yet.
 - **Rotate the setup credentials.** The GitHub PAT and Netlify token were pasted
   into a chat transcript during setup.
