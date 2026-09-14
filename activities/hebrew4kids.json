@@ -57,8 +57,9 @@
     "duration": {
       "startDate": "2026-10-14",
       "endDate": "2026-12-23",
-      "sessionCount": 10,
+      "sessionCount": 11,
       "sessionMinutes": 90,
+      "sessionDates": [],
       "legacyText": {
         "he": "90 דקות, עם הפסקה באמצע.",
         "en": "",
@@ -68,7 +69,11 @@
     "groupSize": {
       "groups": 2,
       "maxPerGroup": 10,
-      "overrideText": "",
+      "overrideText": {
+        "he": "קבוצות קטנות ",
+        "en": "Small groups",
+        "ru": "Занятия ב малых группах"
+      },
       "legacyText": {
         "he": "שתי קבוצות של 7 תלמידים",
         "en": "",
@@ -101,8 +106,9 @@
     },
     "price": {
       "registrationFee": 50,
-      "fullPrice": 300,
+      "fullPrice": 330,
       "perHourOverride": null,
+      "perSessionPrice": null,
       "showPerLesson": false,
       "legacyText": {
         "he": "דמי הרשמה של 50 אירו + 360 אירו ל-12 שיעורים",
@@ -143,11 +149,11 @@
       "logo": "/images/activities/hebrew4kids-sponsors-spo-mtd1o2lk-3.png"
     }
   ],
-  "isoUpdated": "2026-09-08T15:27:17.662Z",
+  "isoUpdated": "2026-09-14T08:46:49.637Z",
   "isoCreated": "2026-08-28T14:55:38.930Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
-  "lastPublishedAt": "2026-09-08T15:27:17.662Z",
+  "lastPublishedAt": "2026-09-14T08:46:49.637Z",
   "factVisibility": {
     "ages": "public",
     "schedule": "public",
@@ -161,5 +167,15 @@
   },
   "cardImage": "/images/activities/hebrew4kids-card-a1f8d75e.jpg",
   "shareImage": "/images/activities/hebrew4kids-share-d8c7f629.jpg",
-  "robots": "index"
+  "robots": "index",
+  "registration": {
+    "autoApprove": true,
+    "pendingExpiryDays": null,
+    "registrationFeeCutoffDate": "2026-10-10",
+    "cancellationPolicy": {
+      "mode": "flat",
+      "cancellationCutoffDate": "2026-11-01"
+    },
+    "defaultBasis": null
+  }
 }
