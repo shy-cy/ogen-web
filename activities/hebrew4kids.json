@@ -59,7 +59,52 @@
       "endDate": "2026-12-23",
       "sessionCount": 11,
       "sessionMinutes": 90,
-      "sessionDates": [],
+      "sessionDates": [
+        {
+          "date": "2026-10-14",
+          "status": "scheduled"
+        },
+        {
+          "date": "2026-10-21",
+          "status": "scheduled"
+        },
+        {
+          "date": "2026-10-28",
+          "status": "scheduled"
+        },
+        {
+          "date": "2026-11-04",
+          "status": "scheduled"
+        },
+        {
+          "date": "2026-11-11",
+          "status": "scheduled"
+        },
+        {
+          "date": "2026-11-18",
+          "status": "scheduled"
+        },
+        {
+          "date": "2026-11-25",
+          "status": "scheduled"
+        },
+        {
+          "date": "2026-12-02",
+          "status": "scheduled"
+        },
+        {
+          "date": "2026-12-09",
+          "status": "scheduled"
+        },
+        {
+          "date": "2026-12-16",
+          "status": "scheduled"
+        },
+        {
+          "date": "2026-12-23",
+          "status": "scheduled"
+        }
+      ],
       "legacyText": {
         "he": "90 דקות, עם הפסקה באמצע.",
         "en": "",
@@ -174,8 +219,11 @@
     "registrationFeeCutoffDate": "2026-10-10",
     "cancellationPolicy": {
       "mode": "flat",
-      "cancellationCutoffDate": "2026-11-01"
+      "cancellationCutoffDate": "2026-11-04"
     },
-    "defaultBasis": null
+    "defaultBasis": {
+      "startDate": "2026-10-14",
+      "sessionCount": 11
+    }
   }
 }

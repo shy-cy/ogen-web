@@ -442,8 +442,28 @@ function formatGroupSize(f, lang) {
 // Total teaching hours a course is worth, in academic (45-minute) hours.
 // Returns null when either half of the sum is missing — a price per hour
 // invented from half the data is worse than no price per hour.
+// HOW MANY SESSIONS AN ACTIVITY ACTUALLY HAS.
+//
+// The calendar when there is one, the typed number when there is not. Two
+// editable fields for one fact is what produced the discrepancy this project
+// carried for months — hebrew4kids said ten sessions across a span holding
+// eleven — and the answer is not to validate them against each other but to
+// stop having two.
+//
+// Deriving it was deliberately NOT done when the calendar was introduced,
+// because pricePerHour() divides by it and changing a denominator silently
+// changes a published price. It is done now because both numbers say eleven, so
+// this changes nothing that anyone can see — which is the only safe moment for
+// a change like this, and it does not come round again.
+function sessionTotal(duration) {
+  const scheduled = (Array.isArray(duration && duration.sessionDates) ? duration.sessionDates : [])
+    .filter((r) => r && r.date && r.status !== 'excluded');
+  if (scheduled.length) return scheduled.length;
+  return num(duration && duration.sessionCount);
+}
+
 function academicHours(duration) {
-  const count = num(duration && duration.sessionCount);
+  const count = sessionTotal(duration);
   const minutes = num(duration && duration.sessionMinutes);
   if (count == null || minutes == null || count <= 0 || minutes <= 0) return null;
   return (count * minutes) / ACADEMIC_MINUTES;
@@ -557,7 +577,7 @@ function priceRows(f, lang, duration) {
   if (perSession != null && perSession > 0) rows.push(row(L.perSession, money(perSession)));
 
   if (hasFull) {
-    const sessions = num(duration && duration.sessionCount);
+    const sessions = sessionTotal(duration);
     const lessons = lessonsPerSession(duration);
     let note = '';
     if (sessions != null && sessions > 0 && lessons != null) {
@@ -694,7 +714,7 @@ module.exports = {
   namedGroups, namedGroupLine, totalCapacity,
   FACT_ORDER, TEXT_FACTS, STRUCTURED_FACTS, DEFAULT_VISIBILITY,
   ACADEMIC_MINUTES, CURRENCY,
-  num, pick, ruPlural, monthYear,
+  num, pick, ruPlural, monthYear, sessionTotal,
   formatAges, formatSchedule, formatDuration, sessionRows, weekOrdinal, showPerLesson,
   SESSION_TABLE, WEEK_ORDINALS, RU_DAY_GENDER, formatGroupSize, formatPrice,
   priceRows, factPriceRows,

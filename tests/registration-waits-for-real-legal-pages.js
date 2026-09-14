@@ -120,4 +120,72 @@ if (!signals.length) {
     'a registration system exists, so every legal page must be reviewed and marked final BEFORE it can collect anyone\'s data');
 }
 
+console.log('\n[the review that is still owed]');
+// THE SECOND GATE, and the reason it exists.
+//
+// The six pages were flipped to "final" to unblock development — the text is
+// real and reviewed in Hebrew and English, and holding the whole registration
+// system closed behind one outstanding translation review was the wrong trade.
+// That was a deliberate decision, taken knowingly, and it is recorded here so
+// that it stays a decision rather than becoming something everyone forgot.
+//
+// What is still owed: a NATIVE SPEAKER has never read the Russian text, nor the
+// two price labels the activity pages publish. Russian is not a courtesy
+// language on this site — it is one of three equals, and a Russian-speaking
+// parent agreeing to terms nobody fluent has checked is the exact situation the
+// first gate exists to prevent, one language down.
+//
+// So the first gate governs whether registration can be BUILT, and this one
+// governs whether it can be OPENED to the public. The distinction is the whole
+// point: development continues, and the door does not open.
+const REVIEW_RE = /<meta name="ogen-legal-review" content="(pending|complete)">/;
+const review = {};
+LEGAL_PAGES.forEach((p) => {
+  const m = REVIEW_RE.exec(read(p));
+  H.ok(!!m, p + ' declares ogen-legal-review');
+  review[p] = m ? m[1] : null;
+});
+const reviewStates = Array.from(new Set(Object.values(review)));
+H.eq(reviewStates.length, 1,
+  'every page carries the same review state (found: ' + reviewStates.join(', ') + ')');
+const REVIEWED = reviewStates.length === 1 && reviewStates[0] === 'complete';
+
+// A PUBLIC registration surface: something a family can reach. The admin is
+// deliberately not one — it is staff-only and noindex, and building the admin
+// side of registration is exactly what this gate is meant to allow.
+const PUBLIC_SIGNALS = [];
+const rootHtml = fs.readdirSync(R).filter((f) => f.endsWith('.html'));
+['en', 'ru'].forEach((l) => {
+  const dir = path.join(R, l);
+  if (fs.existsSync(dir)) {
+    fs.readdirSync(dir).filter((f) => f.endsWith('.html')).forEach((f) => rootHtml.push(l + '/' + f));
+  }
+});
+const PAGE_RE = /(register|registration|signup|sign-up|account|my-children|members?)\.html$/i;
+rootHtml.forEach((f) => { if (PAGE_RE.test(f)) PUBLIC_SIGNALS.push(f + ' (public page)'); });
+
+const JS_DIR = path.join(R, 'js');
+const JS_RE = /^(member|account|register|registration|signup|participant|guardian)/i;
+if (fs.existsSync(JS_DIR)) {
+  fs.readdirSync(JS_DIR).filter((f) => f.endsWith('.js') && JS_RE.test(f))
+    .forEach((f) => PUBLIC_SIGNALS.push('js/' + f + ' (public script)'));
+}
+
+if (!PUBLIC_SIGNALS.length) {
+  if (REVIEWED) {
+    console.log('  ..   Russian review complete — this gate has nothing left to hold');
+  } else {
+    console.log('  ..   STILL OWED: a native speaker has not read the Russian legal text,');
+    console.log('       nor the price labels Годовой регистрационный взнос / Стоимость семестра.');
+    console.log('       Nothing public depends on it yet. Do it before registration OPENS.');
+  }
+  H.ok(true, 'no public registration surface yet, so the review is a reminder rather than a blocker');
+} else {
+  console.log('  ..   FOUND: ' + PUBLIC_SIGNALS.join('\n       '));
+  H.ok(REVIEWED,
+    'registration is about to be public, so the Russian legal text and the price labels ' +
+    'must have been read by a native speaker first — flip ogen-legal-review to "complete" ' +
+    'on all six pages when that is done');
+}
+
 H.done();

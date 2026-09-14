@@ -19,10 +19,22 @@ const isPublic = (a) => a && PUBLIC_STATUSES.indexOf(a.status) !== -1;
 
 // Static routes that are always in the sitemap. /about is deliberately absent:
 // it is still placeholder copy and carries noindex.
+//
+// /privacy and /terms ARE here now. They carry real reviewed text, their
+// noindex is gone, and the sitemap has to agree with the meta tag — a sitemap
+// advertising a page that asks not to be indexed contradicts itself, which is
+// the same pairing /about is still on the other side of.
+const LEGAL_ALTS = (slug) => ({ he: '/' + slug, en: '/en/' + slug, ru: '/ru/' + slug });
 const STATIC_ROUTES = [
   { path: '/', alts: { he: '/', en: '/en', ru: '/ru' } },
   { path: '/en', alts: { he: '/', en: '/en', ru: '/ru' } },
-  { path: '/ru', alts: { he: '/', en: '/en', ru: '/ru' } }
+  { path: '/ru', alts: { he: '/', en: '/en', ru: '/ru' } },
+  { path: '/privacy', alts: LEGAL_ALTS('privacy') },
+  { path: '/en/privacy', alts: LEGAL_ALTS('privacy') },
+  { path: '/ru/privacy', alts: LEGAL_ALTS('privacy') },
+  { path: '/terms', alts: LEGAL_ALTS('terms') },
+  { path: '/en/terms', alts: LEGAL_ALTS('terms') },
+  { path: '/ru/terms', alts: LEGAL_ALTS('terms') }
 ];
 
 // The index is a public file, so it carries only what a listing needs.

@@ -79,6 +79,34 @@ LANGS.forEach((lang) => {
     lang + ': the table has exactly as many rows as there are scheduled sessions');
 });
 
+console.log('\n[one number, not two: the count IS the calendar]');
+// The discrepancy this project carried for months — a typed count of ten across
+// a span holding eleven Wednesdays — was never a validation problem. It was two
+// editable fields for one fact, and the fix is to stop having two.
+//
+// Deriving it was deliberately deferred when the calendar was introduced,
+// because pricePerHour() divides by it and changing a denominator silently
+// changes a published price. It was done at the moment both numbers agreed, so
+// nothing visible moved.
+const eleven = F.course();
+eleven.facts.duration.sessionCount = 10;          // the stale typed value
+H.eq(facts.sessionTotal(eleven.facts.duration), 10, 'ten dates and a typed ten agree');
+eleven.facts.duration.sessionDates.push({ date: '2026-12-23', status: 'scheduled' });
+H.eq(facts.sessionTotal(eleven.facts.duration), 11,
+  'add the eleventh date and the total is eleven, whatever the field still says');
+H.eq(facts.priceRows(eleven.facts.price, 'en', eleven.facts.duration)[1].note,
+  '(11 sessions × 2 lessons)',
+  'so the price qualifier follows the calendar rather than the stale number beside it');
+// An excluded date is not a session, in the count as on the page.
+eleven.facts.duration.sessionDates[0].status = 'excluded';
+H.eq(facts.sessionTotal(eleven.facts.duration), 10, 'excluding one takes it back to ten');
+H.eq(facts.sessionRows(eleven.facts.duration, 'en').length, facts.sessionTotal(eleven.facts.duration),
+  'and the table and the count can never disagree, because they are one list');
+// No calendar at all still falls back, or an activity nobody has scheduled
+// would lose its price qualifier entirely.
+H.eq(facts.sessionTotal({ sessionCount: 12 }), 12, 'with no calendar the typed number still answers');
+H.eq(facts.sessionTotal({}), null, 'and with neither, there is no count rather than a zero');
+
 console.log('\n[a session, not a lesson — the price card is two blocks up]');
 H.eq(facts.SESSION_TABLE.en.row, 'Session', 'English says Session');
 H.eq(facts.SESSION_TABLE.he.row, 'מפגש', 'Hebrew says מפגש, which is what the price card counts');

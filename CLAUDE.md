@@ -779,19 +779,39 @@ carrying the date so a 409 can name it); an admin cancelling in week nine for a
 safety reason still goes through and credits nothing. `creditFor()` therefore
 says nothing at all about admin cancellation.
 
-## ⚠ Legal pages gate registration
+## ⚠ Legal pages: the first gate is open, the second is not
 
-`/privacy` and `/terms` exist in all three languages and are **placeholders**.
-They use the same inner-page shell as `/about`, carry `noindex`, are absent from
-`sitemap.xml`, and show a visible draft banner (`.status-banner.is-draft`,
-reused rather than a new rule). **Nothing links to them yet** — a footer link to
-a page reading `[content needed]` is worse than no link.
+`/privacy` and `/terms` exist in all three languages and now carry **real
+reviewed text**. They are `final`, indexable, in `sitemap.xml`, and their draft
+banners are gone. **Nothing links to them yet** — the footer links are still to
+be added.
 
-Each page carries a machine-readable marker:
+Each page carries **two** machine-readable markers, and they gate different
+things:
 
 ```html
-<meta name="ogen-legal-status" content="placeholder">
+<meta name="ogen-legal-status" content="final">     <!-- may registration be BUILT? -->
+<meta name="ogen-legal-review" content="pending">   <!-- may it be OPENED? -->
 ```
+
+**`ogen-legal-status` is `final`, and that was a deliberate trade.** The Hebrew
+and English text is reviewed; the Russian has never been read by a native
+speaker, nor have the two price labels the activity pages publish
+(`Годовой регистрационный взнос`, `Стоимость семестра`). Holding the entire
+registration system closed behind that one outstanding review was judged the
+wrong call, so the first gate was opened knowingly.
+
+**`ogen-legal-review` is what keeps that a decision rather than an oversight.**
+While it says `pending`, the same suite refuses to let a *public* registration
+surface ship — a page a family can reach (`register.html`, `account.html`, a
+`js/member-*.js`), never the admin, which is staff-only and noindex and is
+exactly what the open first gate is meant to allow. So development continues and
+the door does not open. Flip it to `complete` on all six pages when the review
+is done.
+
+Russian is not a courtesy language here. It is one of three equals, and a
+Russian-speaking parent agreeing to terms nobody fluent has checked is the
+situation the first gate existed to prevent, one language down.
 
 **`tests/registration-waits-for-real-legal-pages.js` reads that marker and is
 the safeguard.** It passes quietly today. The moment any registration surface
@@ -800,16 +820,7 @@ appears — a function named `member-*` / `account-*` / `participant-*` /
 one of the people stores, or a `registrations` entry in `_roles.js` `TOOLS` —
 the suite **fails the build** until every legal page is marked `final`.
 
-This exists because the placeholder looks finished: proper URL, breadcrumb, site
-typography, real headings. The reason the pages were created early is exactly
-the reason nobody would notice they are still empty. Ogen has never stored a
-person's name; the registration system stores a **minor's name and date of
-birth, in the EU**. Shipping that against `[content needed]` is not a
-documentation gap, it is collecting a child's data with no lawful basis
-published.
-
-Flipping to `final` means **four things in one change**, and the test asserts
-all four move together:
+That has now happened, and the four things moved together as the test requires:
 
 1. `ogen-legal-status` → `final`, on **all six pages at once** (a reviewed
    English policy beside an untranslated Hebrew one is not "partly done" —
@@ -818,10 +829,26 @@ all four move together:
 2. the `noindex` meta removed;
 3. the draft banner element deleted, and no `[content needed]` left;
 4. `/privacy` and `/terms` added to `STATIC_ROUTES` in `_activity-index.js`, so
-   the sitemap and the meta tag agree — the same pairing `/about` already has.
+   the sitemap and the meta tag agree — the same pairing `/about` is still on
+   the other side of.
 
-Real legal content is expected to be written through an inner-page editor
-modelled on Shirat HaYam's, which does not exist here yet.
+The gate existed because the placeholder looked finished: proper URL,
+breadcrumb, site typography, real headings. The reason the pages were created
+early was exactly the reason nobody would have noticed they were still empty.
+Ogen has never stored a person's name; the registration system stores a
+**minor's name and date of birth, in the EU**.
+
+**What is still owed is now `ogen-legal-review`**, and it enforces the same idea
+one step further down the road: the Russian text and the two Russian price
+labels have not been read by a native speaker, and while the marker says
+`pending` the suite refuses a **public** registration surface — a page a family
+can reach, never the admin. The test proves it bites rather than asserting it
+does; dropping a `register.html` into the repo turns the suite red.
+
+Real legal content was expected to be written through an inner-page editor
+modelled on Shirat HaYam's. It was pasted in instead, and that editor still does
+not exist — so the next substantive edit to these pages is a hand edit to six
+HTML files.
 
 ## Admin backend (Activities)
 
@@ -1184,9 +1211,11 @@ share image, Formspree wiring, domain) is done. Open items:
   and has not been proofread, including the status strings in `js/activity.js`.
 - **`/about` is placeholder copy** (`[content needed]`), hence `noindex` and no
   sitemap entry.
-- **`/privacy` and `/terms` are placeholders** in all three languages, and they
-  **block the registration system** — see the Legal pages gate above. Nothing
-  links to them yet.
+- **`/privacy` and `/terms` are live and `final`** in all three languages, and
+  no longer block the registration system. **Nothing links to them yet** — the
+  footer needs the links. ⚠ The **Russian text and the two Russian price labels
+  are still awaiting a native-speaker review**; `ogen-legal-review` is `pending`
+  and gates public registration until it is done. See the Legal pages section.
 - **Nothing in the nav links to `/about` or `/activities`** yet.
 - **Registration is not built.** The `open` CTA points at the contact section.
   **Phase 1 of it is** — the activity side: `activityId`, `type`, the

@@ -24,6 +24,48 @@
     <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/"/>
   </url>
+  <url>
+    <loc>https://www.ogen.cy/privacy</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/privacy"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/privacy"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru/privacy"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/privacy"/>
+  </url>
+  <url>
+    <loc>https://www.ogen.cy/en/privacy</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/privacy"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/privacy"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru/privacy"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/privacy"/>
+  </url>
+  <url>
+    <loc>https://www.ogen.cy/ru/privacy</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/privacy"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/privacy"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru/privacy"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/privacy"/>
+  </url>
+  <url>
+    <loc>https://www.ogen.cy/terms</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/terms"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/terms"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru/terms"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/terms"/>
+  </url>
+  <url>
+    <loc>https://www.ogen.cy/en/terms</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/terms"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/terms"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru/terms"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/terms"/>
+  </url>
+  <url>
+    <loc>https://www.ogen.cy/ru/terms</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/terms"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/terms"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru/terms"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/terms"/>
+  </url>
   <!-- Activities listing -->
   <url>
     <loc>https://www.ogen.cy/activities</loc>

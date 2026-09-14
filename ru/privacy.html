@@ -8,20 +8,31 @@
 <title>Политика конфиденциальности · Центр Оген</title>
 <meta name="description" content="Политика конфиденциальности центра Оген.">
 
-<!-- PLACEHOLDER LEGAL PAGE.
-     This page exists so the routes are real and linkable during development.
-     It is NOT a legal document and must not be treated as one.
+<!-- PUBLISHED LEGAL PAGE, WITH ONE REVIEW STILL OUTSTANDING.
 
-     ogen-legal-status is machine-readable and load-bearing:
-     tests/registration-waits-for-real-legal-pages.js reads it, and refuses to
-     let a registration system ship while any legal page still says
-     "placeholder". Flip it to "final" ONLY when the reviewed text is in place,
-     and in the same change: drop the noindex below, delete the draft banner in
-     the body, and add these routes to STATIC_ROUTES in
-     netlify/functions/_activity-index.js so the sitemap agrees with the meta
-     tag. The test checks all four move together. -->
-<meta name="ogen-legal-status" content="placeholder">
-<meta name="robots" content="noindex, follow">
+     The reviewed text is in place and these pages are live and indexable. They
+     were flipped from "placeholder" deliberately, to unblock development of the
+     registration system, which the test below had been holding closed.
+
+     ⚠ THIS IS NOT A FULL LEGAL SIGN-OFF, AND ONE THING IS STILL OWED:
+     the RUSSIAN text has never been read by a native speaker. Nor have the two
+     price labels the activity pages publish (Годовой регистрационный взнос,
+     Стоимость семестра). That review must happen BEFORE public registration
+     opens — not before development continues, which is the trade being made
+     here on purpose.
+
+     ogen-legal-review below is the machine-readable half of that, and
+     tests/registration-waits-for-real-legal-pages.js reads it: while it says
+     "pending", the suite refuses to let a PUBLIC registration surface ship.
+     Flip it to "complete" when the review is done, on all six pages at once.
+
+     ogen-legal-status is the older marker and is load-bearing in the same way.
+     It now says "final", which is what let the registration work begin; the
+     noindex is gone, the draft banner is gone, and /privacy and /terms are in
+     STATIC_ROUTES so the sitemap agrees with the meta tag. All four moved
+     together, which is what the test requires. -->
+<meta name="ogen-legal-status" content="final">
+<meta name="ogen-legal-review" content="pending">
 <link rel="canonical" href="https://www.ogen.cy/ru/privacy">
 
 <!-- Language alternates -->
@@ -50,8 +61,6 @@
 </div>
 
 <div class="inner-body">
-  <p class="status-banner is-draft">Приведённый ниже текст ещё не полностью соответствует английской и ивритской версиям и содержит незаполненное поле. Политика не вступила в силу: регистрационные сервисы Ogen пока не открыты.</p>
-
 <p class="legal-updated">Последнее обновление: 1 сентября 2026 года</p>
 
 <h2>1. Кто мы</h2>
