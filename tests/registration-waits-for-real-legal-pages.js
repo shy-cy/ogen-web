@@ -172,11 +172,41 @@ const rootHtml = fs.readdirSync(R).filter((f) => f.endsWith('.html'));
 const PAGE_RE = /(register|registration|signup|sign-up|account|my-children|members?)\.html$/i;
 rootHtml.forEach((f) => { if (PAGE_RE.test(f)) PUBLIC_SIGNALS.push(f + ' (public page)'); });
 
+// Scripts are matched by NAME, which is a proxy for "a family can reach this"
+// and deliberately a loose one: a file that exists but is not wired up yet still
+// counts, because the point is to catch a surface appearing rather than a
+// surface finishing.
+//
+// The one false positive that proxy produces is an ADMIN script, and the admin
+// is exactly what this gate is meant to allow — /admin/*.html is already outside
+// the scan for that reason. So a script is exempt only when it is PROVEN to be
+// admin-only: referenced by at least one page under /admin/ and by no page
+// outside it. That is mechanical and checkable, and it is stricter than a naming
+// convention would be — a public page loading an "-admin" script still trips.
 const JS_DIR = path.join(R, 'js');
 const JS_RE = /^(member|account|register|registration|signup|participant|guardian)/i;
+
+const scriptsIn = (files, base) => {
+  const out = new Set();
+  files.forEach((f) => {
+    const src = read(base ? base + '/' + f : f);
+    const re = /<script[^>]+src="\/js\/([^"]+)"/g;
+    let m;
+    while ((m = re.exec(src))) out.add(m[1]);
+  });
+  return out;
+};
+const ADMIN_DIR = path.join(R, 'admin');
+const adminPages = fs.existsSync(ADMIN_DIR)
+  ? fs.readdirSync(ADMIN_DIR).filter((f) => f.endsWith('.html')) : [];
+const usedByAdmin = scriptsIn(adminPages, 'admin');
+const usedByPublic = scriptsIn(rootHtml);
+
 if (fs.existsSync(JS_DIR)) {
-  fs.readdirSync(JS_DIR).filter((f) => f.endsWith('.js') && JS_RE.test(f))
-    .forEach((f) => PUBLIC_SIGNALS.push('js/' + f + ' (public script)'));
+  fs.readdirSync(JS_DIR).filter((f) => f.endsWith('.js') && JS_RE.test(f)).forEach((f) => {
+    if (usedByAdmin.has(f) && !usedByPublic.has(f)) return;
+    PUBLIC_SIGNALS.push('js/' + f + ' (public script)');
+  });
 }
 
 if (!PUBLIC_SIGNALS.length) {

@@ -882,8 +882,10 @@ netlify/functions/
   activities-admin.js    /api/activities-admin
   admin-login.js         /api/admin-login
   admin-users.js         /api/admin-users
-admin/index.html, admin/activities.html, admin/users.html, admin/admin.css
-js/admin-session.js, js/activities-admin.js, js/repeatable-items.js
+admin/index.html, admin/activities.html, admin/registrations.html,
+admin/users.html, admin/admin.css
+js/admin-session.js, js/activities-admin.js, js/registrations-admin.js,
+js/repeatable-items.js
 js/image-optimize.js   resizes + re-encodes every upload IN THE BROWSER
 ```
 
@@ -1549,6 +1551,71 @@ last-guardian refusal comes first, so an admin is never shown a debt prompt for
 an action that was never going to complete — and "reassign has no target"
 cannot arise, because a permitted unlink implies a remaining guardian.
 
+## The approval queue (admin)
+
+`admin/registrations.html` + `js/registrations-admin.js`, against
+`/api/admin-registrations`. It is the screen that makes "an admin can run a
+term" true rather than true in principle — Phases 4 and 5 shipped the API with
+nothing in front of it.
+
+**It is a table where the rest of the admin is cards**, and the difference is the
+job: every other screen is opened to edit one thing, this one is opened to find
+the rows that need something doing. Columns line up so the eye runs down them,
+and the numbers are `tabular-nums`.
+
+Four things it shows that are easy to get wrong:
+
+- **The capacity line says "23 / 20 — over capacity" plainly.** Uncapped says
+  "no limit set" rather than warning: a blank group size means nobody finished
+  filling the activity in, and reading it as zero would refuse everybody.
+  Registrations taken before the groups were named are counted and shown as
+  belonging to no row, because they are.
+- **The age flag is amber, never red.** It is advisory: auto-approve stood aside
+  and left the decision to a person, and the person may well say yes. Styling it
+  as an error would make the one thing that is not a refusal look like one.
+- **A lapsed hold reads as lapsed before anything has rewritten it**, because the
+  row asks `holdsASpot()` rather than the stored status. The sweep button says
+  so too: *the place is already free either way — this only updates what the
+  queue says and tells the family.*
+- **Whether the yearly fee was billed on this term**, beside the amount. An
+  admin looking at a €300 next to a €350 should not have to open the other term
+  to find out why.
+
+**Every money control lives in one panel, not on the row.** Money is its own
+permission axis, and the ledger is the context all three controls need: what a
+family is owed is the first thing to know before recording a payment against it
+or spending it. Euros in the box, cents on the wire — that conversion happens in
+exactly one place. Each ledger line shows its `basis`, so "credited 150 of 350"
+explains itself on the screen a family is being read it from.
+
+Cancelling asks for a reason and says what it is about to do, because it writes
+into a ledger that cannot be edited afterwards — only corrected with another
+entry.
+
+**The client's permission checks are cosmetic**, as everywhere else here: they
+grey buttons out, and the server re-checks `canAccess` / `canApprove` /
+`canCancel` on every action. `tests/the-queue-screen-calls-actions-that-exist.js`
+checks the two halves against each other mechanically — every `action:` the
+screen sends is a `case` the server handles, and the three money actions are
+behind `canCancel` on both sides. An unknown action answers 400 and that failure
+is otherwise invisible until somebody presses the button.
+
+### ⚠ Why this exists and the family area does not
+
+The guardian-facing area (Phase 6) is a **public registration surface**, and
+`ogen-legal-review` is still `pending`. The admin is explicitly the other side of
+that line — the gate's own comment says "building the admin side of registration
+is exactly what this gate is meant to allow" — so this shipped and the family
+area did not.
+
+The gate's script check is by filename, which would have flagged
+`js/registrations-admin.js` as public. That was fixed by making the exemption
+**earned rather than assumed**: a script is exempt only when it is referenced by
+a page under `/admin/` and by no page outside it. Reachability, not a naming
+convention — anyone can name a public page "-admin", and the check is now
+stricter in that direction than it was, since a public page loading an
+admin-named script still trips it.
+
 ### Email (Resend)
 
 The infrastructure, plus the account, invite and registration messages that now
@@ -1693,8 +1760,13 @@ share image, Formspree wiring, domain) is done. Open items:
   scoped to one participant / one activity / one academic year, `seriesId`
   linking an autumn term to its spring, payments, applying credit, adjustments,
   and the unlink debt disposition.
-  All four are **server-side only** — there is no page in front of any of it
-  yet, deliberately, so the family area stays a rendering job. **Phases 6 and 7
-  remain**: the family-facing area, and pay-per-session.
+  **The admin half now has a screen**: `/admin/registrations.html` is the
+  approval queue, the capacity line, the sweep and every money control.
+  ⚠ **Phase 6 (the family-facing area) is HELD BY `ogen-legal-review`** and is
+  the first thing that gate has ever actually blocked. It is a public
+  registration surface, and nobody fluent has read the Russian legal text, the
+  two price labels, or the account and registration emails. Accounts, family and
+  registration are therefore reachable only through the admin. **Phase 7
+  (pay-per-session) remains** and is not gated.
 - **Rotate the setup credentials.** The GitHub PAT and Netlify token were pasted
   into a chat transcript during setup.

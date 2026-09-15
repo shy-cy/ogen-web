@@ -273,3 +273,62 @@ input:disabled,textarea:disabled,select:disabled{background:#f2f0ea;color:#8b8b8
    "still here, not happening" rather than looking deleted. */
 .item.is-off{ opacity:.62; }
 .item.is-off .session-date{ text-decoration:line-through; }
+
+/* ---------- the approval queue ----------
+   A table rather than the card list the rest of the admin uses, because this is
+   the one screen that is SCANNED: an admin opens it to find the rows that need
+   something doing, not to read any particular one. Columns line up, so the eye
+   runs down them. */
+.capacity-line{
+  display:flex;gap:18px;align-items:baseline;flex-wrap:wrap;
+  padding:10px 14px;border-radius:8px;background:var(--stone);margin-bottom:14px;font-size:13px;
+}
+.capacity-line b{font-size:18px;font-weight:800;font-variant-numeric:tabular-nums;}
+.capacity-line .over{color:var(--danger);}
+.capacity-line .group{padding-inline-start:14px;border-inline-start:1px solid #d7cfbb;}
+
+.queue{width:100%;border-collapse:collapse;font-size:13px;}
+.queue th{
+  text-align:start;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--muted);padding:0 10px 8px;border-bottom:1px solid #e3ded1;white-space:nowrap;
+}
+.queue td{padding:10px;border-bottom:1px solid #f0ece1;vertical-align:top;}
+.queue tr:hover td{background:#fbfaf6;}
+.queue .num{font-variant-numeric:tabular-nums;white-space:nowrap;}
+.queue .who b{display:block;}
+.queue .who span{color:var(--muted);font-size:12px;}
+.queue .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
+.queue .acts button{
+  font-family:inherit;font-size:12px;font-weight:700;padding:5px 10px;border-radius:6px;
+  border:1px solid #d7cfbb;background:#fff;cursor:pointer;white-space:nowrap;
+}
+.queue .acts button:hover:not(:disabled){background:var(--stone);}
+.queue .acts button:disabled{opacity:.4;cursor:not-allowed;}
+.queue .acts button.go{background:var(--olive);border-color:var(--olive);color:#fff;}
+.queue .acts button.no{border-color:#e0cfc8;color:var(--danger);}
+
+/* The age flag is ADVISORY and the styling has to say so: an out-of-range age
+   is a row to look at, never a row that was refused. Amber, not red. */
+.flag{
+  display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:99px;
+  background:#fbf3e2;color:#8a6a20;white-space:nowrap;
+}
+.flag.unknown{background:#efeee9;color:var(--muted);}
+.flag.ok{background:transparent;color:var(--muted);font-weight:400;}
+
+.pill.pending{background:var(--gold);color:#fff;}
+.pill.approved{background:var(--olive);color:#fff;}
+.pill.rejected{background:#c8c2b4;color:#5a5646;}
+.pill.expired{background:#c8c2b4;color:#5a5646;}
+.pill.lapsed{background:var(--camel);color:#fff;}
+.pill.paid{background:var(--olive);color:#fff;}
+.pill.owed{background:#efeee9;color:#6a6658;}
+.pill.credited{background:var(--navy);color:#fff;}
+.pill.written-off{background:#c8c2b4;color:#5a5646;}
+
+.ledger{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:10px;}
+.ledger td{padding:6px 10px;border-bottom:1px solid #f0ece1;}
+.ledger .amt{text-align:end;font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap;}
+.ledger .amt.debit{color:var(--danger);}
+.ledger .why{color:var(--muted);font-size:11.5px;}
+.balance{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;}

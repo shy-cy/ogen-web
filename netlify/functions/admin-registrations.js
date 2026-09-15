@@ -149,11 +149,40 @@ exports.handler = async (event) => {
 
   try {
     switch (body.action) {
+      // Who am I and what may I do. The client mirrors these to grey controls
+      // out; the server re-checks every one of them on every action and assumes
+      // the client is hostile.
+      case 'auth':
+        return json(200, {
+          ok: true, email: session.email, name: session.name, roleName: session.roleName,
+          canApprove: canApprove(session), canCancel: canCancel(session)
+        });
+
+      // The activities there could be a queue for. Read from the published index
+      // rather than listing registrations, so an activity nobody has registered
+      // for still appears — otherwise a new term is invisible until the first
+      // family finds it, which is exactly when an admin wants to be watching.
+      case 'activities': {
+        const index = (await readJson('activities/activities-index.json')) || [];
+        return json(200, {
+          ok: true,
+          activities: index.map((a) => ({
+            slug: a.slug, title: a.title, status: a.status,
+            type: a.type || 'course', activityId: a.activityId || null,
+            seriesId: a.seriesId || a.activityId || null
+          }))
+        });
+      }
+
       // The queue for one activity, with the capacity line above it.
       case 'queue': {
         const activity = await published(body.slug);
         if (!activity) return json(404, { error: 'No such activity.' });
-        let regs = await store.forActivity(activity.activityId);
+        // Read ONCE. The capacity line and the rows are two views of the same
+        // list, and reading it twice is both a wasted round trip and a way for
+        // the count above the table to disagree with the table under it.
+        const all = await store.forActivity(activity.activityId);
+        let regs = all;
         if (body.status) regs = regs.filter((r) => r.status === body.status);
         if (body.groupId) regs = regs.filter((r) => r.groupId === body.groupId);
         const rows = [];
@@ -165,7 +194,9 @@ exports.handler = async (event) => {
           // cannot happen. Two submissions arriving together can both pass the
           // check; there is no atomic increment to close that window, and an
           // extra visible record is a smaller problem than a lost counter.
-          capacity: R.capacityReport(activity, await store.forActivity(activity.activityId)),
+          // Always from the FULL list, never the filtered one: filtering to
+          // "pending" must not make the activity look emptier than it is.
+          capacity: R.capacityReport(activity, all),
           registrations: rows
         });
       }
