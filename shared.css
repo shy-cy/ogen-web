@@ -311,6 +311,25 @@ html[lang="en"] .page-header h1, html[lang="ru"] .page-header h1{ font-weight:80
    contact address), so they are where the rule is needed. */
 .inner-body a{ color: var(--terracotta); text-decoration:underline; text-underline-offset:2px; }
 .inner-body .legal-updated{ font-size:14.5px; color: var(--camel); margin-bottom:26px; }
+
+/* GOVERNING LANGUAGE. It sits at the TOP rather than as a closing clause, and
+   that placement is the whole point: a reader who only reads Russian has to
+   learn that they are holding a courtesy translation before they read it, not
+   after. Put at the end it would be the last thing reached by exactly the
+   reader it is addressed to.
+   Not a numbered section either — adding one would renumber every section
+   below it in three languages, and this is a notice about the document rather
+   than a term within it. Bordered on the INLINE start so it flips with the
+   language, like everything else here. */
+.inner-body .legal-governing{
+  border-inline-start: 3px solid var(--camel);
+  background: var(--paper);
+  padding: 16px 20px; border-radius: 4px; margin-bottom: 30px;
+}
+.inner-body .legal-governing p{ font-size:15px; margin:0; }
+.inner-body .legal-governing .legal-governing-link{
+  margin-top:8px; font-size:14px; color: var(--camel);
+}
 .pullquote{ border-inline-start:4px solid var(--terracotta); padding:6px 22px; margin:30px 0; font-size:18px; font-weight:700; color: var(--olive); }
 .inner-image{ width:100%; border-radius:14px; margin:28px 0; display:block; }
 .placeholder-img{

@@ -783,71 +783,102 @@ carrying the date so a 409 can name it); an admin cancelling in week nine for a
 safety reason still goes through and credits nothing. `creditFor()` therefore
 says nothing at all about admin cancellation.
 
-## ⚠ Legal pages: the first gate is open, the second is not
+## Legal pages, and the two gates on them
 
-`/privacy` and `/terms` exist in all three languages and now carry **real
-reviewed text**. They are `final`, indexable, in `sitemap.xml`, and their draft
-banners are gone. **Nothing links to them yet** — the footer links are still to
-be added.
+`/privacy` and `/terms` exist in all three languages, carry real reviewed text,
+are `final`, indexable, in `sitemap.xml`, and linked from the footer.
 
-Each page carries **two** machine-readable markers, and they gate different
-things:
+**English is the binding version.** A governing-language clause sits at the top
+of all six pages, in each page's own language: the document is provided in
+Hebrew, English and Russian, the English version is legally binding, the others
+are courtesy translations, and English prevails on any discrepancy.
+
+It is **at the top, not as a closing clause**, and that placement is the point —
+a reader who only reads Russian has to learn they are holding a courtesy
+translation *before* they read it. Put at the end it would be the last thing
+reached by exactly the reader it is addressed to. It is **not a numbered
+section**, because adding one would renumber every section below it in three
+languages, and this is a notice about the document rather than a term inside it.
+
+Three machine-readable markers, and they gate different things:
 
 ```html
-<meta name="ogen-legal-status" content="final">     <!-- may registration be BUILT? -->
-<meta name="ogen-legal-review" content="pending">   <!-- may it be OPENED? -->
+<meta name="ogen-legal-status"  content="final">     <!-- may registration be BUILT?   -->
+<meta name="ogen-legal-review"  content="complete">  <!-- has THIS text been read?     -->
+<meta name="ogen-legal-binding" content="en">        <!-- which version GOVERNS?       -->
 ```
 
-**`ogen-legal-status` is `final`, and that was a deliberate trade.** The Hebrew
-and English text is reviewed; the Russian has never been read by a native
-speaker, nor have the two price labels the activity pages publish
-(`Годовой регистрационный взнос`, `Стоимость семестра`). Holding the entire
-registration system closed behind that one outstanding review was judged the
-wrong call, so the first gate was opened knowingly.
+`ogen-legal-review` is **per page** and has three states:
 
-**`ogen-legal-review` is what keeps that a decision rather than an oversight.**
-While it says `pending`, the same suite refuses to let a *public* registration
-surface ship — a page a family can reach (`register.html`, `account.html`, a
-`js/member-*.js`), never the admin, which is staff-only and noindex and is
-exactly what the open first gate is meant to allow. So development continues and
-the door does not open. Flip it to `complete` on all six pages when the review
-is done.
+| | |
+|---|---|
+| `complete` | Hebrew and English. Somebody fluent has read this text. |
+| `courtesy` | Russian. Offered for convenience; nobody fluent has read it. |
+| `pending` | the original state, before any review |
 
-Russian is not a courtesy language here. It is one of three equals, and a
-Russian-speaking parent agreeing to terms nobody fluent has checked is the
-situation the first gate existed to prevent, one language down.
+**Russian is `courtesy`, not `complete`, and that was the whole decision.**
+Flattening it would have made the marker a lie in order to get a gate to pass,
+and the marker is the only machine-readable thing standing between this system
+and a family agreeing to terms nobody checked. A third state costs one word and
+keeps the truth writable.
 
-**`tests/registration-waits-for-real-legal-pages.js` reads that marker and is
-the safeguard.** It passes quietly today. The moment any registration surface
-appears — a function named `member-*` / `account-*` / `participant-*` /
-`guardian-*` / `registration-*`, a `requireStore`/`optionalStore` call opening
-one of the people stores, or a `registrations` entry in `_roles.js` `TOOLS` —
-the suite **fails the build** until every legal page is marked `final`.
+### What the second gate asks now
 
-That has now happened, and the four things moved together as the test requires:
+`tests/registration-waits-for-real-legal-pages.js` used to ask *"has every
+language been reviewed"*, because every language was equally binding — a
+Russian-speaking parent agreeing to unreviewed Russian was agreeing to those
+Russian words. The clause changed what is true, so the gate changed what it asks:
 
-1. `ogen-legal-status` → `final`, on **all six pages at once** (a reviewed
-   English policy beside an untranslated Hebrew one is not "partly done" —
-   Hebrew is this site's default language and the Hebrew reader is the one who
-   cannot read what they agreed to);
-2. the `noindex` meta removed;
-3. the draft banner element deleted, and no `[content needed]` left;
-4. `/privacy` and `/terms` added to `STATIC_ROUTES` in `_activity-index.js`, so
-   the sitemap and the meta tag agree — the same pairing `/about` is still on
-   the other side of.
+1. **Is the binding version reviewed?** Whichever language `ogen-legal-binding`
+   names must be `complete` on both its pages. If the version that governs has
+   not been read, nothing else matters.
+2. **Does every page carry the clause?** Checked on **all six**, the binding
+   language included — a Hebrew reader has to be told which version governs just
+   as much as a Russian one. And a `courtesy` page is only honest while it says
+   it is a courtesy translation: remove the clause and that page silently becomes
+   unreviewed text a family agrees to with no notice at all, which is the exact
+   thing this gate exists to stop.
 
-The gate existed because the placeholder looked finished: proper URL,
-breadcrumb, site typography, real headings. The reason the pages were created
-early was exactly the reason nobody would have noticed they were still empty.
-Ogen has never stored a person's name; the registration system stores a
-**minor's name and date of birth, in the EU**.
+The clause is matched by a `data-governing-language` attribute rather than by its
+prose — matching the words would mean matching them in three languages and would
+break on any rewording, and the clause is meant to be rewordable. The attribute
+and the meta tag must name the same language; two machine-readable statements of
+one fact are two statements that can disagree.
 
-**What is still owed is now `ogen-legal-review`**, and it enforces the same idea
-one step further down the road: the Russian text and the two Russian price
-labels have not been read by a native speaker, and while the marker says
-`pending` the suite refuses a **public** registration surface — a page a family
-can reach, never the admin. The test proves it bites rather than asserting it
-does; dropping a `register.html` into the repo turns the suite red.
+Both failure modes are verified to bite: removing the clause from one page fails,
+and marking the binding version `courtesy` fails.
+
+### ⚠ What the clause does not do
+
+It closes a **legal** gap, not a quality one, and it does not reach everything:
+
+- **GDPR Article 12(1)** requires privacy information to be "concise,
+  transparent, intelligible and easily accessible, using clear and plain
+  language", addressed to the data subject. That is a transparency duty owed to
+  the reader, and a governing-language clause does not discharge it — a Russian-
+  speaking parent who can only read the Russian notice is the person Article 12
+  is about. It bears on the **Privacy Policy** much more than on the Terms.
+- **EU unfair-terms law** (Directive 93/13/EEC, as implemented in Cyprus) makes a
+  non-negotiated consumer term that is not in plain intelligible language liable
+  to be unenforceable *against the consumer*. A clause saying "the English
+  governs" is itself a term, and a court asked about it will look at whether the
+  consumer could understand what they agreed to.
+
+So the clause makes the Russian **honest rather than hidden**, which is a real
+improvement and is why it no longer blocks public registration. It does not make
+the Russian **good**. The native-speaker review is now a quality and trust item
+rather than a blocker, and it is still worth doing — the Russian text, the two
+price labels (`Годовой регистрационный взнос`, `Стоимость семестра`), and the
+account, invite and registration emails. **The emails are not covered by the
+clause at all**: nobody agrees to an email, so a governing-language notice buys
+nothing there — they are simply the product, in a language nobody has checked.
+
+`ogen-legal-status` is the older, coarser marker: may registration be *built*. It
+has said `final` since the text landed. The gate existed because the placeholder
+looked finished — proper URL, breadcrumb, site typography, real headings — and
+the reason the pages were created early is exactly the reason nobody would have
+noticed they were still empty. Ogen has never stored a person's name; the
+registration system stores a **minor's name and date of birth, in the EU**.
 
 Real legal content was expected to be written through an inner-page editor
 modelled on Shirat HaYam's. It was pasted in instead, and that editor still does

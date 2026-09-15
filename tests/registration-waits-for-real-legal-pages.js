@@ -137,26 +137,82 @@ console.log('\n[the review that is still owed]');
 // That was a deliberate decision, taken knowingly, and it is recorded here so
 // that it stays a decision rather than becoming something everyone forgot.
 //
-// What is still owed: a NATIVE SPEAKER has never read the Russian text, nor the
-// two price labels the activity pages publish. Russian is not a courtesy
-// language on this site — it is one of three equals, and a Russian-speaking
-// parent agreeing to terms nobody fluent has checked is the exact situation the
-// first gate exists to prevent, one language down.
+// THE SECOND GATE, AND IT NO LONGER ASKS THE QUESTION IT USED TO.
 //
-// So the first gate governs whether registration can be BUILT, and this one
-// governs whether it can be OPENED to the public. The distinction is the whole
-// point: development continues, and the door does not open.
-const REVIEW_RE = /<meta name="ogen-legal-review" content="(pending|complete)">/;
+// It used to ask "has every language been reviewed", because every language was
+// equally binding — a Russian-speaking parent agreeing to terms nobody fluent
+// had checked was agreeing to those Russian words. A governing-language clause
+// changed what is true: English is the binding version, and the other two are
+// courtesy translations that say so, in their own language, at the top of the
+// page where the reader meets them first.
+//
+// So the gate asks the two questions that now decide it:
+//
+//   1. IS THE BINDING VERSION REVIEWED? Whichever language ogen-legal-binding
+//      names must be `complete` on both of its pages. That is the hard one — if
+//      the version that governs has not been read, nothing else matters.
+//
+//   2. DOES EVERY PAGE CARRY THE CLAUSE? A `courtesy` page is only honest while
+//      it says it is a courtesy translation. Remove the clause from one language
+//      and that page silently becomes an unreviewed text a family is agreeing to
+//      with no notice at all — which is the exact thing this gate exists to
+//      stop. So the clause is checked on ALL SIX, including the binding
+//      language's own pages, because a reader of the Hebrew has to be told which
+//      version governs just as much as a reader of the Russian.
+//
+// Russian is `courtesy`, not `complete`. Flattening it would have made the
+// marker a lie to get the gate to pass, and the marker is the only machine-
+// readable thing standing between this system and a family agreeing to terms
+// nobody checked. A third state costs one word and keeps the truth writable.
+const REVIEW_RE = /<meta name="ogen-legal-review" content="(pending|complete|courtesy)">/;
+const BINDING_RE = /<meta name="ogen-legal-binding" content="([a-z]{2})">/;
+// The machine-readable half of the clause. An attribute rather than a phrase,
+// because matching the prose would mean matching it in three languages and
+// would break on any rewording — and the clause is meant to be reworded.
+const CLAUSE_RE = /data-governing-language="([a-z]{2})"/;
+
 const review = {};
+const binding = {};
 LEGAL_PAGES.forEach((p) => {
-  const m = REVIEW_RE.exec(read(p));
+  const src = read(p);
+  const m = REVIEW_RE.exec(src);
   H.ok(!!m, p + ' declares ogen-legal-review');
   review[p] = m ? m[1] : null;
+
+  const b = BINDING_RE.exec(src);
+  H.ok(!!b, p + ' declares which language governs');
+  binding[p] = b ? b[1] : null;
+
+  // The clause a person actually reads, and it must agree with the meta tag.
+  // Two machine-readable statements of one fact are two statements that can
+  // disagree, so the check is that they do not.
+  const c = CLAUSE_RE.exec(src);
+  H.ok(!!c, p + ' carries the governing-language clause in its body');
+  H.ok(!c || !b || c[1] === b[1],
+    p + ': the clause and the meta tag name the SAME binding language');
 });
-const reviewStates = Array.from(new Set(Object.values(review)));
-H.eq(reviewStates.length, 1,
-  'every page carries the same review state (found: ' + reviewStates.join(', ') + ')');
-const REVIEWED = reviewStates.length === 1 && reviewStates[0] === 'complete';
+
+const bindingLangs = Array.from(new Set(Object.values(binding)));
+H.eq(bindingLangs.length, 1,
+  'all six pages agree on which language governs (found: ' + bindingLangs.join(', ') + ')');
+const GOVERNS = bindingLangs.length === 1 ? bindingLangs[0] : null;
+
+// Which pages ARE the binding version. The Hebrew tree is at the root, so a page
+// belongs to `en` or `ru` by its directory and to `he` by having neither.
+const langOfPage = (p) => (p.indexOf('/') === -1 ? 'he' : p.split('/')[0]);
+const bindingPages = LEGAL_PAGES.filter((p) => langOfPage(p) === GOVERNS);
+H.eq(bindingPages.length, 2, 'the binding language has both of its pages here');
+
+const REVIEWED = !!GOVERNS && bindingPages.every((p) => review[p] === 'complete');
+LEGAL_PAGES.forEach((p) => {
+  if (langOfPage(p) === GOVERNS) {
+    H.eq(review[p], 'complete',
+      p + ' is the BINDING version, so "reviewed" is not optional for it');
+  } else {
+    H.ok(review[p] === 'complete' || review[p] === 'courtesy',
+      p + ' is a non-binding version: reviewed, or a declared courtesy translation');
+  }
+});
 
 // A PUBLIC registration surface: something a family can reach. The admin is
 // deliberately not one — it is staff-only and noindex, and building the admin
@@ -209,21 +265,24 @@ if (fs.existsSync(JS_DIR)) {
   });
 }
 
-if (!PUBLIC_SIGNALS.length) {
-  if (REVIEWED) {
-    console.log('  ..   Russian review complete — this gate has nothing left to hold');
-  } else {
-    console.log('  ..   STILL OWED: a native speaker has not read the Russian legal text,');
-    console.log('       nor the price labels Годовой регистрационный взнос / Стоимость семестра.');
-    console.log('       Nothing public depends on it yet. Do it before registration OPENS.');
-  }
-  H.ok(true, 'no public registration surface yet, so the review is a reminder rather than a blocker');
-} else {
-  console.log('  ..   FOUND: ' + PUBLIC_SIGNALS.join('\n       '));
-  H.ok(REVIEWED,
-    'registration is about to be public, so the Russian legal text and the price labels ' +
-    'must have been read by a native speaker first — flip ogen-legal-review to "complete" ' +
-    'on all six pages when that is done');
+const courtesy = LEGAL_PAGES.filter((p) => review[p] === 'courtesy');
+
+if (PUBLIC_SIGNALS.length) console.log('  ..   FOUND: ' + PUBLIC_SIGNALS.join('\n       '));
+H.ok(REVIEWED,
+  'the BINDING version (' + GOVERNS + ') has been reviewed — everything else is a courtesy ' +
+  'translation that says so on its own page');
+
+if (courtesy.length) {
+  // Not a failure. A standing note, because the thing it describes is real and
+  // easy to stop thinking about once the gate goes green.
+  console.log('  ..   STILL A COURTESY TRANSLATION: ' + courtesy.join(', '));
+  console.log('       Nobody fluent has read that text, nor the price labels');
+  console.log('       Годовой регистрационный взнос / Стоимость семестра, nor the account');
+  console.log('       and registration emails. The clause makes that HONEST rather than');
+  console.log('       hidden — it does not make it good, and it does not reach GDPR Art. 12,');
+  console.log('       which asks for intelligible information in the reader\'s own language.');
+  console.log('       Worth doing. No longer blocking.');
 }
+H.ok(true, 'and every page says, in its own language, which version governs');
 
 H.done();

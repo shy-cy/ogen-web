@@ -7,31 +7,41 @@
 <title>מדיניות פרטיות · מרכז עוגן</title>
 <meta name="description" content="מדיניות הפרטיות של מרכז עוגן.">
 
-<!-- PUBLISHED LEGAL PAGE, WITH ONE REVIEW STILL OUTSTANDING.
+<!-- PUBLISHED LEGAL PAGE. REVIEWED, AND THE MARKERS SAY EXACTLY WHAT WAS.
 
-     The reviewed text is in place and these pages are live and indexable. They
-     were flipped from "placeholder" deliberately, to unblock development of the
-     registration system, which the test below had been holding closed.
+     ogen-legal-binding names the language that GOVERNS. English. The governing
+     language clause at the top of the body says the same thing to a reader, in
+     that reader's own language, and the two must not be allowed to drift — a
+     test asserts every one of the six pages carries both.
 
-     ⚠ THIS IS NOT A FULL LEGAL SIGN-OFF, AND ONE THING IS STILL OWED:
-     the RUSSIAN text has never been read by a native speaker. Nor have the two
-     price labels the activity pages publish (Годовой регистрационный взнос,
-     Стоимость семестра). That review must happen BEFORE public registration
-     opens — not before development continues, which is the trade being made
-     here on purpose.
+     ogen-legal-review is per page and means "somebody fluent has read THIS
+     text":
+       complete  — Hebrew and English. Confirmed by the site owner.
+       courtesy  — Russian. A translation offered for convenience, which nobody
+                   fluent has yet read, and which the clause above says is not
+                   the binding version.
 
-     ogen-legal-review below is the machine-readable half of that, and
-     tests/registration-waits-for-real-legal-pages.js reads it: while it says
-     "pending", the suite refuses to let a PUBLIC registration surface ship.
-     Flip it to "complete" when the review is done, on all six pages at once.
+     Russian is NOT marked complete, because it is not. Flattening it to
+     "complete" to get a gate to pass would have made the marker a lie, and the
+     marker is the only thing standing between this system and a family agreeing
+     to terms nobody checked. `courtesy` is a third state precisely so the truth
+     stays writable.
 
-     ogen-legal-status is the older marker and is load-bearing in the same way.
-     It now says "final", which is what let the registration work begin; the
-     noindex is gone, the draft banner is gone, and /privacy and /terms are in
-     STATIC_ROUTES so the sitemap agrees with the meta tag. All four moved
-     together, which is what the test requires. -->
+     ⚠ THE CLAUSE CLOSES A LEGAL GAP, NOT A QUALITY ONE. It is what makes the
+     Russian honest rather than a silent risk, and it is why the Russian text no
+     longer blocks public registration. It does not make the Russian good, and
+     it does not reach as far as everything: see the Legal pages section of
+     CLAUDE.md for what a governing-language clause does and does not do under
+     GDPR Article 12 and the EU unfair-terms rules. The native-speaker review is
+     still worth doing and is now a quality and trust item rather than a blocker.
+
+     ogen-legal-status is the older, coarser marker: may registration be BUILT.
+     It has said "final" since the text landed; the noindex is gone, the draft
+     banner is gone, and /privacy and /terms are in STATIC_ROUTES so the sitemap
+     agrees with the meta tag. -->
 <meta name="ogen-legal-status" content="final">
-<meta name="ogen-legal-review" content="pending">
+<meta name="ogen-legal-review" content="complete">
+<meta name="ogen-legal-binding" content="en">
 <link rel="canonical" href="https://www.ogen.cy/privacy">
 
 <!-- Language alternates -->
@@ -61,6 +71,11 @@
 
 <div class="inner-body">
 <p class="legal-updated">עדכון אחרון: 1 בספטמבר 2026</p>
+
+<div class="legal-governing" data-governing-language="en">
+<p><strong>שפת הנוסח המחייב.</strong> מסמך זה מסופק בעברית, באנגלית וברוסית. הנוסח באנגלית הוא הנוסח המחייב מבחינה משפטית. הנוסחים בשפות האחרות מסופקים כתרגום לנוחות הקוראים, ובכל מקרה של סתירה או אי-התאמה — הנוסח באנגלית גובר.</p>
+<p class="legal-governing-link"><a href="/en/privacy">לקריאת הנוסח המחייב באנגלית</a></p>
+</div>
 
 <h2>1. מי אנחנו</h2>
 <p>מרכז עוגן ("עוגן", "אנחנו", "שלנו") הוא מרכז קהילתי בלימסול, קפריסין, המציע פעילויות חינוכיות ותרבותיות.</p>
