@@ -21,6 +21,7 @@ const accounts = require('./_account-store');
 const participants = require('./_participant-store');
 const guardians = require('./_guardian-store');
 const registrations = require('./_registration-store');
+const attendance = require('./_session-attendance');
 const { recordAudit } = require('./_audit');
 
 // The family tool, not the activities one. An admin who may publish pages is
@@ -258,6 +259,9 @@ exports.handler = async (event) => {
         // queue that resolves to nothing — and it carries a child's name and
         // date of birth in its frozen block, which is the half that matters.
         await registrations.removeForParticipant(p.participantId);
+        // The per-session bookings too. A booking pointing at a participant that
+        // is gone is a name on a register that resolves to nothing.
+        await attendance.removeForParticipant(p.participantId);
         await guardians.removeAllLinks(p.participantId);
         await participants.deleteParticipant(p.participantId);
         await recordAudit(session, 'family.deleteParticipant', p.participantId, 'ok', { detail: p.firstName + ' ' + (p.lastName || '') });

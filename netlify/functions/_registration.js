@@ -144,6 +144,42 @@ function capacityReport(activity, regs, now) {
   };
 }
 
+// A DROP-IN COUNTS A ROOM ON ONE EVENING, not a term.
+//
+// "The room holds twenty on Tuesday, not twenty forever." A course's capacity is
+// consumed by a registration that holds a spot for the whole term; a drop-in's
+// is consumed by whoever is coming on the night, and is free again the next
+// week. Same capacity figure from the same facts.groupSize, counted against a
+// different list.
+//
+// It takes the attendance records rather than reading them, so this stays pure
+// and testable with no fixtures — the same shape capacityReport() has.
+function capacityForDate(activity, attendances, sessionDate) {
+  const f = (((activity || {}).facts) || {}).groupSize || {};
+  const capacity = facts.totalCapacity(f);
+  const held = (attendances || []).filter(
+    (a) => a && a.sessionDate === sessionDate && holdsASeat(a));
+  const byGroup = Object.create(null);
+  held.forEach((a) => { const g = a.groupId || ''; byGroup[g] = (byGroup[g] || 0) + 1; });
+
+  return {
+    sessionDate: sessionDate,
+    capacity: capacity,
+    taken: held.length,
+    left: capacity == null ? null : capacity - held.length,
+    over: capacity != null && held.length > capacity,
+    byGroup: byGroup
+  };
+}
+
+// Booked or already attended occupies a place on that evening; cancelled and
+// no-show do not. A no-show is deliberately NOT counted — the question this
+// answers is "is there room", and somebody who did not come is not in the room.
+// Whether they still owe for it is a different question, answered by the payment
+// on their own record.
+const SEAT_STATUSES = ['booked', 'attended'];
+const holdsASeat = (att) => !!att && SEAT_STATUSES.indexOf(att.status) !== -1;
+
 // Is there room for one more, in the group they asked for?
 function hasRoom(report, groupId) {
   if (report.named) {
@@ -339,6 +375,11 @@ function freeze(activity, participant, groupId, flag, fee) {
     // retroactively change what an earlier family was billed.
     seriesId: (fee && fee.seriesId) || null,
     feeYear: (fee && fee.feeYear) || null,
+    // WHICH KIND OF ACTIVITY THIS WAS WHEN THEY REGISTERED, frozen for the same
+    // reason the price is. creditFor() reads it to refuse the course arithmetic
+    // outright for a drop-in — and an admin switching an activity's type in
+    // March must not change what a January family's cancellation is worth.
+    type: (activity && activity.type) || 'course',
     participantName: [participant.firstName, participant.lastName].filter(Boolean).join(' '),
     dateOfBirth: participant.dateOfBirth || null,
     activityTitle: activity.title || null,
@@ -495,6 +536,7 @@ module.exports = {
   ACADEMIC_YEAR_STARTS,
   academicYearOf, feeYearOf, seriesOf, feeStandsOn, feeApplies, owedCentsFor,
   holdsASpot, hasLapsed, countSpots, capacityReport, hasRoom,
+  capacityForDate, holdsASeat, SEAT_STATUSES,
   ageCheckMoment, flagFor, autoApproves,
   freeze, submissionErrors, newRegistration, transition
 };

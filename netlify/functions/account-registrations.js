@@ -25,6 +25,7 @@ const R = require('./_registration');
 const credit = require('./_credit');
 const ledger = require('./_credit-ledger');
 const { cancelAndCredit } = require('./_registration-cancel');
+const attendance = require('./_session-attendance');
 const facts = require('./_activity-facts');
 const mail = require('./_registration-email');
 
@@ -58,10 +59,13 @@ function activityView(activity, report, lang) {
     type: activity.type || 'course',
     status: activity.status,
     title: activity.title,
-    capacity: report.capacity,
-    taken: report.taken,
-    left: report.left,
-    full: !R.hasRoom(report, null) && !report.named,
+    // A drop-in has no term-level "places left" to report: the number that means
+    // anything is per evening, and the sessions action answers it per date.
+    capacity: activity.type === 'dropin' ? null : report.capacity,
+    taken: activity.type === 'dropin' ? null : report.taken,
+    left: activity.type === 'dropin' ? null : report.left,
+    perSession: activity.type === 'dropin',
+    full: activity.type !== 'dropin' && !R.hasRoom(report, null) && !report.named,
     groups: report.named
       ? report.named.map((g) => ({
           groupId: g.groupId,
@@ -104,6 +108,130 @@ exports.handler = async (event) => {
         if (!activity) return json(404, { error: 'No such activity.' });
         const regs = await store.forActivity(activity.activityId);
         return json(200, { ok: true, activity: activityView(activity, R.capacityReport(activity, regs), lang) });
+      }
+
+      // --- pay-per-session ---------------------------------------------------
+      //
+      // A drop-in registration means "this child may come". Which evenings they
+      // are coming to is a separate, smaller decision, taken one at a time.
+
+      // The evenings on offer, how full each is, and which this participant has
+      // already booked. A COUNT per date, never a list of who.
+      case 'sessions': {
+        const participant = await mustGuard(body.participantId);
+        if (!participant) return json(404, { error: NOT_YOURS });
+        const activity = await published(body.slug);
+        if (!activity) return json(404, { error: 'No such activity.' });
+        if (activity.type !== 'dropin') {
+          return json(400, { error: 'This activity is booked for the whole term, not by the session.' });
+        }
+        const reg = await store.getRegistration(participant.participantId, activity.activityId);
+        const all = await attendance.forActivity(activity.activityId);
+        const mine = {};
+        all.filter((a) => a.participantId === participant.participantId)
+           .forEach((a) => { mine[a.sessionDate] = a; });
+
+        return json(200, {
+          ok: true,
+          // Booking needs an approved registration behind it. The registration
+          // is the "may come" decision and an admin makes it once; this endpoint
+          // does not quietly become a second way in.
+          mayBook: !!reg && reg.status === 'approved',
+          registrationStatus: reg ? reg.status : null,
+          sessions: attendance.bookableDates(activity).map((date) => {
+            const cap = R.capacityForDate(activity, all, date);
+            const own = mine[date] || null;
+            return {
+              date: date,
+              left: cap.left, capacity: cap.capacity, full: cap.left != null && cap.left <= 0,
+              status: own ? own.status : null,
+              owedCents: own ? own.payment.owedCents : null,
+              paidCents: own ? own.payment.paidCents : null,
+              // What cancelling would do, from the SAME function the server will
+              // apply — so what is shown is what happens.
+              cancellation: own ? credit.creditForSession(own, Date.now()) : null
+            };
+          })
+        });
+      }
+
+      case 'bookSession': {
+        const participant = await mustGuard(body.participantId);
+        if (!participant) return json(404, { error: NOT_YOURS });
+        const activity = await published(body.slug);
+        if (!activity) return json(404, { error: 'No such activity.' });
+        const bad = attendance.validate(activity, body.sessionDate);
+        if (bad) return json(400, { error: bad });
+
+        const reg = await store.getRegistration(participant.participantId, activity.activityId);
+        if (!reg || reg.status !== 'approved') {
+          return json(409, { error: 'You need an approved registration for this activity first.' });
+        }
+        const existing = await attendance.getAttendance(
+          participant.participantId, activity.activityId, body.sessionDate);
+        if (existing && R.holdsASeat(existing)) {
+          return json(409, { error: 'That evening is already booked.', status: existing.status });
+        }
+
+        // The room on THAT evening, not the term. Counted, never decremented —
+        // so a cancellation frees the place the moment it is written.
+        const all = await attendance.forActivity(activity.activityId, body.sessionDate);
+        const cap = R.capacityForDate(activity, all, body.sessionDate);
+        if (cap.left != null && cap.left <= 0) {
+          return json(409, { error: 'That evening is full.', full: true });
+        }
+
+        const att = attendance.newAttendance({
+          activity: activity, participantId: participant.participantId,
+          accountId: me.accountId, groupId: reg.groupId, sessionDate: body.sessionDate
+        });
+        // A re-booking after a cancellation lands on the same key, so the earlier
+        // history is carried forward rather than overwritten — the same rule a
+        // re-requested registration follows.
+        if (existing) att.history = (existing.history || []).concat(att.history);
+        await attendance.saveAttendance(att);
+        return json(200, { ok: true, session: att });
+      }
+
+      case 'cancelSession': {
+        const participant = await mustGuard(body.participantId);
+        if (!participant) return json(404, { error: NOT_YOURS });
+        const att = await attendance.getAttendance(
+          body.participantId, body.activityId, body.sessionDate);
+        if (!att) return json(404, { error: 'No such booking.' });
+        if (att.status === 'cancelled') return json(200, { ok: true, session: att });
+        if (att.status !== 'booked') {
+          return json(409, { error: 'That evening has already happened.' });
+        }
+
+        // ALL OR NOTHING. In time, the payment becomes credit; after the
+        // deadline, nothing — and the booking is released either way, because a
+        // family can always say they are not coming. The same split between
+        // entitlement and the ability to act that the course cutoff makes.
+        const owed = credit.creditForSession(att, Date.now());
+        let entry = null;
+        if (owed.credit > 0) {
+          // Ledger first, for the reason it is always first here: a credit not
+          // written is money lost with nobody able to tell.
+          entry = await ledger.append({
+            accountId: att.accountId, type: 'credit', amountCents: owed.credit,
+            reason: 'registration-cancelled-by-guardian',
+            relatedRegistrationKey: R.key(att.participantId, att.activityId),
+            basis: { perSession: true, sessionDate: att.sessionDate,
+                     startsAt: att.frozen.startsAt, cancelHours: att.frozen.cancelHours,
+                     paidCents: att.payment.paidCents, reason: owed.reason },
+            createdBy: me.accountId
+          });
+        }
+        const next = attendance.transition(att, { status: 'cancelled', by: me.accountId });
+        next.payment = Object.assign({}, next.payment, {
+          creditedCents: (next.payment.creditedCents || 0) + owed.credit,
+          creditedToAccountId: owed.credit > 0 ? att.accountId : next.payment.creditedToAccountId,
+          status: owed.credit > 0 ? 'credited' : next.payment.status
+        });
+        await attendance.saveAttendance(next);
+        return json(200, { ok: true, session: next, credit: owed, entry: entry,
+                           balance: await ledger.balanceFor(me.accountId) });
       }
 
       // --- this account's registrations ------------------------------------
@@ -166,9 +294,21 @@ exports.handler = async (event) => {
           });
         }
 
+        // ⚠ A DROP-IN REGISTRATION IS NOT CAPPED BY THE SIZE OF THE ROOM.
+        //
+        // For a course the two are the same question: a place is held for the
+        // whole term, so registrations and seats are one count. For a drop-in
+        // they are not. The room holds twenty on Tuesday; forty families can be
+        // registered and eight turn up. Counting registrations against the room
+        // refused the twenty-first family from ever registering, on an activity
+        // that was never more than half full on the night — and the refusal read
+        // as "this activity is full", which was untrue of every actual evening.
+        //
+        // The capacity that matters for a drop-in is per date, and it is checked
+        // where it belongs: in bookSession.
         const regs = await store.forActivity(activity.activityId);
         const report = R.capacityReport(activity, regs);
-        if (!R.hasRoom(report, groupId)) {
+        if (activity.type !== 'dropin' && !R.hasRoom(report, groupId)) {
           // No waitlist yet. The design flagged one and did not build it: a
           // waitlist has to choose who gets a freed place, tell them, and give
           // them a deadline before it moves on again, and none of that is
@@ -241,7 +381,12 @@ exports.handler = async (event) => {
         });
         return json(200, {
           ok: true, registration: done.registration, credit: done.credit,
-          entry: done.entry, balance: await ledger.balanceFor(me.accountId)
+          entry: done.entry,
+          // Null for a course. On a drop-in it is the evenings that were
+          // released, each with what it earned — so a family sees the per-session
+          // credits rather than one figure that came from nowhere.
+          sessions: done.sessions,
+          balance: await ledger.balanceFor(me.accountId)
         });
       }
 

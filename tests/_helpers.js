@@ -134,7 +134,8 @@ function loadWithStubs({ github, blobs, modules }) {
     '_email-log', 'account-auth',
     '_participant-store', '_guardian-store', 'account-family', 'admin-family',
     '_registration', '_registration-store', '_registration-email',
-    '_registration-sweep', 'account-registrations', 'admin-registrations',
+    '_registration-sweep', '_registration-cancel', '_credit', '_credit-ledger',
+    '_session-attendance', 'account-registrations', 'admin-registrations',
     'registration-sweep' ].forEach((m) => {
     try { delete require.cache[fnPath(m)]; } catch (err) { /* not all exist in every test */ }
   });

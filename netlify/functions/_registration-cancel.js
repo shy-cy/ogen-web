@@ -25,6 +25,7 @@
 const credit = require('./_credit');
 const ledger = require('./_credit-ledger');
 const store = require('./_registration-store');
+const attendance = require('./_session-attendance');
 const R = require('./_registration');
 
 const REASON = {
@@ -36,11 +37,70 @@ const REASON = {
 // hard cutoff cannot cancel at all; an ADMIN past it still can, and credits
 // nothing — a child has to be removable in week nine for a reason that is not
 // about money. Passing it in keeps that policy where the two paths differ.
+// Cancelling a DROP-IN registration credits nothing and instead releases the
+// evenings that have not happened yet, each judged on its own deadline.
+//
+// There is no upfront commitment to unwind: a family that stops coming has
+// cancelled nothing and simply owes nothing further. What they may still be owed
+// is money for sessions they booked and paid for and are now giving back in
+// time — which is a per-session question, not a per-term one, so it is asked
+// once per booking rather than answered once for the lot.
+//
+// Only `booked` sessions are touched. One already `attended` is not undone by a
+// registration ending, and one already `cancelled` must not be cancelled twice —
+// which on an append-only ledger would mean crediting it twice.
+async function releaseFutureSessions(reg, { by, source, at, note }) {
+  const rows = (await attendance.forParticipant(reg.participantId, reg.activityId))
+    .filter((a) => a.status === 'booked');
+  const out = [];
+  for (const att of rows) {
+    const owed = credit.creditForSession(att, at);
+    let entry = null;
+    if (owed.credit > 0) {
+      entry = await ledger.append({
+        accountId: att.accountId,
+        type: 'credit',
+        amountCents: owed.credit,
+        reason: REASON[source] || REASON.admin,
+        relatedRegistrationKey: R.key(reg.participantId, reg.activityId),
+        basis: { perSession: true, sessionDate: att.sessionDate,
+                 startsAt: att.frozen.startsAt, cancelHours: att.frozen.cancelHours,
+                 paidCents: att.payment.paidCents, reason: owed.reason },
+        note: note || null, createdAt: at, createdBy: by || null
+      });
+    }
+    const next = attendance.transition(att, {
+      status: 'cancelled', by: by, note: 'registration ended'
+    });
+    next.payment = Object.assign({}, next.payment, {
+      creditedCents: (next.payment.creditedCents || 0) + owed.credit,
+      creditedToAccountId: owed.credit > 0 ? att.accountId : next.payment.creditedToAccountId,
+      status: owed.credit > 0 ? 'credited' : next.payment.status
+    });
+    await attendance.saveAttendance(next);
+    out.push({ sessionDate: att.sessionDate, credit: owed.credit, entry: entry });
+  }
+  return out;
+}
+
 async function cancelAndCredit(reg, { by, source, note, now, entitled }) {
   const at = now == null ? Date.now() : now;
   const owed = credit.creditFor(reg, at);
   const basis = credit.basisFor(reg, at);
   const total = entitled === false ? 0 : owed.total;
+
+  // THE DROP-IN PATH, and it is a branch here rather than a second function so
+  // that "one function both cancel paths call" stays true — the guardian's
+  // cancellation and the admin's still differ in exactly two things, and the
+  // type is not one of them.
+  //
+  // creditFor() has already refused the course arithmetic for a drop-in and
+  // returned zero, so `total` is zero below and no term-level ledger entry is
+  // written. What money moves, moves one evening at a time.
+  let sessions = null;
+  if ((reg.frozen || {}).type === 'dropin') {
+    sessions = await releaseFutureSessions(reg, { by: by, source: source, at: at, note: note });
+  }
 
   let entry = null;
   if (total > 0) {
@@ -71,7 +131,7 @@ async function cancelAndCredit(reg, { by, source, note, now, entitled }) {
     status: total > 0 ? 'credited' : (next.payment || {}).status
   });
   await store.saveRegistration(next);
-  return { registration: next, credit: owed, entry: entry, basis: basis };
+  return { registration: next, credit: owed, entry: entry, basis: basis, sessions: sessions };
 }
 
-module.exports = { cancelAndCredit, REASON };
+module.exports = { cancelAndCredit, releaseFutureSessions, REASON };

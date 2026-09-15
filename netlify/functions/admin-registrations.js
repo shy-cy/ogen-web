@@ -32,6 +32,7 @@ const R = require('./_registration');
 const credit = require('./_credit');
 const ledger = require('./_credit-ledger');
 const { cancelAndCredit } = require('./_registration-cancel');
+const attendance = require('./_session-attendance');
 const { recordAudit } = require('./_audit');
 const mail = require('./_registration-email');
 const sweep = require('./_registration-sweep');
@@ -250,7 +251,8 @@ exports.handler = async (event) => {
                     (done.entry ? ' · credited ' + done.entry.amountCents + 'c' : ' · no credit') +
                     (body.note ? ' · ' + body.note : '') });
         return json(200, {
-          ok: true, registration: done.registration, credit: done.credit, entry: done.entry
+          ok: true, registration: done.registration, credit: done.credit, entry: done.entry,
+          sessions: done.sessions
         });
       }
 
@@ -288,6 +290,92 @@ exports.handler = async (event) => {
         await recordAudit(session, 'registrations.moveGroup',
           body.participantId + '__' + activity.activityId, 'ok', { detail: body.groupId });
         return json(200, { ok: true, registration: next });
+      }
+
+      // --- the register, for a pay-per-session activity -----------------------
+
+      // One evening, and who is on it. This is the screen an admin opens on the
+      // night, so it is a list of people rather than a count — the privacy rule
+      // that keeps the family-facing endpoint to a number does not apply to the
+      // person running the room.
+      case 'register': {
+        const activity = await published(body.slug);
+        if (!activity) return json(404, { error: 'No such activity.' });
+        if (activity.type !== 'dropin') {
+          return json(400, { error: 'This activity runs by the term, so it has a queue rather than a register.' });
+        }
+        const date = body.sessionDate;
+        const all = await attendance.forActivity(activity.activityId, date || undefined);
+        const rows = [];
+        for (const att of all.filter((a) => !date || a.sessionDate === date)) {
+          const account = await accounts.getAccount(att.accountId);
+          const p = await participants.getParticipant(att.participantId);
+          rows.push({
+            participantId: att.participantId, sessionDate: att.sessionDate,
+            name: p ? [p.firstName, p.lastName].filter(Boolean).join(' ') : att.participantId,
+            accountId: att.accountId, accountEmail: account ? account.email : null,
+            groupId: att.groupId, status: att.status, payment: att.payment,
+            startsAt: att.frozen.startsAt, history: att.history
+          });
+        }
+        return json(200, {
+          ok: true,
+          activity: { activityId: activity.activityId, slug: activity.slug, title: activity.title },
+          dates: attendance.bookableDates(activity),
+          sessionDate: date || null,
+          capacity: date ? R.capacityForDate(activity, all, date) : null,
+          register: rows
+        });
+      }
+
+      // Marking the register. `approve` rather than `cancel`: recording who
+      // turned up moves no money on its own — what they owe was decided when the
+      // evening was booked, and a no-show still owes it.
+      case 'markAttendance': {
+        if (!canApprove(session)) {
+          return json(403, { error: 'Your role may open the register but not mark it' });
+        }
+        const att = await attendance.getAttendance(
+          body.participantId, body.activityId, body.sessionDate);
+        if (!att) return json(404, { error: 'No such booking.' });
+        if (['attended', 'no-show'].indexOf(body.status) === -1) {
+          return json(400, { error: 'A register is marked "attended" or "no-show".' });
+        }
+        const next = attendance.transition(att, {
+          status: body.status, by: session.email,
+          note: body.note ? String(body.note).slice(0, 500) : null
+        });
+        await attendance.saveAttendance(next);
+        await recordAudit(session, 'registrations.markAttendance',
+          body.participantId + '__' + body.activityId + '__' + body.sessionDate, 'ok',
+          { detail: body.status });
+        return json(200, { ok: true, session: next });
+      }
+
+      // Money for ONE evening. Its own action rather than a flag on
+      // recordPayment, because the two settle different records: one clears a
+      // term, the other clears a Tuesday.
+      case 'recordSessionPayment': {
+        if (!canCancel(session)) return json(403, { error: 'Your role may not record payments' });
+        const att = await attendance.getAttendance(
+          body.participantId, body.activityId, body.sessionDate);
+        if (!att) return json(404, { error: 'No such booking.' });
+        const cents = Math.round(Number(body.amountCents));
+        if (!(cents > 0)) return json(400, { error: 'A payment is a positive number of cents.' });
+
+        const paid = (att.payment.paidCents || 0) + cents;
+        const next = attendance.transition(att, {
+          status: att.status, by: session.email, note: 'paid ' + cents + 'c'
+        });
+        next.payment = Object.assign({}, next.payment, {
+          paidCents: paid, paidAt: new Date().toISOString(),
+          status: next.payment.owedCents != null && paid >= next.payment.owedCents ? 'paid' : 'owed'
+        });
+        await attendance.saveAttendance(next);
+        await recordAudit(session, 'registrations.recordSessionPayment',
+          body.participantId + '__' + body.activityId + '__' + body.sessionDate, 'ok',
+          { detail: cents + 'c' });
+        return json(200, { ok: true, session: next });
       }
 
       // --- money ------------------------------------------------------------

@@ -223,6 +223,30 @@ function creditFor(reg, now) {
   const price = frozen.price || {};
   const payment = (reg && reg.payment) || {};
 
+  // A DROP-IN NEVER REACHES THE COURSE ARITHMETIC BELOW, and this guard is what
+  // makes "creditFor() is not called for a drop-in" a property of the code
+  // rather than a rule every call site has to remember.
+  //
+  // It matters because the course path would answer, and answer WRONG. A
+  // drop-in has no cancellation policy, so the frozen block carries mode 'flat'
+  // and both cutoffs null — and every null in this file resolves towards the
+  // family. The fee would come back at 100% and the "course" at 50%, for an
+  // activity where the fee is a once-a-year joining fee and there is no course
+  // to prorate. Nobody would have seen a wrong number; they would have seen a
+  // plausible one.
+  //
+  // Cancelling a drop-in REGISTRATION credits nothing, because there was no
+  // upfront commitment to unwind: a family that stops coming has cancelled
+  // nothing and simply owes nothing further. What is creditable is a single
+  // booked session, and that is creditForSession() below.
+  if (frozen.type === 'dropin') {
+    return {
+      guardianMayCancel: true,
+      feeCredit: 0, courseCredit: 0, total: 0,
+      reason: 'per-session'
+    };
+  }
+
   const { fee, course } = splitPaid(payment.paidCents, price.registrationFee, price.feeCharged);
   const starts = sessionInstants(C);
 
@@ -342,6 +366,99 @@ function freezeCancellation(activity, resolveSessionInstant) {
   };
 }
 
+// --- one session, and the only rule it has -----------------------------------
+
+// ALL OR NOTHING, and deliberately so. A single evening has nothing to be part
+// of, so there is nothing to prorate: proration divides sessions remaining by
+// sessions total, and for one session that is 1/1 or 0/1, which is a boolean
+// wearing a fraction's clothes.
+//
+//   sessionCancelHours = 24   cancel 24h or more before it starts -> full credit
+//                             later than that                     -> nothing
+//   sessionCancelHours = null always creditable until it begins
+//
+// Null is the generous reading, the same direction every other blank in this
+// file resolves in: a missing number is an activity nobody finished configuring,
+// and reading a blank as "the deadline has passed" would keep a family's money
+// on the strength of an empty field.
+//
+// It reuses the ledger, the credit-never-refund rule, and the Asia/Nicosia
+// resolution the cutoffs use. Only the arithmetic is smaller — and note it is
+// hours before a START TIME rather than the end of a day, because a session is a
+// moment and a cutoff date is a day.
+function creditForSession(att, now) {
+  const frozen = (att && att.frozen) || {};
+  const payment = (att && att.payment) || {};
+  const paid = Math.max(0, Math.round(Number(payment.paidCents) || 0));
+  const startsAt = ms(frozen.startsAt);
+  // NO Date.now() — THE CALLER PASSES THE MOMENT IN. That is the whole contract
+  // of this module: it reads one record and one timestamp and nothing else, so
+  // re-running it a year later against the same pair returns the same figure. A
+  // test asserts the file never asks what time it is, and it caught this
+  // function reaching for a fallback clock.
+  //
+  // An unknown moment therefore reads as "nothing has passed yet", exactly as
+  // past(null) does for the course cutoffs — the same direction every blank here
+  // resolves in.
+  const at = ms(now);
+
+  // No resolvable start is the same generous answer: something is misconfigured,
+  // and that is not the family's doing.
+  if (startsAt == null) {
+    return { mayCancel: true, credit: paid, reason: 'no-start-time' };
+  }
+  const hours = frozen.cancelHours;
+  const deadline = hours == null ? startsAt : startsAt - (Number(hours) * 3600 * 1000);
+
+  if (at == null || at < deadline) {
+    return { mayCancel: true, credit: paid, reason: 'in-time', deadline: deadline };
+  }
+  // Past the deadline the session is still CANCELLABLE — a family can always say
+  // they are not coming, and an admin can always take somebody off a register.
+  // What is refused is the money, which is the same split the course cutoff
+  // makes between entitlement and the ability to act.
+  return { mayCancel: true, credit: 0, reason: hours == null ? 'started' : 'too-late', deadline: deadline };
+}
+
+// What to freeze onto one booked session, beside the function that reads it, for
+// the same reason freezeCancellation() sits beside creditFor(): the two shapes
+// cannot drift, and the answer stays reproducible a year later.
+//
+// `resolveSessionInstant` is a parameter for the same reason it is there — the
+// caller knows which zone the wall-clock times were written in.
+function freezeSession(activity, sessionDate, resolveSessionInstant) {
+  const reg = (activity && activity.registration) || {};
+  const facts = (activity && activity.facts) || {};
+  const duration = facts.duration || {};
+  const times = facts.schedule || {};
+  const resolve = typeof resolveSessionInstant === 'function'
+    ? resolveSessionInstant
+    : (date, time) => resolveLocal(date, time, TZ);
+
+  // ONLY A SESSION THAT IS ACTUALLY HAPPENING has a start time. A date the
+  // calendar does not hold — or one that is excluded — freezes `null` rather
+  // than a plausible instant built from the default time, which would make a
+  // booking for a date the activity does not meet on look perfectly well formed.
+  // Same rule freezeCancellation() follows, where an excluded date never enters
+  // the frozen list at all.
+  const row = (Array.isArray(duration.sessionDates) ? duration.sessionDates : [])
+    .filter((r) => r && r.date === sessionDate && r.status !== 'excluded')[0] || null;
+  const defaultTime = ((times.sessions || [])[0] || {}).time || '';
+  const price = facts.price || {};
+
+  return {
+    type: 'dropin',
+    sessionDate: sessionDate,
+    startsAt: row ? resolve(sessionDate, row.time || defaultTime) : null,
+    // Null means "creditable until it starts", and absent must not become 0 —
+    // zero hours and no rule are the same answer here, but only by accident, and
+    // a later edit to either would separate them.
+    cancelHours: reg.sessionCancelHours == null ? null : Number(reg.sessionCancelHours),
+    perSessionPrice: price.perSessionPrice == null ? null : Number(price.perSessionPrice),
+    currency: 'EUR'
+  };
+}
+
 // One local wall-clock date and time in a zone, as an instant. Same two-pass
 // offset correction as endOfDay, for the same DST reason.
 function resolveLocal(iso, time, tz) {
@@ -358,6 +475,7 @@ function resolveLocal(iso, time, tz) {
 module.exports = {
   TZ, OFF,
   creditFor, basisFor, freezeCancellation,
+  creditForSession, freezeSession,
   splitPaid, share, past, endOfDay, resolveLocal, parseDateParts,
   sessionInstants, hasStarted, remaining, ms
 };

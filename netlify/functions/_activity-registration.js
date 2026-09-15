@@ -336,13 +336,57 @@ function mergeRegistration(base, incoming, type) {
   const from = normaliseRegistration(base, t);
   const to = normaliseRegistration(incoming, t);
   const out = normaliseRegistration(base, t);
+
+  // ⚠ AN UNDRAWN FIELD IS READ FROM THE RAW STORED RECORD, NOT FROM `from`.
+  //
+  // `from` is the base normalised TO THE TARGET TYPE, and normalising is exactly
+  // what drops the other type's fields — so reading the value to carry across
+  // from a copy that has already had it removed carries across nothing. The loop
+  // looked like it was protecting the field and was quietly writing undefined
+  // over it.
+  //
+  // Only one field has the asymmetry today (a course has no sessionCancelHours;
+  // normaliseRegistration writes the cutoffs whatever the type), which is why
+  // five of the six were protected by coincidence and the sixth was not. Reading
+  // the raw record makes the protection the rule.
+  const raw = base || {};
+  const kept = (key) => {
+    const normalised = getPath(from, key);
+    if (normalised !== undefined && normalised !== null) return normalised;
+    return getPath(raw, key);
+  };
+
   FIELDS.forEach((f) => {
     if (draws(f, t)) setPath(out, f.key, getPath(to, f.key));
-    else setPath(out, f.key, getPath(from, f.key));
+    else setPath(out, f.key, kept(f.key));
   });
   // Not a form field: it is stamped by defaultIfBlank and only ever read.
   out.defaultBasis = from.defaultBasis || to.defaultBasis || null;
-  return normaliseRegistration(out, t);
+
+  // ⚠ THE FINAL NORMALISE WOULD OTHERWISE UNDO HALF OF THE WORK ABOVE, and the
+  // asymmetry is easy to miss because only one field has it.
+  //
+  // normaliseRegistration() builds the canonical shape FOR A TYPE, and a course
+  // has no sessionCancelHours — so a drop-in configured with a 24-hour window,
+  // switched to course to fix something and switched back, silently came back
+  // with no window at all. That is the exact failure this whole mechanism exists
+  // to prevent, in the one direction nobody had tested: nothing was typed, the
+  // save succeeded, and the policy quietly became more generous than the one
+  // that was agreed.
+  //
+  // It went unnoticed because the course-only fields survive a drop-in save for
+  // an unrelated reason — normaliseRegistration writes the cutoffs whatever the
+  // type — so five of the six fields were protected by accident rather than by
+  // this rule. Carrying every UNDRAWN field across explicitly makes the
+  // protection the rule rather than a coincidence, and covers the next
+  // type-scoped field without anyone remembering to.
+  const result = normaliseRegistration(out, t);
+  FIELDS.forEach((f) => {
+    if (draws(f, t)) return;
+    const kept = getPath(out, f.key);
+    if (kept !== undefined && kept !== null) setPath(result, f.key, kept);
+  });
+  return result;
 }
 
 // The same rule, for the two price fields that are type-scoped. A course quotes
