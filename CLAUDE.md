@@ -1640,6 +1640,125 @@ last-guardian refusal comes first, so an admin is never shown a debt prompt for
 an action that was never going to complete — and "reassign has no target"
 cannot arise, because a permitted unlink implies a remaining guardian.
 
+## Pay-per-session (Phase 7)
+
+A drop-in is not a course with a different price. It is the same activity record
+with `type: "dropin"`, and **exactly five places are allowed to notice**:
+`priceRows()`, `creditFor()`, the capacity count, `validate()` and
+`FIELD_SCHEMA`. The page, the listing, the sitemap, the image pipeline, the
+publish path, the optimistic locking, `_roles.js` and the session table never
+ask — which is the concrete form of the argument against a second content type:
+the surface a second type would have duplicated is the surface that turns out not
+to care.
+
+```
+netlify/functions/
+  _session-attendance.js   ogen-session-attendance; att-<pid>__<aid>__<YYYY-MM-DD>
+```
+plus `creditForSession()` / `freezeSession()` in `_credit.js`, `capacityForDate()`
+in `_registration.js`, and three actions on each registration handler.
+
+### ⚠ `creditFor()` would have answered, and answered wrong
+
+This is the one that mattered. A drop-in has no cancellation policy, so the
+frozen block carries mode `flat` with **both cutoffs null** — and every null in
+`_credit.js` resolves towards the family. Run a drop-in cancellation through the
+course path and the joining fee comes back at 100% and the "course" at 50%, on an
+activity with no course to prorate. Nobody would have seen a wrong number; they
+would have seen a **plausible** one, on a real receipt.
+
+So `creditFor()` refuses at the top, on `frozen.type === 'dropin'`, returning
+`total: 0` with `reason: 'per-session'` — a zero that says why rather than one
+that fell out of the arithmetic. That makes "creditFor() is not called for a
+drop-in" a property of the code rather than a rule every call site remembers.
+`frozen.type` is captured at submission for the same reason the price is: an
+admin switching the type in March must not change what a January family is owed.
+
+**Cancelling a drop-in registration credits nothing** and instead releases the
+evenings that have not happened yet, each judged on its own deadline. There was
+no upfront commitment to unwind — a family that stops coming has cancelled
+nothing and simply owes nothing further.
+
+### One blob per evening
+
+`att-<participantId>__<activityId>__<YYYY-MM-DD>`, holding status, the frozen
+start time and window, and the same `owedCents`/`paidCents`/`creditedCents`
+vocabulary the registration uses — so the ledger, the reminders and the admin
+views work against one shape rather than learning a second.
+
+Hanging session charges off the registration is the obvious move and is wrong for
+a reason this design has met twice: it makes the registration a **hot blob**
+rewritten every week on a store with no compare-and-swap, so two writes on one
+evening lose one silently. Separate keys make that impossible rather than
+unlikely — the same argument that made a registration one-per-participant rather
+than an `attendees[]` array, and capacity counted rather than decremented.
+
+The date is **in the key** rather than an id, because a session is identified by
+when it happened, and it makes the register for one evening readable from a
+`list()` without opening a blob.
+
+### Capacity is a room on one evening
+
+"The room holds twenty on Tuesday, not twenty forever." `capacityForDate()` sits
+beside `capacityReport()` in `_registration.js` so the two counting rules cannot
+drift about what a place means. Same `facts.groupSize` figure, counted against a
+different list. `booked` and `attended` occupy a place; `cancelled` and
+**`no-show` do not** — the question is "is there room", and somebody who did not
+come is not in the room. Whether they still owe for it is a different question,
+answered by the payment on their own record.
+
+⚠ **A drop-in registration is not capped by the size of the room**, and it was.
+For a course the two are one question — a place is held for the whole term. For a
+drop-in they are not: forty families can be registered and eight turn up.
+Counting registrations against the room refused the twenty-first family from ever
+registering, on an activity that was never more than half full on the night, and
+the refusal read *"this activity is full"* — untrue of every actual evening.
+
+### Cancelling one evening is all or nothing
+
+`registration.sessionCancelHours`, a single number, no modes and no proration —
+one evening has nothing to be part of, and 1/1 or 0/1 is a boolean in a
+fraction's clothes. Null means creditable until it starts, the same generous
+direction every blank in `_credit.js` takes.
+
+It is **hours before a start time**, not the end of a day, because a session is a
+moment where a cutoff date is a day — but it reuses the same `Asia/Nicosia`
+resolution, the same ledger and the same credit-never-refund rule. Past the
+deadline the booking is still **cancellable** and simply earns nothing: the same
+split between entitlement and the ability to act that the course cutoff makes.
+
+`freezeSession()` lives beside `creditForSession()`, and freezes only a session
+that is **actually happening** — a date the calendar does not hold, or one that
+is excluded, freezes `null` rather than a plausible instant built from the
+default time, which would make a booking for a date the activity does not meet on
+look well formed.
+
+⚠ `creditForSession()` **must not call `Date.now()`**. The whole contract of
+`_credit.js` is one record and one timestamp and nothing else, so the same pair
+returns the same figure a year later. A test asserts the file never asks what
+time it is, and it caught this function reaching for a fallback clock.
+
+### The conditional-panel trap, in the direction nobody had tested
+
+`mergeRegistration()` carried undrawn fields across from `from` — the base
+normalised **to the target type**, which is exactly what strips the other type's
+fields. So the loop looked like it was protecting a field and was quietly writing
+`undefined` over it.
+
+Only one field has the asymmetry: `normaliseRegistration()` writes the cutoffs
+whatever the type, but a course has no `sessionCancelHours`. So five of the six
+fields were protected **by coincidence** and the sixth was not — and a drop-in
+configured with a 24-hour window, switched to course to fix something and
+switched back, came back with no window at all. Nothing typed, the save
+succeeded, and the policy quietly became more generous than the one agreed. It
+now reads undrawn values from the **raw stored record**, which makes the
+protection the rule rather than an accident and covers the next type-scoped field
+without anyone remembering to.
+
+Note the deliberate limit: when a type **does** draw a field and sends it empty,
+that is the admin clearing it, and it clears. Absent means "this type did not
+send it"; empty from a form that drew it means empty.
+
 ## The family area (Phase 6)
 
 The first thing on this site a family signs into. Trilingual, RTL, and the whole
@@ -1954,7 +2073,10 @@ share image, Formspree wiring, domain) is done. Open items:
   children and their guardians, the invitation flow, registering for an
   activity, cancelling, and the credit balance — in all three languages, from
   one string table. `/admin/registrations.html` is the admin's side of the same
-  system. **Phase 7 (pay-per-session) remains.**
+  system.
+  **Phase 7 (pay-per-session) is done**: the attendance store, per-date capacity,
+  the all-or-nothing per-session cancellation, and the register. All seven
+  phases of the registration system are built.
   The gate that held Phase 6 opened when English became the binding version and
   was confirmed reviewed; the Russian is now a declared courtesy translation.
 - **Rotate the setup credentials.** The GitHub PAT and Netlify token were pasted
