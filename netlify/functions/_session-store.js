@@ -10,12 +10,46 @@ const { requireStore, optionalStore } = require('./_blobs');
 const { getUser, anyUsersExist } = require('./_user-store');
 const { permissionsFor, getRole } = require('./_roles');
 
-const TTL_MS = 8 * 60 * 60 * 1000;   // 8h — these sessions carry publish rights
+// TWO LIMITS, AND THEY ANSWER DIFFERENT QUESTIONS.
+//
+// IDLE is how long a session survives being unused. It was effectively "until
+// the tab closes", because the browser threw the token away — which is not a
+// security property at all, it is a browser storage detail that happened to
+// look like one. An admin who closed a tab was signed out; an admin who left
+// the tab open all week was not. The wrong one of those was being enforced.
+//
+// ABSOLUTE is the backstop the idle window cannot give: a session that is
+// touched every three hours forever never idles out, and publish rights should
+// not be indefinite. Twelve hours means an admin signs in about once a day, and
+// a session left running overnight is dead by morning however active the
+// machine was.
+//
+// 4h idle is the number the guardian's 7-day window is deliberately NOT. These
+// carry publish rights; that one is sized for a parent who visits monthly. A
+// test asserts the admin's is the shorter of the two, so nobody can quietly
+// unify them.
+const IDLE_MS = 4 * 60 * 60 * 1000;
+const ABSOLUTE_MS = 12 * 60 * 60 * 1000;
+// Legacy name, kept because a test and the client both read it. It is the IDLE
+// window, which is what "how long does this session last" meant when there was
+// only one number.
+const TTL_MS = IDLE_MS;
+
+// Don't rewrite a blob to move a timestamp on every request. Below this, the
+// slide is skipped — the same rule the member session follows, at a shorter
+// interval because an admin's window is shorter.
+const REFRESH_AFTER_MS = 5 * 60 * 1000;
+
 const key = (token) => 'sess-' + token;
+
+// Never later than the absolute cap, whatever the idle window says.
+const expiryFor = (createdAt, lastSeenAt) =>
+  Math.min(lastSeenAt + IDLE_MS, createdAt + ABSOLUTE_MS);
 
 async function createSession(user) {
   const store = await requireStore('admin-sessions');
   const role = await getRole(user.adminRole);
+  const now = Date.now();
   const session = {
     token: crypto.randomUUID(),
     email: user.email,
@@ -23,7 +57,9 @@ async function createSession(user) {
     role: user.adminRole,
     roleName: role ? role.name : user.adminRole,
     permissions: await permissionsFor(user.adminRole),
-    expiresAt: Date.now() + TTL_MS
+    createdAt: now,
+    lastSeenAt: now,
+    expiresAt: expiryFor(now, now)
   };
   await store.setJSON(key(session.token), session);
   return session;
@@ -51,6 +87,20 @@ async function getSession(token) {
       return null;
     }
   }
+
+  // The slide, and it is deliberately AFTER every check above: a session that
+  // was going to be refused must not have its clock moved forward on the way
+  // out. A record written before this existed has no createdAt, so the absolute
+  // cap is measured from now — which gives it a full twelve hours rather than
+  // expiring it retroactively, and it is gone within a day either way.
+  const now = Date.now();
+  const createdAt = session.createdAt || now;
+  if (now - (session.lastSeenAt || 0) > REFRESH_AFTER_MS) {
+    session.createdAt = createdAt;
+    session.lastSeenAt = now;
+    session.expiresAt = expiryFor(createdAt, now);
+    await store.setJSON(key(token), session).catch(() => {});
+  }
   return session;
 }
 
@@ -77,7 +127,9 @@ function legacySession() {
       users: { access: true },
       roles: { access: true }
     },
-    expiresAt: Date.now() + TTL_MS
+    createdAt: Date.now(),
+    lastSeenAt: Date.now(),
+    expiresAt: Date.now() + IDLE_MS
   };
 }
 
@@ -133,6 +185,7 @@ function isSuperAdmin(session) {
 }
 
 module.exports = {
-  TTL_MS, createSession, getSession, destroySession, authenticate, legacySession,
+  TTL_MS, IDLE_MS, ABSOLUTE_MS, REFRESH_AFTER_MS, expiryFor,
+  createSession, getSession, destroySession, authenticate, legacySession,
   canAccess, canPublish, editLangs, canEditLang, canApprove, canCancel, isSuperAdmin
 };
