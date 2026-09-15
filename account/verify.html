@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>אימות כתובת דוא״ל · מרכז עוגן</title>
+
+<!-- THE FAMILY AREA. Deliberately noindex and deliberately absent from
+     sitemap.xml: a sign-in page has nothing for a search engine, and everything
+     behind it is one family's private record.
+
+     The page is a SHELL. Every word a person reads is in the {he, en, ru}
+     table in js/member-account.js, the same way the nav, the footer and the
+     contact form each carry their own — so a wording change is an edit to one
+     table rather than to twelve HTML files in three languages, which is the
+     shape that guarantees the Russian drifts from the Hebrew.
+
+     data-view is the whole router. The three token-bearing views exist as real
+     URLs because the account emails already point at them, and those links are
+     in inboxes. -->
+<meta name="robots" content="noindex, nofollow">
+
+<link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/images/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/images/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared.css">
+</head>
+<body>
+<div id="page" dir="rtl">
+
+<div class="page-header" data-motif="ring" data-corner="tr">
+  <nav class="breadcrumb" aria-label="אימות כתובת דוא״ל">
+    <a href="/">דף הבית</a><span class="sep">&#8594;</span>אימות כתובת דוא״ל
+  </nav>
+  <h1>אימות כתובת דוא״ל</h1>
+</div>
+
+<div class="inner-body">
+  <div id="account-mount" data-view="verify"></div>
+</div>
+
+<script src="/js/nav.js"></script>
+<script src="/js/footer.js"></script>
+<script src="/js/motifs.js"></script>
+<script src="/js/member-session.js"></script>
+<script src="/js/member-account.js"></script>
+</div>
+</body>
+</html>

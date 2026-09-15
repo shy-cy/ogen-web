@@ -21,12 +21,19 @@
 
   const lang = currentLang();
   const home = lang === 'he' ? '/' : '/' + lang;
+  // The tree prefix on its own. `home` is '/' in Hebrew, which is right for a
+  // link to the homepage and wrong as a prefix — `${home}/account` would be
+  // '//account', a protocol-relative URL pointing at a host called "account".
+  const base = lang === 'he' ? '' : '/' + lang;
   const logo = `/images/logos/logo-${lang}.svg`;
 
   const L = {
-    he: { about:'אודות', offer:'מה תמצאו בעוגן', contact:'צור קשר', menu:'תפריט', alt:'עוגן' },
-    en: { about:'About', offer:'What We Offer', contact:'Contact', menu:'Menu', alt:'Ogen' },
-    ru: { about:'О нас', offer:'Что мы предлагаем', contact:'Контакты', menu:'Меню', alt:'Оген' }
+    he: { about:'אודות', offer:'מה תמצאו בעוגן', contact:'צור קשר', menu:'תפריט', alt:'עוגן',
+          account:'אזור המשפחה' },
+    en: { about:'About', offer:'What We Offer', contact:'Contact', menu:'Menu', alt:'Ogen',
+          account:'My family' },
+    ru: { about:'О нас', offer:'Что мы предлагаем', contact:'Контакты', menu:'Меню', alt:'Оген',
+          account:'Моя семья' }
   }[lang];
 
   const navHTML = `
@@ -49,6 +56,7 @@
   <a href="${home}#about" onclick="toggleMenu()">${L.about}</a>
   <a href="${home}#offer" onclick="toggleMenu()">${L.offer}</a>
   <a href="${home}#contact" onclick="toggleMenu()">${L.contact}</a>
+  <a href="${base}/account" onclick="toggleMenu()" class="menu-account">${L.account}</a>
 </div>`;
 
   const page = document.getElementById('page') || document.body;
@@ -60,7 +68,13 @@
     const base = target === 'he' ? '' : '/' + target;
     const bp = barePath();
     const dest = bp === '/' ? (base || '/') : base + bp;
-    location.href = dest + location.hash;
+    // THE QUERY STRING TRAVELS TOO, and on three pages it is the entire point:
+    // /account/verify, /account/reset and /account/guardian-invite carry their
+    // token there. Dropping it meant that switching language on any of those —
+    // which is exactly what a Russian-speaking parent does when a link opens in
+    // Hebrew — silently turned a valid link into a dead one, and the page could
+    // only say "that link has expired or has already been used".
+    location.href = dest + location.search + location.hash;
   };
 
   window.toggleMenu = function() {

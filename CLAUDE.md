@@ -1582,6 +1582,106 @@ last-guardian refusal comes first, so an admin is never shown a debt prompt for
 an action that was never going to complete — and "reassign has no target"
 cannot arise, because a permitted unlink implies a remaining guardian.
 
+## The family area (Phase 6)
+
+The first thing on this site a family signs into. Trilingual, RTL, and the whole
+of it reachable from the activity page's Register button.
+
+```
+account.html                  /account            the area itself
+account/verify.html           /account/verify     the three token-bearing views,
+account/reset.html            /account/reset      which exist as real URLs because
+account/guardian-invite.html                      the emails already point at them
+en/…  ru/…                    the same four, per tree — twelve shells
+js/member-session.js          the token, and the one post() every call goes through
+js/member-account.js          every view, and the ONE {he,en,ru} table
+```
+
+**The twelve pages are shells.** Every word a person reads is in the string table
+in `js/member-account.js`, exactly as the nav, the footer and the contact form
+each carry their own — so a wording change is an edit to one table rather than to
+twelve HTML files in three languages, which is the shape that guarantees the
+Russian drifts from the Hebrew. A test asserts the body of each page is a mount
+point and nothing else, and that the three languages have **exactly** the same
+keys: a missing Russian key is not a missing translation, it is `undefined`
+rendered into a label.
+
+`data-view` on the mount is the entire router. The three token views are real
+URLs rather than query parameters on one page because **`_account-email.js` has
+been sending those links since Phase 2**, and once a message is sent the link
+lives in an inbox where it cannot be corrected. A test builds every message in
+every language, extracts every href, and asserts each one resolves to a file that
+exists — neither side is the source of truth on its own.
+
+**Noindex, and deliberately absent from `sitemap.xml`.** A sign-in page has
+nothing for a search engine and everything behind it is one family's record.
+
+### ⚠ The language toggle was dropping the token
+
+`setLang` preserved `location.hash` and not `location.search`. Three of these
+pages carry their token in the query string, so a reader switching a
+Hebrew-looking link to Russian — *exactly* what that toggle is for — silently
+turned a valid invitation into a dead one, and the page could only say "that link
+has expired or has already been used". It now carries both. A test pins it.
+
+The same edit fixed a second thing in waiting: the family-area link is built from
+a bare tree prefix (`''` / `'/en'` / `'/ru'`), not from `home`, because `home` is
+`'/'` in Hebrew and `'/' + '/account'` is a protocol-relative URL pointing at a
+host called `account`.
+
+### What the client does and does not decide
+
+Permission checks here are **cosmetic**, like the admin's. "Invite a second
+guardian" is offered only to the primary guardian and only below the maximum;
+"remove myself" only when another guardian would remain; "cancel" only when the
+terms frozen on that registration allow it. Every one of those is re-decided
+server-side, and the client's copy exists so a family is not offered an action
+that is about to be refused.
+
+Two of them are worth naming because the server rule is the interesting half:
+a participant is **never** left with no guardian, and the cancel button is shown
+from the same `creditFor()` the server will apply — so what is offered is what
+happens.
+
+**The invited address is filled in and locked** on the invitation path. An invite
+is bound to the address it was sent to, so letting it be edited would produce a
+sign-in that succeeds and then an acceptance that is refused, which reads as the
+invitation being broken. `inviteDetails` returns `hasAccount`, so the page opens
+the door that person actually needs — sign in, or sign up — with no second round
+trip and revealing nothing they do not already know about their own address.
+
+### The session is localStorage, and the admin's is not
+
+A guardian session is seven days on a sliding window, sized for a parent who
+visits once a month; losing it every time a tab closes would defeat the reason it
+is seven days. An admin session carries publish rights and should not outlive the
+tab. Different store, different key, different lifetime — and server-side they
+are different Blobs stores with different key prefixes, which is the actual
+security boundary.
+
+`post()` clears a dead session on a 401 but **never navigates**: a family halfway
+through a form should not lose it to a redirect they did not ask for. One place
+also decides what a failure says, because "you are offline" and "that was
+refused" are different things and a person should not be told the wrong one.
+
+### The Register button now leads somewhere
+
+`js/activity.js` fell back to `#register`, the contact section, because
+registration did not exist and a dead end was worse than a form. It now defaults
+to `/account?register=<slug>` **in the reader's own tree**, so a Russian-speaking
+parent lands on the Russian page rather than in the Hebrew default with a
+language switch to find. An explicit `data-cta-url` still wins, and still has to
+pass `isLinkish()` before it is published.
+
+### Not built
+
+The public "places left" count on the static activity page, and
+`memberVisibleRows()` — the authenticated view that serves the members-only
+address to a guardian with an approved participant. The family area shows a
+places-left count on the register panel, from an authenticated call; the *static*
+page still says nothing, and `isPubliclyVisible()` keeps its exact current
+meaning and its only caller.
+
 ## The approval queue (admin)
 
 `admin/registrations.html` + `js/registrations-admin.js`, against
@@ -1770,7 +1870,8 @@ share image, Formspree wiring, domain) is done. Open items:
   footer needs the links. ⚠ The **Russian text and the two Russian price labels
   are still awaiting a native-speaker review**; `ogen-legal-review` is `pending`
   and gates public registration until it is done. See the Legal pages section.
-- **Nothing in the nav links to `/about` or `/activities`** yet.
+- **Nothing in the nav links to `/about` or `/activities`** yet. The mobile menu
+  does now link to `/account`, which is the only nav change so far.
 - **Registration has no page.** The API is built; nothing on the public site
   reaches it, and the `open` CTA still points at the contact section. Wiring is
   Phase 6's, and `ogen-legal-review` has to be `complete` before a public
@@ -1791,13 +1892,12 @@ share image, Formspree wiring, domain) is done. Open items:
   scoped to one participant / one activity / one academic year, `seriesId`
   linking an autumn term to its spring, payments, applying credit, adjustments,
   and the unlink debt disposition.
-  **The admin half now has a screen**: `/admin/registrations.html` is the
-  approval queue, the capacity line, the sweep and every money control.
-  ⚠ **Phase 6 (the family-facing area) is HELD BY `ogen-legal-review`** and is
-  the first thing that gate has ever actually blocked. It is a public
-  registration surface, and nobody fluent has read the Russian legal text, the
-  two price labels, or the account and registration emails. Accounts, family and
-  registration are therefore reachable only through the admin. **Phase 7
-  (pay-per-session) remains** and is not gated.
+  **Phase 6 (the family area) is done**: sign up, sign in, reset, verify, the
+  children and their guardians, the invitation flow, registering for an
+  activity, cancelling, and the credit balance — in all three languages, from
+  one string table. `/admin/registrations.html` is the admin's side of the same
+  system. **Phase 7 (pay-per-session) remains.**
+  The gate that held Phase 6 opened when English became the binding version and
+  was confirmed reviewed; the Russian is now a declared courtesy translation.
 - **Rotate the setup credentials.** The GitHub PAT and Netlify token were pasted
   into a chat transcript during setup.

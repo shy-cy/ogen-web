@@ -1,0 +1,166 @@
+// What this defends against:
+//
+// The account emails have been sending links since Phase 2 — verify your
+// address, reset your password, join a child's record — and until Phase 6 there
+// was nothing at the other end of any of them. Those URLs are already written
+// into `_account-email.js`, in three languages, and once a message is sent the
+// link lives in somebody's inbox where it cannot be corrected. A typo in a path,
+// or a language tree with a missing page, is a 404 that a person meets while
+// trying to accept an invitation to their own child's record.
+//
+// So the emails and the pages are checked against each other mechanically: every
+// href any message can produce, in every language, must resolve to a file that
+// exists. Neither side gets to be the source of truth on its own.
+//
+// The rest is the "copy lives in triplicate" rule, which this area could break
+// more easily than anything else on the site because it has more words than
+// everything else put together. They live in ONE table in js/member-account.js,
+// so the check is that the three languages have exactly the same keys — a
+// missing Russian key is not a missing translation, it is `undefined` rendered
+// into a label.
+//
+// And one bug found while building it: the language toggle preserved the hash
+// and dropped the QUERY STRING. Three of these pages carry their token there, so
+// a Russian-speaking parent switching a Hebrew-looking link to Russian — exactly
+// what that toggle is for — silently turned a valid invitation into a dead one,
+// and the page could only say "that link has expired or has already been used".
+
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const H = require('./_helpers');
+
+const R = path.join(__dirname, '..');
+const read = (p) => fs.readFileSync(path.join(R, p), 'utf8');
+const SITE = 'https://www.ogen.cy';
+const LANGS = ['he', 'en', 'ru'];
+
+process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
+
+console.log('[every link an account email can send lands on a page]');
+const mail = require(H.fnPath('_account-email'));
+const account = (l) => ({ email: 'dana@example.com', accountId: 'a-1',
+                          profile: { firstName: 'Dana', preferredLanguage: l } });
+
+const hrefsIn = (msg) => {
+  const out = [];
+  const re = /href="([^"]+)"/g;
+  let m;
+  while ((m = re.exec(msg.html))) out.push(m[1]);
+  return out;
+};
+
+// A URL on this site, turned into the file that has to exist for it to work.
+// Netlify's pretty URLs serve /en/account/verify from en/account/verify.html.
+function fileFor(url) {
+  if (url.indexOf(SITE) !== 0) return null;
+  const p = url.slice(SITE.length).split('?')[0].split('#')[0].replace(/^\//, '');
+  if (!p) return 'index.html';
+  return p + '.html';
+}
+
+let checked = 0;
+LANGS.forEach((l) => {
+  const messages = [
+    ['verify', mail.verifyMessage(account(l), 'tok')],
+    ['reset', mail.resetMessage(account(l), 'tok')],
+    ['changed', mail.changedMessage(account(l))],
+    ['invite', mail.inviteMessage({ token: 'inv', invitedEmail: 'x@y.z' }, 'Dana', 'Noa', l)]
+  ];
+  messages.forEach(([name, msg]) => {
+    hrefsIn(msg).forEach((href) => {
+      const file = fileFor(href);
+      if (!file) return;                       // mailto:, or an outside link
+      checked++;
+      H.ok(fs.existsSync(path.join(R, file)),
+        l + ' ' + name + ': ' + href.replace(SITE, '') + ' → ' + file);
+    });
+  });
+});
+H.ok(checked >= 9, 'and there were real links to check (' + checked + ')');
+
+console.log('\n[the twelve shells exist, one per view per language]');
+const VIEWS = { account: 'account.html', verify: 'account/verify.html',
+                reset: 'account/reset.html', invite: 'account/guardian-invite.html' };
+LANGS.forEach((l) => {
+  Object.keys(VIEWS).forEach((view) => {
+    const file = (l === 'he' ? '' : l + '/') + VIEWS[view];
+    H.ok(fs.existsSync(path.join(R, file)), file + ' exists');
+    const src = read(file);
+    H.ok(src.indexOf('data-view="' + view + '"') !== -1, file + ' declares its view');
+    H.ok(src.indexOf('<html lang="' + l + '">') !== -1, file + ' is in the right language');
+    // Direction is set ONLY on #page, never on html or body. That was fixed the
+    // hard way once and must not come back.
+    H.ok(src.indexOf('<div id="page" dir="' + (l === 'he' ? 'rtl' : 'ltr') + '">') !== -1,
+      file + ' sets direction on #page and nowhere else');
+    H.ok(!/<html[^>]+dir=|<body[^>]+dir=/.test(src), file + ' puts dir on neither html nor body');
+    // Private, so noindex — and deliberately absent from the sitemap.
+    H.ok(/<meta name="robots" content="noindex/.test(src), file + ' is noindex');
+  });
+});
+
+const sitemap = read('sitemap.xml');
+H.ok(sitemap.indexOf('/account') === -1, 'and no account page is in sitemap.xml');
+
+console.log('\n[the copy is in one table, and the three languages agree]');
+const screen = read('js/member-account.js');
+const start = screen.indexOf('var T = {');
+const end = screen.indexOf('}[lang];', start);
+H.ok(start !== -1 && end !== -1, 'the string table is where it says it is');
+const tableSrc = screen.slice(start, end + '}[lang];'.length);
+
+const tableFor = (l) => {
+  const ctx = { lang: l };
+  vm.runInNewContext(tableSrc + '\nresult = T;', ctx);
+  return ctx.result;
+};
+const he = tableFor('he');
+const keys = Object.keys(he).sort();
+H.ok(keys.length > 50, 'it carries the whole area (' + keys.length + ' keys)');
+['en', 'ru'].forEach((l) => {
+  const other = tableFor(l);
+  H.eq(Object.keys(other).sort().join(','), keys.join(','),
+    l + ' has exactly the same keys as Hebrew — a missing one renders "undefined" into a label');
+  keys.forEach((k) => {
+    if (typeof he[k] === 'object') {
+      H.eq(Object.keys(other[k]).sort().join(','), Object.keys(he[k]).sort().join(','),
+        l + '.' + k + ' agrees too');
+    }
+  });
+  H.ok(Object.keys(other).every((k) => typeof other[k] === typeof he[k]),
+    l + ' has nothing of the wrong shape');
+});
+// Every value is actually filled in. An empty string is a key somebody added and
+// never translated, which renders as a blank label rather than as an error.
+['he', 'en', 'ru'].forEach((l) => {
+  const t = tableFor(l);
+  const blank = Object.keys(t).filter((k) => typeof t[k] === 'string' && !t[k].trim());
+  H.eq(blank.length, 0, l + ' has no blank strings' + (blank.length ? ': ' + blank.join(', ') : ''));
+});
+
+console.log('\n[the pages carry no copy of their own, so they cannot drift]');
+LANGS.forEach((l) => {
+  Object.keys(VIEWS).forEach((view) => {
+    const file = (l === 'he' ? '' : l + '/') + VIEWS[view];
+    const body = read(file).split('<div class="inner-body">')[1].split('</div>')[0];
+    H.ok(body.indexOf('account-mount') !== -1 && body.replace(/\s|<[^>]+>/g, '') === '',
+      file + ': the body is a mount point and nothing else');
+  });
+});
+
+console.log('\n[the language toggle keeps the token]');
+const nav = read('js/nav.js');
+H.ok(/location\.href = dest \+ location\.search \+ location\.hash/.test(nav),
+  'setLang carries the query string as well as the hash');
+H.ok(/const base = lang === 'he' \? '' : '\/' \+ lang/.test(nav),
+  "and the family-area link is built from a prefix, not from `home` — '/' + '/account' is a host called \"account\"");
+
+console.log('\n[nothing in the family area is pushed to a physical edge]');
+const css = read('shared.css');
+const block = css.slice(css.indexOf('THE FAMILY AREA'));
+H.ok(block.length > 1000, 'the block is there');
+H.eq((block.match(/(^|[^-])(left|right)\s*:/g) || []).length, 0,
+  'not one directional property — the same markup flips on its own in all three languages');
+H.ok(/border-inline-start/.test(block), 'and the insets that do exist are logical');
+
+H.done();

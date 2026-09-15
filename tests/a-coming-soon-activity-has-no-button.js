@@ -32,7 +32,7 @@ const css = fs.readFileSync(path.join(R, 'shared.css'), 'utf8');
 // --- the smallest DOM that js/activity.js can run against ------------------
 // Credits and optional fields are deliberately absent — both have their own
 // suite — so only the badge and the CTA slot are wired up.
-function render(status, lang, ctaUrl) {
+function render(status, lang, ctaUrl, pathname) {
   const el = () => ({
     className: '', textContent: '', innerHTML: '',
     querySelector: () => null, querySelectorAll: () => [], remove() {}
@@ -53,7 +53,13 @@ function render(status, lang, ctaUrl) {
       return null;
     }
   };
-  vm.runInNewContext(activityJs, { document, console });
+  // The CTA's fallback is built from the URL now — the activity's slug, and the
+  // language tree it is being read in — so the fake DOM has to carry a location.
+  const location = {
+    pathname: pathname || (lang === 'he' ? '/activities/hebrew4kids' : '/' + lang + '/activities/hebrew4kids'),
+    href: ''
+  };
+  vm.runInNewContext(activityJs, { document, console, location });
   return { badge: badge.textContent, badgeClass: badge.className, cta: cta.innerHTML };
 }
 
@@ -115,8 +121,16 @@ H.ok(render('open', 'he', '/#contact').cta.indexOf('href="/#contact"') !== -1,
   'open still links to the registration target');
 H.ok(render('waitlist', 'he', '/#contact').cta.indexOf('href="/#contact"') !== -1,
   'waitlist still links to it too');
-H.ok(render('open', 'he').cta.indexOf('href="#register"') !== -1,
-  'and with no target they fall back to the contact section');
+// THE FALLBACK IS THE FAMILY AREA NOW, not the contact section. That fallback
+// existed because registration did not, and a dead end was worse than a form;
+// there is somewhere to send people now, and it carries the slug so the family
+// area knows which activity was being read.
+H.ok(render('open', 'he').cta.indexOf('href="/account?register=hebrew4kids"') !== -1,
+  'with no explicit target, open leads to the family area carrying the slug');
+H.ok(render('waitlist', 'ru').cta.indexOf('href="/ru/account?register=hebrew4kids"') !== -1,
+  'in the READER\'S OWN TREE — a Russian-speaking parent must not land in the Hebrew default');
+H.ok(render('open', 'en').cta.indexOf('href="/en/account?register=hebrew4kids"') !== -1,
+  'and in English too');
 
 console.log('\n[the stylesheet describes only what is drawn]');
 H.ok(/\.status-banner\.is-announcement\{/.test(css),

@@ -11,6 +11,10 @@
 //   3. OPTIONAL FIELDS. A [data-optional] block with no content is REMOVED
 //      from the DOM, so an unused field leaves no empty heading behind.
 //
+// The `open` CTA now points at the family area carrying this activity's slug,
+// rather than at the contact section. That fallback existed because there was
+// nowhere to send anybody; there is now.
+//
 // TRANSLATION REVIEW NEEDED: the Hebrew status copy below is approved; the
 // English and Russian strings are first-pass translations and have not been
 // checked by a native speaker. Same caveat as the Russian homepage copy.
@@ -111,7 +115,23 @@
     } else if (cfg.disabled) {
       ctaSlot.innerHTML = `<button type="button" class="sidebar-cta is-${status}" disabled>${esc(pick(cfg.cta))}</button>`;
     } else {
-      const href = root.dataset.ctaUrl || '#register';
+      // WHERE THE BUTTON GOES, now that there is somewhere for it to go.
+      //
+      // It used to fall back to '#register', the contact section, because
+      // registration did not exist and a dead end was worse than a form. It now
+      // defaults to the family area with this activity's slug, in the reader's
+      // own language tree — so a Russian-speaking parent lands on the Russian
+      // page rather than in the Hebrew default with a language switch to find.
+      //
+      // An explicit data-cta-url still wins, and still has to pass isLinkish()
+      // on the server before it is published at all.
+      const slug = (location.pathname.replace(/\/$/, '').split('/').pop() || '')
+        .replace(/\.html$/, '');
+      const base = lang === 'he' ? '' : '/' + lang;
+      const fallback = slug
+        ? base + '/account?register=' + encodeURIComponent(slug)
+        : base + '/account';
+      const href = root.dataset.ctaUrl || fallback;
       const note = cfg.note ? `<p class="sidebar-note">${esc(pick(cfg.note))}</p>` : '';
       ctaSlot.innerHTML =
         `<a class="sidebar-cta is-${status}" href="${esc(href)}">${esc(pick(cfg.cta))}</a>${note}`;

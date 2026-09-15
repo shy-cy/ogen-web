@@ -76,10 +76,16 @@ H.eq(attrOf(renderActivityPage(withLabel, 'he')), null,
   'a label is not published as a link — the attribute is absent');
 H.eq(attrOf(renderActivityPage(withLabel, 'en')), null, 'in English too');
 // Absent is the whole point: js/activity.js reads `root.dataset.ctaUrl ||
-// '#register'`, so an absent attribute IS the contact section.
-H.ok(/root\.dataset\.ctaUrl \|\| '#register'/.test(
-  fs.readFileSync(path.join(R, 'js/activity.js'), 'utf8')),
-  "and an absent attribute means '#register', the contact section");
+// fallback`, and the fallback is the family area carrying this activity's slug.
+// It used to be '#register', the contact section, because registration did not
+// exist and a dead end was worse than a form.
+const activityJs = fs.readFileSync(path.join(R, 'js/activity.js'), 'utf8');
+H.ok(/root\.dataset\.ctaUrl \|\| fallback/.test(activityJs),
+  'and an absent attribute falls back rather than publishing nothing');
+H.ok(/\/account\?register=' \+ encodeURIComponent\(slug\)/.test(activityJs),
+  'to the family area, carrying the slug');
+H.ok(/const base = lang === 'he' \? '' : '\/' \+ lang/.test(activityJs),
+  "in the reader's own language tree");
 
 const withLink = Object.assign(activity(), { ctaUrl: { he: '/#contact', en: '/en/#contact' } });
 H.eq(attrOf(renderActivityPage(withLink, 'he')), '/#contact', 'a real link is published as given');

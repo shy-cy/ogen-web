@@ -757,3 +757,102 @@ html[lang="he"] .thankyou h1{ font-family: var(--font-he); font-weight:700; }
   .about h3, .offer-head h3, .why-ogen h3, .vision h2{ font-size:26px !important; }
   .contact-heading{ font-size:22px !important; }
 }
+
+/* ============================================================================
+   THE FAMILY AREA
+   ----------------------------------------------------------------------------
+   Everything here is inside .inner-body, so it inherits the measure, the type
+   scale and the page header from the shell /about and the legal pages already
+   use. Only what is genuinely new is defined.
+
+   NOT ONE DIRECTIONAL PROPERTY IN THIS BLOCK. Every inset is logical, and
+   nothing is pushed to a physical edge — the same rule the activity fact cards
+   were rebuilt around after the edge-aligned version was fixed three times and
+   came back each time. The same markup is emitted in all three languages and
+   the layout flips on its own.
+   ========================================================================== */
+
+.acc-head{
+  display:flex; flex-wrap:wrap; gap:12px; align-items:baseline;
+  justify-content:space-between; margin-bottom:8px;
+}
+.acc-head h1{ font-size:clamp(26px,4vw,34px); margin:0; }
+
+.acc-card{
+  background:var(--paper); border:1px solid var(--stone); border-radius:10px;
+  padding:22px 24px; margin-bottom:20px;
+}
+.acc-card h2{ font-size:19px; margin:0 0 14px; }
+.acc-card h3{ font-size:16px; margin:18px 0 10px; }
+
+.acc-intro{ color:var(--camel); margin:0 0 14px; }
+.acc-meta{ display:block; font-size:14px; color:var(--camel); }
+
+.acc-field{ margin-bottom:14px; }
+.acc-field label{ display:block; font-size:14px; font-weight:500; margin-bottom:5px; }
+.acc-field input, .acc-field select{
+  width:100%; font:inherit; font-size:16px; padding:11px 13px;
+  border:1px solid var(--stone); border-radius:8px; background:#fff; color:var(--ink);
+}
+/* 16px is not a style choice: below it, iOS Safari zooms the page on focus and
+   the form jumps out from under the person filling it in. */
+.acc-field input:focus, .acc-field select:focus{
+  outline:2px solid var(--terracotta); outline-offset:1px; border-color:var(--terracotta);
+}
+
+.acc-check{ display:flex; gap:10px; align-items:flex-start; margin:4px 0 18px; }
+.acc-check input{ margin-top:4px; flex:0 0 auto; width:18px; height:18px; }
+.acc-check label{ font-size:14.5px; }
+
+/* A row is a label and its actions, and it WRAPS rather than switching
+   direction at a breakpoint — the same declaration serves the full measure and
+   a phone, and it is the row that decides, from the space it actually has. */
+.acc-row{
+  display:flex; flex-wrap:wrap; gap:10px 18px; align-items:baseline;
+  justify-content:space-between;
+  padding:12px 0; border-bottom:1px solid var(--stone);
+}
+.acc-row:last-child{ border-bottom:0; }
+.acc-sub{
+  margin-block-start:10px; padding-inline-start:16px;
+  border-inline-start:2px solid var(--stone); width:100%;
+}
+.acc-inline{ margin-block-start:16px; }
+
+.acc-link{
+  font:inherit; font-size:15px; font-weight:500; color:var(--terracotta);
+  background:none; border:0; padding:0; cursor:pointer; text-decoration:underline;
+}
+.acc-link:hover{ color:var(--olive); }
+.acc-link.is-danger{ color:#8a3220; }
+.acc-alt{ font-size:14.5px; margin-top:14px; }
+
+/* The status of a registration, in the same five words the guardian's list and
+   the admin queue both use. Colour carries meaning here and is not decoration:
+   `pending` is the gold of "waiting", `approved` the olive of "yes". */
+.acc-pill{
+  display:inline-block; font-size:12.5px; font-weight:700; padding:3px 10px;
+  border-radius:99px; background:var(--stone); color:var(--ink);
+}
+.acc-pill.is-pending{ background:var(--gold); color:#fff; }
+.acc-pill.is-approved{ background:var(--olive); color:#fff; }
+.acc-pill.is-rejected, .acc-pill.is-expired, .acc-pill.is-cancelled{
+  background:var(--stone); color:var(--camel);
+}
+
+.acc-balance{ font-size:30px; font-weight:700; margin:0 0 10px; font-variant-numeric:tabular-nums; }
+
+.acc-notice{
+  padding:13px 16px; border-radius:8px; margin-bottom:16px; font-size:15px;
+  border-inline-start:3px solid var(--camel); background:var(--stone);
+}
+.acc-notice.is-ok{ border-inline-start-color:var(--olive); }
+.acc-notice.is-err{ border-inline-start-color:#8a3220; }
+.acc-notice.is-warn{ border-inline-start-color:var(--gold); }
+
+/* The family-area link in the mobile menu, set apart because it is the one
+   entry that leads somewhere private rather than to a section of this page. */
+.mobile-menu .menu-account{
+  margin-block-start:6px; padding-block-start:14px;
+  border-block-start:1px solid var(--stone); color:var(--terracotta);
+}
