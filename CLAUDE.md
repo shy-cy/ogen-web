@@ -1168,8 +1168,66 @@ Guardian sessions run **7 days on a sliding window**, refreshed on each
 validated read (skipped unless the session is over an hour old, or every request
 rewrites a blob to move a timestamp). Long enough for a parent who visits monthly
 not to be signed out mid-term; short enough that a session on a shared family
-laptop dies within a week. **Admin sessions stay at 8 hours** because they carry
-publish rights — the two numbers must not be unified.
+laptop dies within a week. **Admin sessions run 4 hours idle with a 12-hour
+absolute cap** — see below. The two sets of numbers must not be unified.
+
+### ⚠ The admin session limit was a browser detail wearing a policy's costume
+
+`js/admin-session.js` kept the token in `sessionStorage`, under a comment saying
+publish rights "should not outlive the tab". That read as a security decision and
+was not one.
+
+`sessionStorage` is scoped to a **browsing context**. It survives reloads and
+same-tab navigation; it is **not** affected by switching tabs; it dies when the
+tab closes; and it is **not shared between tabs**. So the rule being enforced was
+*"how long is this tab open"*, which is unrelated to how long a session should
+last — and it was wrong in both directions at once. An admin who closed a tab was
+signed out while an 8-hour session sat live on the server. An admin who left one
+open for a week was never signed out at all. Opening the admin in a second tab
+meant signing in again.
+
+The limit moved to the only place that can enforce one, and became two limits
+because they answer different questions:
+
+| | | |
+|---|---|---|
+| **Idle** | 4 hours | how long a session survives being unused, and it **slides** while in use |
+| **Absolute** | 12 hours | from sign-in, whatever the activity |
+
+The cap is what the idle window cannot give: a session touched every three hours
+never idles out, and publish rights must not be indefinite. Twelve hours means an
+admin signs in about once a day and a session left running overnight is dead by
+morning. Four hours covers a lunch, a morning of meetings, an afternoon away.
+
+Two ordering rules in `getSession()` carry weight:
+
+- **The slide happens after every refusal check.** A session that was going to be
+  rejected must not have its clock moved forward on the way out — the record left
+  behind would quietly claim it was alive.
+- **The slide is skipped for five minutes.** An admin clicking around must not
+  rewrite a blob to move a timestamp on every request. Same rule the member
+  session follows, at a shorter interval because the window is shorter.
+
+A record written before this existed has no `createdAt`, so the cap is measured
+from now rather than expiring it retroactively; it is gone within a day either
+way.
+
+**One property is genuinely weaker, and it is worth naming.** On a shared machine
+the token now survives closing the browser. The idle window is the compensating
+control, and so is **cross-tab sign-out**: `localStorage` is shared between tabs,
+so signing out in one now ends the others through a `storage` listener.
+Otherwise a second tab left open would keep working against a token the person
+believed they had revoked, and "I signed out" would be false in a way nothing on
+screen showed.
+
+**The admin/guardian boundary is untouched.** It was never client storage — it is
+two Blobs stores with two key prefixes (`sess-` / `msess-`), and neither
+`authenticate()` can find the other's token. The two clients use different
+`localStorage` keys on the same origin, and neither reads the other's; a token
+pasted across would still be refused server-side, which is what the cross-feed
+test proves. `tests/an-admin-session-outlives-the-tab.js` asserts the admin's
+idle window **and its cap** are both shorter than a guardian's ordinary window,
+so the numbers cannot be quietly unified.
 
 **Nothing reveals whether an address has an account.** Sign-in answers
 identically for a wrong password and an address nobody has used — including the
