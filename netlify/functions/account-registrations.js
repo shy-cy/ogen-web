@@ -23,6 +23,8 @@ const guardians = require('./_guardian-store');
 const store = require('./_registration-store');
 const R = require('./_registration');
 const credit = require('./_credit');
+const ledger = require('./_credit-ledger');
+const { cancelAndCredit } = require('./_registration-cancel');
 const facts = require('./_activity-facts');
 const mail = require('./_registration-email');
 
@@ -126,6 +128,13 @@ exports.handler = async (event) => {
               holdsASpot: R.holdsASpot(reg),
               submittedAt: reg.submittedAt,
               expiresAt: reg.expiresAt,
+              // What this registration is billed, and whether the yearly fee was
+              // part of it. A family looking at a second term should be able to
+              // see that it is 300 rather than 350, and why.
+              owedCents: reg.payment.owedCents,
+              paidCents: reg.payment.paidCents,
+              feeCharged: reg.frozen.price.feeCharged,
+              feeYear: reg.frozen.feeYear,
               // What cancelling would do, computed from the terms frozen onto
               // this registration — so the answer shown is the answer that will
               // be applied, and both come from the same function.
@@ -169,7 +178,12 @@ exports.handler = async (event) => {
         }
 
         const reg = R.newRegistration({
-          activity: activity, participant: participant, accountId: me.accountId, groupId: groupId
+          activity: activity, participant: participant, accountId: me.accountId, groupId: groupId,
+          // THIS PARTICIPANT'S OWN registrations, and nothing else. The fee is
+          // scoped to one participant, one activity, one academic year, so the
+          // waiver is answerable from a prefix scan of their own key space — no
+          // sibling lookup, no account aggregate, no ledger.
+          priorRegistrations: await store.forParticipant(participant.participantId)
         });
 
         // A record already existed for this pair — rejected, expired or
@@ -212,38 +226,37 @@ exports.handler = async (event) => {
           });
         }
 
-        // PHASE 5 SEAM, AND IT REFUSES RATHER THAN ROUNDING DOWN.
+        // Nothing to release. The place is free the moment the cancellation is
+        // written, because capacity is counted and holdsASpot() is already false
+        // for a cancelled record — there is no hold to give back and no counter
+        // to decrement, and so no window in which the number is wrong.
         //
-        // A cancellation that earns a credit has to write one, and the ledger
-        // (ogen-account-credits) does not exist yet. Today this cannot fire:
-        // payment.paidCents is zero on every record because nothing collects
-        // money, and creditFor() returns zero for a family that has paid
-        // nothing — which is also why the design says no ledger entry is written
-        // in that case at all. A zero entry is a line in a financial record that
-        // means nothing and still has to be explained later.
-        //
-        // It is written as a refusal so that the day payments arrive, a
-        // cancellation cannot quietly drop what a family is owed. Failing loudly
-        // on an unreachable branch costs nothing; the alternative costs money
-        // and is found by a family rather than by a test.
-        if (owed.total > 0) {
-          return json(409, {
-            requires: 'credit-ledger',
-            owed: owed,
-            error: 'This cancellation earns a credit, and crediting is not built yet. Please contact us.'
-          });
-        }
-
-        const next = R.transition(reg, {
-          status: 'cancelled', by: me.accountId, source: 'guardian',
+        // The credit is written FIRST, inside cancelAndCredit. A ledger entry
+        // that fails must take the whole action down with it: the family keeps
+        // their place and can try again, which is recoverable, where cancelling
+        // and losing the credit is not.
+        const done = await cancelAndCredit(reg, {
+          by: me.accountId, source: 'guardian',
           note: body.reason ? String(body.reason).slice(0, 500) : null
         });
-        // Nothing to release. The place is free the moment this is written,
-        // because capacity is counted and holdsASpot() is already false for a
-        // cancelled record — there is no hold to give back and no counter to
-        // decrement, and so no window in which the number is wrong.
-        await store.saveRegistration(next);
-        return json(200, { ok: true, registration: next, credit: owed });
+        return json(200, {
+          ok: true, registration: done.registration, credit: done.credit,
+          entry: done.entry, balance: await ledger.balanceFor(me.accountId)
+        });
+      }
+
+      // What this account is owed, and every line behind it. Summed from the
+      // entries rather than read off a cached total: two representations of one
+      // number on a store with no transaction is how a balance quietly stops
+      // matching its own history.
+      case 'balance': {
+        const entries = await ledger.entriesFor(me.accountId);
+        return json(200, {
+          ok: true,
+          balanceCents: ledger.balanceOf(entries),
+          currency: ledger.CURRENCY,
+          entries: entries
+        });
       }
 
       default:

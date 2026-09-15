@@ -30,6 +30,8 @@ const participants = require('./_participant-store');
 const store = require('./_registration-store');
 const R = require('./_registration');
 const credit = require('./_credit');
+const ledger = require('./_credit-ledger');
+const { cancelAndCredit } = require('./_registration-cancel');
 const { recordAudit } = require('./_audit');
 const mail = require('./_registration-email');
 const sweep = require('./_registration-sweep');
@@ -78,6 +80,12 @@ async function row(reg) {
     decidedBy: reg.decidedBy,
     ageFlagAtSubmission: reg.ageFlag,
     payment: reg.payment,
+    // Whether the yearly fee was billed on THIS term, and which year it was
+    // judged against. An admin looking at a 300 beside a 350 needs to be able to
+    // see why without opening the other term.
+    feeCharged: reg.frozen.price.feeCharged,
+    feeYear: reg.frozen.feeYear,
+    seriesId: reg.frozen.seriesId,
     history: reg.history
   };
 }
@@ -188,31 +196,31 @@ exports.handler = async (event) => {
         const reg = await store.getRegistration(body.participantId, body.activityId);
         if (!reg) return json(404, { error: 'No such registration.' });
 
+        if (ACTABLE.cancelled.indexOf(reg.status) === -1) {
+          return json(409, { error: 'This registration is ' + reg.status + '.' });
+        }
+
         // AN ADMIN CANCELLATION IS NOT SUBJECT TO THE HARD CUTOFF, and that is
         // deliberate. The cutoff decides what a family is OWED, not whether a
         // child can be removed: something can come to light in week nine, and a
         // policy about money must not be the thing that prevents acting on it.
-        // So creditFor()'s `guardianMayCancel: false` is read as "credits
-        // nothing" here rather than as a refusal.
+        // So creditFor()'s `guardianMayCancel: false` becomes `entitled: false`
+        // here — the cancellation goes through and credits nothing — rather than
+        // a refusal.
         const owed = credit.creditFor(reg);
-        const credits = owed.guardianMayCancel === false ? 0 : owed.total;
-        if (credits > 0) {
-          // Same Phase 5 seam as the guardian's own path, and unreachable for
-          // the same reason: nothing collects money yet, so paidCents is zero
-          // everywhere. It refuses rather than silently cancelling without
-          // writing the credit.
-          return json(409, {
-            requires: 'credit-ledger', owed: owed,
-            error: 'This cancellation earns a credit, and crediting is not built yet.'
-          });
-        }
-        const out = await decide(body, session, 'cancelled', 'admin');
-        if (out.code === 200) {
-          await recordAudit(session, 'registrations.cancel',
-            body.participantId + '__' + body.activityId, 'ok',
-            { detail: reg.frozen.participantName + (body.note ? ' · ' + body.note : '') });
-        }
-        return json(out.code, Object.assign({ credit: owed }, out.payload));
+        const done = await cancelAndCredit(reg, {
+          by: session.email, source: 'admin',
+          note: body.note ? String(body.note).slice(0, 500) : null,
+          entitled: owed.guardianMayCancel !== false
+        });
+        await recordAudit(session, 'registrations.cancel',
+          body.participantId + '__' + body.activityId, 'ok',
+          { detail: reg.frozen.participantName +
+                    (done.entry ? ' · credited ' + done.entry.amountCents + 'c' : ' · no credit') +
+                    (body.note ? ' · ' + body.note : '') });
+        return json(200, {
+          ok: true, registration: done.registration, credit: done.credit, entry: done.entry
+        });
       }
 
       // Moving a child between groups is an admin action, never a family one.
@@ -249,6 +257,113 @@ exports.handler = async (event) => {
         await recordAudit(session, 'registrations.moveGroup',
           body.participantId + '__' + activity.activityId, 'ok', { detail: body.groupId });
         return json(200, { ok: true, registration: next });
+      }
+
+      // --- money ------------------------------------------------------------
+      //
+      // All three sit behind the CANCEL axis rather than approve, because that
+      // is the axis that exists to mean "may move money". Approving costs
+      // nothing and is undone by rejecting; everything below writes a figure a
+      // family is billed or can spend.
+
+      // Money in from outside — a bank transfer, cash at the desk. It ADDS
+      // rather than sets, so two part payments are two calls and the record
+      // keeps both in its history.
+      case 'recordPayment': {
+        if (!canCancel(session)) return json(403, { error: 'Your role may not record payments' });
+        const reg = await store.getRegistration(body.participantId, body.activityId);
+        if (!reg) return json(404, { error: 'No such registration.' });
+        const cents = Math.round(Number(body.amountCents));
+        if (!(cents > 0)) return json(400, { error: 'A payment is a positive number of cents.' });
+
+        const paid = (reg.payment.paidCents || 0) + cents;
+        const next = R.transition(reg, {
+          status: reg.status, by: session.email,
+          note: 'paid ' + cents + 'c' + (body.note ? ' · ' + body.note : '')
+        });
+        next.payment = Object.assign({}, next.payment, {
+          paidCents: paid,
+          paidAt: new Date().toISOString(),
+          // `owed` until it covers what was billed. Deliberately not "paid" at
+          // the first cent: a part payment that reads as settled is a debt
+          // nobody chases.
+          status: next.payment.owedCents != null && paid >= next.payment.owedCents ? 'paid' : 'owed'
+        });
+        await store.saveRegistration(next);
+        await recordAudit(session, 'registrations.recordPayment',
+          body.participantId + '__' + body.activityId, 'ok', { detail: cents + 'c' });
+        return json(200, { ok: true, registration: next });
+      }
+
+      // Money from the family's own credit, which is a DEBIT on the ledger and a
+      // payment on the registration — one action, because doing either alone
+      // leaves the two disagreeing about the same euros.
+      case 'applyCredit': {
+        if (!canCancel(session)) return json(403, { error: 'Your role may not move credit' });
+        const reg = await store.getRegistration(body.participantId, body.activityId);
+        if (!reg) return json(404, { error: 'No such registration.' });
+        const cents = Math.round(Number(body.amountCents));
+        if (!(cents > 0)) return json(400, { error: 'An amount is a positive number of cents.' });
+        const balance = await ledger.balanceFor(reg.accountId);
+        if (cents > balance) {
+          return json(409, { error: 'That is more than this account holds.', balanceCents: balance });
+        }
+        // Ledger first, for the same reason the cancellation writes it first: a
+        // debit that lands without the payment is visible and reversible, and a
+        // payment that lands without the debit is credit spent twice.
+        const entry = await ledger.append({
+          accountId: reg.accountId, type: 'debit', amountCents: cents,
+          reason: 'credit-applied',
+          relatedRegistrationKey: R.key(reg.participantId, reg.activityId),
+          note: body.note || null, createdBy: session.email
+        });
+        const paid = (reg.payment.paidCents || 0) + cents;
+        const next = R.transition(reg, {
+          status: reg.status, by: session.email, note: 'credit applied ' + cents + 'c'
+        });
+        next.payment = Object.assign({}, next.payment, {
+          paidCents: paid,
+          paidAt: new Date().toISOString(),
+          status: next.payment.owedCents != null && paid >= next.payment.owedCents ? 'paid' : 'owed'
+        });
+        await store.saveRegistration(next);
+        await recordAudit(session, 'registrations.applyCredit',
+          body.participantId + '__' + body.activityId, 'ok', { detail: cents + 'c' });
+        return json(200, { ok: true, registration: next, entry: entry,
+                           balanceCents: balance - cents });
+      }
+
+      // A correction, and it is an ENTRY rather than an edit. The ledger is
+      // append-only: a mistake is fixed by writing the opposite line, which
+      // leaves both in the record. That is the point — the question a family
+      // asks is not what their balance is but why.
+      case 'adjustCredit': {
+        if (!canCancel(session)) return json(403, { error: 'Your role may not move credit' });
+        const account = await accounts.getAccount(body.accountId);
+        if (!account) return json(404, { error: 'No such account.' });
+        const cents = Math.round(Number(body.amountCents));
+        if (!(cents > 0)) return json(400, { error: 'An amount is a positive number of cents.' });
+        if (!body.note) return json(400, { error: 'An adjustment needs a note saying why.' });
+        const entry = await ledger.append({
+          accountId: account.accountId,
+          type: body.type === 'debit' ? 'debit' : 'credit',
+          amountCents: cents, reason: 'admin-adjustment',
+          note: String(body.note).slice(0, 500), createdBy: session.email
+        });
+        await recordAudit(session, 'registrations.adjustCredit', account.accountId, 'ok',
+          { detail: entry.type + ' ' + cents + 'c · ' + entry.note });
+        return json(200, { ok: true, entry: entry,
+                           balanceCents: await ledger.balanceFor(account.accountId) });
+      }
+
+      // Reading the ledger is `access`, not `cancel`. Seeing what a family is
+      // owed is part of answering their question about it.
+      case 'ledger': {
+        const account = await accounts.getAccount(body.accountId);
+        if (!account) return json(404, { error: 'No such account.' });
+        const entries = await ledger.entriesFor(account.accountId);
+        return json(200, { ok: true, accountId: account.accountId, email: account.email,
+                           balanceCents: ledger.balanceOf(entries), entries: entries });
       }
 
       // "Run now", because the scheduled function cannot be triggered from a

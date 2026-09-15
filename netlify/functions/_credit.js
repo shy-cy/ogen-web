@@ -150,13 +150,27 @@ function past(date, now) {
 // transaction to hold it. A broken invariant in a money field is the kind of bug
 // that is discovered by a family rather than by a test.
 //
-// It carries an assumption worth naming, because it constrains a system that
-// does not exist yet: THE PAYMENT FLOW MUST BILL THE REGISTRATION FEE FIRST.
-// That is how it already works in practice — the fee is what secures the place —
-// but when payments are built, that ordering stops being a description of what
-// happens and becomes a requirement.
-function splitPaid(paidCents, feeEur) {
+// It carries an assumption worth naming, because it constrains the payment flow:
+// THE PAYMENT FLOW MUST BILL THE REGISTRATION FEE FIRST. That is how it already
+// works in practice — the fee is what secures the place — but once payments
+// exist that ordering stops being a description and becomes a requirement.
+//
+// `feeCharged` IS THE THIRD ARGUMENT, AND IT HAS TO BE, because the fee is
+// charged once a year per participant per activity: a child returning for the
+// spring term of the same course is not billed it again. On that registration
+// NOTHING PAID IS FEE, so taking it off the top would credit back the first €50
+// of a course payment as a fee — inflating the fee credit and deflating the
+// course credit, which are governed by different dates and different rules, so
+// the total moves too.
+//
+// It is a tri-state on purpose. `false` means the fee was waived on this
+// registration; `true` means it was billed; ABSENT means a record written before
+// the waiver existed, which is every registration taken so far — and for those
+// "charged" is not a default, it is the fact. So absent reads as charged and
+// nothing already stored changes meaning.
+function splitPaid(paidCents, feeEur, feeCharged) {
   const paid = Math.max(0, Math.round(Number(paidCents) || 0));
+  if (feeCharged === false) return { fee: 0, course: paid };
   const feeTotal = Math.max(0, Math.round((Number(feeEur) || 0) * 100));
   const fee = Math.min(paid, feeTotal);
   return { fee: fee, course: paid - fee };
@@ -209,7 +223,7 @@ function creditFor(reg, now) {
   const price = frozen.price || {};
   const payment = (reg && reg.payment) || {};
 
-  const { fee, course } = splitPaid(payment.paidCents, price.registrationFee);
+  const { fee, course } = splitPaid(payment.paidCents, price.registrationFee, price.feeCharged);
   const starts = sessionInstants(C);
 
   // 1. The hard cutoff answers for everything, and comes first.
@@ -268,10 +282,14 @@ function basisFor(reg, now) {
   const price = ((reg && reg.frozen) || {}).price || {};
   const starts = sessionInstants(C);
   const result = creditFor(reg, now);
-  const split = splitPaid(((reg && reg.payment) || {}).paidCents, price.registrationFee);
+  const split = splitPaid(((reg && reg.payment) || {}).paidCents, price.registrationFee, price.feeCharged);
   return {
     at: new Date(ms(now)).toISOString(),
     mode: C.mode || 'flat',
+    // Whether the fee was billed on THIS registration, so a family asking why
+    // their spring credit is smaller than their autumn one has the answer in the
+    // record rather than in somebody's memory of the waiver rule.
+    feeCharged: price.feeCharged !== false,
     registrationFeeCutoffDate: C.registrationFeeCutoffDate == null ? null : C.registrationFeeCutoffDate,
     cancellationCutoffDate: C.cancellationCutoffDate == null ? null : C.cancellationCutoffDate,
     sessionsTotal: starts.length,

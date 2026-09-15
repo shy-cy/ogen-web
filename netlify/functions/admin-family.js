@@ -28,6 +28,13 @@ const { recordAudit } = require('./_audit');
 // has to be able to say so.
 const TOOL = 'family';
 
+// What may happen to an unpaid registration when the guardian who submitted it
+// is removed. Two answers, both of which somebody has to choose: move it to the
+// remaining guardian, or write it off. There is deliberately no third option
+// meaning "leave it" — a debt owed by an account that can no longer see the
+// participant is a debt nobody will ever be asked about.
+const DISPOSITIONS = ['reassign', 'write-off'];
+
 const json = (statusCode, payload) => ({
   statusCode,
   headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
@@ -180,16 +187,45 @@ exports.handler = async (event) => {
 
         const remaining = links.find((l) => l.accountId !== body.accountId);
         const owed = await debtsFor(p.participantId, body.accountId);
-        if (owed.length && !body.debtDisposition) {
+        if (owed.length && DISPOSITIONS.indexOf(body.debtDisposition) === -1) {
           // A question, not a rule. No default and no "skip": the response says
-          // what is owed and waits to be told what to do with it.
+          // what is owed and waits to be told what to do with it. Nothing about
+          // money happens in the background.
           return json(409, {
             requires: 'debtDisposition',
+            options: DISPOSITIONS,
             owed: owed,
-            total: owed.reduce((n, r) => n + (r.owedCents || 0), 0),
+            total: owed.reduce((n, r) => n + (r.owedCents - r.paidCents), 0),
             remainingGuardian: remaining ? remaining.accountId : null,
             error: 'This guardian has unpaid registrations. Choose what happens to them.'
           });
+        }
+
+        // Applied BEFORE the unlink, so a failure here leaves the guardian
+        // linked and the debt where it was rather than half-moved.
+        for (const debt of owed) {
+          const reg = await registrations.getRegistration(p.participantId, debt.activityId);
+          if (!reg) continue;
+          if (body.debtDisposition === 'reassign') {
+            // The remaining guardian becomes the one who owes. `reassignedFrom`
+            // is kept because the person being asked to pay did not submit it,
+            // and will ask why they are being asked.
+            reg.payment = Object.assign({}, reg.payment, { reassignedFrom: reg.accountId });
+            reg.accountId = remaining.accountId;
+          } else {
+            reg.payment = Object.assign({}, reg.payment, {
+              status: 'written-off',
+              writtenOffAt: new Date().toISOString(),
+              writtenOffBy: session.email
+            });
+          }
+          reg.history = (reg.history || []).concat([{
+            iso: new Date().toISOString(),
+            action: 'debt-' + body.debtDisposition,
+            by: session.email,
+            note: 'on unlinking ' + body.accountId
+          }]);
+          await registrations.saveRegistration(reg);
         }
 
         // Primacy moves in the same write, before the link goes. There is only

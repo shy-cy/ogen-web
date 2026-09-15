@@ -262,6 +262,48 @@
       tl: 'Top / start', tr: 'Top / end', bl: 'Bottom / start', br: 'Bottom / end'
     }));
 
+    box.appendChild(seriesPicker(rec));
+  }
+
+  // ---------- which activity this is a term of ----------
+  //
+  // One slug is one semester, so the spring term of a course is a second record
+  // with its own dates, its own calendar and its own page. Everything the site
+  // publishes wants that. One thing does not: the registration fee is charged
+  // once a year per participant PER ACTIVITY, so the two records have to be able
+  // to say they are the same activity, or a child returning in the spring is
+  // charged it twice.
+  //
+  // The default is "its own activity", which is what every existing record
+  // already means, so nothing changes until an admin says otherwise.
+  //
+  // The VALUE of each option is the candidate's seriesId, not its activityId.
+  // Choosing a term that already belongs to a series joins that series rather
+  // than starting a third one — otherwise a third term pointed at the second
+  // would produce two series for one course and the waiver would match neither.
+  function seriesPicker(rec) {
+    var own = rec.activityId || null;
+    var sel = el('select', { id: 'f-series', disabled: !S.schema.langs.every(canEdit) || null });
+    sel.appendChild(el('option', {
+      value: '', text: 'Its own activity (default)',
+      selected: !rec.seriesId || rec.seriesId === own || null
+    }));
+    (S.activities || []).forEach(function (a) {
+      // Not itself, and not a record with no id yet — an unsaved activity has
+      // nothing to point at.
+      if (!a.activityId || a.activityId === own) return;
+      var title = (a.title && (a.title.he || a.title.en || a.title.ru)) || a.slug;
+      var series = a.seriesId || a.activityId;
+      sel.appendChild(el('option', {
+        value: series, text: 'Another term of: ' + title,
+        selected: rec.seriesId && rec.seriesId === series || null
+      }));
+    });
+    sel.addEventListener('change', function () { S.dirty = true; });
+    return el('div', {}, [
+      el('label', { for: 'f-series', text: 'Part of' }), sel,
+      el('div', { class: 'hint', text: 'Link an autumn and a spring term of the same course. It changes nothing on the page — it is what stops a returning child being charged the yearly registration fee twice.' })
+    ]);
   }
 
   // The registration link, drawn under the sidebar facts because that is where
@@ -1487,6 +1529,10 @@
     rec.cardImage = S.cardImage !== undefined ? S.cardImage : (S.record.cardImage || null);
     rec.shareImage = S.shareImage !== undefined ? S.shareImage : (S.record.shareImage || null);
     rec.robots = ($('f-robots') && $('f-robots').value) || S.record.robots || 'index';
+    // Blank means "its own activity", and the server turns that into this
+    // record's own id. Sent as null rather than omitted, so "the admin unlinked
+    // it" and "this form did not draw it" stay different requests.
+    rec.seriesId = ($('f-series') && $('f-series').value) || null;
     var facts = readFacts();
     rec.facts = facts.facts;
     rec.factVisibility = facts.factVisibility;
@@ -1609,6 +1655,13 @@
   function refreshList(selectSlug) {
     return send({ action: 'list' }).then(function (res) {
       if (!res.ok) return message('err', failure(res, 'Loading the activity list'));
+      // Kept for the series picker, which needs every other activity's id. The
+      // list arrives after the form is first drawn, so the settings panel is
+      // redrawn once it does — without touching anything else, since nothing
+      // above it has been typed into yet at that point.
+      var hadNone = !S.activities;
+      S.activities = res.data.activities || [];
+      if (hadNone && $('settings').children.length) renderSettings();
       var picker = $('picker');
       picker.innerHTML = '';
       res.data.activities.forEach(function (a) {

@@ -1361,54 +1361,8 @@ owed. The **admin's** cancellation is never refused by the hard cutoff, only
 credited nothing: a child has to be removable in week nine for a reason that is
 not about money.
 
-**`payment.owedCents` is null, on purpose**, because the registration fee is
-waived in exactly one case and the schema cannot yet express that case.
-
-**THE FEE IS SCOPED TO ONE PARTICIPANT, ONE ACTIVITY, ONE YEAR.**
-
-| | Fee |
-|---|---|
-| Same child, same activity, second semester | **not** charged again |
-| Same child, a different activity | charged |
-| A sibling, same or different activity | charged |
-
-Not per family and not per account. Two children in one activity pay two fees;
-one child in two activities pays two fees. The only thing that suppresses it is
-that *this participant* has already paid it for *this activity* this year.
-
-That scope is what makes the waiver answerable **from `ogen-registrations`
-alone** — a prefix scan of `reg-<participantId>__` filtered to the same activity
-and year. No account aggregate, no cross-store join, nothing to reconcile
-against a ledger. It is strictly cheaper than the family-level rule this file
-previously described, which would have had to resolve every participant linked
-to an account before it could price a single registration.
-
-⚠ **What it waits on is not the ledger, it is a term.** The key is
-`reg-<participantId>__<activityId>`, one record per pair with no semester in it,
-so the one case the waiver exists for — the same child in the same activity next
-semester — **has nowhere to go**. `submit` answers 409 "already has a place". Two
-ways out, and it has to be chosen before `owedCents` can be computed:
-
-- **Each semester is its own activity record**, which is what the data looks like
-  today: hebrew4kids runs 14 Oct to 16 Dec and `fullPrice` is labelled *per
-  semester*. Then the spring term is a different `activityId`, the registration
-  key already works unchanged, and what is missing is a way to say two activity
-  records are the same activity — one more structure field on the schema root,
-  defaulting to the record's own id, so nothing existing changes meaning.
-- **The registration key gains a term.** Truthful, and it moves every prefix scan
-  written so far plus a migration of live records. Worth it only if a term turns
-  out to be a thing the system needs for more than the fee.
-
-The first is recommended: no key change, no migration, and it matches how the
-activity is already published — one page per semester, with its own dates, its
-own calendar and its own price.
-
-⚠ **It also changes `splitPaid()` in `_credit.js`**, which takes the fee off the
-top of whatever was paid. On a waived registration **nothing paid is fee**, so
-the first €50 of a course payment would be credited back as one — inflating the
-fee credit and deflating the course credit on a cancellation. The frozen block
-has to record whether the fee was **charged on this registration**, not only what
-the fee was.
+**`payment.owedCents` is computed at submission**, with the registration fee
+already decided — see the Phase 5 section for the waiver.
 
 **The sweep is the cosmetic half and says so.** `[functions."registration-sweep"]`
 in `netlify.toml`, 06:00 UTC daily. It rewrites lapsed `pending` to `expired`,
@@ -1432,13 +1386,168 @@ That file had said from the beginning that there is one shell "so they cannot
 drift apart visually", and a second family of messages was the moment that either
 became a shared module or became two copies. The lift is byte-identical.
 
-**Not built, and deliberately:** the public "places left" count (an
+**Not built, and deliberately:** a payment PROVIDER (every payment is recorded
+by an admin, which is how Ogen already collects money), the public "places left"
+count (an
 unauthenticated endpoint returning a number, never a list), and
 `memberVisibleRows()` — the authenticated view that serves the members-only
 address to a guardian with an approved participant. Both are rendering-side and
 belong with Phase 6, and the second must never be reached by
 `_activity-template.js`: `isPubliclyVisible()` keeps its exact current meaning
 and its only caller.
+
+## Money (Phase 5)
+
+```
+netlify/functions/
+  _credit-ledger.js       ogen-account-credits; append-only, no cached balance
+  _registration-cancel.js cancelAndCredit() — the one function both cancel paths call
+```
+
+Plus `feeApplies()` / `owedCentsFor()` in `_registration.js`, `seriesId` on the
+activity, and a third argument on `splitPaid()`.
+
+### The registration fee, and the one case it is waived
+
+**THE FEE IS SCOPED TO ONE PARTICIPANT, ONE ACTIVITY, ONE ACADEMIC YEAR.**
+
+| | Fee |
+|---|---|
+| Same child, same activity, second term | **not** charged again |
+| Same child, a different activity | charged |
+| A sibling, same or different activity | charged |
+
+Not per family and not per account. The scope is what makes the waiver
+answerable from **that child's own registrations and nothing else** — a prefix
+scan of `reg-<participantId>__`, which is the cheap direction of the key. No
+sibling lookup, no account aggregate, no ledger, nothing to reconcile. This file
+briefly described a family-level rule, which was wrong in both directions at
+once: it would have waived a sibling's fee, which Ogen does charge, and it would
+have needed the whole family resolved before it could price one registration.
+
+**The year is academic, not calendar, and that is the feature rather than a
+refinement.** Autumn runs October to December and spring January to June, so on
+a calendar year the two halves of one course fall either side of the boundary and
+a returning child is charged twice — the exact case the waiver exists for.
+September is the boundary, which is when the school year starts in both Israel
+and Cyprus. It is measured from the **activity's start date**, not from the
+moment of submission, so 31 August and 1 September enrolments for one October
+term land in the same year.
+
+**`seriesId` is what says two records are the same activity**, and it **defaults
+to the record's own `activityId`**. A slug is one semester: hebrew4kids runs
+mid-October to mid-December and its `fullPrice` is labelled *per semester*, so
+the spring term is a second record with its own dates, its own calendar and its
+own page. That is right for everything the site publishes and wrong for exactly
+one question, which is the fee. Defaulting to the record's own id is what makes
+it free — every activity is a series of one, nothing that reads it changes
+meaning, there is no migration and **the registration key does not move**.
+
+It is a **pointer, never minted**: a series carries the id of whichever term was
+created first. The admin's picker therefore offers each candidate's *seriesId*,
+not its activityId, so a third term pointed at the second joins the series rather
+than starting a third one. It is structure, so a Russian-only role cannot move an
+activity into another's series and change what a family is billed. It rides in
+`indexEntry()` beside `activityId`.
+
+**What counts as "already charged" depends on whether the prior registration is
+live or finished**, and collapsing the two left a hole:
+
+- `pending` / `approved` — it stands, so the fee is billed on it and will be
+  collected. Counts **even if nothing has been paid yet**, or a family
+  registering for both terms before paying anything would be billed twice.
+- `rejected` / `expired` — never became a place, so nothing was owed.
+- `cancelled` — over, so "billed" promises nothing. Counts only if the fee was
+  actually **paid and not given back**. Reading `cancelled` as charged outright
+  made register → don't pay → cancel → register again a way to never pay the fee
+  at all. A test found it.
+
+That last clause is why `payment.feeCreditedCents` is tracked **apart from**
+`creditedCents`: a family refunded the fee is paying it again next time, and the
+total cannot answer that.
+
+**`frozen.price.feeCharged` is the third argument to `splitPaid()`**, and it has
+to be. `splitPaid` takes the fee off the top of whatever was paid; on a waived
+registration **nothing paid is fee**, so without the flag the first €50 of a
+course payment comes back as a fee credit. That is not a labelling error — the
+fee and the course answer to **different dates**, so it moves the total too. The
+flag is tri-state: `false` waived, `true` billed, **absent reads as charged**,
+because every registration written before the waiver existed was charged.
+
+### The ledger
+
+`ogen-account-credits`, keyed `cred-<accountId>__<ISO>__<random>`.
+
+**Append-only. An entry is never edited and never deleted** — a ledger that can
+be rewritten is not a ledger. A mistake is corrected by writing the opposite
+line, which leaves both in the record; the question a family asks is not what
+their balance is but why it is that.
+
+**There is no cached balance, now or by default ever.** A stored total and a list
+of entries are two representations of one fact on a store with no transaction to
+keep them agreeing, and the sister project's wallet warns that this failure is
+silent and loses money. It is summed every time.
+
+Account, then timestamp, then a random tail: the prefix makes a balance one scan,
+the timestamp orders a person's entries without sorting on a field, and **the
+random tail stops two entries written in the same millisecond overwriting each
+other** — which matters here more than elsewhere, because there is no
+compare-and-swap. Integer cents throughout, `amountCents` **always positive**
+with the sign in `type`, and `reason` a closed list so a typo cannot invent a
+category. **Zero is refused**: a zero entry is a line in a financial record that
+means nothing and still has to be explained, so a caller with nothing to write
+writes nothing.
+
+`basis` carries what `basisFor()` produced — the mode, both dates, sessions
+remaining over sessions total, and the two figures added — so a family credited
+150 out of 350 gets the answer from the record.
+
+### `cancelAndCredit()` — written once, called by both
+
+A guardian's cancellation and an admin's differ in exactly two things: who did
+it, and whether the hard cutoff stops them. Everything after that is identical
+and involves money, so two copies would be two copies that can round differently
+— and the difference surfaces when two families compare receipts. `entitled` is
+the caller's decision, which is where the two genuinely differ: a guardian past
+the cutoff cannot cancel at all, an **admin past it still can and credits
+nothing**.
+
+**The ledger is written first, the registration second** — the opposite of the
+email rule, for the opposite reason. An email not sent leaves a person waiting; a
+credit not written is money lost with nobody able to tell. A failed ledger write
+takes the whole action down and the family keeps their place, which is
+recoverable. The cost is a possible double credit on a retry, which is visible in
+an append-only ledger a person reads, and reversible with an adjustment.
+
+### Money is the `cancel` axis
+
+`recordPayment`, `applyCredit` and `adjustCredit` all sit behind `cancel` rather
+than `approve`, because that is the axis that exists to mean "may move money".
+Reading a ledger is `access` — seeing what a family is owed is part of answering
+their question about it.
+
+`recordPayment` **adds rather than sets**, so two part payments are two calls and
+both are in the history; it settles to `paid` only when the total covers what was
+billed, because a part payment reading as settled is a debt nobody chases.
+`applyCredit` writes the debit **and** the payment in one action, or the ledger
+and the registration disagree about the same euros, and it refuses more than the
+account holds. `adjustCredit` requires a note.
+
+### The unlink debt disposition
+
+`debtsFor()` is real now. An unpaid registration attached to the guardian being
+removed is **a question, not a rule**: the unlink answers 409 with what is owed
+and who is left, and completes only when told `reassign` or `write-off`. There is
+deliberately no third option meaning "leave it" — a debt owed by an account that
+can no longer see the participant is a debt nobody will ever be asked about. The
+disposition is applied **before** the unlink, so a failure leaves the guardian
+linked and the debt where it was. `reassignedFrom` is kept because the person
+being asked to pay did not submit it, and will ask why.
+
+The ordering the Phase 3 stub already had is what makes this safe: the
+last-guardian refusal comes first, so an admin is never shown a debt prompt for
+an action that was never going to complete — and "reassign has no target"
+cannot arise, because a permitted unlink implies a remaining guardian.
 
 ### Email (Resend)
 
@@ -1571,9 +1680,8 @@ share image, Formspree wiring, domain) is done. Open items:
   **Phase 1 is done** — the activity side: `activityId`, `type`, the
   registration settings block, the session calendar and its table on the page,
   named groups and `perSessionPrice`. All of it ships to the live site.
-  **Phase 5's `creditFor()` is done** and is now called on every cancellation,
-  from both sides; the ledger it would write to is not built, which is why both
-  paths refuse a cancellation earning more than zero.
+  **`creditFor()` is called on every cancellation, from both sides**, and the
+  ledger entry it produces is written before the registration is touched.
   **Phase 2 (accounts) is done**: sign up, sign in, sign out, password reset,
   email verification, profile.
   **Phase 3 (the family) is done**: participants, guardian links, the invite
@@ -1581,10 +1689,12 @@ share image, Formspree wiring, domain) is done. Open items:
   **Phase 4 (registration) is done**: submission, the approval queue, capacity
   counted rather than decremented, auto-approve with its fall-through, the
   expiry sweep, and the `registrations` tool with `{access, approve, cancel}`.
-  All three are **server-side only** — there is no page in front of any of it
-  yet, deliberately, so the family area stays a rendering job. **Phases 5, 6 and
-  7 remain**: the credit ledger and the money (both cancel paths already refuse
-  rather than silently dropping a credit), the family-facing area, and
-  pay-per-session.
+  **Phase 5 (money) is done**: the append-only credit ledger, the fee waiver
+  scoped to one participant / one activity / one academic year, `seriesId`
+  linking an autumn term to its spring, payments, applying credit, adjustments,
+  and the unlink debt disposition.
+  All four are **server-side only** — there is no page in front of any of it
+  yet, deliberately, so the family area stays a rendering job. **Phases 6 and 7
+  remain**: the family-facing area, and pay-per-session.
 - **Rotate the setup credentials.** The GitHub PAT and Netlify token were pasted
   into a chat transcript during setup.

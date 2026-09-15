@@ -80,6 +80,38 @@ function dropin(over) {
   }, over || {});
 }
 
+// THE THIRD PAIR: an autumn term and the spring term of the same course.
+//
+// A slug is one semester, so the spring term is a second record with its own
+// dates, its own calendar and its own page. `seriesId` is what says the two are
+// the same activity, and it exists for exactly one consumer — the registration
+// fee, which is charged once an academic year per participant per activity. The
+// pair is here rather than hand-made per suite for the usual reason: the waived
+// branch will sit unexercised for months, and the branch nobody tests is the
+// branch that works until the evening somebody uses it.
+//
+// Same academic year as course(): October-December 2026 and February-June 2027
+// are both 2026/27. That is the point — on a CALENDAR year they would not be,
+// and a returning child would be charged the fee twice.
+function secondTerm(over) {
+  const first = course();
+  return Object.assign(course(), {
+    slug: 'course-fixture-spring',
+    activityId: 'act-000000000000spr1',
+    // Points at the autumn term's id, which is what an admin choosing "another
+    // term of: Course" in the form produces.
+    seriesId: first.activityId,
+    facts: Object.assign({}, first.facts, {
+      duration: Object.assign({}, first.facts.duration, {
+        startDate: '2027-02-03', endDate: '2027-04-07',
+        sessionDates: ['2027-02-03', '2027-02-10', '2027-02-17', '2027-02-24',
+                       '2027-03-03', '2027-03-10', '2027-03-17', '2027-03-24',
+                       '2027-03-31', '2027-04-07'].map((d) => ({ date: d, status: 'scheduled' }))
+      })
+    })
+  }, over || {});
+}
+
 // The other pair. Pooled is the default and is what hebrew4kids is: two groups
 // of seven meeting at the same hour, and which one a child lands in is the
 // teacher's business. Named is for the case where the family has to choose, and
@@ -98,9 +130,16 @@ const TYPE_PAIR = [
   { name: 'course', build: course },
   { name: 'dropin', build: dropin }
 ];
+// Autumn and spring of one course. Iterated by anything that has to behave the
+// same whether or not the yearly fee was charged on this particular term.
+const TERM_PAIR = [
+  { name: 'first term', build: course, feeCharged: true },
+  { name: 'second term', build: secondTerm, feeCharged: false }
+];
 const GROUP_PAIR = [
   { name: 'pooled', groupSize: POOLED },
   { name: 'named', groupSize: NAMED }
 ];
 
-module.exports = { course, dropin, POOLED, NAMED, TYPE_PAIR, GROUP_PAIR, lang };
+module.exports = { course, dropin, secondTerm, POOLED, NAMED,
+                   TYPE_PAIR, GROUP_PAIR, TERM_PAIR, lang };

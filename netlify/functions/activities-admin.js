@@ -73,6 +73,12 @@ const WEEKS_OF_MONTH = [
 // identifier rather than a secret, but it is also permanent and public, and
 // Math.random() collides far sooner than its output length suggests.
 const mintActivityId = () => 'act-' + require('crypto').randomBytes(8).toString('hex');
+// A seriesId is always some activity's id, never a new identifier, so this is
+// the only shape it may take. Validated on the way in because it decides whether
+// a family is billed a registration fee: a client able to write an arbitrary
+// string here is a client able to put an activity in a series that does not
+// exist, where the waiver would silently never match.
+const SERIES_ID = /^act-[0-9a-f]{16}$/;
 
 const TOOL = 'activities';
 const DRAFT_STORE = 'activity-drafts';
@@ -505,6 +511,22 @@ function mergeByPermission(current, incoming, session) {
   if (base && base.activityId) out.activityId = base.activityId;
   else delete out.activityId;
 
+  // The series IS settable, and that is the difference between the two. An
+  // activityId answers "which record is this"; a seriesId answers "which
+  // activity is this a term of", which is a judgement an admin makes when they
+  // create the spring term. It is structure rather than words — one answer for
+  // all three languages — so a role permitted to edit only Russian cannot move
+  // an activity into another's series and change what a family is billed.
+  if (full && incoming.seriesId !== undefined) {
+    out.seriesId = SERIES_ID.test(String(incoming.seriesId || '')) ? incoming.seriesId : null;
+  } else if (base && base.seriesId) {
+    out.seriesId = base.seriesId;
+  }
+  // A blank series is this record's own id: every activity is a series of one
+  // until somebody says otherwise. Written here rather than left absent so the
+  // stored record always answers the question.
+  if (!out.seriesId && out.activityId) out.seriesId = out.activityId;
+
   SIMPLE_KEYS.forEach((k) => { out[k] = mergeLang(base && base[k], incoming[k]); });
   // The rich fields are markup, and the page prints that markup as markup.
   RICH_KEYS.forEach((k) => {
@@ -769,6 +791,9 @@ exports.handler = async (event) => {
     // id is random, and a pure function that invents one is not idempotent.
     // Only ever filled in when absent.
     if (!record.activityId) record.activityId = mintActivityId();
+    // A series of one, unless the admin pointed this term at another. Never
+    // minted: a seriesId is always some activity's id.
+    if (!record.seriesId) record.seriesId = record.activityId;
     // Fill a blank cutoff, never overwrite a value that is there. On save
     // rather than on create, because at create time the dates these are
     // computed from have usually not been typed yet.
@@ -799,6 +824,11 @@ exports.handler = async (event) => {
         published.forEach((a) =>
           bySlug.set(a.slug, {
             slug: a.slug, status: a.status, where: 'published',
+            // The form's series picker needs both: the id to point AT, and the
+            // series each candidate already belongs to, so choosing a term that
+            // is itself part of a series joins the series rather than starting a
+            // third one.
+            activityId: a.activityId || null, seriesId: a.seriesId || a.activityId || null,
             title: a.title, langs: langsPresent(a),
             isoUpdated: a.isoUpdated || null,
             lastEditedByName: a.lastEditedByName || null,
@@ -808,6 +838,7 @@ exports.handler = async (event) => {
         drafts.forEach((a) =>
           bySlug.set(a.slug, {
             slug: a.slug, status: a.status, where: 'draft',
+            activityId: a.activityId || null, seriesId: a.seriesId || a.activityId || null,
             title: a.title, langs: langsPresent(a),
             isoUpdated: a.isoUpdated || null,
             lastEditedByName: a.lastEditedByName || null,

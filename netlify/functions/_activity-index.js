@@ -47,6 +47,12 @@ function indexEntry(a) {
     // function. It is an opaque identifier, not a secret: it names an activity
     // that is already public and grants nothing on its own.
     activityId: a.activityId || null,
+    // Which activity this is a TERM of. Equal to activityId for every activity
+    // that is a series of one, which is all of them until an admin links a
+    // second term. Published here for the same reason activityId is: it is an
+    // opaque identifier for something already public, and it saves a round trip
+    // for anything that wants to show a course's terms together.
+    seriesId: a.seriesId || a.activityId || null,
     // What KIND of activity, so a listing or a form can tell a semester course
     // from a pay-per-session one without opening the record.
     type: a.type || 'course',

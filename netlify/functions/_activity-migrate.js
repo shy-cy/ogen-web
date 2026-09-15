@@ -239,6 +239,29 @@ function migrate(record, options) {
   else if (mintId) out.activityId = mintId();
   else delete out.activityId;
 
+  // WHICH ACTIVITY THIS IS A TERM OF, and it defaults to the record's own id.
+  //
+  // A slug is one semester: hebrew4kids runs mid-October to mid-December and its
+  // fullPrice is labelled "per semester", so the spring term is a second record
+  // with its own dates, its own calendar and its own page. That is right for
+  // everything the site publishes and wrong for exactly one question — the
+  // registration fee, which is charged once a year per participant PER ACTIVITY,
+  // and therefore has to be able to tell that two records are the same activity.
+  //
+  // Defaulting to the record's own id is what makes this free: every activity
+  // that exists is a series of one, so nothing that reads it changes meaning,
+  // and a record only stops being its own series when an admin says so. There is
+  // no migration and no key change — the registration key is still one record
+  // per participant per activity.
+  //
+  // Minted with no randomness of its own for the same reason: it is a POINTER to
+  // an activityId, never a new identifier, so a series has the id of whichever
+  // term was created first and the second term points at it.
+  const existingSeries = String(out.seriesId || '').trim();
+  if (existingSeries) out.seriesId = existingSeries;
+  else if (out.activityId) out.seriesId = out.activityId;
+  else delete out.seriesId;
+
   // One answer for all three languages, like robots and shareImage. Absent
   // means course, which is what every activity written before this field
   // existed was.

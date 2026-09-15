@@ -200,6 +200,124 @@ function autoApproves(activity, flag) {
   return true;
 }
 
+// --- the registration fee, and the one case it is waived ---------------------
+
+// THE ACADEMIC YEAR, NOT THE CALENDAR YEAR, and the distinction is the whole
+// feature rather than a detail.
+//
+// The fee is annual. Ogen's autumn term runs October to December and its spring
+// term January to June, so on a calendar year the two halves of one course fall
+// either side of the boundary and a child returning in the spring would be
+// charged again — which is the exact case the waiver exists to prevent. On an
+// academic year they are one year, which is what "yearly registration fee"
+// means to the family paying it.
+//
+// September, because that is when the school year starts in both Israel and
+// Cyprus, and a term beginning in September belongs with the ones after it.
+const ACADEMIC_YEAR_STARTS = 9;
+
+function academicYearOf(isoDate) {
+  const p = credit.parseDateParts(isoDate);
+  if (p == null) return null;
+  const start = p.mo >= ACADEMIC_YEAR_STARTS ? p.y : p.y - 1;
+  return start + '/' + String((start + 1) % 100).padStart(2, '0');
+}
+
+// Measured from the ACTIVITY'S START DATE, not from the moment of submission. A
+// family enrolling in August for a course beginning in October is enrolling for
+// that course's year, and a registration taken on 31 August must not land in a
+// different year from one taken on 1 September for the same term. Falls back to
+// the submission moment only for an activity with no start date.
+function feeYearOf(activity, now) {
+  const start = ((((activity || {}).facts) || {}).duration || {}).startDate;
+  const byStart = academicYearOf(start);
+  if (byStart) return byStart;
+  return academicYearOf(new Date(ms(now) == null ? Date.now() : ms(now)).toISOString().slice(0, 10));
+}
+
+// Which activity this is a term of. Defaults to the activity's own id, so every
+// activity is a series of one until an admin links a second term.
+const seriesOf = (activity) => (activity && (activity.seriesId || activity.activityId)) || null;
+
+// Does a prior registration still count as having been charged the fee?
+//
+// LIVE AND FINISHED ARE DIFFERENT QUESTIONS, and collapsing them leaves a hole.
+//
+//   pending / approved   The registration stands, so the fee is billed on it and
+//                        will be collected. It counts even if nothing has been
+//                        paid yet — otherwise a family registering for both terms
+//                        before paying anything would be billed the fee twice.
+//
+//   rejected / expired   The request never became a place, so nothing was ever
+//                        owed. The fee applies to the next one.
+//
+//   cancelled            The registration is over, so "billed" is no longer a
+//                        promise of anything. It counts only if the fee was
+//                        actually PAID and not given back. Registering, not
+//                        paying, cancelling and registering again must not be a
+//                        way to never pay the fee at all — which is what reading
+//                        `cancelled` as "charged" outright would have made it,
+//                        and it is the kind of hole that is found by whoever
+//                        discovers it rather than by whoever wrote it.
+//
+// And in every case, a registration whose own fee was waived proves nothing
+// about a third one: `feeCharged === false` is not a payment.
+const CHARGED_STATUSES = ['pending', 'approved', 'cancelled'];
+const LIVE_STATUSES = ['pending', 'approved'];
+
+function feeStandsOn(reg) {
+  if (!reg) return false;
+  const price = ((reg.frozen || {}).price) || {};
+  // Absent reads as charged: a record written before the waiver existed was
+  // charged, so nothing already stored changes meaning.
+  if (price.feeCharged === false) return false;
+  if (LIVE_STATUSES.indexOf(reg.status) !== -1) return true;
+  if (reg.status !== 'cancelled') return false;
+
+  const payment = reg.payment || {};
+  // The fee portion of what was actually paid, against what was actually given
+  // back. splitPaid is the same function the credit uses, so the two cannot
+  // disagree about which euros were fee.
+  const paidFee = credit.splitPaid(payment.paidCents, price.registrationFee, true).fee;
+  return paidFee > (payment.feeCreditedCents || 0);
+}
+
+// THE WAIVER, in one place.
+//
+//   THE FEE IS SCOPED TO ONE PARTICIPANT, ONE ACTIVITY, ONE ACADEMIC YEAR.
+//
+//   same child, same activity, second term  -> not charged again
+//   same child, a different activity        -> charged
+//   a sibling, any activity                 -> charged
+//
+// It is answerable from this participant's own registrations and nothing else —
+// a prefix scan of reg-<participantId>__, which is the cheap direction of the
+// key. No account aggregate, no ledger, nothing to reconcile. That is a property
+// of the SCOPE rather than of the implementation: a family-level rule would have
+// had to resolve every participant on the account before it could price one
+// registration.
+function feeApplies(priorRegistrations, seriesId, feeYear) {
+  if (!seriesId || !feeYear) return true;
+  return !(priorRegistrations || []).some((r) =>
+    ((r.frozen || {}).seriesId) === seriesId &&
+    ((r.frozen || {}).feeYear) === feeYear &&
+    feeStandsOn(r));
+}
+
+// What this registration is billed, in integer cents. Euros are a display
+// concern; float arithmetic drifts, and a balance that drifts is a balance
+// nobody can explain.
+//
+// A drop-in owes the fee and nothing else at submission: its sessions are billed
+// as they are attended, which is Phase 7. A course owes the fee plus the term.
+function owedCentsFor(activity, feeCharged) {
+  const price = (((activity || {}).facts) || {}).price || {};
+  const eur = (v) => (v == null || v === '' ? 0 : Math.max(0, Math.round(Number(v) * 100)) || 0);
+  const fee = feeCharged ? eur(price.registrationFee) : 0;
+  const course = (activity.type || 'course') === 'course' ? eur(price.fullPrice) : 0;
+  return fee + course;
+}
+
 // --- what is frozen ---------------------------------------------------------
 
 // The inputs to the decision, captured at submission, so a later edit to the
@@ -208,13 +326,19 @@ function autoApproves(activity, flag) {
 // keeps that dependency from being live: an admin changing a price or an age
 // range in March changes the activity, and every registration already taken
 // keeps the terms it was taken under.
-function freeze(activity, participant, groupId, flag) {
+function freeze(activity, participant, groupId, flag, fee) {
   const f = ((activity || {}).facts) || {};
   const price = f.price || {};
   const group = facts.namedGroups(f.groupSize || {})
     .filter((g) => g.groupId === groupId)[0] || null;
 
   return {
+    // Which activity and which year the fee was judged against. Frozen so the
+    // decision can be re-derived and explained without reading the activity
+    // back — and so moving an activity into a different series later cannot
+    // retroactively change what an earlier family was billed.
+    seriesId: (fee && fee.seriesId) || null,
+    feeYear: (fee && fee.feeYear) || null,
     participantName: [participant.firstName, participant.lastName].filter(Boolean).join(' '),
     dateOfBirth: participant.dateOfBirth || null,
     activityTitle: activity.title || null,
@@ -228,7 +352,12 @@ function freeze(activity, participant, groupId, flag) {
       registrationFee: price.registrationFee == null ? null : Number(price.registrationFee),
       fullPrice: price.fullPrice == null ? null : Number(price.fullPrice),
       perSessionPrice: price.perSessionPrice == null ? null : Number(price.perSessionPrice),
-      currency: CURRENCY
+      currency: CURRENCY,
+      // WHETHER THE FEE WAS BILLED ON THIS REGISTRATION, which is not derivable
+      // from the fee itself. splitPaid() in _credit.js reads it: on a waived
+      // registration nothing paid is fee, and taking it off the top anyway would
+      // credit back the first €50 of a course payment as a fee.
+      feeCharged: !!(fee && fee.charged)
     },
     // Frozen for the same reason the price is: a group renamed from "Advanced"
     // to "Level 3" in March must not rewrite what a family chose in January. The
@@ -270,12 +399,22 @@ function submissionErrors(activity, participant, groupId) {
 // The record also keeps WHICH number produced it and WHERE IT CAME FROM. Without
 // those, "why did this one expire in three days and that one in fourteen" is
 // unanswerable a month later.
-function newRegistration({ activity, participant, accountId, groupId, now, env }) {
+function newRegistration({ activity, participant, accountId, groupId, now, env, priorRegistrations }) {
   const at = ms(now) == null ? Date.now() : ms(now);
   const iso = new Date(at).toISOString();
   const expiry = REG.resolveExpiryDays(activity, env || process.env);
   const flag = flagFor(activity, participant, at);
   const auto = autoApproves(activity, flag);
+
+  // Decided ONCE, here, from this participant's own prior registrations — and
+  // then frozen. An admin who links this activity into another series next month
+  // must not change what this family was billed today.
+  const fee = {
+    seriesId: seriesOf(activity),
+    feeYear: feeYearOf(activity, at),
+    charged: false
+  };
+  fee.charged = feeApplies(priorRegistrations, fee.seriesId, fee.feeYear);
 
   return {
     participantId: participant.participantId,
@@ -297,45 +436,15 @@ function newRegistration({ activity, participant, accountId, groupId, now, env }
     cancelledAt: null,
     cancelledBy: null,
     cancelSource: null,
-    frozen: freeze(activity, participant, groupId || null, flag),
+    frozen: freeze(activity, participant, groupId || null, flag, fee),
     // ADVISORY ONLY. It annotates the queue and nothing branches on it except
     // autoApproves above, which reads it to decide whether to stand aside.
     ageFlag: flag,
     payment: {
-      // PHASE 5 FILLS THIS, and it is null rather than a number on purpose.
-      //
-      // What a registration is billed is not a property of the activity alone,
-      // because the registration fee is waived in one case and one case only:
-      //
-      //   THE FEE IS SCOPED TO ONE PARTICIPANT, ONE ACTIVITY, ONE YEAR.
-      //
-      //   same child, same activity, second semester  -> NOT charged again
-      //   same child, a different activity            -> charged
-      //   a sibling, any activity                     -> charged
-      //
-      // Not per family and not per account: two children in the same activity
-      // pay two fees, and one child in two activities pays two fees. The only
-      // thing that suppresses it is that this participant has already paid it
-      // for THIS activity this year.
-      //
-      // That scope is what makes the waiver answerable HERE rather than from a
-      // ledger: it is a question about this participant's own registrations for
-      // this activity, which is a prefix scan of reg-<participantId>__ — no
-      // account aggregate, no cross-store join, nothing to reconcile. The rule
-      // is strictly cheaper than a family-level one would have been.
-      //
-      // ⚠ WHAT IT STILL WAITS ON is not the ledger, it is a TERM. The key is
-      // reg-<participantId>__<activityId>, one record per pair with no semester
-      // in it, so the one case the waiver exists for — the same child in the
-      // same activity next semester — has nowhere to go. See the Phase 5 note in
-      // CLAUDE.md; that has to be settled before owedCents can be computed.
-      //
-      // ⚠ AND IT CHANGES splitPaid() in _credit.js, which takes the fee off the
-      // top of whatever was paid. On a waived registration nothing paid is fee,
-      // so the first 50 euros of a course payment would be credited as one. The
-      // frozen block has to record whether the fee was CHARGED on this
-      // registration, not only what the fee was.
-      owedCents: null,
+      // Computed at submission, with the fee already decided — see feeApplies
+      // above for the scope, and frozen.price.feeCharged for what was concluded
+      // about this one.
+      owedCents: owedCentsFor(activity, fee.charged),
       paidCents: 0,
       currency: CURRENCY,
       paidAt: null,
@@ -344,6 +453,11 @@ function newRegistration({ activity, participant, accountId, groupId, now, env }
       writtenOffBy: null,
       reassignedFrom: null,
       creditedCents: 0,
+      // The FEE portion of whatever was credited back, kept separately because
+      // the waiver reads it: a family refunded the fee and registering again is
+      // paying it again. The course portion needs no such field — nothing asks
+      // it a second question.
+      feeCreditedCents: 0,
       creditedToAccountId: null
     },
     history: [{ iso: iso, action: auto ? 'auto-approved' : 'submitted', by: accountId, note: null }],
@@ -377,7 +491,9 @@ function transition(reg, { status, by, source, note, now }) {
 }
 
 module.exports = {
-  STATUSES, CANCEL_SOURCES, CURRENCY, key,
+  STATUSES, CANCEL_SOURCES, CURRENCY, key, CHARGED_STATUSES, LIVE_STATUSES,
+  ACADEMIC_YEAR_STARTS,
+  academicYearOf, feeYearOf, seriesOf, feeStandsOn, feeApplies, owedCentsFor,
   holdsASpot, hasLapsed, countSpots, capacityReport, hasRoom,
   ageCheckMoment, flagFor, autoApproves,
   freeze, submissionErrors, newRegistration, transition
