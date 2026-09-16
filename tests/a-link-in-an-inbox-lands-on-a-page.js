@@ -163,4 +163,24 @@ H.eq((block.match(/(^|[^-])(left|right)\s*:/g) || []).length, 0,
   'not one directional property — the same markup flips on its own in all three languages');
 H.ok(/border-inline-start/.test(block), 'and the insets that do exist are logical');
 
+console.log('\n[two buttons side by side have a gap between them]');
+// Nothing in the family area is built from HTML source — it is all
+// createElement — so adjacent siblings have NO whitespace text node between
+// them and sit flush against each other. "Save" and "Cancel" were touching on
+// the participant form, and the invite row's two links were too. A margin per
+// button would have to be remembered every time; one wrapper cannot be.
+H.ok(/\.acc-actions\{[^}]*display:flex/.test(block.replace(/\s+/g, ' ')),
+  '.acc-actions is a flex row');
+H.ok(/\.acc-actions\{[^}]*gap:\s*\d+px/.test(block.replace(/\s+/g, ' ')),
+  'with a real gap — flex + gap so the order follows the page direction');
+H.ok(/\.acc-row \.acc-actions\{ margin-block-start:0; \}/.test(block.replace(/\s+/g, ' ')),
+  'and no top margin inside a row, which aligns on the baseline');
+const acct = read('js/member-account.js');
+H.ok(/function actions\(kids\)/.test(acct), 'there is one helper rather than a margin per button');
+H.eq((acct.match(/actions\(\[/g) || []).length, 2,
+  'and both places that put two buttons together use it');
+// The failure mode is a button appended straight into a form beside another.
+H.ok(!/\[f\.row, l\.row, d\.row, n\.row, go,/.test(acct),
+  'the participant form no longer appends Cancel as a bare sibling of Save');
+
 H.done();

@@ -874,6 +874,20 @@ html[lang="he"] .thankyou h1{ font-family: var(--font-he); font-weight:700; }
 }
 .acc-inline{ margin-block-start:16px; }
 
+/* A row of buttons. Nothing in the family area is built from HTML source — it is
+   all createElement — so two adjacent buttons have no whitespace text node
+   between them and sit flush against each other. The gap has to be declared.
+   flex + gap, so the order follows the page direction and there is nothing
+   directional to get wrong. */
+.acc-actions{
+  display:flex; flex-wrap:wrap; align-items:center; gap:18px;
+  margin-block-start:20px;
+}
+/* Inside a row it is not a footer, it is the row's own controls — and .acc-row
+   aligns on the baseline, so the margin above would drop the buttons out of line
+   with the text they belong to. */
+.acc-row .acc-actions{ margin-block-start:0; }
+
 .acc-link{
   font:inherit; font-size:15px; font-weight:500; color:var(--terracotta);
   background:none; border:0; padding:0; cursor:pointer; text-decoration:underline;

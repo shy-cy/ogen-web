@@ -257,6 +257,14 @@
     ]), input: input };
   }
 
+  // Any row of buttons. One helper rather than a margin on each button, so the
+  // gap cannot be forgotten the next time two of them end up side by side — and
+  // it is a flex row with `gap`, so the order follows the page direction and
+  // there is nothing directional to get wrong in Hebrew.
+  function actions(kids) {
+    return el('div', { class: 'acc-actions' }, kids);
+  }
+
   function section(title, kids) {
     return el('section', { class: 'acc-card' },
       [title ? el('h2', { text: title }) : null].concat(kids || []));
@@ -556,9 +564,14 @@
         if (!res.ok) return say('err', failure(res));
         renderChildren(where);
       });
-    } }, [f.row, l.row, d.row, n.row, go,
-          el('button', { type: 'button', class: 'acc-link', text: T.cancel,
-                         onclick: function () { renderChildren(where); } })]);
+    } }, [f.row, l.row, d.row, n.row,
+          // WRAPPED, because these are built with createElement and adjacent
+          // siblings made that way have no whitespace text node between them —
+          // so the cancel link sat flush against the Save button's rounded edge
+          // with literally zero gap. Inline-block spacing that "usually just
+          // works" in hand-written HTML does not exist here at all.
+          actions([go, el('button', { type: 'button', class: 'acc-link', text: T.cancel,
+                                      onclick: function () { renderChildren(where); } })])]);
     clear(where);
     where.appendChild(section(T.childrenTitle, [form]));
   }
@@ -580,7 +593,7 @@
       (res.data.pendingInvites || []).forEach(function (i) {
           sub.appendChild(el('div', { class: 'acc-row' }, [
             el('span', { text: i.invitedEmail + ' · ' + T.invitePending }),
-            el('span', {}, [
+            actions([
               el('button', { type: 'button', class: 'acc-link', text: T.inviteResend, onclick: function () {
                 post(FAMILY, { action: 'resendInvite', participantId: p.participantId, inviteToken: i.token })
                   .then(function (r) { say(r.ok ? 'ok' : 'err', r.ok ? T.saved : failure(r)); });
