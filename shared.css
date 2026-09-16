@@ -831,7 +831,9 @@ html[lang="he"] .thankyou h1{ font-family: var(--font-he); font-weight:700; }
   display:flex; flex-wrap:wrap; gap:12px; align-items:baseline;
   justify-content:space-between; margin-bottom:8px;
 }
-.acc-head h1{ font-size:clamp(26px,4vw,34px); margin:0; }
+/* An h2 — the shell's .page-header owns the page's single h1. Sized like one
+   anyway, because it is what a reader's eye lands on. */
+.acc-head h2{ font-size:clamp(26px,4vw,34px); margin:0; }
 
 .acc-card{
   background:var(--paper); border:1px solid var(--stone); border-radius:10px;
@@ -918,6 +920,123 @@ html[lang="he"] .thankyou h1{ font-family: var(--font-he); font-weight:700; }
 .acc-notice.is-ok{ border-inline-start-color:var(--olive); }
 .acc-notice.is-err{ border-inline-start-color:#8a3220; }
 .acc-notice.is-warn{ border-inline-start-color:var(--gold); }
+
+
+/* ---- the dashboard's two summary tiles ---------------------------------- */
+/* A count is a LINK, not an ornament: "4 people" is how you get to the four
+   people. Auto-fit rather than a two-column rule, so they stack on a phone from
+   the space they have rather than from a breakpoint someone has to maintain. */
+.acc-tiles{
+  display:grid; gap:16px; margin-bottom:20px;
+  grid-template-columns:repeat(auto-fit, minmax(230px, 1fr));
+}
+.acc-tile{
+  display:flex; flex-direction:column; gap:2px;
+  background:var(--paper); border:1px solid var(--stone); border-radius:10px;
+  padding:20px 22px; text-decoration:none; color:var(--ink);
+}
+.acc-tile:hover{ border-color:var(--terracotta); }
+.acc-tile-label{ font-size:14px; font-weight:700; color:var(--camel); letter-spacing:.04em; text-transform:uppercase; }
+.acc-stat{ font-size:38px; font-weight:700; line-height:1.1; font-variant-numeric:tabular-nums; }
+.acc-tile-go{ margin-block-start:10px; font-size:15px; font-weight:500; color:var(--terracotta); }
+
+/* ---- the two tabs on /account/details ----------------------------------- */
+.acc-tabs{
+  display:flex; flex-wrap:wrap; gap:6px;
+  border-block-end:1px solid var(--stone); margin-bottom:20px;
+}
+.acc-tab{
+  font:inherit; font-size:15.5px; font-weight:500; color:var(--camel);
+  background:none; border:0; border-block-end:2px solid transparent;
+  padding:10px 14px; margin-block-end:-1px; cursor:pointer;
+}
+.acc-tab:hover{ color:var(--ink); }
+.acc-tab.is-on{ color:var(--ink); font-weight:700; border-block-end-color:var(--terracotta); }
+
+/* A heading inside a card that groups rows — "Current" over the live
+   registrations, the participant's name over who may manage them. */
+.acc-group{
+  font-size:13px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+  color:var(--camel); margin:22px 0 2px;
+}
+.acc-card > .acc-group:first-of-type{ margin-block-start:0; }
+
+/* A finished registration is still readable and no longer the thing to look at. */
+.acc-row.is-muted b{ color:var(--camel); font-weight:500; }
+
+/* "me" on your own row. Olive rather than terracotta for the same reason the
+   nav's signed-in initial is: a "this is you" marker is not a call to action,
+   and terracotta is reserved for the things that are. */
+.acc-pill.is-self{
+  background:var(--olive); color:#fff; margin-inline-start:8px;
+  font-size:11px; vertical-align:middle;
+}
+.acc-pill.is-s-booked{ background:var(--gold); color:#fff; }
+.acc-pill.is-s-attended{ background:var(--olive); color:#fff; }
+
+/* Who this page is about, under the activity's name. */
+.acc-sub-head{
+  display:flex; flex-wrap:wrap; align-items:center; gap:10px;
+  margin:0 0 22px;
+}
+
+/* ---- the facts of one activity ------------------------------------------ */
+/* The same rows the public page shows, from the same module — so the family
+   area cannot start describing an activity differently from the page it is
+   published on. Stacked label over value, never pushed to opposite edges: that
+   shape has to be told which edge is which, and in a site rendering the same
+   markup both directions the instruction kept being wrong. */
+.acc-facts{
+  display:grid; gap:16px; margin-bottom:20px;
+  grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));
+}
+.acc-fact{
+  background:var(--paper); border:1px solid var(--stone); border-radius:10px;
+  padding:18px 20px;
+}
+.acc-fact h3{ font-size:13px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+              color:var(--camel); margin:0 0 12px; }
+.acc-fact p{ margin:0 0 12px; }
+.acc-fact p:last-child{ margin-bottom:0; }
+.acc-fact b{ display:block; font-size:14px; font-weight:700; }
+/* A fact value can be more than one line — the group size splits the count from
+   the size, the duration puts the date range above the sessions. The newline is
+   in the plain text, never markup, so nothing here is ever interpreted as HTML. */
+.acc-fact span{ display:block; font-size:15px; color:var(--ink); white-space:pre-line; }
+
+/* ---- money -------------------------------------------------------------- */
+/* ROWS, AND NEVER A TOTAL OF THE FEE AND THE TERM PRICE. The registration fee is
+   charged once a year and the course fee once a semester, so their sum is a
+   figure nobody is ever billed. "Still to pay" is a different number: what is
+   outstanding on THIS registration, which is billed as one amount. */
+.acc-money{
+  display:flex; flex-wrap:wrap; gap:6px 18px; justify-content:space-between;
+  align-items:baseline; padding:9px 0; border-block-end:1px solid var(--stone);
+}
+.acc-money:last-child{ border-block-end:0; }
+.acc-money b{ font-variant-numeric:tabular-nums; white-space:nowrap; }
+.acc-money.is-sum b{ font-size:18px; }
+/* The qualifier — "(10 sessions × 2 lessons)". Its own quiet line, because it is
+   neither the label nor the figure, and glued onto either it reads as a second
+   label or as part of the number. */
+.acc-note{ display:block; font-size:13.5px; font-style:italic; color:var(--camel); }
+
+/* ---- the session table -------------------------------------------------- */
+/* Wide content scrolls inside its own container so the page body never scrolls
+   sideways. */
+.acc-scroll{ overflow-x:auto; }
+.acc-table{ width:100%; border-collapse:collapse; font-size:15px; }
+.acc-table th{
+  font-size:12.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+  color:var(--camel); padding-block:0 8px; padding-inline-end:14px;
+  border-block-end:1px solid var(--stone); text-align:start; white-space:nowrap;
+}
+.acc-table td{
+  padding-block:10px; padding-inline-end:14px;
+  border-block-end:1px solid var(--stone); vertical-align:middle;
+}
+.acc-table tr:last-child td{ border-block-end:0; }
+.acc-table .is-num{ text-align:end; font-variant-numeric:tabular-nums; white-space:nowrap; }
 
 /* The family-area link in the mobile menu, set apart because it is the one
    entry that leads somewhere private rather than to a section of this page. */

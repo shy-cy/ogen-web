@@ -34,6 +34,9 @@ Three parallel language trees. Hebrew is the default and lives at the root.
 | `/en/privacy`, `/ru/privacy` | `{en,ru}/privacy.html` | | |
 | `/terms` | `terms.html` | `he` | `rtl` |
 | `/en/terms`, `/ru/terms` | `{en,ru}/terms.html` | | |
+| `/account` | `account.html` | `he` | `rtl` |
+| `/account/details`, `/account/activity` | `account/{details,activity}.html` | `he` | `rtl` |
+| `/en/account…`, `/ru/account…` | `{en,ru}/account…` | | |
 | `/confirmation` | `confirmation.html` | `he` | `rtl` |
 | `/en/confirmation` | `en/confirmation.html` | `en` | `ltr` |
 | `/ru/confirmation` | `ru/confirmation.html` | `ru` | `ltr` |
@@ -1847,23 +1850,126 @@ The first thing on this site a family signs into. Trilingual, RTL, and the whole
 of it reachable from the activity page's Register button.
 
 ```
-account.html                  /account            the area itself
+account.html                  /account            the dashboard
+account/details.html          /account/details    your details, and the people
+account/activity.html         /account/activity   one registration, in full
 account/verify.html           /account/verify     the three token-bearing views,
 account/reset.html            /account/reset      which exist as real URLs because
 account/guardian-invite.html                      the emails already point at them
-en/…  ru/…                    the same four, per tree — twelve shells
+en/…  ru/…                    the same six, per tree — eighteen shells
 js/member-session.js          the token, and the one post() every call goes through
 js/member-account.js          every view, and the ONE {he,en,ru} table
 ```
 
-**The twelve pages are shells.** Every word a person reads is in the string table
-in `js/member-account.js`, exactly as the nav, the footer and the contact form
-each carry their own — so a wording change is an edit to one table rather than to
-twelve HTML files in three languages, which is the shape that guarantees the
-Russian drifts from the Hebrew. A test asserts the body of each page is a mount
-point and nothing else, and that the three languages have **exactly** the same
-keys: a missing Russian key is not a missing translation, it is `undefined`
-rendered into a label.
+**The eighteen pages are shells.** Every word a person reads is in the string
+table in `js/member-account.js`, exactly as the nav, the footer and the contact
+form each carry their own — so a wording change is an edit to one table rather
+than to eighteen HTML files in three languages, which is the shape that
+guarantees the Russian drifts from the Hebrew. A test asserts the body of each
+page is a mount point and nothing else, that the three languages have **exactly**
+the same keys (a missing Russian key is not a missing translation, it is
+`undefined` rendered into a label), and that **no key is left unreferenced** — an
+orphan is dead copy three languages carry, and is indistinguishable from a key
+whose only caller was renamed, which is a real bug wearing a harmless costume.
+
+A shell's `.page-header` carries the page's single `<h1>`; the heading the script
+draws is an **`<h2>`**. Two h1s are two claims about what the page is. These are
+noindex so nothing is reading them for SEO, but a screen reader announces the
+outline.
+
+### Three signed-in views, split by what a person came to do
+
+| | |
+|---|---|
+| `account` | the dashboard — who you are, and what you are registered to |
+| `details` | your own details, and the people on this account |
+| `activity` | one registration: the facts, what it costs, what is paid, the sessions |
+
+It was **one screen holding a summary and five forms**, and the one thing a
+family opens it for — *is Noa in?* — was the hardest thing on it to find. The
+dashboard is now two summary tiles and the list, and the tiles are links rather
+than ornaments: "My family · 4" is how you reach the four people.
+
+**Every row is a person AND an activity**, never an activity alone. Ogen
+registers one participant to one activity, so two children in the same class are
+two registrations with their own status, price and cancellation; a row naming
+only the activity would hide which of them it was about. Rows group **live and
+finished** rather than upcoming and past — a row carries no end date, so grouping
+by time would be a claim the list cannot support.
+
+`/account/activity` is addressed by **participantId and activityId**, which is
+the registration's key, and the server resolves the activity through
+`activities-index.json`. Never by the frozen slug:
+`frozen.activitySlugAtSubmission` is audit only, and following it after a rename
+opens the wrong record or none — and the family is told their registration does
+not exist. One server-side `regRow()` builds the shape for both the list and the
+page, so the row a family reads on the dashboard cannot disagree with the page
+they opened from it.
+
+The facts on that page come from **`sidebarGroups()` — the same module the
+published page uses**, so the family area cannot start describing an activity
+differently from the page it is published on. `isPubliclyVisible()` keeps its
+exact current meaning and its only caller: the members-only address is **omitted
+from the payload**, not hidden in the client, and `memberVisibleRows()` is still
+not built. One wrinkle worth knowing: `LABELS` is authored for an HTML template,
+so `gSchedule` is literally `When &amp; where`. The client sets `textContent`, so
+there is one `plainLabel()` decoder at the point the two worlds meet — JSON is
+not HTML, and an undecoded entity reaches a family's screen as itself.
+
+### ⚠ The area was not about children, and said it was
+
+`_participant-store.js` has opened by saying so since Phase 3 — *"a guardian must
+be able to register themselves… One entity"* — and nothing in the model branches
+on age. A parent could always add themselves and sign up for the folk dancing.
+
+**The words drifted, and only half of them**, which is why nobody noticed: the
+button already said "Add a participant" / `הוספת משתתף/ת` while the heading
+directly above it said "My children" / `הילדים שלי` / `Мои дети`. A model that is
+right and a screen that says otherwise is worse than either alone — the
+capability was built, paid for, and invisible.
+
+The heading is `familyTitle` now, the list holds whoever takes part, and **"Add
+myself" is a button** rather than something you have to work out is allowed. It
+prefills the name the account already knows. A test pins the words to the model
+rather than to a review somebody has to repeat: no string in any language calls
+anybody a child.
+
+**`isSelf` lives on the LINK, not on the participant.** It is a fact about a
+*pair* — a couple who each manage the other's record are "self" on one of their
+two links and not on the other. Put on the participant it would have to name an
+account, which is primacy's job and already has a home. It authorises nothing: a
+client that lies about it has mislabelled its own screen.
+
+Two edges it exposed. **"Remove myself from this record" is hidden on the record
+that is you** — you would be handing your own attendance to somebody else and
+losing sight of it. And the guardian **invitation email** still says "second
+guardian for &lt;name&gt;", which reads oddly adult-to-adult; it is trilingual
+copy whose Russian is already awaiting review, so it belongs in that pass.
+
+### The credit card stays, and renders nothing
+
+Payments are not built, so the card was going to be removed until the same
+release. It is kept and simply draws nothing while the ledger is empty, because
+**cancelling in time already writes a credit** — removing it would give a family
+credit they cannot see. Today every balance is €0.00 because nothing collects
+money. The day that changes, it is already there.
+
+### The screens are EXECUTED by a test, not read
+
+`tests/_dom.js` is a DOM small enough to run `js/member-account.js` in and no
+smaller. There is no jsdom on purpose: *"a test that needs installing is a test
+that stops being run"* is the rule this directory is built on, and the same one
+that put fake Blobs and fake GitHub in `_helpers.js`. It implements what this one
+script actually uses and **throws on anything else** — a class selector that is
+not a class selector, a click on a node with no handler, an `appendChild(null)` —
+so it cannot quietly decay into a bad imitation of a browser.
+
+Over a thousand lines of client code had never been run by anything. It found two
+bugs in one sitting, and both read fine on the page: registering said "your
+request has been sent" and then rebooted the dashboard, which threw the notice
+away inside one repaint; and the two tabs on `/account/details` told themselves
+apart by comparing their own **label text**, which would have lit both up in any
+language where the wording converged.
 
 `data-view` on the mount is the entire router. The three token views are real
 URLs rather than query parameters on one page because **`_account-email.js` has
@@ -1913,10 +2019,12 @@ trip and revealing nothing they do not already know about their own address.
 
 A guardian session is seven days on a sliding window, sized for a parent who
 visits once a month; losing it every time a tab closes would defeat the reason it
-is seven days. An admin session carries publish rights and should not outlive the
-tab. Different store, different key, different lifetime — and server-side they
-are different Blobs stores with different key prefixes, which is the actual
-security boundary.
+is seven days. **Both clients use `localStorage` now** — the admin's used to use
+`sessionStorage` under a comment calling that a security property, which it was
+not; the real limits are server-side and differ on purpose, four hours idle with
+a twelve-hour cap against seven sliding days. Different store, different key,
+different lifetime — and server-side they are different Blobs stores with
+different key prefixes, which is the actual security boundary.
 
 `post()` clears a dead session on a 401 but **never navigates**: a family halfway
 through a form should not lose it to a redirect they did not ask for. One place
@@ -2152,10 +2260,13 @@ share image, Formspree wiring, domain) is done. Open items:
   linking an autumn term to its spring, payments, applying credit, adjustments,
   and the unlink debt disposition.
   **Phase 6 (the family area) is done**: sign up, sign in, reset, verify, the
-  children and their guardians, the invitation flow, registering for an
-  activity, cancelling, and the credit balance — in all three languages, from
+  people on an account and their guardians, the invitation flow, registering for
+  an activity, cancelling, and the credit balance — in all three languages, from
   one string table. `/admin/registrations.html` is the admin's side of the same
-  system.
+  system. It is now **three signed-in screens** rather than one — a dashboard,
+  `/account/details`, and `/account/activity` — and the area is about the
+  **family**, the account holder included, rather than about children. A DOM
+  shim in `tests/_dom.js` runs all three.
   **Phase 7 (pay-per-session) is done**: the attendance store, per-date capacity,
   the all-or-nothing per-session cancellation, and the register. All seven
   phases of the registration system are built.

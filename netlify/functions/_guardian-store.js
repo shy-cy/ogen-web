@@ -73,6 +73,15 @@ async function participantIdsFor(accountId) {
     .map((k) => k.slice('link-'.length, k.length - suffix.length));
 }
 
+// The link itself, for the one caller that needs more than "is there one" —
+// the family list, which asks each link whether that participant is the reader.
+async function getLink(participantId, accountId) {
+  if (!participantId || !accountId) return null;
+  const store = await optionalStore(LINKS);
+  if (!store) return null;
+  return (await store.get(linkKey(participantId, accountId), { type: 'json' })) || null;
+}
+
 async function isGuardian(participantId, accountId) {
   if (!participantId || !accountId) return false;
   const store = await optionalStore(LINKS);
@@ -84,7 +93,16 @@ async function isGuardian(participantId, accountId) {
 // than only at the point an invite is sent, because an admin may have added
 // somebody in between — the invite was valid when it left and is not when it
 // arrives.
-async function addLink({ participantId, accountId, addedVia, addedBy, inviteId }) {
+// IS THIS PARTICIPANT THE ACCOUNT HOLDER THEMSELVES? It lives on the LINK and
+// not on the participant, because it is a fact about a pair rather than about a
+// person: a couple who each manage the other's record are each "self" on one of
+// the two links and not on the other. Put on the participant it would have to
+// name an account, which is primacy's job and already has a home.
+//
+// It changes nothing about what a participant IS — no attendeeType branch, no
+// second entity, no different validation. A guardian registering themselves has
+// always worked; this is only what lets the screen stop calling them a child.
+async function addLink({ participantId, accountId, addedVia, addedBy, inviteId, isSelf }) {
   if (!participantId || !accountId) throw new Error('A link needs a participant and an account');
   const via = ADDED_VIA.indexOf(addedVia) !== -1 ? addedVia : 'admin';
 
@@ -106,7 +124,8 @@ async function addLink({ participantId, accountId, addedVia, addedBy, inviteId }
     addedVia: via,
     addedAt: new Date().toISOString(),
     addedBy: addedBy || null,
-    inviteId: inviteId || null
+    inviteId: inviteId || null,
+    isSelf: isSelf === true
   };
   const store = await requireStore(LINKS);
   await store.setJSON(linkKey(participantId, accountId), record);
@@ -248,7 +267,7 @@ async function acceptInvite(token, account) {
 
 module.exports = {
   LINKS, INVITES, MAX_GUARDIANS, INVITE_TTL_MS, ADDED_VIA,
-  guardiansOf, participantIdsFor, isGuardian, addLink, removeLink, removeAllLinks,
+  guardiansOf, participantIdsFor, isGuardian, getLink, addLink, removeLink, removeAllLinks,
   getInvite, invitesFor, createInvite, acceptInvite, revokeInvite, saveInvite, isLive,
   _keys: { linkKey, invKey }
 };

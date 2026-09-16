@@ -27,6 +27,16 @@ const ledger = require('./_credit-ledger');
 const { cancelAndCredit } = require('./_registration-cancel');
 const attendance = require('./_session-attendance');
 const facts = require('./_activity-facts');
+const { LABELS } = require('./_activity-template');
+
+// LABELS is authored for an HTML TEMPLATE, so "When &amp; where" is correct
+// there and wrong here — JSON is not HTML, and the client sets textContent, so
+// the entity would reach a family's screen literally. Decoded at the one point
+// the two worlds meet rather than in LABELS itself, which still has a template
+// to feed.
+const plainLabel = (s) => String(s || '')
+  .replace(/&#(\d+);/g, (m, n) => String.fromCharCode(+n))
+  .replace(/&amp;/g, '&');
 const mail = require('./_registration-email');
 
 const json = (statusCode, payload) => ({
@@ -76,6 +86,47 @@ function activityView(activity, report, lang) {
           full: g.left != null && g.left <= 0
         }))
       : null
+  };
+}
+
+// ONE ROW SHAPE, built once. The list and the single-registration view are two
+// views of the same record, and two builders would drift — the one the family
+// reads on a dashboard would stop agreeing with the one they read on the page
+// they opened from it.
+function regRow(reg, participant) {
+  return {
+    participantId: reg.participantId,
+    participantName: participant
+      ? [participant.firstName, participant.lastName].filter(Boolean).join(' ')
+      : reg.frozen.participantName,
+    activityId: reg.activityId,
+    slug: reg.frozen.activitySlugAtSubmission,
+    title: reg.frozen.activityTitle,
+    type: reg.frozen.type || 'course',
+    groupId: reg.groupId,
+    groupName: reg.frozen.groupName,
+    status: reg.status,
+    // The DERIVED answer, not the stored status. A pending registration whose
+    // deadline passed an hour ago is already not holding a place, whether or not
+    // the nightly sweep has run.
+    holdsASpot: R.holdsASpot(reg),
+    submittedAt: reg.submittedAt,
+    expiresAt: reg.expiresAt,
+    // What this registration is billed, and whether the yearly fee was part of
+    // it. A family looking at a second term should be able to see that it is 300
+    // rather than 350, and why.
+    owedCents: reg.payment.owedCents,
+    paidCents: reg.payment.paidCents,
+    creditedCents: reg.payment.creditedCents,
+    feeCharged: reg.frozen.price.feeCharged,
+    feeYear: reg.frozen.feeYear,
+    registrationFee: reg.frozen.price.registrationFee,
+    fullPrice: reg.frozen.price.fullPrice,
+    perSessionPrice: reg.frozen.price.perSessionPrice,
+    // What cancelling would do, computed from the terms frozen onto this
+    // registration — so the answer shown is the answer that will be applied, and
+    // both come from the same function.
+    cancellation: credit.creditFor(reg)
   };
 }
 
@@ -240,37 +291,58 @@ exports.handler = async (event) => {
         const out = [];
         for (const id of ids) {
           const p = await participants.getParticipant(id);
-          for (const reg of await store.forParticipant(id)) {
-            out.push({
-              participantId: reg.participantId,
-              participantName: p ? [p.firstName, p.lastName].filter(Boolean).join(' ') : reg.frozen.participantName,
-              activityId: reg.activityId,
-              slug: reg.frozen.activitySlugAtSubmission,
-              title: reg.frozen.activityTitle,
-              groupId: reg.groupId,
-              groupName: reg.frozen.groupName,
-              status: reg.status,
-              // The DERIVED answer, not the stored status. A pending
-              // registration whose deadline passed an hour ago is already not
-              // holding a place, whether or not the nightly sweep has run.
-              holdsASpot: R.holdsASpot(reg),
-              submittedAt: reg.submittedAt,
-              expiresAt: reg.expiresAt,
-              // What this registration is billed, and whether the yearly fee was
-              // part of it. A family looking at a second term should be able to
-              // see that it is 300 rather than 350, and why.
-              owedCents: reg.payment.owedCents,
-              paidCents: reg.payment.paidCents,
-              feeCharged: reg.frozen.price.feeCharged,
-              feeYear: reg.frozen.feeYear,
-              // What cancelling would do, computed from the terms frozen onto
-              // this registration — so the answer shown is the answer that will
-              // be applied, and both come from the same function.
-              cancellation: credit.creditFor(reg)
-            });
-          }
+          for (const reg of await store.forParticipant(id)) out.push(regRow(reg, p));
         }
         return json(200, { ok: true, registrations: out });
+      }
+
+      // --- one registration, in full ----------------------------------------
+      //
+      // What the family area's activity page shows: the registration, the
+      // activity's PUBLIC facts, and what it costs. One call rather than three,
+      // because the three would have to agree about which activity they were
+      // describing and one of them would be reading a stale slug.
+      //
+      // ⚠ RESOLVED BY activityId, NEVER BY THE FROZEN SLUG.
+      // `frozen.activitySlugAtSubmission` is audit only — if it disagrees with
+      // the activity's slug today, that is a rename working, and following it
+      // would open the wrong record or none at all.
+      case 'registration': {
+        const participant = await mustGuard(body.participantId);
+        if (!participant) return json(404, { error: NOT_YOURS });
+        const reg = await store.getRegistration(body.participantId, body.activityId);
+        if (!reg) return json(404, { error: 'No such registration.' });
+
+        const index = (await readJson('activities/activities-index.json')) || [];
+        const entry = index.filter((a) => a.activityId === reg.activityId)[0] || null;
+        const activity = entry ? await published(entry.slug) : null;
+
+        // An activity can be unpublished after somebody registered for it. The
+        // registration is still real and still shows its frozen terms; there is
+        // simply nothing current to say about when and where.
+        const report = activity ? R.capacityReport(activity, await store.forActivity(reg.activityId)) : null;
+        const L = LABELS[lang] || LABELS.he;
+        return json(200, {
+          ok: true,
+          registration: regRow(reg, participant),
+          activity: activity ? Object.assign(activityView(activity, report, lang), {
+            // THE SAME ROWS THE PUBLIC PAGE SHOWS, from the one place a fact
+            // becomes text. isPubliclyVisible() keeps its exact current meaning
+            // and its only caller: the members-only address is filtered out here
+            // as it is everywhere, and the authenticated view that would serve
+            // it is still not built.
+            facts: facts.sidebarGroups(activity, lang).map((g) => ({
+              key: g.key,
+              heading: plainLabel(L['g' + g.key.charAt(0).toUpperCase() + g.key.slice(1)]),
+              facts: g.facts.map((f) => ({ key: f.key, label: plainLabel(L[f.key]), value: f.value }))
+            })),
+            // Rows, never a total. The registration fee is charged once a year
+            // and the course fee once a semester, so their sum is a figure
+            // nobody is ever billed.
+            priceRows: facts.factPriceRows(activity, lang),
+            sessionRows: facts.sessionRows((activity.facts || {}).duration, lang)
+          }) : null
+        });
       }
 
       // --- ask for a place --------------------------------------------------

@@ -79,8 +79,9 @@ LANGS.forEach((l) => {
 });
 H.ok(checked >= 9, 'and there were real links to check (' + checked + ')');
 
-console.log('\n[the twelve shells exist, one per view per language]');
-const VIEWS = { account: 'account.html', verify: 'account/verify.html',
+console.log('\n[the eighteen shells exist, one per view per language]');
+const VIEWS = { account: 'account.html', details: 'account/details.html',
+                activity: 'account/activity.html', verify: 'account/verify.html',
                 reset: 'account/reset.html', invite: 'account/guardian-invite.html' };
 LANGS.forEach((l) => {
   Object.keys(VIEWS).forEach((view) => {
@@ -130,6 +131,15 @@ H.ok(keys.length > 50, 'it carries the whole area (' + keys.length + ' keys)');
   H.ok(Object.keys(other).every((k) => typeof other[k] === typeof he[k]),
     l + ' has nothing of the wrong shape');
 });
+// EVERY KEY IS ACTUALLY USED. An unreferenced one is dead copy that three
+// languages still have to carry, and it is indistinguishable from a key whose
+// only caller was renamed — which is a real bug wearing a harmless costume,
+// because the screen that used to say it now says nothing.
+const body = screen.slice(0, start) + screen.slice(end);
+const used = new Set((body.match(/T\.([A-Za-z]+)/g) || []).map((s) => s.slice(2)));
+const orphans = keys.filter((k) => !used.has(k));
+H.eq(orphans.length, 0, 'no key is left unreferenced' + (orphans.length ? ': ' + orphans.join(', ') : ''));
+
 // Every value is actually filled in. An empty string is a key somebody added and
 // never translated, which renders as a blank label rather than as an error.
 ['he', 'en', 'ru'].forEach((l) => {
@@ -177,8 +187,9 @@ H.ok(/\.acc-row \.acc-actions\{ margin-block-start:0; \}/.test(block.replace(/\s
   'and no top margin inside a row, which aligns on the baseline');
 const acct = read('js/member-account.js');
 H.ok(/function actions\(kids\)/.test(acct), 'there is one helper rather than a margin per button');
-H.eq((acct.match(/actions\(\[/g) || []).length, 2,
-  'and both places that put two buttons together use it');
+H.ok((acct.match(/actions\(\[/g) || []).length >= 2,
+  'and every place that puts two buttons together uses it (' +
+  (acct.match(/actions\(\[/g) || []).length + ')');
 // The failure mode is a button appended straight into a form beside another.
 H.ok(!/\[f\.row, l\.row, d\.row, n\.row, go,/.test(acct),
   'the participant form no longer appends Cancel as a bare sibling of Save');

@@ -85,11 +85,17 @@ exports.handler = async (event) => {
         for (const id of ids) {
           const p = await participants.getParticipant(id);
           if (!p) continue;
+          // The link, not just its existence: it carries whether this
+          // participant is the reader themselves, which is what lets the screen
+          // say "that is you" and stop offering "remove myself from this
+          // record" on a record that IS the person reading it.
+          const link = await guardians.getLink(id, me.accountId);
           out.push(Object.assign(participants.publicParticipant(p), {
             // Age is derived on read, never stored — a written-down age is
             // wrong from the day after it is written.
             age: participants.ageAt(p.dateOfBirth),
-            isPrimary: p.primaryAccountId === me.accountId
+            isPrimary: p.primaryAccountId === me.accountId,
+            isSelf: !!(link && link.isSelf)
           }));
         }
         out.sort((a, b) => String(a.firstName).localeCompare(String(b.firstName)));
@@ -113,7 +119,12 @@ exports.handler = async (event) => {
             participantId: created.participantId,
             accountId: me.accountId,
             addedVia: 'creator',
-            addedBy: me.accountId
+            addedBy: me.accountId,
+            // "Add myself" rather than "add someone". It is the client saying
+            // which of the two buttons was pressed; nothing authorises on it and
+            // nothing else behaves differently, so a client that lies about it
+            // has only mislabelled its own screen.
+            isSelf: body.isSelf === true
           });
         } catch (err) {
           await participants.deleteParticipant(created.participantId);

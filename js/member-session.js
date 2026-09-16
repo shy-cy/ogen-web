@@ -1,10 +1,14 @@
 // window.MemberSession — the client half of a guardian's session.
 //
-// ⚠ THE STORAGE IS localStorage, WHERE THE ADMIN USES sessionStorage, and the
-// difference is deliberate rather than an oversight. An admin session carries
-// publish rights and should not outlive the tab. A guardian session is seven
-// days on a sliding window, sized for a parent who visits once a month — losing
-// it every time they close a tab would defeat the reason it is seven days.
+// ⚠ THE STORAGE IS localStorage, UNDER A DIFFERENT KEY FROM THE ADMIN'S. Both
+// clients use localStorage now — the admin's used to use sessionStorage under a
+// comment calling it a security property, which it was not: sessionStorage is
+// scoped to a browsing context, so the rule it enforced was "how long is this
+// tab open", and that is unrelated to how long a session should last. The real
+// limits are server-side and differ on purpose: a guardian gets seven days on a
+// sliding window, sized for a parent who visits once a month; an admin gets four
+// hours idle with a twelve-hour cap, because publish rights must not be
+// indefinite.
 //
 // It is also a completely separate key from the admin's, against a completely
 // separate store server-side: ogen-member-sessions keyed `msess-`, against
