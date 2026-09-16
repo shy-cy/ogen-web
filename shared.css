@@ -105,6 +105,61 @@ html[lang="ru"] div[data-lang="ru"] { display:block; }
 .logo-mark{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); }
 .logo-mark img{ height:78px; display:block; }
 .nav-right{ position:absolute; right:24px; top:50%; transform:translateY(-50%); display:flex; align-items:center; gap:18px; direction:ltr; }
+/* ---- the account chip -------------------------------------------------------
+   It lives INSIDE .nav-right, which is pinned to the physical right and forced
+   direction:ltr in every language. That is deliberate and the chip inherits it:
+   the language toggle has to sit in one place, in one [עב][EN][RU] order, because
+   whoever needs it most is the reader who cannot read the language on screen.
+   Mirroring the chip alone would fling it to the far side of the bar in Hebrew,
+   away from the controls it belongs to.
+
+   What mirrors is the INSIDE of the chip. The rule below opts Hebrew back into
+   rtl so the avatar sits at the reading start and the label follows it, and the
+   padding is logical so the rounded end stays on the label's side. */
+.nav-account{ display:flex; align-items:center; gap:2px; }
+.nav-account-chip{
+  display:flex; align-items:center; gap:7px; text-decoration:none;
+  padding-block:5px; padding-inline:6px 11px; border-radius:20px;
+}
+.nav-account-chip:hover{ background: var(--stone); }
+.nav-account-label{
+  font-family: var(--font-latin); font-size:13px; font-weight:500; letter-spacing:0.02em;
+  color: var(--navy); white-space:nowrap;
+}
+html[lang="he"] .nav-account-label{ font-family: var(--font-he); }
+.nav-account-chip:hover .nav-account-label{ color: var(--terracotta); }
+/* Terracotta, because signing in is the one actionable thing in this bar. */
+.nav-account-icon{ width:21px; height:21px; stroke: var(--terracotta); fill:none; stroke-width:1.7; }
+/* Olive, because a signed-in marker is not a call to action — it is a statement
+   that this is you. The one terracotta element in the nav stays the way in. */
+.nav-account-initial{
+  width:30px; height:30px; border-radius:50%; background: var(--olive); color: var(--paper);
+  font-family: var(--font-latin); font-size:13.5px; font-weight:700;
+  display:flex; align-items:center; justify-content:center; flex:0 0 auto;
+}
+.nav-signout{
+  display:flex; align-items:center; justify-content:center; width:30px; height:30px;
+  padding:0; background:none; border:none; border-radius:50%; cursor:pointer; color: var(--camel);
+}
+.nav-signout svg{ width:17px; height:17px; }
+.nav-signout:hover{ background: var(--stone); color: var(--terracotta); }
+.nav-signout:focus-visible{ outline:2px solid var(--terracotta); outline-offset:1px; }
+/* Hebrew reads right to left, so the leaving arrow points that way too. */
+html[lang="he"] .nav-account{ direction:rtl; }
+html[lang="he"] .nav-signout svg{ transform:scaleX(-1); }
+
+/* Persistent at every width, by request — so on a narrow bar it sheds the word
+   rather than the chip. The avatar or the icon is still a reachable target and
+   still says which state you are in; the hamburger entry carries the words. */
+@media (max-width:760px){
+  .nav-account-label{ display:none; }
+  .nav-account-chip{ padding-inline:6px; }
+}
+@media (max-width:420px){
+  .nav-right{ gap:10px; }
+  .lang-toggle button{ padding:6px 7px; }
+}
+
 .lang-toggle{ display:flex; gap:6px; }
 .lang-toggle button{
   font-family: var(--font-latin); font-size:12px; font-weight:700; letter-spacing:0.05em;

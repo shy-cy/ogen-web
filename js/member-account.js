@@ -212,6 +212,28 @@
     return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : null;
   }
 
+  // WHERE TO GO BACK TO. The nav chip carries the page you were on into the
+  // sign-in link, so signing in from an activity page returns you to it rather
+  // than dropping you on a dashboard with your place lost.
+  //
+  // ⚠ ONLY A PATH ON THIS SITE IS FOLLOWED. `next` arrives in a URL anyone can
+  // write, so an absolute one — or a protocol-relative `//evil.example` — would
+  // make this an open redirect: a link that looks like ogen.cy, asks for a
+  // password, and lands somewhere else. It must start with a single slash and
+  // nothing more.
+  function nextTarget() {
+    var raw = param('next');
+    if (!raw) return null;
+    if (raw.charAt(0) !== '/' || raw.charAt(1) === '/' || raw.charAt(1) === '\\') return null;
+    return raw;
+  }
+  function goNext() {
+    var target = nextTarget();
+    if (!target) return false;
+    window.location.href = target;
+    return true;
+  }
+
   var notice = null;
   function say(kind, text) {
     if (!notice) return;
@@ -241,6 +263,19 @@
   }
 
   var post = function (url, body) { return window.MemberSession.post(url, body); };
+
+  // The nav chip draws an initial, and js/nav.js runs on every page WITHOUT the
+  // member scripts — so it cannot ask the server who this is. The name is cached
+  // beside the token here, where it is already in hand, and it is the only thing
+  // about a person kept in browser storage. Nothing authorises on it.
+  function sessionFor(data) {
+    var p = (data.account && data.account.profile) || {};
+    return {
+      token: data.token, expiresAt: data.expiresAt,
+      firstName: p.firstName || '',
+      email: data.account ? data.account.email : ''
+    };
+  }
 
   // ------------------------------------------------------------ sign in -----
   function renderSignedOut(where, opts) {
@@ -286,8 +321,9 @@
         .then(function (res) {
           go.disabled = false;
           if (!res.ok) return say('err', failure(res));
-          window.MemberSession.set({ token: res.data.token, expiresAt: res.data.expiresAt });
+          window.MemberSession.set(sessionFor(res.data));
           if (opts.onSignedIn) return opts.onSignedIn(res.data.account);
+          if (goNext()) return;
           boot();
         });
     } }, [e1.row, p1.row, go]);
@@ -346,8 +382,9 @@
         // A session immediately. Making somebody sign in again with the password
         // they typed ten seconds ago is a step that exists only because it was
         // easier to build.
-        window.MemberSession.set({ token: res.data.token, expiresAt: res.data.expiresAt });
+        window.MemberSession.set(sessionFor(res.data));
         if (opts.onSignedIn) return opts.onSignedIn(res.data.account);
+        if (goNext()) return;
         boot();
       });
     } }, [f.row, l.row, ph.row, e1.row, p1.row,
@@ -825,6 +862,14 @@
     if (!window.MemberSession.token()) return renderSignedOut(body, {});
     post(AUTH, { action: 'me' }).then(function (res) {
       if (!res.ok) return renderSignedOut(body, {});
+      // Refresh the cached name on every visit, so the nav chip is right for
+      // somebody who signed in before it existed, and follows a change of name
+      // rather than showing the letter they first registered under.
+      window.MemberSession.set(sessionFor({
+        token: window.MemberSession.token(),
+        expiresAt: res.data.expiresAt,
+        account: res.data.account
+      }));
       renderAccount(res.data.account);
     });
   }

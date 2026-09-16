@@ -72,12 +72,13 @@ banner) → `why-ogen` → `vision` → `contact`.
 Page files contain **only their own body copy**. The nav, footer, and contact
 form are injected at runtime into `<div id="page">`:
 
-- **`js/nav.js`** — fixed 96px nav, centered logo, עב/EN/RU toggle, hamburger
-  menu. Detects language from `location.pathname`. The toggle navigates to the
-  twin URL (`/` ↔ `/en` ↔ `/ru`, `/confirmation` ↔ `/en/confirmation` ↔ …),
-  preserving `location.hash`. `.nav-right` is forced `direction:ltr` so the lang
-  buttons and hamburger stay pinned to the physical right in a fixed
-  `[עב][EN][RU]` order in all three languages.
+- **`js/nav.js`** — fixed 96px nav, centered logo, **account chip**, עב/EN/RU
+  toggle, hamburger menu. Detects language from `location.pathname`. The toggle
+  navigates to the twin URL (`/` ↔ `/en` ↔ `/ru`, `/confirmation` ↔
+  `/en/confirmation` ↔ …), preserving `location.search` **and**
+  `location.hash`. `.nav-right` is forced `direction:ltr` so the lang buttons
+  and hamburger stay pinned to the physical right in a fixed `[עב][EN][RU]`
+  order in all three languages. See **The account chip** below.
 - **`js/footer.js`** — tagline logo → divider → partner logo row → copyright.
 - **`js/contact-form.js`** — builds the form, lazy-loads `intl-tel-input` from
   CDN (Cyprus default country), and AJAX-POSTs to Formspree. Language comes from
@@ -1759,6 +1760,87 @@ Note the deliberate limit: when a type **does** draw a field and sends it empty,
 that is the admin clearing it, and it clears. Absent means "this type did not
 send it"; empty from a form that drew it means empty.
 
+## The account chip
+
+Ported from the sister project's nav (`js/nav.js` there, lines 238-318), which
+shows a person icon and "Log in" when signed out and the member's initial plus
+"My account" when signed in. Ogen's says **"My family"** — the area is about
+children rather than billing.
+
+Two things carried over verbatim, because both are the reason the pattern works:
+
+- **It reads `localStorage` directly, not through `MemberSession`.** `js/nav.js`
+  loads on every page; `js/member-session.js` loads only under `/account`. A chip
+  that reached for the helper would throw on the homepage, which is most of the
+  site. This is the one place that duplication is correct rather than lazy, and a
+  test asserts the nav never touches the global.
+- **Sign-out drops the token locally first, then tells the server.** If the
+  network call fails the person standing at the screen is still signed out, which
+  is the half that matters to them. It reloads in place rather than navigating —
+  a change of state, not of place — *except* on an account page, where reloading
+  would only ask them to sign back in, which is the opposite of signing out.
+
+Sign-out lives in the bar rather than inside `/account` because shared and family
+devices are normal here; leaving has to be one click from anywhere.
+
+### ⚠ The chip does NOT mirror across the bar, and that is correct
+
+This looks like a violation of the logical-properties rule and is not. The chip
+joins `.nav-right`, which is pinned to the physical right and forced
+`direction:ltr` **on purpose**: the language toggle has to keep one place and one
+`[עב][EN][RU]` order in all three languages, because the reader who needs it most
+is the one who cannot read what is currently on screen. Mirroring the chip alone
+would fling it to the far side of the bar in Hebrew, away from the controls it
+belongs with.
+
+So it sits on the same physical side in every language — exactly as the sister
+project's does, on the other side and for a documented reason rather than by
+accident. The sister project pins its chip with `position:absolute; left:0`, a
+physical edge on a site that renders Hebrew; that part is **not** copied.
+
+**What genuinely mirrors is the inside of the chip.** `html[lang="he"]
+.nav-account { direction: rtl }` opts Hebrew back in, so the avatar sits at the
+reading start and the label follows it; the padding is `padding-inline: 6px 11px`
+so the rounded end stays on the label's side; and the exit arrow is flipped with
+`scaleX(-1)` so "leaving" points the way the language reads. A test asserts there
+is not one physical inset in the block, and that the rtl opt-in and the arrow flip
+are both present.
+
+### Colour, and the one CTA
+
+The signed-out icon is **terracotta**, because signing in is the one actionable
+thing in the bar and rule 5 says every actionable CTA is terracotta. The
+signed-in initial is **olive**, because a "this is you" marker is not a call to
+action — keeping it off terracotta leaves the way in as the only such element in
+the nav.
+
+### Persistent at every width
+
+Requested explicitly, so below 760px the chip sheds its **label** rather than
+itself: the avatar or icon stays, still a reachable target and still saying which
+state you are in. The hamburger entry carries the words, and now says "Sign in"
+when signed out rather than always offering the same phrase.
+
+### `?next=` is an open redirect waiting to happen
+
+The chip carries the current page into the sign-in link, so signing in from an
+activity page returns you to it. `nextTarget()` in `js/member-account.js`
+therefore follows **only a path on this site**: it must start with a single slash
+and not a second slash or a backslash. An absolute or protocol-relative value
+would make a link that looks like ogen.cy, asks for a password, and lands
+somewhere else — and it is followed immediately after somebody types one. The
+guard is one line, which is exactly the kind of line that gets "simplified"
+later, so the test exercises it rather than reading it.
+
+### The initial comes from a cached name
+
+`js/nav.js` cannot ask the server who this is — it has no session helper and runs
+on static pages. So `sessionFor()` in `js/member-account.js` caches the first
+name beside the token, and refreshes it on every visit to the account area, so
+the letter follows a change of name rather than showing what somebody first
+registered under. It is the only thing about a person kept in browser storage,
+and **nothing authorises on it**.
+
 ## The family area (Phase 6)
 
 The first thing on this site a family signs into. Trilingual, RTL, and the whole
@@ -2047,8 +2129,8 @@ share image, Formspree wiring, domain) is done. Open items:
   footer needs the links. ⚠ The **Russian text and the two Russian price labels
   are still awaiting a native-speaker review**; `ogen-legal-review` is `pending`
   and gates public registration until it is done. See the Legal pages section.
-- **Nothing in the nav links to `/about` or `/activities`** yet. The mobile menu
-  does now link to `/account`, which is the only nav change so far.
+- **Nothing in the nav links to `/about` or `/activities`** yet. The nav does
+  carry the account chip and the hamburger's `/account` entry.
 - **Registration has no page.** The API is built; nothing on the public site
   reaches it, and the `open` CTA still points at the contact section. Wiring is
   Phase 6's, and `ogen-legal-review` has to be `complete` before a public
