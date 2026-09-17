@@ -487,12 +487,20 @@ exports.handler = async (event) => {
 
       // "Run now", because the scheduled function cannot be triggered from a
       // browser — Netlify's edge answers 403 to every external HTTP request to
-      // one. So the admin calls run() directly rather than the endpoint.
+      // one. So the admin calls the sweep directly rather than the endpoint.
+      //
+      // ⚠ runRegistrations(), NOT run(). The nightly job has a second half that
+      // completes finished activities, and that half commits to git and
+      // republishes live pages — an ACTIVITIES permission. This button is gated
+      // on canApprove, which is a registrations one, and tells the admin it
+      // "only updates what the queue says". Calling run() here would let an
+      // admin who may work the queue but may not publish do exactly that, from a
+      // button that says it does something else.
       case 'sweep': {
         if (!canApprove(session)) {
           return json(403, { error: 'Your role may open the queue but not decide on it' });
         }
-        const result = await sweep.run();
+        const result = await sweep.runRegistrations();
         await recordAudit(session, 'registrations.sweep', 'all', 'ok',
           { detail: result.expired + ' expired' });
         return json(200, Object.assign({ ok: true }, result));

@@ -61,34 +61,57 @@ const SITE = 'https://www.ogen.cy';
 const LANGS = ['he', 'en', 'ru'];
 const STATUSES = ['draft', 'announcement', 'open', 'waitlist', 'closed', 'cancelled', 'completed'];
 
-// THE TWO HALVES OF THE LISTING, and the split the nav menu uses too.
+// THE THREE GROUPS OF THE LISTING, and the split the nav menu uses too.
 //
-// LIVE is "there is still something a family can do about this" — ask to join,
-// wait to be let in, or be told when it opens. PAST is everything else that has
-// a page at all.
+//   OPEN      registration is open, or about to be, or full and still taking
+//             interest — there is something a family can do right now.
+//   RUNNING   past registration and underway. `closed` is the whole group.
+//   ARCHIVED  over, one way or the other.
 //
-// `closed` sits in PAST and is the one that reads slightly wrong there: a closed
-// activity is still running, it has simply stopped taking registrations. It is
-// there because of what the group is FOR — a parent looking for the activity
-// their child is already in — and that is exactly a closed one. The alternative
-// was a third group of one status, or a heading clumsy enough ("not open for
-// registration") to be worse copy than the small imprecision.
+// `waitlist` is in OPEN. The brief that settled this mapping listed only
+// `announcement` and `open` there and left `waitlist` with no group at all,
+// which the require-time assertion below would have refused — and its own
+// earlier definition of the group was "anything still accepting or about to
+// accept registration interest", which is exactly what a waitlist is.
 //
-// `draft` is in neither, and cannot be: a draft has no files at all, so it never
-// reaches the index these are applied to.
-const LIVE_STATUSES = ['open', 'announcement', 'waitlist'];
-const PAST_STATUSES = ['closed', 'completed', 'cancelled'];
+// `draft` is in none of them, and cannot be: a draft has no files at all, so it
+// never reaches the index these are applied to.
+//
+// IT IS STATUS ALONE, NEVER A DATE. Every other part of this site decides
+// display from the declared status — js/activity.js renders the badge and the
+// CTA from `data-status` and asks no clock — and a listing page that
+// second-guessed it would be the only thing here overriding an admin. It would
+// also rot: these pages are static build artifacts, regenerated only when
+// somebody publishes, so a date comparison baked into one is right on the day it
+// is written and wrong afterwards with nothing to notice.
+//
+// The drift that reasoning leaves — an activity `closed` in October and never
+// flipped to `completed` — is closed at the other end instead, by
+// _activity-autocomplete.js in the nightly sweep. The status stays the single
+// source of truth; something else keeps it true.
+// The order OPEN_STATUSES is written in is the order the menu lists them, and it
+// is deliberate: what is open comes before what is only announced, which comes
+// before a waitlist. Nothing else depends on it, so a test pins it rather than a
+// comment asking nicely.
+const OPEN_STATUSES = ['open', 'announcement', 'waitlist'];
+const RUNNING_STATUSES = ['closed'];
+const ARCHIVED_STATUSES = ['completed', 'cancelled'];
 
-// The order LIVE_STATUSES is written in is the order the menu lists them, and it
-// is deliberate: what is open comes before what is only announced. Nothing else
-// depends on it, so a test pins it rather than a comment asking nicely.
-(function assertEveryPublicStatusIsOnExactlyOneSide() {
-  const both = LIVE_STATUSES.concat(PAST_STATUSES);
-  const twice = both.filter((s, i) => both.indexOf(s) !== i);
-  const unknown = both.filter((s) => STATUSES.indexOf(s) === -1);
-  const missed = STATUSES.filter((s) => s !== 'draft' && both.indexOf(s) === -1);
+// In listing order, so a caller loops over one thing rather than knowing three
+// names and the sequence they go in.
+const STATUS_GROUPS = [
+  { key: 'open', statuses: OPEN_STATUSES },
+  { key: 'running', statuses: RUNNING_STATUSES },
+  { key: 'archived', statuses: ARCHIVED_STATUSES }
+];
+
+(function assertEveryPublicStatusIsInExactlyOneGroup() {
+  const all = [].concat(...STATUS_GROUPS.map((g) => g.statuses));
+  const twice = all.filter((s, i) => all.indexOf(s) !== i);
+  const unknown = all.filter((s) => STATUSES.indexOf(s) === -1);
+  const missed = STATUSES.filter((s) => s !== 'draft' && all.indexOf(s) === -1);
   if (twice.length || unknown.length || missed.length) {
-    throw new Error('LIVE_STATUSES/PAST_STATUSES are out of step with STATUSES: ' +
+    throw new Error('STATUS_GROUPS is out of step with STATUSES: ' +
       JSON.stringify({ twice, unknown, missed }));
   }
 })();
@@ -114,7 +137,7 @@ const LABELS = {
     gParticipants: 'למי זה מתאים', gSchedule: 'מתי ואיפה', gPrice: 'מחיר', gCredits: 'צוות וחסות',
     indexTitle: 'הפעילויות שלנו', indexLead: 'מה אפשר למצוא במרכז עוגן',
     indexEmpty: 'בקרוב נפרסם כאן את הפעילויות.', more: 'לפרטים',
-    indexCurrent: 'פעילויות נוכחיות', indexPast: 'פעילויות קודמות'
+    indexOpen: 'פתוח להרשמה', indexRunning: 'פעיל', indexArchived: 'ארכיון'
   },
   en: {
     dir: 'ltr', sep: '&#8594;', home: 'Home', activities: 'Activities',
@@ -127,7 +150,7 @@ const LABELS = {
     gParticipants: 'Who it is for', gSchedule: 'When &amp; where', gPrice: 'Price', gCredits: 'Staff &amp; sponsors',
     indexTitle: 'Our activities', indexLead: 'What you can find at Ogen Center',
     indexEmpty: 'Activities will be published here soon.', more: 'Details',
-    indexCurrent: 'Current activities', indexPast: 'Past activities'
+    indexOpen: 'Open for registration', indexRunning: 'Currently Running', indexArchived: 'Archived'
   },
   ru: {
     dir: 'ltr', sep: '&#8594;', home: 'Главная', activities: 'Занятия',
@@ -140,7 +163,7 @@ const LABELS = {
     gParticipants: 'Для кого', gSchedule: 'Когда и где', gPrice: 'Цена', gCredits: 'Педагоги и партнёры',
     indexTitle: 'Наши занятия', indexLead: 'Что можно найти в центре Оген',
     indexEmpty: 'Занятия скоро появятся здесь.', more: 'Подробнее',
-    indexCurrent: 'Текущие занятия', indexPast: 'Прошедшие занятия'
+    indexOpen: 'Открыта запись', indexRunning: 'Активные', indexArchived: 'Архив'
   }
 };
 
@@ -580,25 +603,30 @@ ${thumb}
 ${rows.map((a) => card(a, level)).join('\n')}
   </div>`;
 
-  // TWO GROUPS, AND THE SECOND ONLY WHEN IT HAS SOMETHING IN IT. A parent
-  // looking for the activity their child was in needs somewhere to look that is
-  // not the same grid as what is on offer now; an empty "Past activities"
-  // heading is worse than no heading, and until the first activity finishes
-  // this page renders exactly as it always has.
-  const live = list.filter((a) => LIVE_STATUSES.indexOf(a.status) !== -1);
-  const past = list.filter((a) => PAST_STATUSES.indexOf(a.status) !== -1);
+  // THREE GROUPS, EACH ONLY WHEN IT HAS SOMETHING IN IT. A parent looking for
+  // the activity their child was in needs somewhere to look that is not the same
+  // grid as what is on offer now; an empty heading is worse than no heading, and
+  // with a single group there are no headings at all — which is how this page
+  // rendered before groups existed and how it still renders today.
+  //
+  // The ids are the menu's jump targets. They sit on the headings rather than on
+  // wrappers so a reader lands on the words, and they do not move if the grid
+  // under them is restyled.
+  const groups = STATUS_GROUPS
+    .map((g) => ({
+      key: g.key,
+      heading: L['index' + g.key.charAt(0).toUpperCase() + g.key.slice(1)],
+      rows: list.filter((a) => g.statuses.indexOf(a.status) !== -1)
+    }))
+    .filter((g) => g.rows.length);
 
   const cards = !list.length
     ? `  <p class="activity-empty">${L.indexEmpty}</p>`
-    : !past.length
-      ? grid(list, 'h2')
-      : [
-          // `id="past"` is the menu's target. It is on the heading rather than on
-          // a wrapper so the browser lands on the words, and it does not move if
-          // the grid under it is restyled.
-          live.length ? `  <h2 class="activity-group">${L.indexCurrent}</h2>\n${grid(live, 'h3')}` : '',
-          `  <h2 class="activity-group" id="past">${L.indexPast}</h2>\n${grid(past, 'h3')}`
-        ].filter(Boolean).join('\n');
+    : groups.length === 1
+      ? grid(groups[0].rows, 'h2')
+      : groups
+          .map((g) => `  <h2 class="activity-group" id="${g.key}">${g.heading}</h2>\n${grid(g.rows, 'h3')}`)
+          .join('\n');
 
   return `${head({
     lang,
@@ -635,7 +663,8 @@ ${cards}
 }
 
 module.exports = {
-  SITE, LANGS, STATUSES, LIVE_STATUSES, PAST_STATUSES, MOTIFS, CORNERS, LABELS, FALLBACK,
+  SITE, LANGS, STATUSES, OPEN_STATUSES, RUNNING_STATUSES, ARCHIVED_STATUSES, STATUS_GROUPS,
+  MOTIFS, CORNERS, LABELS, FALLBACK,
   esc, pick, has, langsPresent, isLinkish,
   pathFor, filePathFor, indexPathFor, indexFilePathFor, homeFor,
   renderActivityPage, renderActivitiesIndexPage

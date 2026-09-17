@@ -905,6 +905,8 @@ netlify/functions/
                          store, no gate. See the naming warning at its top; PURE
   _credit.js             what a cancellation credits; reads one registration and
                          one timestamp, and nothing else; PURE
+  _activity-autocomplete.js  when a closed activity has finished, and nothing
+                         else; no store, no clock, no GitHub; PURE
   _blobs.js              the only place a Blobs store is opened; ALL store names
                          are prefixed `ogen-` (see the warning below)
   _user-store.js         ogen-admin-users, bcrypt @12
@@ -1344,7 +1346,8 @@ netlify/functions/
   _registration.js        what a registration IS, and every rule needing no storage; PURE
   _registration-store.js  ogen-registrations; reg-<participantId>__<activityId>
   _registration-email.js  the four messages, in three languages
-  _registration-sweep.js  run(); the nightly pass, shared by the schedule and the admin
+  _registration-sweep.js  run() the nightly pass (both halves, schedule only);
+                          runRegistrations() the admin's narrower "run now"
   registration-sweep.js   the scheduled entry point — see netlify.toml
   account-registrations.js  /api/account-registrations — guardian session
   admin-registrations.js    /api/admin-registrations   — ADMIN session, separate on purpose
@@ -1461,7 +1464,10 @@ not about money.
 already decided — see the Phase 5 section for the waiver.
 
 **The sweep is the cosmetic half and says so.** `[functions."registration-sweep"]`
-in `netlify.toml`, 06:00 UTC daily. It rewrites lapsed `pending` to `expired`,
+in `netlify.toml`, 06:00 UTC daily. It has **two halves now** — releasing
+registrations nobody answered, and completing activities that have finished (see
+**The three groups**) — sharing a schedule rather than a subject: each writes
+down something that has already become true, and neither is load-bearing. It rewrites lapsed `pending` to `expired`,
 stamps the reason, and mails the family. Two things about Netlify's scheduler
 that look like bugs: it invokes the function as a **POST carrying
 `{"next_run":…}`**, so a handler treating a request body as proof of a human has
@@ -1879,52 +1885,136 @@ twice asks once.
 the way the listing page checks it; without that, the Russian menu links to a
 Russian page that was never generated.
 
-### The status split, and where it lives
+### The three groups, and where the split lives
 
-`LIVE_STATUSES` / `PAST_STATUSES` in `_activity-template.js` are the canonical
-pair, and the module throws at require time if they do not between them cover
-every status but `draft` — which is in neither and cannot be, since a draft has
-no files at all.
+`STATUS_GROUPS` in `_activity-template.js` is the canonical mapping, and the
+module throws at require time unless the groups between them cover every status
+but `draft` — which is in none of them and cannot be, since a draft has no files
+at all.
 
-| | |
-|---|---|
-| **Live** | `open`, `announcement`, `waitlist` — *in that order*, which is the menu order |
-| **Past** | `closed`, `completed`, `cancelled` |
+| Group | Statuses | he · en · ru |
+|---|---|---|
+| **Open** | `open`, `announcement`, `waitlist` | פתוח להרשמה · Open for registration · Открыта запись |
+| **Currently Running** | `closed` | פעיל · Currently Running · Активные |
+| **Archived** | `completed`, `cancelled` | ארכיון · Archived · Архив |
 
-**`closed` sits in Past, and reads slightly wrong there**: a closed activity is
-still running, it has simply stopped taking registrations. It is there because of
-what the group is *for* — a parent looking for the activity their child is
-already in — and that is exactly a closed one. The alternatives were a third
-group holding one status, or a heading clumsy enough ("not open for
-registration") to be worse copy than the small imprecision.
+The order `open, announcement, waitlist` is written, not sorted: it is the order
+the menu lists them in, so what you can join now comes before what is only
+announced.
 
-**The split exists twice**: the server groups the listing page by it, the browser
-filters the menu by it, and a browser cannot `require` a Netlify function. There
-is no way to share the array, only a test comparing the two — including the
-order, since that is what puts `open` above `announcement`. Drift means the menu
-offers a link to a section the page does not render.
+**`waitlist` is in Open.** The brief that settled this mapping named only
+`announcement` and `open`, leaving `waitlist` with no group — which the
+require-time assertion refuses, and which the brief's own earlier definition of
+the group ("anything still accepting or about to accept registration interest")
+answers.
 
-The same rule applies to the words: `L.past` in `js/nav.js` must be
-character-identical to `LABELS[lang].indexPast`, or a link's label changes on
-arrival, which reads as the wrong link.
+**`פעיל`, not `פעילות`.** Unvocalised, `פעילות` is ambiguous between *activity /
+activities* and *active (f.pl.)*, so that heading inside a menu called
+`פעילויות` would be genuinely confusing. The short masculine form sidesteps it at
+the cost of grammatical agreement, which is the right trade for a label.
 
-### The listing page grew a second group
+**The split necessarily exists twice**: the server groups the listing page by it,
+the browser filters the menu by it, and a browser cannot `require` a Netlify
+function. There is no way to share the array, only a test comparing the two —
+including the order. Same for the words: `L.running` / `L.archived` in
+`js/nav.js` must be character-identical to `LABELS[lang].indexRunning` /
+`.indexArchived`, or a link's label changes on arrival, which reads as the wrong
+link.
 
-`/activities` was one flat grid of every public status, sorted by slug. It is now
-**Current activities** and **Past activities**, and the second only appears when
-something is in it — until the first activity finishes, the page renders exactly
-as it always has, byte for byte. That was verified by regenerating against the
-live record rather than assumed.
+### ⚠ It is status alone, never a date — and what keeps the status true
 
-`id="past"` is on the heading, and is what the menu's *Past activities* entry
-jumps to. It carries `scroll-margin-block-start:112px`, or the 96px fixed nav
-lands on top of it. The menu entry is **absent until there is a past group**,
-since jumping to an anchor the page does not render does nothing and looks
-broken.
+Nothing in the listing or the menu asks a clock. Two reasons, both specific to
+this site:
 
-Card titles are `<h2>` when there is one group and `<h3>` under the two headings
-when there are two — the levels follow the outline rather than being pinned to a
-tag. Still exactly one `<h1>`.
+- **Every other part of it decides display from the declared status.**
+  `js/activity.js` renders the badge *and* the CTA from `data-status` and asks no
+  clock. A date-checking menu would be the only component here overriding an
+  admin, and it would contradict the page it links to.
+- **The listing pages are static build artifacts.** They regenerate only when
+  somebody publishes, so a date comparison baked into one is right on the day it
+  is written and wrong afterwards, with nothing to notice.
+
+That leaves one drift: `closed` means "underway, registration shut" and is set
+months before the thing ends, so an admin who never flips it to `completed`
+leaves a finished activity filed as running, for good.
+
+**`_activity-autocomplete.js` closes it from the other end.** Nightly, a `closed`
+activity whose last session has passed becomes `completed`. The status stays the
+single source of truth; something else keeps it honest, and the three readers
+stay simple.
+
+It is **pure** — activities in, the due ones out, `now` passed in — so it is
+testable with no fixtures, and it reuses `past()` from `_credit.js` rather than
+writing a second timezone: the deadline is the **end of that day in
+`Asia/Nicosia`**, so an activity whose last session is today runs all of today,
+and a course finishing on a Tuesday does not complete at 02:00 Cyprus time on
+that Tuesday because a server is on UTC.
+
+**The last day is the LATER of the calendar and the typed `endDate`**, and that
+direction is the safety argument. The two can disagree — this repo has carried an
+activity whose session count ran out a week before its stated end. The errors are
+not symmetric: completing too **early** archives a running activity and rewrites
+its public page under a family still attending; completing too **late** leaves
+exactly the state this job exists to improve on, harmlessly. An excluded date is
+not a session and cannot be the last one, the same rule `freezeCancellation()`
+follows. No dates at all reads as *not ended*, the direction every blank in
+`_credit.js` takes.
+
+### ⚠ It is a PUBLISH, not a field edit
+
+The status lives in the record, in three static pages and in the listing, so
+writing it to the record alone would leave the live site saying "registration
+closed" under an activity that ended in December — the same bug, moved. It goes
+through `activities-admin`'s **`generate()`**, the same function an admin's
+publish goes through and the one `preview-matches-publish` asserts byte-identity
+against. A second renderer would be a second thing to keep in step.
+
+Consequences worth knowing:
+
+- **One commit per activity**, not one batched commit. Batching is fewer requests
+  and also means one bad record takes the rest down — and this runs unattended,
+  so that failure is a log line nobody reads until a family asks why a page is
+  wrong. A failure leaves that activity `closed`, names it in the result, and
+  tomorrow finds it again.
+- **`activities-admin` is required lazily**, inside the function. It pulls in
+  GitHub, Blobs, the template and the image pipeline; the registration half needs
+  none of that and a scheduled function has ten seconds.
+- **It bumps `isoUpdated`**, so an admin holding that record open gets a 409 on
+  their next save. That is the optimistic lock working, not a bug.
+- **`lastEditedBy` is `system`**, and the record carries `autoCompletedAt` and
+  `autoCompletedAfter` — the date it acted on, because "it completed on the 24th"
+  is not a useful record and "its last session was the 23rd" is.
+
+### ⚠ The admin's "Run now" button must not call `run()`
+
+`run()` is the scheduled entry point and does both halves. The admin's button
+calls **`runRegistrations()`**.
+
+That button is gated on `canApprove`, a **registrations** permission, and its own
+hint says it "only updates what the queue says and tells the family". The
+activity half commits to git and republishes live pages, which is an
+**activities** permission. Wiring the button to `run()` would let an admin who
+may work the queue but may not publish do exactly that, from a control saying it
+does something else. The scheduled function has no session at all, so there is
+nothing there for a permission to leak through. A test pins both call sites.
+
+### The listing page grew group headings
+
+`/activities` was one flat grid of every public status, sorted by slug. It now
+renders the three groups in order, and **a group with nothing in it gets no
+heading** — with a single group there are no headings at all, which is how the
+page rendered before groups existed and how it still renders today. Verified by
+regenerating against the live record, not assumed.
+
+`id="open"`, `id="running"` and `id="archived"` are the menu's jump targets, on
+the headings rather than on wrappers so a reader lands on the words. They carry
+`scroll-margin-block-start:112px`, or the 96px fixed nav lands on top. A menu
+entry is **absent until its section exists**, since jumping to an anchor the page
+does not render does nothing and looks broken.
+
+Card titles are `<h2>` with one group and `<h3>` under headings when there are
+more — the levels follow the outline rather than being pinned to a tag. Still
+exactly one `<h1>`.
 
 ### ⚠ Two mechanics from the sister project deliberately NOT copied
 

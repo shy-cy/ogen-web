@@ -50,25 +50,42 @@ const arr = (name) => {
   const m = new RegExp('var ' + name + ' = \\[([^\\]]*)\\]').exec(navSrc);
   return m ? m[1].split(',').map((s) => s.trim().replace(/^'|'$/g, '')).filter(Boolean) : null;
 };
-H.eq(JSON.stringify(arr('LIVE')), JSON.stringify(T.LIVE_STATUSES),
-  'js/nav.js LIVE matches _activity-template.js LIVE_STATUSES — including the ORDER, which is the menu order');
-H.eq(JSON.stringify(arr('PAST')), JSON.stringify(T.PAST_STATUSES),
-  'and PAST matches PAST_STATUSES');
-// Every public status is on exactly one side. The module asserts this at require
-// time; this proves the assertion is reached rather than trusting it.
-const both = T.LIVE_STATUSES.concat(T.PAST_STATUSES);
-H.eq(both.slice().sort().join(','), IDX.PUBLIC_STATUSES.slice().sort().join(','),
-  'and between them they are exactly the statuses that reach the index');
-H.ok(T.STATUSES.indexOf('draft') !== -1 && both.indexOf('draft') === -1,
-  'draft is in neither, and cannot be — a draft has no files at all');
+const byKey = {};
+T.STATUS_GROUPS.forEach((g) => { byKey[g.key] = g.statuses; });
+H.eq(JSON.stringify(arr('OPEN')), JSON.stringify(byKey.open),
+  'js/nav.js OPEN matches the template, including the ORDER, which is the menu order');
+H.eq(JSON.stringify(arr('RUNNING')), JSON.stringify(byKey.running), 'RUNNING matches');
+H.eq(JSON.stringify(arr('ARCHIVED')), JSON.stringify(byKey.archived), 'ARCHIVED matches');
+// The mapping itself, spelled out — this is the decision, and it should be
+// readable here rather than inferred from two arrays.
+H.eq(byKey.open.slice().sort().join(','), 'announcement,open,waitlist',
+  'Open holds announcement, open AND waitlist — a waitlist is still accepting interest');
+H.eq(byKey.running.join(','), 'closed', 'Currently Running is exactly `closed`');
+H.eq(byKey.archived.slice().sort().join(','), 'cancelled,completed', 'Archived is the two terminal ones');
+// Every public status is in exactly one group. The module asserts this at
+// require time; this proves the assertion is reached rather than trusting it.
+const all3 = [].concat(byKey.open, byKey.running, byKey.archived);
+H.eq(all3.slice().sort().join(','), IDX.PUBLIC_STATUSES.slice().sort().join(','),
+  'between them they are exactly the statuses that reach the index — no status has no home');
+H.ok(T.STATUSES.indexOf('draft') !== -1 && all3.indexOf('draft') === -1,
+  'draft is in none of them, and cannot be — a draft has no files at all');
 
 console.log('\n[the menu entry and the heading it jumps to say the same thing]');
 LANGS.forEach((l) => {
-  const menu = new RegExp("past:'([^']+)'").exec(navSrc.split(l + ': {')[1] || '');
-  H.ok(menu, l + ': the menu has a past label');
-  H.eq(menu[1], T.LABELS[l].indexPast,
-    l + ': it is character-identical to LABELS.indexPast — a link whose words change on arrival reads as the wrong link');
+  const table = navSrc.split(l + ': {')[1] || '';
+  [['running', 'indexRunning'], ['archived', 'indexArchived']].forEach(([key, label]) => {
+    const m = new RegExp(key + ":'([^']+)'").exec(table);
+    H.ok(m, l + ': the menu has a ' + key + ' label');
+    H.eq(m[1], T.LABELS[l][label],
+      l + '.' + key + ' is character-identical to LABELS.' + label +
+      ' — a link whose words change on arrival reads as the wrong link');
+  });
 });
+// The labels themselves, so a rename has to be deliberate in all three.
+H.eq(T.LABELS.he.indexRunning, 'פעיל', 'Hebrew: פעיל, not פעילות — unvocalised, פעילות is ambiguous between "activities" and "active"');
+H.eq(T.LABELS.ru.indexRunning, 'Активные', 'Russian: Активные');
+H.eq(T.LABELS.he.indexArchived, 'ארכיון', 'Hebrew: ארכיון');
+H.eq(T.LABELS.ru.indexArchived, 'Архив', 'Russian: Архив');
 
 console.log('\n["What We Offer" is gone, and Activities is in its place]');
 H.ok(!/offer:/.test(navCode), 'the offer string is deleted, not left unused');
@@ -217,11 +234,16 @@ function findById(root, id) {
     'nor one with no page in this language — `langs` is checked, or the link would 404');
   H.eq(texts[0], 'Singing', 'open comes first, because it is the one you can act on now');
   H.ok(texts.indexOf('See all activities') !== -1, 'the way through to the full list is always there');
-  H.ok(texts.indexOf('Past activities') !== -1, 'and Past activities, because this index has some');
+  H.ok(texts.indexOf('Currently Running') !== -1, 'and Currently Running, because a closed activity is in this index');
+  H.ok(texts.indexOf('Archived') !== -1, 'and Archived, because a completed one is too');
   H.eq(links.filter((a) => (a.getAttribute('href') || '').indexOf('/en/') !== 0).length, 0,
     'every link stays in the reader\'s tree');
-  H.ok(links.filter((a) => a.textContent === 'Past activities')[0].getAttribute('href') === '/en/activities#past',
-    'past points at the anchor the listing page renders');
+  H.eq(links.filter((a) => a.textContent === 'Currently Running')[0].getAttribute('href'),
+    '/en/activities#running', 'Currently Running points at the anchor the listing page renders');
+  H.eq(links.filter((a) => a.textContent === 'Archived')[0].getAttribute('href'),
+    '/en/activities#archived', 'and so does Archived');
+  H.eq(links.filter((a) => a.textContent === 'See all activities')[0].getAttribute('href'),
+    '/en/activities', 'while See all goes to the top of the page');
   const notes = D.byClass(g.slot, 'menu-note').map((n) => n.textContent);
   H.eq(notes.join('|'), 'Coming soon|Waiting list',
     'a second line only where the status is not open — open is what a reader already assumes');
@@ -238,7 +260,8 @@ function findById(root, id) {
   g = await group({ lang: 'he', index: INDEX });
   texts = D.byTag(g.slot, 'a').map((a) => a.textContent);
   H.ok(texts.indexOf('לכל הפעילויות') !== -1, 'Hebrew: the see-all row');
-  H.ok(texts.indexOf('פעילויות קודמות') !== -1, 'Hebrew: the past row, matching the page heading');
+  H.ok(texts.indexOf('פעיל') !== -1, 'Hebrew: the currently-running row, matching the page heading');
+  H.ok(texts.indexOf('ארכיון') !== -1, 'Hebrew: the archive row');
   H.ok(texts.some((t) => t.indexOf('רק בעברית') === 0), 'the Hebrew-only activity IS listed in Hebrew');
   H.eq(D.byTag(g.slot, 'a').filter((a) => /^\/(en|ru)\//.test(a.getAttribute('href') || '')).length, 0,
     'and a Hebrew reader is never linked out of the Hebrew tree');
@@ -258,16 +281,24 @@ function findById(root, id) {
   H.eq(D.byTag(g.slot, 'a').filter((a) => a.textContent === 'See all activities').length, 1,
     'and the twelfth activity is one tap away, not clipped out of a panel while still in the DOM');
 
-  console.log('\n[no past activities, no past link]');
-  g = await group({ lang: 'en', index: INDEX.filter((a) => T.PAST_STATUSES.indexOf(a.status) === -1) });
+  console.log('\n[a section with nothing in it gets no link]');
+  // The listing page renders no heading for an empty group, so an unconditional
+  // link would jump to an anchor that is not on the page — which does nothing at
+  // all and reads as a broken menu.
+  g = await group({ lang: 'en', index: INDEX.filter((a) => byKey.open.indexOf(a.status) !== -1) });
   texts = D.byTag(g.slot, 'a').map((a) => a.textContent);
   H.ok(texts.indexOf('See all activities') !== -1, 'the see-all row is still there');
-  H.eq(texts.indexOf('Past activities'), -1,
-    'and Past activities is absent — the listing renders no #past heading to jump to');
+  H.eq(texts.indexOf('Currently Running'), -1, 'Currently Running is absent with nothing closed');
+  H.eq(texts.indexOf('Archived'), -1, 'and Archived with nothing finished');
+
+  g = await group({ lang: 'en', index: INDEX.filter((a) => a.status !== 'closed') });
+  texts = D.byTag(g.slot, 'a').map((a) => a.textContent);
+  H.eq(texts.indexOf('Currently Running'), -1, 'each section is judged on its own…');
+  H.ok(texts.indexOf('Archived') !== -1, '…so Archived survives while Currently Running does not');
 
   console.log('\n[every way this can fail leaves the plain link alone]');
   const cases = [
-    ['nothing live', { index: INDEX.filter((a) => T.LIVE_STATUSES.indexOf(a.status) === -1) }],
+    ['nothing open', { index: INDEX.filter((a) => byKey.open.indexOf(a.status) === -1) }],
     ['the index 404s', { index: null }],
     ['the JSON is not a list', { index: { oops: true } }],
     ['the fetch rejects', { fetch: () => Promise.reject(new Error('offline')) }],
@@ -297,31 +328,42 @@ function findById(root, id) {
     slug: 'x', status: 'open', title: { he: 'א', en: 'A', ru: 'А' },
     summary: { he: 'ס', en: 'S', ru: 'С' }
   }, over || {});
-  const onlyLive = T.renderActivitiesIndexPage([rec()], 'en');
-  H.ok(onlyLive.indexOf('id="past"') === -1, 'no past heading while nothing is past');
-  H.ok(onlyLive.indexOf('activity-group') === -1, 'and no group headings at all');
-  H.ok(/<h2>A<\/h2>/.test(onlyLive), 'the card title is the page\'s h2, exactly as before');
+  const onlyOpen = T.renderActivitiesIndexPage([rec()], 'en');
+  H.ok(onlyOpen.indexOf('activity-group') === -1, 'one group, so no headings at all');
+  H.ok(/<h2>A<\/h2>/.test(onlyOpen), 'and the card title is the page\'s h2, exactly as before');
 
-  const mixed = T.renderActivitiesIndexPage(
-    [rec(), rec({ slug: 'y', status: 'completed', title: { he: 'ב', en: 'B', ru: 'Б' } })], 'en');
-  H.ok(mixed.indexOf('id="past"') !== -1, 'a completed activity brings the anchor');
-  H.ok(mixed.indexOf('>Current activities<') !== -1 && mixed.indexOf('>Past activities<') !== -1,
-    'with both headings');
-  H.ok(/<h3>A<\/h3>/.test(mixed) && /<h3>B<\/h3>/.test(mixed),
+  const three = T.renderActivitiesIndexPage([
+    rec(),
+    rec({ slug: 'y', status: 'closed', title: { he: 'ב', en: 'B', ru: 'Б' } }),
+    rec({ slug: 'z', status: 'completed', title: { he: 'ג', en: 'C', ru: 'В' } })
+  ], 'en');
+  ['open', 'running', 'archived'].forEach((k) => {
+    H.ok(three.indexOf('id="' + k + '"') !== -1, 'the ' + k + ' anchor is rendered');
+  });
+  H.ok(three.indexOf('>Open for registration<') !== -1 &&
+       three.indexOf('>Currently Running<') !== -1 &&
+       three.indexOf('>Archived<') !== -1, 'with all three headings');
+  H.ok(three.indexOf('id="open"') < three.indexOf('id="running"') &&
+       three.indexOf('id="running"') < three.indexOf('id="archived"'),
+    'in that order — what you can join, what is happening, what is over');
+  H.ok(/<h3>A<\/h3>/.test(three) && /<h3>C<\/h3>/.test(three),
     'and the card titles drop to h3 under them — the levels follow the outline');
-  H.eq((mixed.match(/<h1/g) || []).length, 1, 'still exactly one h1');
+  H.eq((three.match(/<h1/g) || []).length, 1, 'still exactly one h1');
   LANGS.forEach((l) => {
-    const p = T.renderActivitiesIndexPage(
-      [rec(), rec({ slug: 'y', status: 'completed' })], l);
-    H.ok(p.indexOf('>' + T.LABELS[l].indexPast + '<') !== -1, l + ': the heading is translated');
+    const p = T.renderActivitiesIndexPage([
+      rec(), rec({ slug: 'y', status: 'closed' }), rec({ slug: 'z', status: 'completed' })], l);
+    ['indexOpen', 'indexRunning', 'indexArchived'].forEach((k) => {
+      H.ok(p.indexOf('>' + T.LABELS[l][k] + '<') !== -1, l + ': ' + k + ' is translated');
+    });
   });
 
-  console.log('\n[a closed activity is reachable, just not from the live list]');
+  console.log('\n[a closed activity is Currently Running, not archived]');
   const withClosed = T.renderActivitiesIndexPage(
     [rec(), rec({ slug: 'z', status: 'closed', title: { he: 'ג', en: 'C', ru: 'В' } })], 'en');
-  H.ok(withClosed.indexOf('id="past"') !== -1,
-    'closed lands in the past group — which is what a parent looking for their child\'s activity needs');
-  H.ok(withClosed.indexOf('/en/activities/z') !== -1, 'and its page is still linked');
+  H.ok(withClosed.indexOf('>Currently Running<') !== -1,
+    'closed is underway — registration is shut, the activity is not over');
+  H.ok(withClosed.indexOf('>Archived<') === -1, 'and nothing is archived by it');
+  H.ok(withClosed.indexOf('/en/activities/z') !== -1, 'its page is still linked');
 
   H.done();
 })();

@@ -1014,7 +1014,12 @@ exports.handler = async (event) => {
 
 // Exported for the test suites, which call the real functions.
 exports._internal = {
-  generate, validate, mergeByPermission, assertFresh, extractImages, decodeImage,
+  // generate/allPublished/getPublished are also the nightly sweep's publish
+  // path. It must go through THIS generate() and not a second renderer, for the
+  // same reason preview does: a publish that renders through different code is
+  // a publish that can differ from the one an admin would have made.
+  generate, allPublished, getPublished,
+  validate, mergeByPermission, assertFresh, extractImages, decodeImage,
   sanitiseRich, RICH_KEYS,
   currentRecord, langObject, FIELD_SCHEMA, Conflict, SLUG_RE
 };

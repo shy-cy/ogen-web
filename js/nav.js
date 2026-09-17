@@ -33,21 +33,22 @@
   // already scrolled past. The #offer section is untouched and still on the
   // homepage; it simply no longer has a menu entry of its own.
   //
-  // `past` MUST match LABELS[lang].indexPast in _activity-template.js: it is the
-  // menu entry and the heading it jumps to, and a link whose words change on
-  // arrival reads as the wrong link. A test asserts the two agree.
+  // `running` and `archived` MUST match LABELS[lang].indexRunning and
+  // .indexArchived in _activity-template.js: each is a menu entry and the
+  // heading it jumps to, and a link whose words change on arrival reads as the
+  // wrong link. A test asserts they agree, character for character.
   const L = {
     he: { about:'אודות', activities:'פעילויות', contact:'צור קשר', menu:'תפריט', alt:'עוגן',
           account:'אזור המשפחה', signIn:'כניסה', signOut:'יציאה',
-          seeAll:'לכל הפעילויות', past:'פעילויות קודמות',
+          seeAll:'לכל הפעילויות', running:'פעיל', archived:'ארכיון',
           soon:'בקרוב', waitlist:'רשימת המתנה' },
     en: { about:'About', activities:'Activities', contact:'Contact', menu:'Menu', alt:'Ogen',
           account:'My family', signIn:'Sign in', signOut:'Sign out',
-          seeAll:'See all activities', past:'Past activities',
+          seeAll:'See all activities', running:'Currently Running', archived:'Archived',
           soon:'Coming soon', waitlist:'Waiting list' },
     ru: { about:'О нас', activities:'Занятия', contact:'Контакты', menu:'Меню', alt:'Оген',
           account:'Моя семья', signIn:'Войти', signOut:'Выйти',
-          seeAll:'Все занятия', past:'Прошедшие занятия',
+          seeAll:'Все занятия', running:'Активные', archived:'Архив',
           soon:'Скоро', waitlist:'Лист ожидания' }
   }[lang];
 
@@ -219,12 +220,18 @@
   // load buys a request on every page view for a panel almost nobody sees. The
   // sister project pays exactly that; one flag avoids it.
   //
-  // The two status lists are the SAME SPLIT the listing page groups by, and are
-  // written here in the order the menu lists them: what is open before what is
-  // only announced. _activity-template.js owns the canonical copy and a test
-  // asserts these two agree with it.
-  var LIVE = ['open', 'announcement', 'waitlist'];
-  var PAST = ['closed', 'completed', 'cancelled'];
+  // The three status lists are the SAME SPLIT the listing page groups by, and
+  // OPEN is written in the order the menu lists them: what is open before what
+  // is only announced before a waitlist. _activity-template.js owns the
+  // canonical copy and a test asserts all three agree with it.
+  //
+  // `closed` is RUNNING and not ARCHIVED — it means registration is shut and the
+  // activity is underway. Nothing here asks a clock about that; the nightly
+  // sweep flips a finished activity to `completed` instead, so the status this
+  // reads is kept true rather than second-guessed. See _activity-autocomplete.js.
+  var OPEN = ['open', 'announcement', 'waitlist'];
+  var RUNNING = ['closed'];
+  var ARCHIVED = ['completed', 'cancelled'];
   var MAX_ROWS = 6;
   var FALLBACK = { he: ['he'], en: ['en', 'he'], ru: ['ru', 'en', 'he'] };
   var loaded = false;
@@ -253,19 +260,21 @@
         var mine = list.filter(function (a) {
           return a && a.langs && a.langs.indexOf(lang) !== -1;
         });
-        var live = mine.filter(function (a) { return LIVE.indexOf(a.status) !== -1; });
-        if (!live.length) return;              // nothing to open an accordion onto
-        live.sort(function (a, b) {
-          var d = LIVE.indexOf(a.status) - LIVE.indexOf(b.status);
+        var open = mine.filter(function (a) { return OPEN.indexOf(a.status) !== -1; });
+        if (!open.length) return;              // nothing to open an accordion onto
+        open.sort(function (a, b) {
+          var d = OPEN.indexOf(a.status) - OPEN.indexOf(b.status);
           return d || pickLang(a.title).localeCompare(pickLang(b.title), lang);
         });
-        var hasPast = mine.some(function (a) { return PAST.indexOf(a.status) !== -1; });
-        build(slot, live, hasPast);
+        var has = function (list) {
+          return mine.some(function (a) { return list.indexOf(a.status) !== -1; });
+        };
+        build(slot, open, { running: has(RUNNING), archived: has(ARCHIVED) });
       })
       .catch(function () { /* the plain link is already there */ });
   }
 
-  function build(slot, live, hasPast) {
+  function build(slot, open, sections) {
     var group = document.createElement('div');
     group.className = 'menu-group';
 
@@ -289,7 +298,7 @@
     // keyboard, read by a screen reader, shown to nobody, with nothing saying
     // the list was cut. "See all activities" is always there, so stopping at six
     // costs a reader one tap and never hides a row it claims to be showing.
-    live.slice(0, MAX_ROWS).forEach(function (a) {
+    open.slice(0, MAX_ROWS).forEach(function (a) {
       var link = document.createElement('a');
       link.href = base + '/activities/' + a.slug;
       link.setAttribute('onclick', 'toggleMenu()');
@@ -307,24 +316,21 @@
       sub.appendChild(link);
     });
 
-    var all = document.createElement('a');
-    all.className = 'menu-sub-all';
-    all.href = base + '/activities';
-    all.setAttribute('onclick', 'toggleMenu()');
-    all.textContent = L.seeAll;
-    sub.appendChild(all);
-
-    // PAST ONLY WHEN THERE IS A PAST. The listing page renders no "Past
-    // activities" heading until something is in it, so linking to #past before
-    // then would jump to an anchor that is not on the page.
-    if (hasPast) {
-      var past = document.createElement('a');
-      past.className = 'menu-sub-all';
-      past.href = base + '/activities#past';
-      past.setAttribute('onclick', 'toggleMenu()');
-      past.textContent = L.past;
-      sub.appendChild(past);
-    }
+    // The way through to the whole page, always, followed by a jump to each
+    // section that EXISTS. The listing page renders no heading for an empty
+    // group, so an unconditional link would jump to an anchor that is not there
+    // — which does nothing at all and reads as a broken menu.
+    var tail = function (label, hash) {
+      var link = document.createElement('a');
+      link.className = 'menu-sub-all';
+      link.href = base + '/activities' + (hash || '');
+      link.setAttribute('onclick', 'toggleMenu()');
+      link.textContent = label;
+      sub.appendChild(link);
+    };
+    tail(L.seeAll, '');
+    if (sections.running) tail(L.running, '#running');
+    if (sections.archived) tail(L.archived, '#archived');
 
     toggle.addEventListener('click', function (e) {
       // Stop the document click handler from reading this as a click outside
