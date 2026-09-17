@@ -11,7 +11,15 @@
 //
 // The fix is s-maxage, which speaks only to a shared cache. max-age stays 0, so
 // a returning browser still revalidates and still sees a publish immediately;
-// what changes is that Cloudflare answers repeat traffic itself.
+// what changes is that a shared cache may answer repeat traffic itself.
+//
+// ⚠ Measured after deploying: the shared cache that honours it is NETLIFY'S,
+// not Cloudflare's. Cloudflare still answers cf-cache-status: DYNAMIC, because
+// it caches by file extension by default and HTML is not in that set — only a
+// dashboard Cache Rule changes that, and no Cache-Control value can. Netlify's
+// own CDN was revalidating to origin on every request and now does not, which
+// took the homepage from 6.21s to ~0.30s. The header is right; the hop it
+// turned out to fix was one earlier than intended.
 //
 // SIXTY SECONDS is the number, and the reasoning is what this pins. It is the
 // window in which a stale page can be served after a publish — and a Netlify

@@ -1160,8 +1160,25 @@ page and 6.21s on the homepage, while `/shared.css` sat beside them at 0.33s and
 
 The fix is **`s-maxage=60`**, which speaks only to a shared cache. `max-age`
 stays 0, so a returning browser still revalidates and still sees a publish
-immediately; what changes is that Cloudflare answers repeat traffic itself
-instead of forwarding all of it to Netlify.
+immediately; what changes is that a shared cache may serve repeat traffic
+itself instead of forwarding all of it to origin.
+
+⚠ **And the shared cache that honours it is Netlify's, not Cloudflare's.** This
+was added expecting Cloudflare to start keeping the HTML, and measured after
+deploying, it does not: every page still answers `cf-cache-status: DYNAMIC`.
+Cloudflare caches by file **extension** by default and HTML is not in that set
+— no `Cache-Control` value changes that on its own, only a Cache Rule in the
+dashboard. What did change is **Netlify's own CDN**, which was revalidating to
+origin on every request and now serves a minute of repeat traffic itself.
+
+The numbers say the header earns its place regardless: the homepage went 6.21s
+→ ~0.30s and an activity page 0.76-4.96s → ~0.29s. Closing the last hop would
+mean a Cloudflare Cache Rule, worth perhaps 0.25s more (`/shared.css` is a
+`HIT` at 0.04s) — and it is **not recommended**: it is a dashboard setting
+outside this repository, the same class of thing as Browser Cache TTL, which
+this file already records silently rewriting every header on the site. Trading
+a quarter of a second for another invisible control plane is the wrong way
+round.
 
 **Sixty seconds, and the number is the interesting part.** It is the window in
 which a stale page can be served after a publish — and a Netlify deploy already
