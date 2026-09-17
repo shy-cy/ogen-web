@@ -166,7 +166,7 @@
         "en": "Dorit Zontag Kurman",
         "ru": "Dorit Zontag Kurman"
       },
-      "photo": "/images/activities/hebrew4kids-teachers-tea-mtcyrd47-1.png"
+      "photo": "/images/activities/hebrew4kids-teachers-tea-mtcyrd47-1-c380c5da.jpg"
     },
     {
       "id": "tea-mtd1nrnl-2",
@@ -175,7 +175,7 @@
         "en": "Irit Berger-Rozanski",
         "ru": "Irit Berger-Rozanski"
       },
-      "photo": "/images/activities/hebrew4kids-teachers-tea-mtd1nrnl-2-d7d689bb.gif"
+      "photo": "/images/activities/hebrew4kids-teachers-tea-mtd1nrnl-2-ebfa50f0.jpg"
     }
   ],
   "sponsors": [
@@ -189,11 +189,11 @@
       "logo": "/images/activities/hebrew4kids-sponsors-spo-mtd1o2lk-3.png"
     }
   ],
-  "isoUpdated": "2026-09-17T15:37:43.681Z",
+  "isoUpdated": "2026-09-17T15:50:32.990Z",
   "isoCreated": "2026-08-28T14:55:38.930Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
-  "lastPublishedAt": "2026-09-17T14:39:45.362Z",
+  "lastPublishedAt": "2026-09-17T15:50:32.990Z",
   "factVisibility": {
     "ages": "public",
     "schedule": "public",
@@ -221,5 +221,9 @@
       "sessionCount": 11
     }
   },
-  "seriesId": "act-ac164520eacd1b92"
+  "seriesId": "act-ac164520eacd1b92",
+  "retiredImages": [
+    "images/activities/hebrew4kids-teachers-tea-mtcyrd47-1.png",
+    "images/activities/hebrew4kids-teachers-tea-mtd1nrnl-2-d7d689bb.gif"
+  ]
 }
