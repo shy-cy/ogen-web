@@ -4,7 +4,7 @@
     "activityId": "act-ac164520eacd1b92",
     "seriesId": "act-ac164520eacd1b92",
     "type": "course",
-    "status": "announcement",
+    "status": "open",
     "langs": [
       "he",
       "en",
@@ -21,6 +21,6 @@
       "ru": "Иврит, Израиль и еврейская культура - учимся вместе"
     },
     "cardImage": "/images/activities/hebrew4kids-card-a1f8d75e.jpg",
-    "isoUpdated": "2026-09-14T08:46:49.637Z"
+    "isoUpdated": "2026-09-17T14:39:45.362Z"
   }
 ]

@@ -2,7 +2,7 @@
   "slug": "hebrew4kids",
   "activityId": "act-ac164520eacd1b92",
   "type": "course",
-  "status": "announcement",
+  "status": "open",
   "motif": "leaf",
   "corner": "tl",
   "ctaUrl": {
@@ -194,11 +194,11 @@
       "logo": "/images/activities/hebrew4kids-sponsors-spo-mtd1o2lk-3.png"
     }
   ],
-  "isoUpdated": "2026-09-14T08:46:49.637Z",
+  "isoUpdated": "2026-09-17T14:39:45.362Z",
   "isoCreated": "2026-08-28T14:55:38.930Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
-  "lastPublishedAt": "2026-09-14T08:46:49.637Z",
+  "lastPublishedAt": "2026-09-17T14:39:45.362Z",
   "factVisibility": {
     "ages": "public",
     "schedule": "public",
@@ -225,5 +225,6 @@
       "startDate": "2026-10-14",
       "sessionCount": 11
     }
-  }
+  },
+  "seriesId": "act-ac164520eacd1b92"
 }
