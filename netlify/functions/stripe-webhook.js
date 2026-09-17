@@ -36,6 +36,8 @@
 const S = require('./_stripe');
 const store = require('./_registration-store');
 const R = require('./_registration');
+const accounts = require('./_account-store');
+const mail = require('./_registration-email');
 
 const json = (statusCode, body) => ({
   statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
@@ -130,6 +132,24 @@ async function settle(session) {
       : (session.payment_intent && session.payment_intent.id) || null
   });
   await store.saveRegistration(next);
+
+  // THE RECORD IS WRITTEN FIRST, THE EMAIL SENT SECOND, and settle() swallows a
+  // failure. The rule this project already follows for money: an email not sent
+  // leaves a person wondering, a payment not recorded loses money nobody can
+  // trace. So the receipt is best effort and the settlement is not.
+  //
+  // The outstanding figure is computed here rather than inside the message, so
+  // what a family reads and what the registration holds cannot disagree.
+  try {
+    const account = await accounts.getAccount(next.accountId);
+    if (account) {
+      const owedCents = next.payment.owedCents;
+      const outstanding = owedCents == null ? 0 : Math.max(0, owedCents - paid);
+      await mail.sendPaid(next, account, cents, outstanding);
+    }
+  } catch (err) {
+    console.error('stripe-webhook: receipt not sent for', session.id, err && err.message);
+  }
 }
 
 module.exports.settle = settle;

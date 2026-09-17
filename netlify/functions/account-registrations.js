@@ -26,6 +26,8 @@ const credit = require('./_credit');
 const ledger = require('./_credit-ledger');
 const { cancelAndCredit } = require('./_registration-cancel');
 const attendance = require('./_session-attendance');
+const S = require('./_stripe');
+const { SITE } = require('./_email-shell');
 const facts = require('./_activity-facts');
 const { LABELS } = require('./_activity-template');
 
@@ -466,6 +468,112 @@ exports.handler = async (event) => {
       // entries rather than read off a cached total: two representations of one
       // number on a store with no transaction is how a balance quietly stops
       // matching its own history.
+      // --- paying for a place -----------------------------------------------
+      //
+      // TWO GATES, AND BOTH ARE ABOUT NOT TAKING MONEY WE SHOULD NOT HAVE.
+      //
+      // 1. THE ACCOUNT MUST BE VERIFIED. This is the first place in the whole
+      //    system that enforces `emailVerifiedAt` — until now it has been
+      //    stored, shown as a banner, and acted on by nothing. Payment is the
+      //    right place to start: a receipt, and every later message about money,
+      //    goes to an address nobody has proved belongs to this person. It is
+      //    not a dead end — the dashboard already carries a resend button — so
+      //    the refusal names the reason and the client can act on it.
+      //
+      // 2. THE REGISTRATION MUST BE APPROVED. A `pending` registration is a
+      //    request that may still be refused, and taking money for a place that
+      //    might not exist means an immediate refund and a family wondering what
+      //    happened. How it reached `approved` is irrelevant — auto-approval and
+      //    an admin pressing the button produce the same status, which is the
+      //    point of the status being the single source of truth.
+      //
+      // The amount is `owedCents - paidCents`, computed HERE and never accepted
+      // from the client: an amount in a request body is an amount somebody can
+      // edit. Stripe's own figure is then the authority on the way back in —
+      // see stripe-webhook.js.
+      case 'pay': {
+        const participant = await mustGuard(body.participantId);
+        if (!participant) return json(404, { error: NOT_YOURS });
+
+        if (!me.emailVerifiedAt) {
+          return json(403, {
+            error: 'Please confirm your email address before paying.',
+            reason: 'email-unverified'
+          });
+        }
+
+        const reg = await store.getRegistration(body.participantId, body.activityId);
+        if (!reg) return json(404, { error: 'No such registration.' });
+        if (reg.status !== 'approved') {
+          return json(409, {
+            error: 'This registration is ' + reg.status + '. Only an approved place can be paid for.',
+            reason: 'not-approved', status: reg.status
+          });
+        }
+
+        const owed = (reg.payment && reg.payment.owedCents) || 0;
+        const paid = (reg.payment && reg.payment.paidCents) || 0;
+        const due = owed - paid;
+        if (!(due > 0)) {
+          return json(409, { error: 'There is nothing outstanding on this registration.', reason: 'nothing-due' });
+        }
+
+        // The FROZEN title, not the activity's current one: a rename must not
+        // change what a family sees on the payment they are making.
+        const title = (reg.frozen && facts.pick(reg.frozen.activityTitle, lang)) || 'Ogen';
+        const base = lang === 'he' ? '' : '/' + lang;
+        const back = SITE + base + '/account/activity'
+          + '?participantId=' + encodeURIComponent(reg.participantId)
+          + '&activityId=' + encodeURIComponent(reg.activityId);
+
+        let session;
+        try {
+          session = await S.stripe().checkout.sessions.create({
+            mode: 'payment',
+            customer_email: me.email,
+            // Stripe Checkout has no Hebrew; 'auto' falls back to English.
+            locale: lang === 'en' ? 'en' : 'auto',
+            line_items: [{
+              quantity: 1,
+              price_data: {
+                currency: 'eur',
+                unit_amount: due,
+                product_data: {
+                  name: title,
+                  description: (reg.frozen && reg.frozen.participantName) || undefined
+                }
+              }
+            }],
+            success_url: back + '&paid=1',
+            cancel_url: back,
+            // Tagged on the SESSION and mirrored onto the PaymentIntent. The
+            // account is shared with another organisation, so an untagged
+            // object is indistinguishable from theirs — and a session-only tag
+            // is invisible on the PaymentIntent a dispute arrives attached to.
+            metadata: S.meta({
+              ogen_kind: 'registration',
+              participant_id: reg.participantId,
+              activity_id: reg.activityId,
+              registration: 'reg-' + reg.participantId + '__' + reg.activityId,
+              activity_slug: reg.frozen && reg.frozen.activitySlugAtSubmission
+            }),
+            payment_intent_data: {
+              statement_descriptor_suffix: S.STATEMENT_DESCRIPTOR_SUFFIX,
+              metadata: S.meta({
+                ogen_kind: 'registration',
+                participant_id: reg.participantId,
+                activity_id: reg.activityId
+              })
+            }
+          });
+        } catch (err) {
+          console.error('account-registrations: Stripe session failed:', err && err.message);
+          return json(502, { error: 'Could not start the payment. Please try again.' });
+        }
+
+        return json(200, { ok: true, url: session.url, amountCents: due });
+      }
+
       case 'balance': {
         const entries = await ledger.entriesFor(me.accountId);
         return json(200, {

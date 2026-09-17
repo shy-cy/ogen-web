@@ -64,8 +64,16 @@ H.ok(!/metadata\.(?!organization)/.test(settle.replace(/registrationRef|isOurs/g
 
 console.log('\n[Stripe\'s figure is the authority, never ours]');
 H.ok(/Number\(session\.amount_total\)/.test(bare), 'the amount comes from session.amount_total');
-H.ok(!/owedCents\s*-\s*|owedCents\s*\)\s*-/.test(bare),
-  'and is never derived from the record being checked, which would make the check circular');
+// The rule is about the SETTLED AMOUNT, not about arithmetic in general. The
+// receipt legitimately computes what is still outstanding from the record —
+// that is a figure to display, not a figure to bank. What must never happen is
+// the amount CREDITED being derived from the record it is being credited to,
+// which would make the check circular and settle any payment as "correct".
+const centsLine = (bare.match(/const cents = [^;]+;/) || [''])[0];
+H.ok(/session\.amount_total/.test(centsLine),
+  'the settled amount comes from Stripe: ' + centsLine.trim());
+H.ok(!/owedCents|paidCents|reg\./.test(centsLine),
+  'and nothing in it is read from the registration being credited');
 H.ok(/if \(!\(cents > 0\)\)/.test(bare), 'a zero or missing amount settles nothing');
 
 console.log('\n[a repeat delivery counts once]');
