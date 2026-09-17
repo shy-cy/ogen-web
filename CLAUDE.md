@@ -1098,10 +1098,25 @@ removing a row reissues an id and merges two items' state).
 
 **6. Uploads are shrunk in the browser, not on the server.** `js/image-optimize.js`
 resizes and re-encodes before a byte is sent — hero to 1600px on the long edge
-as JPEG, teacher/sponsor images to 600px, card images cropped to a centred
-square at 800px, share images cropped to 1200×630, transparency keeping them
-PNG, to match what the site already does by hand (`og-image.jpg` is 1200×630 at 72KB; `images/partners/*` are
-19–51KB). Measured: an 865KB hero became 26KB, a 1.77MB logo 134KB.
+as JPEG, teacher/sponsor images to **240px** (see below), card images cropped to
+a centred square at 800px, share images cropped to 1200×630, transparency
+keeping them PNG, to match what the site already does by hand (`og-image.jpg`
+is 1200×630 at 72KB; `images/partners/*` are 19–51KB). Measured: an 865KB hero
+became 26KB, a 1.77MB logo 134KB.
+
+**The credit profile was 600px for a 40px circle**, and the comment beside it
+admitted as much — "far more than they need" — justified by keeping the file
+sizes near the partner logos'. That optimises for a coincidence rather than for
+anything a reader sees, and it cost 57KB and 36KB on two teacher photos nobody
+can see the pixels of. It is **240** now.
+
+240 rather than the 160 a 40px circle strictly needs, and **the asymmetry is
+the whole argument**: too many pixels costs bytes, too few cannot be recovered
+without asking somebody to find the original and upload it again. 240 covers a
+6× render, survives the credit block being redesigned larger, and lands near
+15KB. The test pins a range with that reasoning rather than a digit. Note a
+profile change reaches only the **next** upload — existing images keep their
+bytes until someone replaces them.
 
 A profile with a **`ratio`** (`card` is `1`, `share` is `1200/630`) **crops
 rather than fits**, and that changes one rule. Every
@@ -1147,6 +1162,23 @@ That is also why **`/images/activities/*` is deliberately not `immutable`** in
 headers to error responses, so a transient 404 under a long immutable cache
 becomes permanent. Uploads do not need `immutable` to cache well — the content
 hash means anything unchanged keeps its URL and revalidates to a 304.
+
+⚠ **And it happened again, at the CDN rather than in a browser.** Two teacher
+photos published in the same commit as the HTML referencing them answered
+**404 on the live site while both files sat in the tree** — `cf-cache-status:
+HIT`, `age: 211`, a cache-busting query string returning 200, and the Netlify
+origin serving all 58435 bytes. Cloudflare caches by file extension, so `.jpg`
+is exactly what it *does* keep, and it had asked during the seconds between the
+HTML reaching an edge and the image doing so.
+
+The 300 was this rule working: it is what made a permanent broken image into a
+five-minute one. But five minutes is still visible, and visible to precisely the
+wrong person — **whoever just pressed Publish and opened the page**, who is the
+first request for every new URL and therefore the one who fills the edge cache
+with whatever the origin happens to say at that instant. It is now **60**, the
+same trade one notch tighter, and a test pins the ceiling rather than the exact
+number. The real fix is purging Cloudflare on deploy; that needs an API token
+and a build hook, lives outside this repository, and does not exist yet.
 
 ⚠ **`www.ogen.cy` is proxied through Cloudflare, so measure cache behaviour
 against the domain, never against `ogen-web.netlify.app`.** A CDN sits between

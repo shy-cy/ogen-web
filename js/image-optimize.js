@@ -21,12 +21,25 @@
 })(typeof self !== 'undefined' ? self : this, function () {
 
   // Long edge and JPEG quality per slot. The hero is drawn at most ~730 CSS px
-  // wide inside the activity layout, so 1600 still covers a 2× screen. Credit
-  // photos are drawn in a 40px circle; 600 is far more than they need and keeps
-  // them in the same range as the partner logos in images/partners/.
+  // wide inside the activity layout, so 1600 still covers a 2× screen.
+  //
+  // CREDIT PHOTOS ARE DRAWN IN A 40px CIRCLE. This said 600 and admitted in the
+  // same breath that 600 "is far more than they need" — the reason given was
+  // keeping their file size in the same range as the partner logos, which is
+  // optimising for a coincidence rather than for anything a reader sees. A real
+  // photograph at 600 costs about 57KB to render 40 CSS px; measured on the two
+  // teacher photos published in September, 57KB and 36KB for two faces nobody
+  // can see the pixels of.
+  //
+  // 240 rather than the 160 that 40px actually needs, and the asymmetry is the
+  // argument: too many pixels costs bytes, and too few cannot be recovered
+  // without asking somebody to find and upload the original again. 240 covers a
+  // 6× render of a 40px circle, survives the credit block being redesigned
+  // larger, and still lands near 15KB. Existing uploads keep their bytes — a
+  // profile change only reaches the next upload.
   var PROFILES = {
     hero:   { maxEdge: 1600, quality: 0.82 },
-    credit: { maxEdge: 600,  quality: 0.85 },
+    credit: { maxEdge: 240,  quality: 0.85 },
     // `ratio` (width ÷ height) crops to a fixed shape rather than fitting inside
     // a box. A card grid where one tile is 4:3 and the next is 16:9 is the thing
     // a fixed ratio exists to prevent, so the shape is guaranteed here, at

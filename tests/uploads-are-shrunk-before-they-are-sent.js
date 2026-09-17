@@ -28,9 +28,27 @@ const IO = require('../js/image-optimize.js');
 
 console.log('\n[sizing down, never up]');
 // The hero is drawn at most ~730 CSS px wide in the activity layout, so 1600
-// still covers a 2× screen; credit photos sit in a 40px circle.
+// still covers a 2× screen.
 H.eq(IO.PROFILES.hero.maxEdge, 1600, 'the hero target is 1600px on the long edge');
-H.eq(IO.PROFILES.credit.maxEdge, 600, 'credit photos target 600px');
+
+// CREDIT PHOTOS SIT IN A 40px CIRCLE, and this used to target 600 — while the
+// comment beside it admitted 600 was "far more than they need". The reason
+// given was keeping their file size near the partner logos', which optimises
+// for a coincidence rather than for anything a reader sees. Two teacher photos
+// published in September cost 57KB and 36KB to render 40 CSS px.
+//
+// The number is a judgement and the test says which way it may move, rather
+// than pinning a digit nobody can argue with: it must be well under 600,
+// because that was the bug, and comfortably over 120, because a 40px circle on
+// a 3× screen is 120 device px and TOO FEW PIXELS CANNOT BE RECOVERED without
+// asking somebody to find the original again. Too many only costs bytes. That
+// asymmetry is why this is 240 rather than the 160 the circle strictly needs.
+H.ok(IO.PROFILES.credit.maxEdge <= 320,
+  'credit photos are sized for the 40px circle they are drawn in, not for the ' +
+  'partner logos (' + IO.PROFILES.credit.maxEdge + 'px)');
+H.ok(IO.PROFILES.credit.maxEdge >= 160,
+  'but with headroom for a redesign and a 3x screen — too few pixels is the ' +
+  'one direction that cannot be undone');
 
 const big = IO.targetSize(4033, 3653, 600);
 H.eq(big.width, 600, 'a 4033px-wide logo comes down to 600');

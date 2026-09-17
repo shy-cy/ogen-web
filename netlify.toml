@@ -87,10 +87,31 @@
 #
 # This rule is more specific than the one above; that it actually wins is
 # verified against the deployed site, not assumed from the documentation.
+#
+# ⚠ SIXTY SECONDS, DOWN FROM 300, AND THE REASON IS THAT IT HAPPENED AGAIN.
+# Two teacher photos published in one commit with the HTML that references them
+# answered 404 on the live site while both files were sitting in the tree — and
+# `cf-cache-status: HIT`, `age: 211`, proved the 404 itself was the cached
+# thing. Cloudflare caches by file extension, so .jpg is exactly what it DOES
+# keep, and it had asked during the seconds between the HTML reaching an edge
+# and the image doing so.
+#
+# The 300 was already this rule working: it is what made a permanent broken
+# image into a five-minute one. But five minutes is still visible, and it is
+# visible to precisely the wrong person — whoever just pressed Publish and
+# immediately opened the page, who is the FIRST request for every new URL and
+# therefore the one who fills the cache with whatever the origin says at that
+# instant.
+#
+# Sixty is the same trade one notch tighter. Revalidation costs nothing here:
+# the names carry a content hash, so an unchanged file answers 304 in a few
+# hundred bytes. The real fix is purging Cloudflare on deploy, which needs an
+# API token and a build hook and lives outside this repository; until that
+# exists, this is the cheap half.
 [[headers]]
   for = "/images/activities/*"
   [headers.values]
-    Cache-Control = "public, max-age=300, must-revalidate"
+    Cache-Control = "public, max-age=60, must-revalidate"
 
 # The admin's own assets are NEVER cached.
 #

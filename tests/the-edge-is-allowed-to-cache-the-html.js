@@ -76,7 +76,7 @@ console.log('\n[the paths that had their own rules still do]');
 // Cache-Control must not read as permission to collapse them.
 const specific = {
   '/images/*': /max-age=31536000/,
-  '/images/activities/*': /max-age=300/,
+  '/images/activities/*': /max-age=(60|300)\b/,
   '/admin/*': /no-cache/
 };
 Object.keys(specific).forEach((p) => {
@@ -91,6 +91,17 @@ Object.keys(specific).forEach((p) => {
 const up = find('/images/activities/*')[0].values['Cache-Control'];
 H.ok(!/immutable/.test(up),
   '/images/activities/* is deliberately not immutable — a cached 404 there was permanent');
+// AND IT MUST STAY SHORT, because the failure recurred: two teacher photos
+// published in the same commit as the HTML referencing them answered 404 on
+// the live site with `cf-cache-status: HIT` and `age: 211`, while both files
+// sat in the tree. Cloudflare caches .jpg by default and had asked in the
+// seconds between the HTML reaching an edge and the image doing so. This
+// number is the whole length of that broken window, and the person who sees it
+// is whoever just pressed Publish.
+const upAge = parseInt((up.match(/max-age=(\d+)/) || [0, 0])[1], 10);
+H.ok(upAge > 0 && upAge <= 60,
+  'and its max-age is 60s or less (' + upAge + 's) — that is how long a ' +
+  'transient 404 stays cached at the edge');
 
 console.log('\n[the security headers survived the edit]');
 ['X-Frame-Options', 'X-Content-Type-Options', 'Referrer-Policy'].forEach((h) => {
