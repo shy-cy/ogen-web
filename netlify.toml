@@ -27,6 +27,31 @@
     X-Frame-Options = "SAMEORIGIN"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
+    # LET THE EDGE CACHE THE HTML.
+    #
+    # Every other path here had a Cache-Control and HTML had none, so Netlify's
+    # default `max-age=0, must-revalidate` applied — and Cloudflare will not
+    # cache a response like that. Measured against www.ogen.cy, every page
+    # answered `cf-cache-status: DYNAMIC`: an origin round trip on EVERY view,
+    # 0.76-4.96s on an activity page and 6.21s on the homepage, while
+    # /shared.css sat beside it at 0.33s and REVALIDATED because the edge was
+    # allowed to keep it.
+    #
+    # s-maxage speaks only to the shared cache, so this changes nothing for the
+    # browser: max-age stays 0 and a returning visitor still revalidates, which
+    # is what keeps a publish visible. What it buys is that Cloudflare answers
+    # repeat traffic itself instead of forwarding it all to Netlify.
+    #
+    # SIXTY SECONDS, because that is the window a stale page can be served in
+    # after a publish — and a Netlify deploy already takes about a minute to go
+    # live, so it adds nothing a publisher can perceive. Do not raise it without
+    # purging Cloudflare on deploy; the admin publishes to this site all day and
+    # a ten-minute edge cache means ten minutes of an admin reloading a page
+    # that has already changed and concluding the publish failed.
+    #
+    # ⚠ Cloudflare's Browser Cache TTL must stay "Respect Existing Headers" for
+    # any of this to mean what it says. See the Blobs/CDN note in CLAUDE.md.
+    Cache-Control = "public, max-age=0, must-revalidate, s-maxage=60"
 
 # Hand-placed assets — logos, partner marks, the share card, the favicons. These
 # are committed by hand, never move, and never 404, so a year is honest.

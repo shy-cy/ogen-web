@@ -636,7 +636,7 @@ function validate(activity) {
     if (v && !isLinkish(v)) {
       errors.push(`The registration button link for ${l.toUpperCase()} is not a web address: "${v}". ` +
         'Use a full https:// link, or a path on this site such as /#contact. ' +
-        'Leave it empty to send people to the contact form. ' +
+        "Leave it empty to send people to this activity's own registration form. " +
         "It is not the button's wording — the status decides that.");
     }
   });

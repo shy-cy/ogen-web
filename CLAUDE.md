@@ -64,6 +64,7 @@ images/
   logos/logo-{he,en,ru}.svg    wordmark + tagline lockup, one per language
   partners/                    kkl, ministry, wzo, kehilot
 netlify.toml      publish root, pretty URLs, security/cache headers, 404
+                  HTML carries s-maxage=60 so the EDGE caches it too
 sitemap.xml, robots.txt
 ```
 
@@ -143,6 +144,24 @@ communicated by the coloured `.status-badge` above it, not by recolouring the
 one button on the page. Only `.sidebar-cta.is-closed` differs, because it is
 not pressable.
 
+⚠ **Reserving the colour was not enough; the SHAPE had to be reserved too.**
+The badge was a solid fill, white text, `font-weight:800` and
+`border-radius:999px` — property for property, `.sidebar-cta` — and for `open`
+it was the same terracotta as well. So the site's most common state rendered a
+tag that *was* the button beneath it, and a reader pressed the tag and nothing
+happened. The badge is now outlined and tinted: `6px` radius, `1px` border,
+dark text, `font-weight:700`. **Solid fill plus a full pill means pressable**,
+and nothing else on an activity page uses it.
+
+Each status keeps its own hue — only the shape changed. But **the text colour
+is not always the token**, and that is not an oversight: five of the seven were
+chosen as *backgrounds* behind white text and fail as foregrounds
+(`--muted-warm` is 1.70:1 on paper, `--camel` 2.30, `--muted` 2.71, `--gold`
+3.05). Each has a darkened same-hue variant, checked against its own tinted
+ground rather than plain paper, since the tint is what sits behind the letters.
+`--navy` and `--danger` pass as they are. A test computes all seven rather than
+trusting the eye.
+
 **6. Icons are Lucide**, always white inside a 56px solid-color circle — never a
 colored icon on a transparent background. The anchor icon is the eyebrow marker
 in every section; reuse the same inline SVG rather than re-sourcing it. Offer
@@ -174,10 +193,11 @@ status CTA. An activity with no `cardImage` renders no frame at all rather than
 an empty one.
 
 Above 939px the grid is `"row pic" / "row aside" / "main aside" /
-"credits credits"` — the picture leads the trailing column, level with the fact
-cards, with the price card directly under it and the registration button under
-that: see the activity, see the cost, act. Below, the areas become
-`"pic" / "row" / "main" / "aside" / "credits"` and nothing else changes.
+"sessions sessions"` — the picture leads the trailing column, level with the
+fact cards, with the price card directly under it, the registration button under
+that, and staff & sponsors under that: see the activity, see the cost, act, then
+see who is behind it. Below, the areas become
+`"pic" / "row" / "main" / "aside" / "sessions"` and nothing else changes.
 
 **The fact row spans the first two rows, and that span is load-bearing.** It is
 what lets the two columns behave as independent stacks: row 1 is then sized by
@@ -259,6 +279,17 @@ it already names the activity. Note `height:auto` in the CSS is load-bearing —
 the `width`/`height` attributes are presentational hints, so without it
 `height="800"` wins and `aspect-ratio` is ignored.
 
+⚠ **And the thumb rendered it in a 150px band, which is the SAME BUG the
+activity page had already fixed.** `object-fit:cover` into a fixed height threw
+away 53% of a 290px card's picture, centred — and because these are *titled*
+graphics with the name typeset near the top, the half discarded was the half
+naming the activity. The live listing showed `עברית` sliced through the middle
+and `Hebrew for kids` gone entirely. It is `aspect-ratio:1/1` now, which crops
+nothing, because `image-optimize.js` already guarantees the square. The lesson
+had to be learned twice because the two rules were written separately; a test
+now pins both, and pins that there is exactly one rule for each so the
+`height:auto` pairing cannot be split across a media query.
+
 The card image is **not** the share image. `shareImage` is a separate field with
 its own 1200×630 crop, and falls back to the site's `og-image.jpg`, never to the
 card.
@@ -283,7 +314,7 @@ Shirat HaYam event sidebar (`.sidebar-detail`) onto Ogen tokens:
 | Above the article | Who it is for | Ages, Group size, Prerequisites, Language of instruction |
 | Above the article | When & where | When, Duration, Location |
 | Side column | Price | its four derived rows |
-| Full-width band | Staff & sponsors | Teachers, then sponsors |
+| Side column, under the button | Staff & sponsors | Teachers, then sponsors |
 
 The grouping answers the questions a parent asks in the order they ask them — is
 this for my child, when and where is it, what does it cost — and then who
@@ -293,12 +324,20 @@ except not fitting elsewhere. Language of instruction is a prerequisite in
 practice, a reader asking when also asks where, and a number a family decides on
 should not be the last line of a mixed list. Details is gone, not emptied.
 
-Price is **alone in the side column**, directly above the registration button:
-read what it costs, then press the thing that acts on it. Staff & sponsors is a
-**full-width band under everything**, where the measure lets it lay its two
-groups across and halve in height — 310px in a 320px column becomes 160px across
-1050. That is a container query on the card's own inline size at 520px, the same
-mechanism the fact cards use, so the narrow rendering is untouched.
+Price sits **at the head of the side column**, directly above the registration
+button: read what it costs, then press the thing that acts on it. Staff &
+sponsors sits **directly under that button**.
+
+It was a **full-width band under everything** until the session calendar landed
+between the article and it. The band was the better shape in isolation — the
+measure let its two groups lay out across and halve in height, 310px in a 320px
+column becoming 160px across 1050, via a container query on the card's own
+inline size at 520px. What changed is what sits above it: a table running to
+eleven rows put the teachers past the fold on every screen. **A wider block
+nobody scrolls to is worth less than a narrower one they see**, so the block is
+back in the column and back to stacking. The container query needed no edit —
+the card decides its own layout from its own width, so moving it into a
+narrower parent is the whole instruction.
 
 A card wide enough lays its facts **across** rather than stacked, decided by a
 container query on the card's own inline size — so the same component serves the
@@ -682,12 +721,15 @@ If nothing skipped is shown, nothing skipped can take a number, so session 3 is
 the third row and the third meeting with no rule saying so, and the table is
 **exactly** the list the credit arithmetic divides by.
 
-The table is a full-width band between the article and the credits, `"sessions
-sessions"` in the grid. **The row list grows with the areas** — five areas, five
-`grid-template-rows` values, or the 117px hole under the picture reopens just as
-silently as before. A test now asserts the two counts are equal rather than
-matching a fixed prefix. No year in the rows, because the date range is already
-on the page as the duration fact; the exception is a term spanning two calendar
+The table is the full-width band at the foot of the page, `"sessions sessions"`
+in the grid. **The row list tracks the areas in BOTH directions** — four areas,
+four `grid-template-rows` values, or the 117px hole under the picture reopens
+just as silently as before. The reverse bites too, and nearly did: when staff &
+sponsors left the grid for the side column, a fifth track left behind would have
+been inflated by the same spanning fact row. A test asserts the two counts are
+equal rather than matching a fixed prefix, which is what caught it. No year in
+the rows, because the date range is already on the page as the duration fact;
+the exception is a term spanning two calendar
 years, where a bare "6 January" is ambiguous.
 
 ### Named groups, and the second price
@@ -778,9 +820,13 @@ reads it, so the two shapes cannot drift. It freezes **only the sessions that ar
 happening** — an excluded date never enters the list — which is what lets
 `creditFor()` stay ignorant of exclusions entirely, and means a holiday appears
 in neither the numerator nor the denominator. The denominator is the **length of
-that list**, never a stored count: hebrew4kids has had a typed session count
-disagreeing with its own calendar since before any of this was built, and this
-is the one place that disagreement would have decided money.
+that list**, never a stored count: hebrew4kids carried a typed session count
+disagreeing with its own calendar from before any of this was built until the
+calendar was regenerated, and this is the one place that disagreement would have
+decided money. The record agrees with itself today — eleven sessions ending on
+23 December — which is the reason to keep the rule structural rather than a
+thing somebody remembers to check: the disagreement was invisible for months,
+and nothing stops the next one appearing the same way.
 
 The hard cutoff governs **entitlement, not the ability to end a registration**.
 It refuses the guardian's own cancel button (`reason: 'cancellation-closed'`,
@@ -1101,6 +1147,29 @@ rather than as a miss.
 The paragraph above used to end by saying this rule was "verified against the
 deployed site, not assumed from the documentation". It had been verified against
 Netlify, which is not the deployed site. There is a CDN in front of it.
+
+### ⚠ And the HTML was not cached anywhere at all
+
+Every path in `netlify.toml` had a `Cache-Control` except the one most people
+request. With none set, Netlify's default applied — `max-age=0,
+must-revalidate` — and **Cloudflare will not keep a copy of a response like
+that**. Measured against `www.ogen.cy`, every page answered `cf-cache-status:
+DYNAMIC`: a full origin round trip on *every* view, 0.76-4.96s on an activity
+page and 6.21s on the homepage, while `/shared.css` sat beside them at 0.33s and
+`REVALIDATED`, because the edge was allowed to keep that.
+
+The fix is **`s-maxage=60`**, which speaks only to a shared cache. `max-age`
+stays 0, so a returning browser still revalidates and still sees a publish
+immediately; what changes is that Cloudflare answers repeat traffic itself
+instead of forwarding all of it to Netlify.
+
+**Sixty seconds, and the number is the interesting part.** It is the window in
+which a stale page can be served after a publish — and a Netlify deploy already
+takes about a minute to go live, so at 60s the edge adds nothing a publisher can
+perceive. Raise it without purging Cloudflare on deploy and an admin reloads a
+page that has already changed, concludes the publish failed, and publishes
+again. That exact confusion is why `/admin/*` is `no-cache`, and a test pins the
+ceiling as well as the floor.
 
 Existing un-hashed files are left alone: `take()` only runs for a `data:` URL,
 so a record that already holds a path keeps it, and nothing is renamed behind
@@ -1951,14 +2020,14 @@ and a course finishing on a Tuesday does not complete at 02:00 Cyprus time on
 that Tuesday because a server is on UTC.
 
 **The last day is the LATER of the calendar and the typed `endDate`**, and that
-direction is the safety argument. The two can disagree — this repo has carried an
-activity whose session count ran out a week before its stated end. The errors are
-not symmetric: completing too **early** archives a running activity and rewrites
-its public page under a family still attending; completing too **late** leaves
-exactly the state this job exists to improve on, harmlessly. An excluded date is
-not a session and cannot be the last one, the same rule `freezeCancellation()`
-follows. No dates at all reads as *not ended*, the direction every blank in
-`_credit.js` takes.
+direction is the safety argument. The two can disagree — this repo carried, for
+months, an activity whose session count ran out a week before its stated end.
+The errors are not symmetric: completing too **early** archives a running
+activity and rewrites its public page under a family still attending;
+completing too **late** leaves exactly the state this job exists to improve on,
+harmlessly. An excluded date is not a session and cannot be the last one, the
+same rule `freezeCancellation()` follows. No dates at all reads as *not ended*,
+the direction every blank in `_credit.js` takes.
 
 ### ⚠ It is a PUBLISH, not a field edit
 
@@ -2289,13 +2358,19 @@ screen sends is a `case` the server handles, and the three money actions are
 behind `canCancel` on both sides. An unknown action answers 400 and that failure
 is otherwise invisible until somebody presses the button.
 
-### ⚠ Why this exists and the family area does not
+### ⚠ Why this shipped a release before the family area
 
-The guardian-facing area (Phase 6) is a **public registration surface**, and
-`ogen-legal-review` is still `pending`. The admin is explicitly the other side of
-that line — the gate's own comment says "building the admin side of registration
-is exactly what this gate is meant to allow" — so this shipped and the family
-area did not.
+The guardian-facing area (Phase 6) is a **public registration surface**, and at
+the time this screen was built `ogen-legal-review` was `pending` on every page.
+The admin is explicitly the other side of that line — the gate's own comment
+says "building the admin side of registration is exactly what this gate is meant
+to allow" — so this shipped and the family area could not.
+
+The gate opened when English became the declared binding version and both its
+pages were confirmed `complete`, which is what let Phase 6 follow. The ordering
+is worth keeping in mind rather than treating as an accident: the admin side has
+no dependency on that gate at all, so it is always the half that can be built
+while the words are still being argued about.
 
 The gate's script check is by filename, which would have flagged
 `js/registrations-admin.js` as public. That was fixed by making the exemption
@@ -2423,20 +2498,25 @@ share image, Formspree wiring, domain) is done. Open items:
   and has not been proofread, including the status strings in `js/activity.js`.
 - **`/about` is placeholder copy** (`[content needed]`), hence `noindex` and no
   sitemap entry.
-- **`/privacy` and `/terms` are live and `final`** in all three languages, and
-  no longer block the registration system. **Nothing links to them yet** — the
-  footer needs the links. ⚠ The **Russian text and the two Russian price labels
-  are still awaiting a native-speaker review**; `ogen-legal-review` is `pending`
-  and gates public registration until it is done. See the Legal pages section.
+- **`/privacy` and `/terms` are live, `final` and linked** from the footer in
+  all three languages, and no longer block the registration system. The gate is
+  **open**: English is the binding version and both its pages are
+  `ogen-legal-review: complete`, as are both Hebrew pages; Russian is a declared
+  `courtesy` translation and says so on the page. ⚠ The **Russian text and the
+  two Russian price labels are still awaiting a native-speaker review** — a
+  quality and trust item now rather than a blocker. See the Legal pages
+  section.
 - **Nothing in the nav links to `/about`.** It is still `[content needed]`
   placeholder copy carrying `noindex`, and a menu entry is exactly how a
   placeholder page gets found. `/activities` **is** linked now — see **The
   Activities group** — and so are the account chip and the hamburger's
   `/account` entry.
-- **Registration has no page.** The API is built; nothing on the public site
-  reaches it, and the `open` CTA still points at the contact section. Wiring is
-  Phase 6's, and `ogen-legal-review` has to be `complete` before a public
-  surface may ship at all.
+- **Registration is wired end to end.** The `open` CTA defaults to
+  `/account?register=<slug>` in the reader's own tree, and the family area is
+  the public surface behind it; an explicit `data-cta-url` still wins and still
+  has to pass `isLinkish()`. What is still not built is the **public
+  places-left count** on the static activity page and `memberVisibleRows()` —
+  both deliberate, both described above.
   **Phase 1 is done** — the activity side: `activityId`, `type`, the
   registration settings block, the session calendar and its table on the page,
   named groups and `perSessionPrice`. All of it ships to the live site.

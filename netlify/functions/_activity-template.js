@@ -426,11 +426,17 @@ ${JSON.stringify(credits, null, 2)}
         </script>`)
       : '';
 
-  // THREE placements. The two cards a reader scans first — who it is for, and
-  // when and where — sit above the article; price sits in the column beside the
-  // picture, directly above the registration button, so the column reads see
-  // the activity, see the cost, act. Teachers and sponsors close the page as a
-  // band under everything, where the full measure lets them lay out across.
+  // TWO placements. The two cards a reader scans first — who it is for, and
+  // when and where — sit above the article. The other two share the column
+  // beside the picture: price directly above the registration button, teachers
+  // and sponsors directly below it. The column reads see the activity, see the
+  // cost, act, and then who is behind it.
+  //
+  // Credits used to close the page as a full-width band, where the measure let
+  // their two groups lay out across instead of stacking. The session calendar
+  // then landed between the article and that band, and a table running to
+  // eleven rows put the teachers past the fold on every screen. A wider block
+  // nobody scrolls to is worth less than a narrower one they see.
   //
   // A group with no facts is already dropped by sidebarGroups, so an activity
   // that has filled in neither of the top two gets no row at all rather than an
@@ -438,7 +444,11 @@ ${JSON.stringify(credits, null, 2)}
   const topCards = [cards.participants, cards.schedule].filter(Boolean).join('\n');
   const factRow = topCards ? `    <div class="fact-row">\n${topCards}\n    </div>\n` : '';
   const asideCards = [cards.price].filter(Boolean).join('\n');
-  const creditsBand = creditsCard ? `    <div class="activity-credits">\n${creditsCard}\n    </div>\n` : '';
+  // Rendered AFTER the status CTA inside .activity-aside, so the reading order
+  // in the source is the reading order on the page in both directions and at
+  // every width. js/activity.js needs no change: it finds [data-credits] by
+  // attribute, never by position.
+  const creditsAside = creditsCard ? `\n      <div class="activity-credits">\n${creditsCard}\n      </div>` : '';
 
   // THE SESSION CALENDAR. The schedule card says "Wednesdays, 16:00" and goes on
   // saying it; what it cannot say is WHICH Wednesdays, and a family planning a
@@ -552,9 +562,9 @@ ${faqBlock}    </div>
 
     <div class="activity-aside">
 ${asideCards}
-      <div data-status-cta></div>
+      <div data-status-cta></div>${creditsAside}
     </div>
-${sessionsBand}${creditsBand}  </div>
+${sessionsBand}  </div>
 </article>
 
 <script src="/js/nav.js"></script>

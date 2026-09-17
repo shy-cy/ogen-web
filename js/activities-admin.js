@@ -319,8 +319,10 @@
     box.innerHTML = '';
     box.appendChild(fieldRow({
       label: 'Registration button link',
-      hint: 'The web address the button opens — a full https:// link, or a path on this site such as /#contact. ' +
-            'Not the button\'s wording: the status decides that. Leave empty and it points at the contact form.'
+      hint: 'Almost always leave this EMPTY. Empty sends people to the registration ' +
+            'form for this activity, in their own language — which is the built, working path. ' +
+            'Fill it in only to override that with somewhere else: a full https:// link, or a ' +
+            'path on this site such as /#contact. It is not the button\'s wording — the status decides that.'
     }, langObj(S.record.ctaUrl), 'f-ctaUrl'));
   }
 
@@ -1624,8 +1626,8 @@
     if (!bad) return true;
     message('err', 'The registration button link for <b>' + LANG_NAME[bad.lang] + '</b> is not a web address: <b>' +
       escText(bad.value) + '</b>.<br>It is where the button goes, not what it says — the status decides the wording. ' +
-      'Use a full <b>https://</b> link or a path on this site such as <b>/#contact</b>, ' +
-      'or leave it empty to send people to the contact form.');
+      'Use a full <b>https://</b> link or a path on this site such as <b>/#contact</b> — ' +
+      'or, better, leave it <b>empty</b> to send people to this activity\'s own registration form.');
     if (bad.field) {
       bad.field.scrollIntoView({ behavior: 'smooth', block: 'center' });
       bad.field.focus();

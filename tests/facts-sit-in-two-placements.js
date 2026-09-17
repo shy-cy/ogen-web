@@ -44,22 +44,26 @@ LANGS.forEach((lang) => {
   const aside = (html.match(/<div class="activity-aside">[\s\S]*?\n    <\/div>/) || [])[0] || '';
   const groupsIn = (chunk) => (chunk.match(/data-group="(\w+)"/g) || []).map((m) => m.slice(12, -1));
 
-  const band = (html.match(/<div class="activity-credits">[\s\S]*?\n    <\/div>/) || [])[0] || '';
-
   H.eq(groupsIn(row).join(','), 'participants,schedule',
     lang + ': the top row is who it is for, then when & where');
-  // Price is ALONE in the column, directly above the registration button, so
-  // the column reads picture, price, act.
-  H.eq(groupsIn(aside).join(','), 'price',
-    lang + ': the side column is the price card and nothing else');
-  H.eq(groupsIn(band).join(','), 'credits',
-    lang + ': staff & sponsors is its own band');
-  // The band is a SIBLING of the aside, not nested in it — nesting would put it
-  // back in a 320px column while still passing a naive "is it present" check.
-  H.ok(aside.indexOf('data-group="credits"') === -1,
-    lang + ': and is not inside the column it left');
-  H.ok(at(html, 'activity-aside') < at(html, 'activity-credits'),
-    lang + ': it comes after the column in the source, which is its mobile order too');
+  // Price, then the button, then who teaches it. Credits came BACK into this
+  // column from a full-width band at the foot of the page: the session
+  // calendar had landed between the article and that band, so a table of up to
+  // eleven rows put the teachers past the fold on every screen. A wider block
+  // nobody scrolls to is worth less than a narrower one they see.
+  H.eq(groupsIn(aside).join(','), 'price,credits',
+    lang + ': the side column is the price card, then staff & sponsors');
+  // ORDER, not just membership. "Under the registration button" is the whole
+  // point — above it, credits would push the one actionable thing on the page
+  // down, which is the problem being fixed rather than a different arrangement
+  // of it.
+  H.ok(aside.indexOf('data-status-cta') < aside.indexOf('data-group="credits"'),
+    lang + ': and the credits sit UNDER the registration button, not above it');
+  // Nested in the column, not a sibling of it. A sibling would render in the
+  // same place at desktop width and drop out of the column entirely when
+  // stacked, which no naive "is it present" check would notice.
+  H.ok(aside.indexOf('data-group="credits"') !== -1,
+    lang + ': nested inside the column rather than beside it');
 
   // Nothing lost in the split: every group the record has is somewhere.
   const all = (html.match(/data-group="(\w+)"/g) || []).length;
@@ -83,8 +87,12 @@ LANGS.forEach((lang) => {
 // down, where the two rules it depends on are.
 // Source order is picture, cards, article, price, sessions, credits — and on a
 // phone the grid does not reorder it, which is the whole point of the areas.
-H.ok(/"pic"\s*\n\s*"row"\s*\n\s*"main"\s*\n\s*"aside"\s*\n\s*"sessions"\s*\n\s*"credits"/.test(css),
-  'the stacked grid puts the picture first and the credits band last');
+H.ok(/"pic"\s*\n\s*"row"\s*\n\s*"main"\s*\n\s*"aside"\s*\n\s*"sessions"/.test(css),
+  'the stacked grid puts the picture first and the session table last');
+// And credits is NOT an area any more, in either grid. Leaving the name behind
+// would place an element that no longer exists, which is silent.
+H.eq((css.match(/"credits/g) || []).length, 0,
+  'credits is no longer a grid area — it is a child of the column now');
 // Scoped to the elements the layout places, not to a slice of the stylesheet:
 // an unrelated `.status-badge:empty{display:none}` sits between them and made a
 // broader check pass for the wrong reason.
@@ -117,19 +125,22 @@ H.ok(/"row\s+pic"/.test(areas), 'the picture shares row 1 with the fact cards');
 H.ok(/"row\s+aside"/.test(areas), 'and the fact row spans into row 2, where the aside starts');
 H.ok(/"main\s+aside"/.test(areas), 'the article sits below the cards, beside the aside');
 H.ok(/"sessions\s+sessions"/.test(areas), 'the session calendar is a full-width band of its own');
-H.ok(/"credits\s+credits"/.test(areas), 'and the credits band spans both columns');
+H.ok(!/"credits/.test(areas), 'and there is no credits area left to place');
 
 // 2. Without pinning the first two tracks, CSS grid shares a spanning item
 //    EQUALLY across auto tracks — which inflates row 2 and opens a 117px hole
 //    under the picture. Nothing overflows and nothing errors; there is just a
 //    gap. So the value is pinned here, on comment-stripped CSS, because the
 //    comment above the rule says the words this searches for.
-H.ok(/grid-template-rows:\s*min-content min-content auto auto auto/.test(body),
+H.ok(/grid-template-rows:\s*min-content min-content auto auto(?!\s+auto)/.test(body),
   'the first two grid rows are pinned to min-content');
-// The row list has to GROW with the areas. A fifth area with only four track
-// values reopens the same 117px hole, in the same silent way — so the count is
-// asserted rather than just the prefix, or the pin above would keep passing
-// while the thing it protects had quietly broken.
+// The row list has to track the areas IN BOTH DIRECTIONS. A fifth area with
+// only four track values reopens the same 117px hole — and so does a fifth
+// TRACK with only four areas, which is what leaving the credits row behind
+// would have done when the band moved into the column. The spanning fact row
+// inflates into whatever spare track it is given. So the count is asserted
+// rather than just the prefix, or the pin above would keep passing while the
+// thing it protects had quietly broken.
 const rowCount = ((body.match(/grid-template-rows:([^;]*);/) || ['', ''])[1].trim().split(/\s+/)).length;
 const areaCount = (areas.match(/"/g) || []).length / 2;
 H.eq(rowCount, areaCount, 'one grid-template-rows value per area row (' + areaCount + ' areas)');
