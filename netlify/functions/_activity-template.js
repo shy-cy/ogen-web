@@ -60,6 +60,38 @@ function groupIcon(key) {
 const SITE = 'https://www.ogen.cy';
 const LANGS = ['he', 'en', 'ru'];
 const STATUSES = ['draft', 'announcement', 'open', 'waitlist', 'closed', 'cancelled', 'completed'];
+
+// THE TWO HALVES OF THE LISTING, and the split the nav menu uses too.
+//
+// LIVE is "there is still something a family can do about this" — ask to join,
+// wait to be let in, or be told when it opens. PAST is everything else that has
+// a page at all.
+//
+// `closed` sits in PAST and is the one that reads slightly wrong there: a closed
+// activity is still running, it has simply stopped taking registrations. It is
+// there because of what the group is FOR — a parent looking for the activity
+// their child is already in — and that is exactly a closed one. The alternative
+// was a third group of one status, or a heading clumsy enough ("not open for
+// registration") to be worse copy than the small imprecision.
+//
+// `draft` is in neither, and cannot be: a draft has no files at all, so it never
+// reaches the index these are applied to.
+const LIVE_STATUSES = ['open', 'announcement', 'waitlist'];
+const PAST_STATUSES = ['closed', 'completed', 'cancelled'];
+
+// The order LIVE_STATUSES is written in is the order the menu lists them, and it
+// is deliberate: what is open comes before what is only announced. Nothing else
+// depends on it, so a test pins it rather than a comment asking nicely.
+(function assertEveryPublicStatusIsOnExactlyOneSide() {
+  const both = LIVE_STATUSES.concat(PAST_STATUSES);
+  const twice = both.filter((s, i) => both.indexOf(s) !== i);
+  const unknown = both.filter((s) => STATUSES.indexOf(s) === -1);
+  const missed = STATUSES.filter((s) => s !== 'draft' && both.indexOf(s) === -1);
+  if (twice.length || unknown.length || missed.length) {
+    throw new Error('LIVE_STATUSES/PAST_STATUSES are out of step with STATUSES: ' +
+      JSON.stringify({ twice, unknown, missed }));
+  }
+})();
 const MOTIFS = ['none', 'ring', 'scatter', 'hatch', 'leaf', 'wave', 'book'];
 const CORNERS = ['tl', 'tr', 'bl', 'br'];
 
@@ -81,7 +113,8 @@ const LABELS = {
     // one row labelled "מחיר" under a heading saying the same thing.
     gParticipants: 'למי זה מתאים', gSchedule: 'מתי ואיפה', gPrice: 'מחיר', gCredits: 'צוות וחסות',
     indexTitle: 'הפעילויות שלנו', indexLead: 'מה אפשר למצוא במרכז עוגן',
-    indexEmpty: 'בקרוב נפרסם כאן את הפעילויות.', more: 'לפרטים'
+    indexEmpty: 'בקרוב נפרסם כאן את הפעילויות.', more: 'לפרטים',
+    indexCurrent: 'פעילויות נוכחיות', indexPast: 'פעילויות קודמות'
   },
   en: {
     dir: 'ltr', sep: '&#8594;', home: 'Home', activities: 'Activities',
@@ -93,7 +126,8 @@ const LABELS = {
     groupSize: 'Group size', price: 'Price',
     gParticipants: 'Who it is for', gSchedule: 'When &amp; where', gPrice: 'Price', gCredits: 'Staff &amp; sponsors',
     indexTitle: 'Our activities', indexLead: 'What you can find at Ogen Center',
-    indexEmpty: 'Activities will be published here soon.', more: 'Details'
+    indexEmpty: 'Activities will be published here soon.', more: 'Details',
+    indexCurrent: 'Current activities', indexPast: 'Past activities'
   },
   ru: {
     dir: 'ltr', sep: '&#8594;', home: 'Главная', activities: 'Занятия',
@@ -105,7 +139,8 @@ const LABELS = {
     groupSize: 'Размер группы', price: 'Цена',
     gParticipants: 'Для кого', gSchedule: 'Когда и где', gPrice: 'Цена', gCredits: 'Педагоги и партнёры',
     indexTitle: 'Наши занятия', indexLead: 'Что можно найти в центре Оген',
-    indexEmpty: 'Занятия скоро появятся здесь.', more: 'Подробнее'
+    indexEmpty: 'Занятия скоро появятся здесь.', more: 'Подробнее',
+    indexCurrent: 'Текущие занятия', indexPast: 'Прошедшие занятия'
   }
 };
 
@@ -517,31 +552,53 @@ function renderActivitiesIndexPage(activities, lang) {
   const L = LABELS[lang];
   const list = (activities || []).filter((a) => langsPresent(a).indexOf(lang) !== -1);
 
-  const cards = list.length
-    ? `  <div class="activity-cards">
-${list
-        .map((a) => {
-          const title = pick(a.title, lang);
-          // Same reason as the meta description: the body is markup now, and a
-          // listing card blurb is text.
-          const blurb = pick(a.summary, lang) || plainText(pick(a.about, lang)).slice(0, 140);
-          // The activity's square picture when it has one, and the coloured band
-          // when it does not — so a listing with a mix of both still reads as a
-          // grid. Decorative either way: the card's own heading names the
-          // activity, so the alt is empty rather than a repeat of it.
-          const thumb = a.cardImage
-            ? `      <img class="activity-card-thumb" src="${esc(a.cardImage)}" alt="" width="800" height="800" loading="lazy">`
-            : `      <span class="activity-card-thumb" aria-hidden="true"></span>`;
-          return `    <a class="activity-card" href="${pathFor(a.slug, lang)}">
+  // One card. `level` is the heading tag, and it is a parameter because the page
+  // has one shape or two: with nothing past there are no group headings and a
+  // card title is the page's h2, exactly as before this existed. With a past
+  // group, the two group headings become the h2s and the card titles drop to h3
+  // — the levels follow the outline rather than being fixed to a tag.
+  const card = (a, level) => {
+    const title = pick(a.title, lang);
+    // Same reason as the meta description: the body is markup now, and a
+    // listing card blurb is text.
+    const blurb = pick(a.summary, lang) || plainText(pick(a.about, lang)).slice(0, 140);
+    // The activity's square picture when it has one, and the coloured band
+    // when it does not — so a listing with a mix of both still reads as a
+    // grid. Decorative either way: the card's own heading names the
+    // activity, so the alt is empty rather than a repeat of it.
+    const thumb = a.cardImage
+      ? `      <img class="activity-card-thumb" src="${esc(a.cardImage)}" alt="" width="800" height="800" loading="lazy">`
+      : `      <span class="activity-card-thumb" aria-hidden="true"></span>`;
+    return `    <a class="activity-card" href="${pathFor(a.slug, lang)}">
 ${thumb}
-      <h2>${esc(title)}</h2>
+      <${level}>${esc(title)}</${level}>
       <p>${esc(blurb)}</p>
       <span class="activity-card-more">${L.more}</span>
     </a>`;
-        })
-        .join('\n')}
-  </div>`
-    : `  <p class="activity-empty">${L.indexEmpty}</p>`;
+  };
+  const grid = (rows, level) => `  <div class="activity-cards">
+${rows.map((a) => card(a, level)).join('\n')}
+  </div>`;
+
+  // TWO GROUPS, AND THE SECOND ONLY WHEN IT HAS SOMETHING IN IT. A parent
+  // looking for the activity their child was in needs somewhere to look that is
+  // not the same grid as what is on offer now; an empty "Past activities"
+  // heading is worse than no heading, and until the first activity finishes
+  // this page renders exactly as it always has.
+  const live = list.filter((a) => LIVE_STATUSES.indexOf(a.status) !== -1);
+  const past = list.filter((a) => PAST_STATUSES.indexOf(a.status) !== -1);
+
+  const cards = !list.length
+    ? `  <p class="activity-empty">${L.indexEmpty}</p>`
+    : !past.length
+      ? grid(list, 'h2')
+      : [
+          // `id="past"` is the menu's target. It is on the heading rather than on
+          // a wrapper so the browser lands on the words, and it does not move if
+          // the grid under it is restyled.
+          live.length ? `  <h2 class="activity-group">${L.indexCurrent}</h2>\n${grid(live, 'h3')}` : '',
+          `  <h2 class="activity-group" id="past">${L.indexPast}</h2>\n${grid(past, 'h3')}`
+        ].filter(Boolean).join('\n');
 
   return `${head({
     lang,
@@ -578,7 +635,7 @@ ${cards}
 }
 
 module.exports = {
-  SITE, LANGS, STATUSES, MOTIFS, CORNERS, LABELS, FALLBACK,
+  SITE, LANGS, STATUSES, LIVE_STATUSES, PAST_STATUSES, MOTIFS, CORNERS, LABELS, FALLBACK,
   esc, pick, has, langsPresent, isLinkish,
   pathFor, filePathFor, indexPathFor, indexFilePathFor, homeFor,
   renderActivityPage, renderActivitiesIndexPage

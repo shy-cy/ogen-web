@@ -177,6 +177,58 @@ html[lang="he"] .nav-signout svg{ transform:scaleX(-1); }
 .mobile-menu.open{ display:flex; }
 .mobile-menu a{ font-weight:700; color: var(--navy); font-size:16px; }
 
+/* ---- the Activities group in the menu ----------------------------------
+   An accordion, built at runtime by js/nav.js from the activities index.
+
+   NOT ONE DIRECTIONAL PROPERTY. The sister project does this with a pair of
+   rules per element — [lang="he"] {text-align:right; padding-right:44px} and an
+   LTR twin — which is two declarations doing what `start` does in one, and is
+   the shape rule 2 forbids. The rail, the indent and the chevron all mirror on
+   their own here. */
+.mobile-menu .menu-group{ display:flex; flex-direction:column; }
+.mobile-menu .menu-group-toggle{
+  display:flex; align-items:center; gap:8px; width:100%;
+  font:inherit; font-weight:700; font-size:16px; color:var(--navy);
+  background:none; border:0; padding:0; cursor:pointer; text-align:start;
+}
+.mobile-menu .menu-chev{
+  margin-inline-start:auto; width:7px; height:7px;
+  border-inline-end:2px solid var(--camel); border-block-end:2px solid var(--camel);
+  transform:rotate(45deg); transform-origin:60% 60%; transition:transform .18s ease;
+}
+.mobile-menu .menu-group.open .menu-chev{ transform:rotate(-135deg); }
+/* Collapsed by display:none rather than by a max-height clamp. A clamp is what
+   silently swallows rows past its height on the sister project — they stay in
+   the DOM, focusable and announced, and invisible. Nothing here can be hidden
+   and reachable at the same time. */
+.mobile-menu .menu-group:not(.open) .menu-sub{ display:none; }
+.mobile-menu .menu-sub{
+  display:flex; flex-direction:column; gap:10px;
+  margin-block:12px 2px; padding-inline-start:16px;
+  border-inline-start:2px solid var(--stone);
+}
+.mobile-menu .menu-sub a{ font-weight:500; font-size:15px; }
+.mobile-menu .menu-note{
+  display:block; font-size:12.5px; font-weight:500; color:var(--camel); margin-block-start:1px;
+}
+.mobile-menu .menu-sub-all{
+  font-weight:700; font-size:14.5px; color:var(--terracotta);
+  border-block-start:1px solid var(--stone); padding-block-start:10px;
+}
+.mobile-menu .menu-sub-all ~ .menu-sub-all{ border-block-start:0; padding-block-start:0; }
+
+/* The two groups on the activities listing. Absent until an activity is
+   closed, completed or cancelled — until then the page renders exactly as it
+   did before grouping existed, with no heading above the one grid. */
+.activity-group{
+  font-size:15px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--camel); margin:44px 0 18px;
+}
+.activity-index .activity-group:first-of-type{ margin-block-start:0; }
+/* #past is a jump target from the menu, and the nav is 96px of fixed overlay —
+   without this the heading lands underneath it. */
+.activity-group[id]{ scroll-margin-block-start:112px; }
+
 /* ============================== HERO ============================== */
 .hero{
   margin-top:96px; position:relative;

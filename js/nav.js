@@ -27,13 +27,28 @@
   const base = lang === 'he' ? '' : '/' + lang;
   const logo = `/images/logos/logo-${lang}.svg`;
 
+  // ACTIVITIES REPLACED "What We Offer". The homepage's four themed cards and
+  // the activities listing were two entries pointing at the same thing — one
+  // the promise, one the actual list — and the promise is what the reader
+  // already scrolled past. The #offer section is untouched and still on the
+  // homepage; it simply no longer has a menu entry of its own.
+  //
+  // `past` MUST match LABELS[lang].indexPast in _activity-template.js: it is the
+  // menu entry and the heading it jumps to, and a link whose words change on
+  // arrival reads as the wrong link. A test asserts the two agree.
   const L = {
-    he: { about:'אודות', offer:'מה תמצאו בעוגן', contact:'צור קשר', menu:'תפריט', alt:'עוגן',
-          account:'אזור המשפחה', signIn:'כניסה', signOut:'יציאה' },
-    en: { about:'About', offer:'What We Offer', contact:'Contact', menu:'Menu', alt:'Ogen',
-          account:'My family', signIn:'Sign in', signOut:'Sign out' },
-    ru: { about:'О нас', offer:'Что мы предлагаем', contact:'Контакты', menu:'Меню', alt:'Оген',
-          account:'Моя семья', signIn:'Войти', signOut:'Выйти' }
+    he: { about:'אודות', activities:'פעילויות', contact:'צור קשר', menu:'תפריט', alt:'עוגן',
+          account:'אזור המשפחה', signIn:'כניסה', signOut:'יציאה',
+          seeAll:'לכל הפעילויות', past:'פעילויות קודמות',
+          soon:'בקרוב', waitlist:'רשימת המתנה' },
+    en: { about:'About', activities:'Activities', contact:'Contact', menu:'Menu', alt:'Ogen',
+          account:'My family', signIn:'Sign in', signOut:'Sign out',
+          seeAll:'See all activities', past:'Past activities',
+          soon:'Coming soon', waitlist:'Waiting list' },
+    ru: { about:'О нас', activities:'Занятия', contact:'Контакты', menu:'Меню', alt:'Оген',
+          account:'Моя семья', signIn:'Войти', signOut:'Выйти',
+          seeAll:'Все занятия', past:'Прошедшие занятия',
+          soon:'Скоро', waitlist:'Лист ожидания' }
   }[lang];
 
   const navHTML = `
@@ -55,7 +70,7 @@
 </nav>
 <div class="mobile-menu" id="mobile-menu">
   <a href="${home}#about" onclick="toggleMenu()">${L.about}</a>
-  <a href="${home}#offer" onclick="toggleMenu()">${L.offer}</a>
+  <div id="activities-slot"><a href="${base}/activities" onclick="toggleMenu()">${L.activities}</a></div>
   <a href="${home}#contact" onclick="toggleMenu()">${L.contact}</a>
   <a href="${base}/account" onclick="toggleMenu()" class="menu-account">${L.account}</a>
 </div>`;
@@ -184,7 +199,146 @@
   window.toggleMenu = function() {
     document.getElementById('mobile-menu').classList.toggle('open');
     document.getElementById('hamburger').classList.toggle('open');
+    loadActivities();
   };
+
+  // ---- the Activities group ------------------------------------------------
+  //
+  // The menu ships with a plain link to /activities, and this REPLACES it with
+  // an accordion naming what is on offer. Everything about it is decided at
+  // runtime from the generated index, so publishing an activity puts it in the
+  // menu of every page on the site with nobody editing this file.
+  //
+  // IT FAILS OPEN. If the fetch fails, the index is unreadable, or nothing is
+  // live, the plain link is simply left alone — and the worst outcome is the
+  // menu Ogen would have had anyway. There is no state in which this removes a
+  // way to reach the activities.
+  //
+  // ⚠ FETCHED ON FIRST OPEN OF THE MENU, NOT ON LOAD. This script runs on every
+  // page on the site and most visits never open the hamburger, so fetching at
+  // load buys a request on every page view for a panel almost nobody sees. The
+  // sister project pays exactly that; one flag avoids it.
+  //
+  // The two status lists are the SAME SPLIT the listing page groups by, and are
+  // written here in the order the menu lists them: what is open before what is
+  // only announced. _activity-template.js owns the canonical copy and a test
+  // asserts these two agree with it.
+  var LIVE = ['open', 'announcement', 'waitlist'];
+  var PAST = ['closed', 'completed', 'cancelled'];
+  var MAX_ROWS = 6;
+  var FALLBACK = { he: ['he'], en: ['en', 'he'], ru: ['ru', 'en', 'he'] };
+  var loaded = false;
+
+  function pickLang(bag) {
+    if (!bag) return '';
+    var chain = FALLBACK[lang];
+    for (var i = 0; i < chain.length; i++) if (bag[chain[i]]) return bag[chain[i]];
+    return '';
+  }
+
+  function loadActivities() {
+    if (loaded || !window.fetch) return;
+    loaded = true;
+    var slot = document.getElementById('activities-slot');
+    if (!slot) return;
+    // no-cache, so an activity published a minute ago is in the menu now. The
+    // file is small and this is one request per visit at most.
+    fetch('/activities/activities-index.json', { cache: 'no-cache' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (list) {
+        if (!Array.isArray(list)) return;
+        // AN ACTIVITY IS ONLY LINKED IN A LANGUAGE IT HAS A PAGE IN. `langs` is
+        // what the listing page filters on too; without it the Russian menu
+        // would link to a Russian page that was never generated.
+        var mine = list.filter(function (a) {
+          return a && a.langs && a.langs.indexOf(lang) !== -1;
+        });
+        var live = mine.filter(function (a) { return LIVE.indexOf(a.status) !== -1; });
+        if (!live.length) return;              // nothing to open an accordion onto
+        live.sort(function (a, b) {
+          var d = LIVE.indexOf(a.status) - LIVE.indexOf(b.status);
+          return d || pickLang(a.title).localeCompare(pickLang(b.title), lang);
+        });
+        var hasPast = mine.some(function (a) { return PAST.indexOf(a.status) !== -1; });
+        build(slot, live, hasPast);
+      })
+      .catch(function () { /* the plain link is already there */ });
+  }
+
+  function build(slot, live, hasPast) {
+    var group = document.createElement('div');
+    group.className = 'menu-group';
+
+    var toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'menu-group-toggle';
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.setAttribute('aria-controls', 'activities-sub');
+    toggle.appendChild(document.createTextNode(L.activities));
+    var chev = document.createElement('span');
+    chev.className = 'menu-chev';
+    toggle.appendChild(chev);
+
+    var sub = document.createElement('div');
+    sub.className = 'menu-sub';
+    sub.id = 'activities-sub';
+
+    // CAPPED, AND THE CAP IS HONEST. The sister project lists every event and
+    // bounds the panel with max-height + overflow:hidden, so past about eight
+    // rows the rest are invisible while still being in the DOM — focusable by
+    // keyboard, read by a screen reader, shown to nobody, with nothing saying
+    // the list was cut. "See all activities" is always there, so stopping at six
+    // costs a reader one tap and never hides a row it claims to be showing.
+    live.slice(0, MAX_ROWS).forEach(function (a) {
+      var link = document.createElement('a');
+      link.href = base + '/activities/' + a.slug;
+      link.setAttribute('onclick', 'toggleMenu()');
+      link.appendChild(document.createTextNode(pickLang(a.title)));
+      // A second line only when the status is NOT open, because open is what a
+      // reader already assumes of something in this list. The summary is too
+      // long for a menu row and is on the card they are one tap from.
+      var note = a.status === 'announcement' ? L.soon : a.status === 'waitlist' ? L.waitlist : null;
+      if (note) {
+        var small = document.createElement('span');
+        small.className = 'menu-note';
+        small.textContent = note;
+        link.appendChild(small);
+      }
+      sub.appendChild(link);
+    });
+
+    var all = document.createElement('a');
+    all.className = 'menu-sub-all';
+    all.href = base + '/activities';
+    all.setAttribute('onclick', 'toggleMenu()');
+    all.textContent = L.seeAll;
+    sub.appendChild(all);
+
+    // PAST ONLY WHEN THERE IS A PAST. The listing page renders no "Past
+    // activities" heading until something is in it, so linking to #past before
+    // then would jump to an anchor that is not on the page.
+    if (hasPast) {
+      var past = document.createElement('a');
+      past.className = 'menu-sub-all';
+      past.href = base + '/activities#past';
+      past.setAttribute('onclick', 'toggleMenu()');
+      past.textContent = L.past;
+      sub.appendChild(past);
+    }
+
+    toggle.addEventListener('click', function (e) {
+      // Stop the document click handler from reading this as a click outside
+      // and closing the whole menu underneath the person opening a group.
+      e.preventDefault();
+      e.stopPropagation();
+      var open = group.classList.toggle('open');
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+
+    group.appendChild(toggle);
+    group.appendChild(sub);
+    slot.replaceChild(group, slot.firstChild);
+  }
 
   document.addEventListener('click', function(e) {
     const menu = document.getElementById('mobile-menu');

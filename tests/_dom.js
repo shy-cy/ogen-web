@@ -32,8 +32,33 @@ function makeDom(opts) {
       },
       get className() { return n.attributes['class'] || ''; },
       set className(v) { n.attributes['class'] = v; },
+      // Real code uses this — js/nav.js toggles the menu and the accordion with
+      // it — so it is the genuine article rather than a stub that always
+      // reports true.
+      classList: {
+        _set() { return (n.attributes['class'] || '').split(/\s+/).filter(Boolean); },
+        _save(list) { n.attributes['class'] = list.join(' '); },
+        contains(c) { return this._set().indexOf(c) !== -1; },
+        add(c) { const l = this._set(); if (l.indexOf(c) === -1) l.push(c); this._save(l); },
+        remove(c) { this._save(this._set().filter((x) => x !== c)); },
+        toggle(c) {
+          if (this.contains(c)) { this.remove(c); return false; }
+          this.add(c); return true;
+        }
+      },
       get value() { return n.attributes.value || ''; },
       set value(v) { n.attributes.value = v; },
+      // REFLECTED PROPERTIES. The real DOM mirrors these between the property
+      // and the attribute, and real code uses whichever is shorter — js/nav.js
+      // writes `link.href = …` and this shim used to file that as a plain JS
+      // property, so getAttribute('href') came back null and a test asserting
+      // where a link points passed against a link pointing nowhere.
+      get href() { return n.attributes.href || ''; },
+      set href(v) { n.attributes.href = String(v); },
+      get id() { return n.attributes.id || ''; },
+      set id(v) { n.attributes.id = String(v); },
+      get type() { return n.attributes.type || ''; },
+      set type(v) { n.attributes.type = String(v); },
       get textContent() {
         return n._text + n.childNodes.map((c) => c.textContent).join('');
       },
@@ -79,12 +104,12 @@ function makeDom(opts) {
       click() {
         const fns = n._handlers.click || [];
         if (!fns.length) throw new Error('clicked a ' + n.tagName + ' with no click handler');
-        fns.forEach((f) => f({ preventDefault() {} }));
+        fns.forEach((f) => f({ preventDefault() {}, stopPropagation() {}, currentTarget: n, target: n }));
       },
       submit() {
         const fns = n._handlers.submit || [];
         if (!fns.length) throw new Error('submitted a form with no submit handler');
-        fns.forEach((f) => f({ preventDefault() {} }));
+        fns.forEach((f) => f({ preventDefault() {}, stopPropagation() {}, currentTarget: n, target: n }));
       }
     };
     return n;
@@ -108,9 +133,22 @@ function makeDom(opts) {
     fetch: opts.fetch,
     document: null
   };
+  // A text node: no tagName, so `children` filters it out and `textContent`
+  // concatenates it like the real thing. js/nav.js builds labels this way.
+  function text(value) {
+    const t = {
+      tagName: null, childNodes: [], parentNode: null, attributes: {},
+      get textContent() { return t._text; },
+      set textContent(v) { t._text = String(v); },
+      _text: String(value)
+    };
+    return t;
+  }
+
   const document = {
     documentElement: { lang: opts.lang || 'he' },
     createElement: node,
+    createTextNode: text,
     getElementById: (id) => (id === 'account-mount' ? root : null)
   };
   window.document = document;
@@ -123,7 +161,7 @@ function textOf(n) { return n.textContent; }
 function all(n, pred) {
   const out = [];
   (function walk(x) {
-    x.childNodes.forEach((c) => { if (pred(c)) out.push(c); walk(c); });
+    (x.childNodes || []).forEach((c) => { if (pred(c)) out.push(c); walk(c); });
   })(n);
   return out;
 }

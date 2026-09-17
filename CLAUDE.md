@@ -81,7 +81,8 @@ form are injected at runtime into `<div id="page">`:
   `/en/confirmation` ↔ …), preserving `location.search` **and**
   `location.hash`. `.nav-right` is forced `direction:ltr` so the lang buttons
   and hamburger stay pinned to the physical right in a fixed `[עב][EN][RU]`
-  order in all three languages. See **The account chip** below.
+  order in all three languages. See **The account chip** below, and **The
+  Activities group** for the one menu entry that is built rather than written.
 - **`js/footer.js`** — tagline logo → divider → partner logo row → copyright.
 - **`js/contact-form.js`** — builds the form, lazy-loads `intl-tel-input` from
   CDN (Cyprus default country), and AJAX-POSTs to Formspree. Language comes from
@@ -1844,6 +1845,106 @@ the letter follows a change of name rather than showing what somebody first
 registered under. It is the only thing about a person kept in browser storage,
 and **nothing authorises on it**.
 
+## The Activities group
+
+The one menu entry that is **built rather than written**. It replaced
+**"What We Offer"**, which pointed at the homepage's four themed cards — the
+promise and the actual list were two entries for the same thing, and the promise
+is what the reader has just scrolled past. The `#offer` section itself is
+untouched; it simply no longer has a menu entry.
+
+It is an **accordion inside the hamburger**, not a hover dropdown, because
+neither this site nor the sister project has desktop nav links at all: both navs
+are logo + language buttons + account chip + hamburger, at every width, and
+everything else lives in the panel.
+
+The menu ships with a plain `/activities` link inside `<div
+id="activities-slot">`. `loadActivities()` reads
+`activities/activities-index.json` and **replaces** that link with a group
+naming what is on offer — so publishing an activity puts it in the menu of every
+page with nobody editing `js/nav.js`.
+
+**It fails open.** No `fetch`, a 404, unparseable JSON, nothing live: the plain
+link is left alone, and the worst outcome is the menu the site would have had
+anyway. There is no state in which this *removes* a way to reach the activities.
+A test exercises all five failure paths.
+
+⚠ **The index is read on first open of the menu, not on page load.** This script
+runs on every page, and most visits never open the hamburger — fetching at load
+buys a request per page view for a panel almost nobody sees. The sister project
+pays exactly that. One flag avoids it, and a test pins that opening the menu
+twice asks once.
+
+**Only activities with a page in this language are listed.** `langs` is checked
+the way the listing page checks it; without that, the Russian menu links to a
+Russian page that was never generated.
+
+### The status split, and where it lives
+
+`LIVE_STATUSES` / `PAST_STATUSES` in `_activity-template.js` are the canonical
+pair, and the module throws at require time if they do not between them cover
+every status but `draft` — which is in neither and cannot be, since a draft has
+no files at all.
+
+| | |
+|---|---|
+| **Live** | `open`, `announcement`, `waitlist` — *in that order*, which is the menu order |
+| **Past** | `closed`, `completed`, `cancelled` |
+
+**`closed` sits in Past, and reads slightly wrong there**: a closed activity is
+still running, it has simply stopped taking registrations. It is there because of
+what the group is *for* — a parent looking for the activity their child is
+already in — and that is exactly a closed one. The alternatives were a third
+group holding one status, or a heading clumsy enough ("not open for
+registration") to be worse copy than the small imprecision.
+
+**The split exists twice**: the server groups the listing page by it, the browser
+filters the menu by it, and a browser cannot `require` a Netlify function. There
+is no way to share the array, only a test comparing the two — including the
+order, since that is what puts `open` above `announcement`. Drift means the menu
+offers a link to a section the page does not render.
+
+The same rule applies to the words: `L.past` in `js/nav.js` must be
+character-identical to `LABELS[lang].indexPast`, or a link's label changes on
+arrival, which reads as the wrong link.
+
+### The listing page grew a second group
+
+`/activities` was one flat grid of every public status, sorted by slug. It is now
+**Current activities** and **Past activities**, and the second only appears when
+something is in it — until the first activity finishes, the page renders exactly
+as it always has, byte for byte. That was verified by regenerating against the
+live record rather than assumed.
+
+`id="past"` is on the heading, and is what the menu's *Past activities* entry
+jumps to. It carries `scroll-margin-block-start:112px`, or the 96px fixed nav
+lands on top of it. The menu entry is **absent until there is a past group**,
+since jumping to an anchor the page does not render does nothing and looks
+broken.
+
+Card titles are `<h2>` when there is one group and `<h3>` under the two headings
+when there are two — the levels follow the outline rather than being pinned to a
+tag. Still exactly one `<h1>`.
+
+### ⚠ Two mechanics from the sister project deliberately NOT copied
+
+- **Its submenu is bounded by `max-height:480px; overflow:hidden` with no cap on
+  rows.** Past roughly eight events the rest are **invisible but still in the
+  DOM** — focusable by keyboard, announced by a screen reader, shown to nobody,
+  with nothing on screen saying the list was cut. Ogen caps at **six rows** and
+  collapses with `display:none`, so nothing can be hidden and reachable at the
+  same time; "See all activities" is always there, so the cap costs one tap and
+  never hides a row it claims to be showing.
+- **Its RTL is a pair of physical rules per element** —
+  `[lang="he"] {text-align:right; padding-right:44px}` and an LTR twin. That is
+  two declarations doing what `start` does in one, and it is the shape rule 2
+  forbids. Ogen's block has no per-language override at all, and a test asserts
+  there is not one physical inset in it.
+
+Also fixed in passing: the sister's toggle is a `<button>` with no
+`aria-expanded`, so a screen reader is never told the group opened. Ogen's sets
+it, and `aria-controls`.
+
 ## The family area (Phase 6)
 
 The first thing on this site a family signs into. Trilingual, RTL, and the whole
@@ -2237,8 +2338,11 @@ share image, Formspree wiring, domain) is done. Open items:
   footer needs the links. ⚠ The **Russian text and the two Russian price labels
   are still awaiting a native-speaker review**; `ogen-legal-review` is `pending`
   and gates public registration until it is done. See the Legal pages section.
-- **Nothing in the nav links to `/about` or `/activities`** yet. The nav does
-  carry the account chip and the hamburger's `/account` entry.
+- **Nothing in the nav links to `/about`.** It is still `[content needed]`
+  placeholder copy carrying `noindex`, and a menu entry is exactly how a
+  placeholder page gets found. `/activities` **is** linked now — see **The
+  Activities group** — and so are the account chip and the hamburger's
+  `/account` entry.
 - **Registration has no page.** The API is built; nothing on the public site
   reaches it, and the `open` CTA still points at the contact section. Wiring is
   Phase 6's, and `ogen-legal-review` has to be `complete` before a public
