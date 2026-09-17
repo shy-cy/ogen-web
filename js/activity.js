@@ -115,23 +115,28 @@
     } else if (cfg.disabled) {
       ctaSlot.innerHTML = `<button type="button" class="sidebar-cta is-${status}" disabled>${esc(pick(cfg.cta))}</button>`;
     } else {
-      // WHERE THE BUTTON GOES, now that there is somewhere for it to go.
+      // WHERE THE BUTTON GOES, and there is only one answer.
       //
       // It used to fall back to '#register', the contact section, because
-      // registration did not exist and a dead end was worse than a form. It now
-      // defaults to the family area with this activity's slug, in the reader's
-      // own language tree — so a Russian-speaking parent lands on the Russian
-      // page rather than in the Hebrew default with a language switch to find.
+      // registration did not exist and a dead end was worse than a form. It is
+      // built from the slug now, in the reader's own language tree — so a
+      // Russian-speaking parent lands on the Russian page rather than in the
+      // Hebrew default with a language switch to find.
       //
-      // An explicit data-cta-url still wins, and still has to pass isLinkish()
-      // on the server before it is published at all.
+      // THE OVERRIDE IS GONE. `data-cta-url` was an escape hatch from before
+      // registration existed, and every value it ever carried on this site was
+      // a mistake: once the button's own LABEL ("Register Now", which shipped
+      // as <a href="Register Now"> and 404'd in three languages), and once the
+      // site homepage, which sent parents away from the form they had come to
+      // find. Both passed validation, because an allowlist can tell a link from
+      // prose but cannot tell a right URL from a wrong one. There is nothing to
+      // get wrong now.
       const slug = (location.pathname.replace(/\/$/, '').split('/').pop() || '')
         .replace(/\.html$/, '');
       const base = lang === 'he' ? '' : '/' + lang;
-      const fallback = slug
+      const href = slug
         ? base + '/account?register=' + encodeURIComponent(slug)
         : base + '/account';
-      const href = root.dataset.ctaUrl || fallback;
       const note = cfg.note ? `<p class="sidebar-note">${esc(pick(cfg.note))}</p>` : '';
       ctaSlot.innerHTML =
         `<a class="sidebar-cta is-${status}" href="${esc(href)}">${esc(pick(cfg.cta))}</a>${note}`;

@@ -348,6 +348,24 @@ function migrate(record, options) {
   // save rather than keeping a dead key forever; the words are in git history.
   delete out.whatToBring;
 
+  // The registration button link goes too, and it is the clearest case in this
+  // list. It existed because registration did not: the button needed somewhere
+  // to point, so the field was an escape hatch, and Phase 6 built the real
+  // target while leaving the hatch open. Every value it ever carried on this
+  // site was a mistake — the button's own LABEL, which shipped as
+  // <a href="Register Now"> and 404'd in three languages, and then the site
+  // homepage, which sent parents away from the form they had come to find.
+  //
+  // Both passed validation, and that is the point rather than an aside: an
+  // allowlist can tell a link from prose, and it CANNOT tell a right URL from a
+  // wrong one. No amount of validating the field would have caught either. The
+  // link is derived from the slug now, so there is nothing left to get wrong.
+  //
+  // If an activity ever genuinely registers somewhere else, the honest shape is
+  // a deliberate setting saying so — not a free-text box on every activity that
+  // is wrong by default.
+  delete out.ctaUrl;
+
   // The hero image is gone too. Activities are described by their words and
   // their facts; the one picture on the page was a decorative band that every
   // activity would have needed sourcing for. `heroAlt` goes with it — there is

@@ -306,25 +306,6 @@
     ]);
   }
 
-  // The registration link, drawn under the sidebar facts because that is where
-  // the button it points at appears — last in that column, directly below them.
-  //
-  // It is one field for every status. The status decides what the button SAYS
-  // and whether it is pressable (see the STATUS table in js/activity.js); this
-  // decides where it goes. A `closed` activity keeps its link stored and simply
-  // does not offer it, so reopening does not mean typing the URL again.
-  function renderCtaField() {
-    var box = $('cta-field');
-    if (!box) return;
-    box.innerHTML = '';
-    box.appendChild(fieldRow({
-      label: 'Registration button link',
-      hint: 'Almost always leave this EMPTY. Empty sends people to the registration ' +
-            'form for this activity, in their own language — which is the built, working path. ' +
-            'Fill it in only to override that with somewhere else: a full https:// link, or a ' +
-            'path on this site such as /#contact. It is not the button\'s wording — the status decides that.'
-    }, langObj(S.record.ctaUrl), 'f-ctaUrl'));
-  }
 
   // ---------- the Registration panel -----------------------------------------
   //
@@ -626,7 +607,6 @@
       $('seo-fields').appendChild(fieldRow(d, langObj(rec[d.key]), 'f-' + d.key));
     });
     renderCardImage();
-    renderCtaField();
     renderSeoOptions();
     renderShareImage();
     renderFacts();
@@ -1516,7 +1496,6 @@
     rec.status = $('f-status').value;
     rec.motif = $('f-motif').value;
     rec.corner = $('f-corner').value;
-    rec.ctaUrl = readLangField('f-ctaUrl');
 
     // Every translatable scalar, in whichever panel it was drawn. Missing the
     // SEO group here would read the form back without it and silently blank a
@@ -1602,38 +1581,6 @@
     return false;
   }
 
-  // The registration button's target must be a link, not the button's wording.
-  // The same rule as isLinkish() in netlify/functions/_activity-template.js,
-  // which is the one that decides — this only says so before the round trip, so
-  // a typo is a red line under the field rather than a rejected publish. A test
-  // asserts the two patterns stay identical.
-  var LINKISH = /^(?:https?:\/\/\S+|\/\S*|#\S*|mailto:\S+|tel:\S+)$/i;
-
-  // message() writes HTML, and what is being quoted back is whatever the admin
-  // typed into the field.
-  function escText(v) {
-    return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
-
-  function requireCtaLink() {
-    var bad = null;
-    (S.schema.langs || ['he', 'en', 'ru']).forEach(function (lang) {
-      if (bad) return;
-      var field = $('f-ctaUrl-' + lang);
-      var v = ((field && field.value) || '').trim();
-      if (v && !LINKISH.test(v)) bad = { lang: lang, value: v, field: field };
-    });
-    if (!bad) return true;
-    message('err', 'The registration button link for <b>' + LANG_NAME[bad.lang] + '</b> is not a web address: <b>' +
-      escText(bad.value) + '</b>.<br>It is where the button goes, not what it says — the status decides the wording. ' +
-      'Use a full <b>https://</b> link or a path on this site such as <b>/#contact</b> — ' +
-      'or, better, leave it <b>empty</b> to send people to this activity\'s own registration form.');
-    if (bad.field) {
-      bad.field.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      bad.field.focus();
-    }
-    return false;
-  }
 
   function showConflict(payload, retry) {
     var c = payload.conflict || {};
@@ -1734,7 +1681,6 @@
   function doPreview() {
     message('');
     if (!requireSlug()) return;
-    if (!requireCtaLink()) return;
     var activity = readForm();
     send({ action: 'preview', activity: activity }).then(function (res) {
       if (!res.ok) return message('err', failure(res, 'Preview'));
@@ -1789,7 +1735,6 @@
   function doSaveDraft(overwrite) {
     message('');
     if (!requireSlug()) return;
-    if (!requireCtaLink()) return;
     var activity = readForm();
     activity.status = 'draft';
     send({ action: 'saveDraft', activity: activity, baseUpdatedAt: S.baseUpdatedAt, overwrite: !!overwrite })
@@ -1808,7 +1753,6 @@
   function doPublish(overwrite) {
     message('');
     if (!requireSlug()) return;
-    if (!requireCtaLink()) return;
     var activity = readForm();
     if (activity.status === 'draft') {
       return message('err', 'Set a status other than Draft to publish. A draft is never committed.');

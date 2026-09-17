@@ -565,8 +565,8 @@ Driven by three markup contracts:
    sidebar CTA from that one value, so they cannot disagree. The seven
    statuses are `draft`, `announcement`, `open`, `waitlist`, `closed`,
    `cancelled`, `completed`; badge/CTA/banner copy for all three languages
-   lives in the `STATUS` table in that file, and `data-cta-url` is the button
-   target.
+   lives in the `STATUS` table in that file. The button's **target is derived**,
+   not stored — see below.
 
    An entry carries **either a `cta` or a `banner`**, and that is what decides
    whether the status offers anything to press. Four of the seven are banners:
@@ -583,16 +583,43 @@ Driven by three markup contracts:
    `cta` strings are deleted rather than kept unused; they return with the
    registration system, which is also what would give them a real target.
 
-   **`ctaUrl` is only published when it is plainly a link** — `isLinkish()` in
-   `_activity-template.js`, an allowlist of http(s), a site path, a fragment,
-   `mailto:` and `tel:`. Anything else is dropped and the button falls back to
-   `#register`, the contact section, because a dead end is worse than the
-   default. `validate()` also refuses it on save, naming the language, so a
-   wrong value is corrected rather than silently discarded — silence is how it
-   reached the live site. `js/activities-admin.js` repeats the same pattern
-   client-side for immediate feedback, and a test asserts the two stay
-   character-identical. Being an allowlist is also what keeps `javascript:` out
-   of an href.
+   ⚠ **`ctaUrl` is gone, and why is worth keeping.**
+
+   **The registration button's target is built from the slug** —
+   `/account?register=<slug>` in the reader's own language tree — and there is
+   no field to override it. There used to be: `ctaUrl`, per language, because
+   registration did not exist and the button needed somewhere to point. Phase 6
+   built the real target and the escape hatch stayed open behind it.
+
+   **Every value that field ever carried on this site was a mistake.** First
+   the button's own *label*, which shipped as `<a href="Register Now">` and
+   404'd in three languages while still *reading* "Register interest" — it
+   looked right and failed only on click. Then `https://www.ogen.cy/`, the site
+   homepage, which sent parents away from the form they had come to find and
+   sat live until somebody pressed the button.
+
+   It was guarded, and the guard was the interesting part. `isLinkish()` was an
+   allowlist — http(s), a site path, a fragment, `mailto:`, `tel:` — with
+   `validate()` refusing a bad value on save, naming the language, and
+   `js/activities-admin.js` mirroring the pattern client-side for immediate
+   feedback. It did its job both times and **both bugs shipped anyway**,
+   because an allowlist can tell a link from prose and **cannot tell a right
+   URL from a wrong one**. The second value was a well-formed `https://` URL on
+   this very domain. No amount of validating that field would have caught it.
+
+   The field's own hint made it worse: it promised that empty "points at the
+   contact form", true before Phase 6 and stale after, which makes empty sound
+   like the broken option. That is plausibly why it got filled in at all.
+
+   So the link is derived and the guard is structural instead: the href is a
+   fixed prefix plus an `encodeURIComponent`'d slug, so no input can send it
+   off this site or make it a `javascript:` URL — the property the allowlist
+   existed for, now unable to fail. `migrate()` drops the key, so a record
+   stops carrying it from its next save.
+
+   If an activity ever genuinely registers somewhere else, the honest shape is
+   a deliberate setting saying so, not a free-text box on every activity that
+   is wrong by default.
 
    There is deliberately **no "places left"**. It was a number an admin typed
    and then had to remember to decrement, so it was wrong the moment anyone
@@ -2314,8 +2341,8 @@ refused" are different things and a person should not be told the wrong one.
 registration did not exist and a dead end was worse than a form. It now defaults
 to `/account?register=<slug>` **in the reader's own tree**, so a Russian-speaking
 parent lands on the Russian page rather than in the Hebrew default with a
-language switch to find. An explicit `data-cta-url` still wins, and still has to
-pass `isLinkish()` before it is published.
+language switch to find. There is **no override** — see the `ctaUrl` note under
+the status contract for why the field was removed.
 
 ### Not built
 
@@ -2530,8 +2557,8 @@ share image, Formspree wiring, domain) is done. Open items:
   `/account` entry.
 - **Registration is wired end to end.** The `open` CTA defaults to
   `/account?register=<slug>` in the reader's own tree, and the family area is
-  the public surface behind it; an explicit `data-cta-url` still wins and still
-  has to pass `isLinkish()`. What is still not built is the **public
+  the public surface behind it, with no override field. What is still not built
+  is the **public
   places-left count** on the static activity page and `memberVisibleRows()` —
   both deliberate, both described above.
   **Phase 1 is done** — the activity side: `activityId`, `type`, the

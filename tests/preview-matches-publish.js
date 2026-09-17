@@ -30,7 +30,6 @@ const H = require('./_helpers');
     status: 'open',
     motif: 'hatch',
     corner: 'br',
-    ctaUrl: { he: '/#contact', en: '/en/#contact', ru: '' },
     title: { he: 'בדיקה', en: 'Preview check', ru: '' },
     about: { he: 'תיאור', en: 'Description with a & ampersand', ru: '' },
     facts: {

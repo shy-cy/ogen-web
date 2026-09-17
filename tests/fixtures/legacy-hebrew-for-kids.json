@@ -2,11 +2,6 @@
   "slug": "hebrew-for-kids",
   "status": "open",
   "spots": 4,
-  "ctaUrl": {
-    "he": "/#contact",
-    "en": "/en/#contact",
-    "ru": "/ru/#contact"
-  },
   "motif": "leaf",
   "corner": "tl",
   "heroImage": null,

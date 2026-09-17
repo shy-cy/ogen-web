@@ -32,7 +32,7 @@ const css = fs.readFileSync(path.join(R, 'shared.css'), 'utf8');
 // --- the smallest DOM that js/activity.js can run against ------------------
 // Credits and optional fields are deliberately absent — both have their own
 // suite — so only the badge and the CTA slot are wired up.
-function render(status, lang, ctaUrl, pathname) {
+function render(status, lang, pathname) {
   const el = () => ({
     className: '', textContent: '', innerHTML: '',
     querySelector: () => null, querySelectorAll: () => [], remove() {}
@@ -40,7 +40,7 @@ function render(status, lang, ctaUrl, pathname) {
   const badge = el();
   const cta = el();
   const root = Object.assign(el(), {
-    dataset: ctaUrl ? { status, ctaUrl } : { status },
+    dataset: { status },
     querySelector: (sel) => (sel === '[data-status-cta]' ? cta : null),
     querySelectorAll: () => []
   });
@@ -87,13 +87,14 @@ const shapeOf = (html) => {
 };
 
 console.log('[coming soon offers nothing to press]');
-const soon = render('announcement', 'he', '/#contact');
+const soon = render('announcement', 'he');
 H.eq(shapeOf(soon.cta), 'banner', 'announcement renders a banner, not a button');
 H.ok(soon.cta.indexOf('sidebar-cta') === -1, 'there is no button element at all');
 H.ok(soon.cta.indexOf('<a ') === -1, 'and nothing to click');
-// The strongest form of the bug: even WITH a link stored, no button appears.
-H.ok(soon.cta.indexOf('/#contact') === -1,
-  'a stored registration link does not resurrect the button');
+// The strongest form of the bug: the status alone decides, so there is no
+// stored value anywhere that could resurrect the button.
+H.ok(soon.cta.indexOf('href') === -1,
+  'and no href of any kind — announcement leads nowhere by construction');
 H.ok(/is-announcement/.test(soon.cta), 'the banner is keyed to the status like every other one');
 
 console.log('\n[the badge is untouched, in all three languages]');
@@ -113,20 +114,16 @@ H.ok(render('announcement', 'ru').cta.indexOf('Мы сообщим вам, ко�
 
 console.log('\n[every other status renders exactly what it did before]');
 STATUSES.forEach((status) => {
-  H.eq(shapeOf(render(status, 'he', '/#contact').cta), SHAPE[status],
+  H.eq(shapeOf(render(status, 'he').cta), SHAPE[status],
     `${status} → ${SHAPE[status]}`);
 });
-// The two that still lead somewhere must still lead there.
-H.ok(render('open', 'he', '/#contact').cta.indexOf('href="/#contact"') !== -1,
-  'open still links to the registration target');
-H.ok(render('waitlist', 'he', '/#contact').cta.indexOf('href="/#contact"') !== -1,
-  'waitlist still links to it too');
-// THE FALLBACK IS THE FAMILY AREA NOW, not the contact section. That fallback
-// existed because registration did not, and a dead end was worse than a form;
-// there is somewhere to send people now, and it carries the slug so the family
-// area knows which activity was being read.
+// THE TARGET IS DERIVED, NOT STORED. It used to be whatever an admin typed
+// into a ctaUrl field, falling back to the contact section because
+// registration did not exist. The field is gone — every value it ever held on
+// this site was a mistake — so the link is built from the slug and there is
+// nothing left for a status to disagree with.
 H.ok(render('open', 'he').cta.indexOf('href="/account?register=hebrew4kids"') !== -1,
-  'with no explicit target, open leads to the family area carrying the slug');
+  'open leads to the family area carrying the slug');
 H.ok(render('waitlist', 'ru').cta.indexOf('href="/ru/account?register=hebrew4kids"') !== -1,
   'in the READER\'S OWN TREE — a Russian-speaking parent must not land in the Hebrew default');
 H.ok(render('open', 'en').cta.indexOf('href="/en/account?register=hebrew4kids"') !== -1,

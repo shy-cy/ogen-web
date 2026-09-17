@@ -227,8 +227,16 @@ function resolveExpiryDays(activity, env) {
 
 // Returns a list of messages, empty when the settings are usable. The caller
 // decides what to do with them; validate() in activities-admin.js refuses the
-// save, which is the same shape the ctaUrl rule already has — name the problem
-// rather than accepting a value and dropping it silently later.
+// save — name the problem rather than accepting a value and dropping it
+// silently later.
+//
+// (This used to point at the ctaUrl rule as the precedent for that shape. That
+// field is gone, and the reason is worth carrying here: refusing loudly is
+// right, but it only catches values that are the wrong SHAPE. ctaUrl was
+// refused on save, by an allowlist, in two places — and both bugs it ever had
+// were well-formed links pointing somewhere wrong, which no validator of that
+// field could have caught. Settings that can be checked against each other,
+// like these, are the case where validation genuinely helps.)
 function validateRegistration(activity) {
   const errors = [];
   const type = activity && activity.type;
