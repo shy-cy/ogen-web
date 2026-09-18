@@ -367,6 +367,23 @@ textarea.modal-editor{ padding:9px 11px; border:1px solid #E4DFD3; resize:vertic
 .modal-acts .no{ background:#B3402B; border-color:#B3402B; color:#fff; }
 .modal-acts button[disabled]{ opacity:.5; cursor:default; }
 
+/* ---- bundles bought ------------------------------------------------------
+   A CARD PER PURCHASE, not a row in the queue. A bundle is not a registration:
+   one family can hold two, and the useful thing about one is a list of dates
+   with what happened to each — which does not fit in a cell. The count is the
+   figure an admin is being asked about on the phone, so it is the largest thing
+   on the card. */
+.bundle-card{
+  border:1px solid #E4DFD3; border-radius:10px; padding:14px 16px;
+  margin-bottom:12px; background:#fff;
+}
+.bundle-head{ display:flex; gap:14px; align-items:baseline; flex-wrap:wrap; margin-bottom:10px; }
+.bundle-count{ font-size:16px; font-weight:800; font-variant-numeric:tabular-nums; }
+.bundle-dates{ width:100%; border-collapse:collapse; font-size:13px; }
+.bundle-dates td{ padding:5px 10px; border-bottom:1px solid #f0ece1; }
+.bundle-dates td:first-child{ font-variant-numeric:tabular-nums; white-space:nowrap; }
+.bundle-dates td:last-child{ color:var(--muted); }
+
 /* ---- the check-in codes ---------------------------------------------------
    Laid out to be PRINTED as much as looked at: each card is one evening, and a
    card is what gets pinned to a wall. Wrapping rather than a fixed column count

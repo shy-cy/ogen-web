@@ -59,7 +59,8 @@ const COURSE = { activityId: 'act-1', slug: 'hebrew', type: 'course', perSession
 const SESSIONS = [
   { date: '2026-01-06', past: true,  status: null, full: false, left: 5, priceCents: 1200 },
   { date: '2026-10-06', past: false, status: 'attended', full: false, left: 5, priceCents: 1200 },
-  { date: '2026-10-13', past: false, status: 'booked',   full: false, left: 5, priceCents: 1200 },
+  { date: '2026-10-13', past: false, status: 'booked',   full: false, left: 5, priceCents: 0,
+    owedCents: 0, paidCents: 0, priceBasis: 'bundle' },
   { date: '2026-10-20', past: false, status: null, full: true,  left: 0, priceCents: 1200 },
   { date: '2026-10-27', past: false, status: null, full: false, left: 5, priceCents: 1200 },
   { date: '2026-11-03', past: false, status: null, full: false, left: 3, priceCents: 1500 }
@@ -73,6 +74,25 @@ const ANSWERS = {
   balance: () => ({ ok: true, balanceCents: 0, entries: [] }),
   activity: (b) => ({ ok: true, activity: b.slug === 'folk' ? DROPIN : COURSE }),
   sessions: () => ({ ok: true, mayBook: true, registrationStatus: 'approved', sessions: SESSIONS }),
+  bundles: () => ({
+    ok: true,
+    held: [{
+      bundleId: 'b3', purchasedAt: '2026-10-01T00:00:00Z', status: 'active',
+      entries: 3, pricePerEntry: 10, totalCents: 3000,
+      validUntil: Date.parse('2026-12-30T00:00:00Z'),
+      remaining: 1, used: 2, shortfallCreditedCents: 0,
+      rows: [
+        { date: '2026-10-06', state: 'used', mayReschedule: false, reason: 'used', deadline: null },
+        { date: '2026-10-13', state: 'booked', mayReschedule: true, reason: 'in-time',
+          deadline: null, targets: ['2026-10-27', '2026-11-03'] },
+        { date: '2026-10-20', state: 'available', mayReschedule: false, reason: 'available', deadline: null }
+      ]
+    }],
+    offers: [{ bundleId: 'b5', entries: 5, pricePerEntry: 10, validityDays: 90,
+               totalCents: 5000, coveredDates: [] }]
+  }),
+  rescheduleSession: () => ({ ok: true, session: {}, bundle: {} }),
+  buyBundle: () => ({ ok: true, url: 'https://checkout.stripe.com/c/pay/bundle' }),
   bookAndPay: () => ({ ok: true, url: 'https://checkout.stripe.com/c/pay/xyz', booked: [] }),
   submit: () => ({ ok: true, registration: {} }),
   // The activity page, for the one assertion that needs a rendered cost card.
@@ -332,6 +352,54 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
     'a drop-in asks the same family for nothing');
   H.eq(D.byTag(walk.mount, 'button').filter((b) => /Pay securely/.test(b.textContent)).length, 1,
     'and gives them the button');
+
+  console.log('\n[the bundle card, on the activity page]');
+  const bun = await screen({ view: 'activity', lang: 'en', search: '?p=p-1&a=act-2' });
+  H.ok(bun.mount.textContent.indexOf('1 of 3') !== -1,
+    'entries left is the largest thing on the card, and it is derived — never a stored counter');
+  H.ok(bun.mount.textContent.indexOf('Valid until') !== -1, 'with the date the window ends');
+  ['used', 'booked', 'available'].forEach((w) => {
+    H.ok(bun.mount.textContent.indexOf(w) !== -1, 'every covered date says where it stands: ' + w);
+  });
+  // ⚠ NOT "expired". The window doing its job and a promise we broke are two
+  // different events, and only the second is credited back.
+  H.ok(bun.mount.textContent.indexOf('expired') === -1, 'and nothing on it says "expired"');
+  // €0.00 on an evening paid for in advance reads as a mistake; the reason it is
+  // nothing is the interesting part.
+  H.ok(bun.mount.textContent.indexOf('from your bundle') !== -1,
+    'and the evenings table names the bundle rather than showing €0.00');
+
+  console.log('\n[moving one session offers only the dates the server named]');
+  const moveBtn = D.byTag(bun.mount, 'button').filter((b) => b.textContent === 'Move')[0];
+  H.ok(moveBtn, 'the one booking that can move has a button');
+  H.eq(D.byTag(bun.mount, 'button').filter((b) => b.textContent === 'Move').length, 1,
+    'and only that one — a used entry and an unbooked date have nothing to move');
+  moveBtn.click();
+  const sel = D.byTag(bun.mount, 'select').filter((n) => (n.childNodes || []).length === 2)[0];
+  H.ok(sel, 'it opens the list of targets the server computed');
+  sel.value = '2026-11-03';
+  sent.length = 0;
+  D.byTag(bun.mount, 'button').filter((b) => b.textContent === 'Move it')[0].click();
+  await settle();
+  const moved = sent.filter((b) => b.action === 'rescheduleSession')[0];
+  H.ok(moved, 'and moving posts rescheduleSession');
+  H.eq(moved.fromDate + ' → ' + moved.toDate, '2026-10-13 → 2026-11-03', 'naming both dates');
+  H.ok(!sent.some((b) => b.action === 'cancelSession'),
+    '⚠ and NEVER as a cancel plus a booking — that would spend the entry and ' +
+    'charge the standard price for the replacement');
+
+  console.log('\n[and buying one goes straight to Checkout]');
+  const buy = await screen({ view: 'activity', lang: 'en', search: '?p=p-1&a=act-2' });
+  sent.length = 0;
+  D.byTag(buy.mount, 'button').filter((b) => b.textContent === 'Buy')[0].click();
+  await settle();
+  const bought = sent.filter((b) => b.action === 'buyBundle')[0];
+  H.ok(bought, 'the offer posts buyBundle');
+  H.eq(bought.bundleId, 'b5', 'with an ID and nothing else');
+  H.ok(!('pricePerEntry' in bought) && !('entries' in bought),
+    'never a price or a count — the server re-decides the offer from the activity');
+  H.eq(buy.window.location.href, 'https://checkout.stripe.com/c/pay/bundle',
+    'and the family leaves for Stripe');
 
   H.done();
 })();

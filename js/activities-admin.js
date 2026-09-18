@@ -1146,7 +1146,13 @@
         checkField('fact-price-showPerLesson', 'Show cost per lesson', fact.showPerLesson === true,
                    'Off by default. The other price lines are unaffected either way.'),
         el('div', { class: 'perhour is-ok', id: 'price-preview' }),
-        el('div', { class: 'perhour is-idle', id: 'perhour-note' })
+        el('div', { class: 'perhour is-idle', id: 'perhour-note' }),
+        // Both of these are drop-in only, and both are KEPT when the form does
+        // not draw them — see TYPE_SCOPED_FACT_KEYS. Switching an activity to a
+        // course to fix something and back must not lose a bundle a family has
+        // already bought an entry from.
+        isDropin ? lateDropInEditor(fact) : null,
+        isDropin ? bundlesEditor(fact) : null
       ]);
     } else {
       body = el('div', { class: 'hint', text: 'Unknown field kind "' + d.kind + '"' });
@@ -1308,6 +1314,120 @@
   // repeatable lists learned when removing a row reissued an id and merged two
   // items' state. Here it would be worse: a group id is what a registration
   // points at, so a reused one attaches a child to the wrong group.
+  function mintBundleId() {
+    return 'b-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+
+  // Late pricing: one price that replaces the standard one inside N hours of a
+  // session starting. Off unless the box is ticked, and the two numbers SURVIVE
+  // being switched off — an admin who turns it off for a term should not have to
+  // retype it, the same instinct a cutoff an admin disabled follows.
+  function lateDropInEditor(fact) {
+    var late = fact.lateDropIn || {};
+    var box = el('div', { style: 'margin-top:18px;' });
+    box.appendChild(el('div', { class: 'field-label', text: 'Late booking price (optional)' }));
+    box.appendChild(el('div', { class: 'hint', text:
+      'A different price for somebody booking close to the start. Bundle entries are ' +
+      'never charged it — a family who paid in advance has already settled that evening.' }));
+    box.appendChild(checkField('fact-price-late-enabled', 'Charge a different price for late bookings',
+                               late.enabled === true));
+    box.appendChild(el('div', { class: 'fact-grid' }, [
+      numField('fact-price-late-hoursBefore', 'Hours before the start', late.hoursBefore),
+      numField('fact-price-late-price', 'Late price (€)', late.price)
+    ]));
+    return box;
+  }
+
+  // ⚠ A BUNDLE IS A PRODUCT, NOT A DISCOUNT FIELD. "5 entries" and "10 entries"
+  // are two things a family chooses between, so this is a list — and the empty
+  // list is the ordinary case rather than a special one.
+  //
+  // All three numbers are required, because a bundle missing any of them is a
+  // half-filled form rather than a product: normaliseBundles() drops it, so it
+  // would simply never be offered, with nothing on screen saying why. validate()
+  // refuses it on save instead.
+  function bundlesEditor(fact) {
+    S.bundles = (fact.bundles || []).map(function (b) {
+      return { bundleId: b.bundleId || mintBundleId(), entries: b.entries,
+               pricePerEntry: b.pricePerEntry, validityDays: b.validityDays };
+    });
+    var box = el('div', { id: 'bundles', style: 'margin-top:18px;' });
+    drawBundles(box);
+    return box;
+  }
+
+  function drawBundles(box) {
+    box.innerHTML = '';
+    box.appendChild(el('div', { class: 'field-label', text: 'Bundles (optional)' }));
+    box.appendChild(el('div', { class: 'hint', text:
+      'A number of sessions bought in advance at a fixed rate. A bundle is only OFFERED ' +
+      'when the calendar ahead can cover every entry inside its validity window — it is ' +
+      'never quietly sold at a smaller size. If we later cancel a session it cannot replace, ' +
+      'the difference is credited back at the rate that was paid.' }));
+
+    S.bundles.forEach(function (b, i) {
+      var id = b.bundleId;
+      var row = el('div', { class: 'item', 'data-bundle-id': id });
+      var entries = numField('bun-' + id + '-entries', 'Entries', b.entries);
+      var price = numField('bun-' + id + '-price', 'Price per entry (€)', b.pricePerEntry);
+      var days = numField('bun-' + id + '-days', 'Valid for (days)', b.validityDays);
+      var remove = el('button', { type: 'button', class: 'add-btn', text: 'Remove this bundle',
+                                  disabled: !canEditAll() || null });
+      remove.addEventListener('click', function () {
+        syncBundles();
+        S.bundles.splice(i, 1);
+        S.dirty = true;
+        drawBundles(box);
+      });
+      row.appendChild(el('div', { class: 'fact-grid' }, [entries, price, days]));
+      row.appendChild(el('div', { class: 'hint', id: 'bun-' + id + '-total' }));
+      row.appendChild(remove);
+      box.appendChild(row);
+      // The number a family actually sees. Two figures that multiply are two
+      // figures somebody has to multiply, and the one place that arithmetic
+      // matters is the moment of choosing between a 5 and a 10.
+      ['bun-' + id + '-entries', 'bun-' + id + '-price'].forEach(function (f) {
+        var node = $(f);
+        if (node) node.addEventListener('input', function () { bundleTotal(id); });
+      });
+      bundleTotal(id);
+    });
+
+    var add = el('button', { type: 'button', class: 'add-btn', text: '+ Add a bundle',
+                             disabled: !canEditAll() || null });
+    add.addEventListener('click', function () {
+      // Read the form into the model BEFORE redrawing, or adding a row eats
+      // whatever was typed into the row above it.
+      syncBundles();
+      S.bundles.push({ bundleId: mintBundleId(), entries: null, pricePerEntry: null, validityDays: null });
+      S.dirty = true;
+      drawBundles(box);
+    });
+    box.appendChild(add);
+  }
+
+  function bundleTotal(id) {
+    var node = $('bun-' + id + '-total');
+    if (!node) return;
+    var n = readNum('bun-' + id + '-entries');
+    var p = readNum('bun-' + id + '-price');
+    node.textContent = (n > 0 && p != null)
+      ? n + ' sessions · €' + (n * p).toFixed(2) + ' in total'
+      : 'Entries, price per entry and a validity window are all required.';
+  }
+
+  function syncBundles() {
+    S.bundles = (S.bundles || []).map(function (b) {
+      return {
+        bundleId: b.bundleId,
+        entries: $('bun-' + b.bundleId + '-entries') ? readNum('bun-' + b.bundleId + '-entries') : b.entries,
+        pricePerEntry: $('bun-' + b.bundleId + '-price') ? readNum('bun-' + b.bundleId + '-price') : b.pricePerEntry,
+        validityDays: $('bun-' + b.bundleId + '-days') ? readNum('bun-' + b.bundleId + '-days') : b.validityDays
+      };
+    });
+    return S.bundles;
+  }
+
   function mintGroupId() {
     return 'g-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   }
@@ -1455,10 +1575,20 @@
           perHourOverride: readNum('fact-price-perHourOverride'),
           showPerLesson: readBool('fact-price-showPerLesson')
         };
-        // Only the one that was drawn. Sending the other as null is how a term
-        // price gets cleared by an admin who only changed the type.
-        if (currentType() === 'dropin') out.perSessionPrice = readNum('fact-price-perSessionPrice');
-        else out.fullPrice = readNum('fact-price-fullPrice');
+        // ⚠ ONLY WHAT WAS DRAWN. Sending the other as null is how a term price
+        // gets cleared by an admin who only changed the type — and the same is
+        // now true of the bundle list, which is several products rather than one
+        // number. A course draws none of these and sends none of them; the
+        // server keeps what it already had.
+        if (currentType() === 'dropin') {
+          out.perSessionPrice = readNum('fact-price-perSessionPrice');
+          out.lateDropIn = {
+            enabled: readBool('fact-price-late-enabled'),
+            hoursBefore: readNum('fact-price-late-hoursBefore'),
+            price: readNum('fact-price-late-price')
+          };
+          out.bundles = syncBundles();
+        } else out.fullPrice = readNum('fact-price-fullPrice');
       } else out = {};
 
       // Carry the legacy sentence through untouched. It is what the page still

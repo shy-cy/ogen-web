@@ -1193,6 +1193,18 @@ html[lang="he"] .thankyou h1{ font-family: var(--font-he); font-weight:700; }
    it. Level with the last row it read as part of the list; this is the gap that
    says the reading stops and the doing starts. */
 .acc-pay{ margin-block-start:20px; }
+
+/* A BUNDLE IS A CARD, not a row: one family can hold two, and what matters
+   about one is a list of dates with what happened to each. The count is the
+   number they opened the page for, so it is the largest thing on it.
+   Nothing here is pushed to a physical edge — the head is a flex row in source
+   order, so it reads from the start in all three languages with no override. */
+.acc-bundle{
+  border:1px solid var(--stone); border-radius:10px; padding:14px 16px;
+  margin-block-start:12px; background:var(--paper);
+}
+.acc-bundle-head{ display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; margin-block-end:10px; }
+.acc-bundle-count{ font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; }
 /* Every message about money links to #pay, and the nav is a fixed 96px — without
    this the card it scrolls to arrives under the bar. */
 .acc-card[id]{ scroll-margin-block-start:112px; }

@@ -1651,10 +1651,14 @@ not about money.
 already decided — see the Phase 5 section for the waiver.
 
 **The sweep is the cosmetic half and says so.** `[functions."registration-sweep"]`
-in `netlify.toml`, 06:00 UTC daily. It has **two halves now** — releasing
-registrations nobody answered, and completing activities that have finished (see
-**The three groups**) — sharing a schedule rather than a subject: each writes
-down something that has already become true, and neither is load-bearing. It rewrites lapsed `pending` to `expired`,
+in `netlify.toml`, 06:00 UTC daily. It has **three jobs now** — releasing
+registrations nobody answered, completing activities that have finished (see
+**The three groups**), and keeping every bundle's promise against a calendar that
+moved (see **Bundles**) — sharing a schedule rather than a subject: each writes
+down something that has already become true, and none is load-bearing. The third
+is the one exception worth naming: when an activity is genuinely over and a
+bundle could not be honoured in full it writes a **credit**, so that half follows
+the money rule rather than the cosmetic one. It rewrites lapsed `pending` to `expired`,
 stamps the reason, and mails the family. Two things about Netlify's scheduler
 that look like bugs: it invokes the function as a **POST carrying
 `{"next_run":…}`**, so a handler treating a request body as proof of a human has
@@ -2610,6 +2614,187 @@ address to a guardian with an approved participant. The family area shows a
 places-left count on the register panel, from an authenticated call; the *static*
 page still says nothing, and `isPubliclyVisible()` keeps its exact current
 meaning and its only caller.
+
+## Bundles (Phase 8)
+
+N sessions of one drop-in activity, bought in advance at a fixed rate.
+
+```
+netlify/functions/
+  _bundle.js        every rule; PURE — no store, no clock, `now` passed in
+  _bundle-store.js  ogen-bundles; bun-<participantId>__<activityId>__<ISO>
+```
+plus `createBundleCheckout()`, `settleBundle()` in the webhook, three guardian
+actions, a third job in the nightly sweep, the Price panel's editor, and a
+panel on each of the two screens that read a purchase.
+
+⚠ **The pure half was written first and wired to NOTHING for a release.** The
+rules were right and tested and unreachable: no admin could define a bundle, no
+family could buy one, booking never looked for an entry, and the nightly pass
+had never heard of any of it. A pure module nothing calls is a design document
+that compiles.
+
+**THE PROMISE IS THE ENTRY COUNT, NOT THE WINDOW**, and every rule is that one
+sentence at a different moment:
+
+| | |
+|---|---|
+| at purchase | a bundle the calendar ahead cannot cover **in full** is not offered — never resized, never sold with a warning |
+| afterwards | a session excluded after purchase is replaced by the next bookable date, **reaching past the validity window** if it must |
+| at the end | when the calendar genuinely runs out, the shortfall becomes account credit **at the rate that was paid** |
+
+**⚠ Entries are derived, never decremented** — `entries - usedDates.length`, the
+rule capacity already follows, because Blobs has no compare-and-swap and a lost
+decrement is invisible. And **`usedDates` is a list of dates, not a count**,
+which is what makes `reconcile()` safe: a count cannot say whether the session
+just cancelled had already been attended, so it would either strand an entry or
+hand one back twice.
+
+### Nothing is written until Stripe says it was paid
+
+Every other payment here settles a debt on a record that already exists. A
+bundle is a **purchase** — there is nothing to owe until it is bought — so the
+obvious shape, writing the record and then charging for it, leaves an unpaid
+bundle in the store with entries in it, and `covers()` would have to learn a
+fourth status. The one place that can go wrong is the one place it must not.
+
+So the terms travel in the Checkout metadata and `settleBundle()` writes the
+record on the way back. **The covered DATES travel too**, rather than being
+recomputed: coverage is read off the calendar as it stands, and an admin can
+edit that calendar in the seconds a card takes to clear — so recomputing would
+hand a family a bundle covering dates other than the ones they chose from. What
+they saw is what they get, and the nightly pass repairs it if the calendar
+really has moved.
+
+Idempotent **by key**, not by a settled-payments list, because there is no
+record yet to keep one on. The purchase timestamp is the third part of the key,
+so a redelivered event resolves to the same blob and finds it there — which
+matters more here than elsewhere: by the time Stripe retries, entries may have
+been spent, and rewriting would hand them back.
+
+The offer is **re-decided server-side from the activity** at the moment of
+purchase. The client sends a `bundleId` and nothing else — never a price, never
+a count.
+
+### Spending an entry
+
+`bookSession` and `bookAndPay` look for a bundle covering the date before
+freezing a price; one that does freezes the evening at zero with
+`priceBasis: 'bundle'`. **The attendance is written first and the bundle
+second**: a crash between them costs us a free session, where the other order
+costs the family an entry they paid for.
+
+⚠ **Entries are allocated across a whole multi-date booking in ONE pass.**
+`spendableFor()` answers for one date, and calling it per date re-reads a store
+that has not been written yet — so a family with one entry left choosing four
+evenings would get four free ones. `allocateEntries()` loads the records once
+and marks each spend in memory, so `covers()` sees it when it decides the next
+date.
+
+Oldest bundle first, because a bundle has a window and spending the one closest
+to expiring first is the only order that does not strand entries.
+
+### Moving one session is not cancelling and rebooking
+
+Cancelling a bundle entry and booking another date works on any ordinary evening
+and is wrong here: the cancellation credits **nothing** (a bundle entry is frozen
+at zero), so the entry would be spent and gone, and the replacement would be
+charged at the standard price. A move keeps the entry and relocates it.
+
+**Twenty-four hours, fixed** — not a per-activity field, because
+`sessionCancelHours` uses null to mean *no* deadline and a second null meaning
+the opposite is a trap this codebase keeps finding. Inside the window there is no
+move at all and the entry is spent exactly as a no-show spends it.
+
+`rescheduleTargets()` is **bounded by the window that was sold**, which is the
+one place this is deliberately less generous than `reconcile()`: the repair
+function reaches past the window because the system failed, and a guardian's own
+change of plan does not, or repeated moves would extend a bundle indefinitely.
+The server computes the list and the client offers exactly it — a client
+filtering the calendar itself would offer a full evening.
+
+Order: **the new booking, then the old one, then the bundle.** A failure leaves
+the family holding two evenings on one entry, which is visible on their own page
+and costs them nothing; the other order takes the evening away and gives nothing
+back.
+
+`afterReschedule()` has **two branches and they are not the same move**. The
+entry always moves; the *coverage* moves only when the target is outside it.
+Moving to a date the bundle already covers changes nothing about which dates it
+may be spent on, and treating them alike removed `fromDate` anyway — so a
+three-entry bundle came back covering two. Both branches keep the coverage the
+same **length**, which is what lets the nightly reconcile run afterwards and find
+nothing to do.
+
+### The third job in the nightly sweep
+
+`reconcileBundles()` runs last, after registrations and after autocompletion. It
+touches no git and publishes nothing, so a failure in the activity half cannot
+stop a family's bundle being repaired. `reconcile()` is idempotent, so it runs
+over every bundle every night with no flag saying whether it has already looked.
+
+⚠ **The shortfall is credited only when the activity is OVER** — when
+`datesAhead()` is empty. An admin who excludes a session this week usually adds
+one next week, and crediting on the spot pays a family for a date they are about
+to be given back, and then hands them the date too.
+
+And note what is **not** a shortfall: a date the family simply let pass unused.
+`reconcile()` deliberately keeps those in the coverage so they cannot be
+replaced — that is the window doing its job, and the entry was theirs. Only a
+date that **left the calendar** is ours to make good. The distinction is the one
+the first version got wrong, and getting it wrong gave entries away.
+
+The credit is written **ledger first, record second** — the money rule, which is
+the opposite of the email rule and wins over it. `bundle-shortfall` is its own
+reason on the ledger's closed list rather than an adjustment, because nobody
+adjusted anything: the calendar ran out. `shortfallCreditedCents` on the record
+stops it being written twice.
+
+### One view, two screens
+
+`bundleView()` in `_bundle.js` is pure and is read by the family's own card and
+by the admin roster. Two builders would be two screens that can disagree about
+how many entries somebody has left — **and the family would be reading one of
+them out to the admin reading the other**.
+
+Four states per covered date, and the difference between the last two is the
+whole point of the window:
+
+| | |
+|---|---|
+| `used` | the entry was spent and the session has happened |
+| `booked` | spent, still ahead — the only state that can be moved |
+| `available` | not spent, still ahead |
+| `gone` | not spent, and the date has passed |
+
+**`gone` is rendered "not used", never "expired"**, in both screens and all three
+languages. The window doing its job and a promise we broke are two different
+events, and only the second is credited back.
+
+### In the admin
+
+Bundles live in the **Price panel**, drop-in only, as a repeatable list — "5
+entries" and "10 entries" are two products on one activity. All three numbers are
+required and **refused on save**: `normaliseBundles()` drops an incomplete one,
+which is right on read and silent on save, so an admin would publish an activity
+offering nothing with the form still showing what they typed. The cap on entries
+is what the Stripe metadata field can hold, not a round number.
+
+Both `bundles` and `lateDropIn` are in `TYPE_SCOPED_FACT_KEYS`, so a save from
+the **course** form keeps them. That matters more than the two prices already
+there: a term price is one number an admin can retype, and a bundle list is
+several products with ids a family's purchase points at.
+
+On the Roster, **Bundles bought** is a card per purchase rather than a column —
+one family can hold two, and what matters about one is a list of dates, which
+does not fit in a cell.
+
+### Not built
+
+A bundle cannot be **refunded** or transferred by an admin, and there is no
+admin-side "grant a bundle" for a family who paid in cash. Both are real gaps
+rather than decisions; today an admin compensates with `adjustCredit`, which
+writes a line in the ledger with a note.
 
 ## The emailed payment link
 

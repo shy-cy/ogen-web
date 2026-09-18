@@ -181,12 +181,68 @@ async function createSessionsCheckout(atts, activityTitle, lang, email) {
   });
 }
 
+// ⚠ A BUNDLE IS PAID FOR BEFORE IT EXISTS, which is the opposite of everything
+// else here and is deliberate.
+//
+// A term and an evening are debts on records that already exist: the family has
+// a place, and the payment settles what it costs. A bundle is a purchase — there
+// is nothing to owe until it is bought — so the obvious shape, writing the
+// record and then charging for it, would leave an unpaid bundle sitting in the
+// store with entries in it. `covers()` would have to learn a fourth status, and
+// the one place that could go wrong is the one place it must not.
+//
+// So NOTHING IS WRITTEN UNTIL STRIPE SAYS IT WAS PAID, and the terms travel in
+// the metadata: the entries, the rate, the window, and THE DATES THEMSELVES.
+//
+// Carrying the dates rather than recomputing them on the way back matters more
+// than it looks. Coverage is computed from the calendar as it stands, and an
+// admin can edit that calendar in the seconds a card takes to clear — so
+// recomputing would hand a family a bundle covering dates other than the ones
+// they were shown when they chose it. What they saw is what they get, and the
+// nightly reconcile repairs it afterwards if the calendar really has moved.
+async function createBundleCheckout({ activity, bundle, coveredDates, participantId,
+                                      accountId, purchasedAt, lang, email, participantName }) {
+  const perEntry = Math.max(0, Math.round(Number(bundle.pricePerEntry) * 100)) || 0;
+  const total = perEntry * bundle.entries;
+  if (!(total > 0)) throw Object.assign(new Error('A free bundle is not a purchase'), { reason: 'nothing-due' });
+
+  const title = facts.pick(activity.title, lang) || 'Ogen';
+  const base = lang === 'he' ? '' : '/' + lang;
+  const back = SITE + base + '/account/activity'
+    + '?p=' + encodeURIComponent(participantId)
+    + '&a=' + encodeURIComponent(activity.activityId);
+
+  return build({
+    lang: lang, email: email,
+    lines: [{
+      name: title,
+      // The size of the bundle, because a family holding two receipts needs to
+      // tell the five from the ten.
+      description: bundle.entries + ' × ' + (participantName || ''),
+      amountCents: total
+    }],
+    back: back,
+    meta: {
+      ogen_kind: 'bundle',
+      participant_id: participantId,
+      activity_id: activity.activityId,
+      account_id: accountId,
+      bundle_id: bundle.bundleId,
+      bundle_entries: String(bundle.entries),
+      bundle_price_per_entry: String(bundle.pricePerEntry),
+      bundle_validity_days: String(bundle.validityDays),
+      covered_dates: coveredDates.join(','),
+      purchased_at: new Date(purchasedAt).toISOString()
+    }
+  });
+}
+
 // One evening. The plural is the general case; this exists because two call
 // sites read better with it, and it is the same builder underneath.
 const createSessionCheckout = (att, activityTitle, lang, email) =>
   createSessionsCheckout([att], activityTitle, lang, email);
 
 module.exports = {
-  createCheckout, createSessionCheckout, createSessionsCheckout,
+  createCheckout, createSessionCheckout, createSessionsCheckout, createBundleCheckout,
   dueCents, returnUrl, MAX_SESSION_LINES
 };

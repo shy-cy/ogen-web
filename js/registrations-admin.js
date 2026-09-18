@@ -164,7 +164,11 @@
     renderCapacity(q.capacity);
     // A course has no register, so it gets no button rather than a dead one.
     $('btn-codes').hidden = q.activity.type !== 'dropin';
-    if (q.activity.type !== 'dropin') $('codes-panel').hidden = true;
+    $('btn-bundles').hidden = q.activity.type !== 'dropin';
+    if (q.activity.type !== 'dropin') {
+      $('codes-panel').hidden = true;
+      $('bundles-panel').hidden = true;
+    }
 
     var box = $('queue');
     box.innerHTML = '';
@@ -256,6 +260,69 @@
       } else {
         art.appendChild(el('p', { class: 'hint', text: 'The code drawer did not load — use the address below.' }));
       }
+    });
+  }
+
+  // ---------- what was bought in advance ----------
+  //
+  // ⚠ THE QUEUE CANNOT SHOW THIS, and that is why it is its own panel rather
+  // than a column. A bundle is not a registration: it is a purchase against an
+  // activity, one family can hold two of them, and the thing an admin needs to
+  // see is a list of DATES with what happened to each. That does not fit in a
+  // cell, and squeezing it into one would have meant the number that matters —
+  // how many entries are left — being derived on screen from two others.
+  //
+  // The figures come from the server's bundleView(), the same builder the
+  // family's own card uses. An admin reading a different number from the family
+  // on the phone is the failure this avoids.
+  function loadBundles() {
+    send({ action: 'bundles', slug: S.slug }).then(function (res) {
+      if (!res.ok) return message('err', (res.data && res.data.error) || 'That did not work');
+      renderBundles(res.data.bundles || []);
+    });
+  }
+
+  var ENTRY_STATE = {
+    used: 'used', booked: 'booked', available: 'available',
+    // Not "expired": the entry was theirs and the date simply went by. The
+    // window doing its job is not the same event as a promise being broken, and
+    // the word has to keep them apart — a shortfall we caused is credited back,
+    // and this is not that.
+    gone: 'not used'
+  };
+
+  function renderBundles(list) {
+    var box = $('bundles');
+    box.innerHTML = '';
+    $('bundles-panel').hidden = false;
+    if (!list.length) {
+      box.appendChild(el('p', { class: 'hint', text: 'Nobody has bought a bundle for this activity.' }));
+      return;
+    }
+    box.appendChild(el('p', { class: 'hint', text:
+      'Sessions bought in advance. Entries left is derived from the dates used, never ' +
+      'stored — and a date we cancel that cannot be replaced is credited back at the ' +
+      'rate that was paid, by the nightly pass, once the activity is over.' }));
+
+    list.forEach(function (b) {
+      var head = el('div', { class: 'bundle-head' }, [
+        el('b', { text: b.participantName }),
+        el('span', { class: 'bundle-count', text: b.remaining + ' of ' + b.entries + ' left' }),
+        el('span', { class: 'hint', text: money(b.totalCents) + ' · ' + b.status })
+      ]);
+      var table = el('table', { class: 'bundle-dates' });
+      b.rows.forEach(function (r) {
+        table.appendChild(el('tr', {}, [
+          el('td', { text: r.date }),
+          el('td', { text: ENTRY_STATE[r.state] || r.state })
+        ]));
+      });
+      var kids = [head, table];
+      if (b.shortfallCreditedCents > 0) {
+        kids.push(el('p', { class: 'hint', text:
+          'Credited back for sessions we could not offer: ' + money(b.shortfallCreditedCents) }));
+      }
+      box.appendChild(el('div', { class: 'bundle-card' }, kids));
     });
   }
 
@@ -534,6 +601,7 @@
   // answers 403 to every external request to one — so this calls the same run()
   // through the admin API instead of fetching the endpoint.
   $('btn-codes').addEventListener('click', loadCodes);
+  $('btn-bundles').addEventListener('click', loadBundles);
   $('btn-sweep').addEventListener('click', function () {
     send({ action: 'sweep' }).then(function (res) {
       if (!res.ok) return message('err', (res.data && res.data.error) || 'That did not work');

@@ -33,6 +33,16 @@ async function saveBundle(bundle) {
   return bundle;
 }
 
+// One bundle by its own key. The purchase timestamp is the third part of the
+// key, so this is what makes settling a payment idempotent: a redelivered Stripe
+// event finds the record already there and writes nothing over a bundle whose
+// entries may since have been spent.
+async function getBundle(participantId, activityId, purchasedAt) {
+  const store = await optionalStore(STORE);
+  if (!store || !participantId || !activityId || !purchasedAt) return null;
+  return store.get(prefixFor(participantId, activityId) + purchasedAt, { type: 'json' });
+}
+
 // Every bundle this participant holds for this activity, oldest first.
 async function forParticipant(participantId, activityId) {
   const store = await optionalStore(STORE);
@@ -102,5 +112,5 @@ function newBundle({ participantId, activityId, accountId, bundle, coveredDates,
   };
 }
 
-module.exports = { STORE, PREFIX, saveBundle, forParticipant, forActivity, spendableFor, newBundle,
+module.exports = { STORE, PREFIX, saveBundle, getBundle, forParticipant, forActivity, spendableFor, newBundle,
                    _keys: { prefixFor } };

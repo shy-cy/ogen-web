@@ -26,6 +26,8 @@ const credit = require('./_credit');
 const ledger = require('./_credit-ledger');
 const { cancelAndCredit } = require('./_registration-cancel');
 const attendance = require('./_session-attendance');
+const B = require('./_bundle');
+const bundleStore = require('./_bundle-store');
 const checkout = require('./_checkout');
 const facts = require('./_activity-facts');
 const { LABELS } = require('./_activity-template');
@@ -185,6 +187,47 @@ function verificationRefusal(me, type) {
     error: 'Please confirm your email address before paying.',
     reason: 'email-unverified'
   });
+}
+
+// ⚠ WHICH BUNDLE PAYS FOR EACH DATE, ALLOCATED ACROSS THE WHOLE SELECTION.
+//
+// spendableFor() answers for one date, and asking it per date in a loop hands
+// the SAME entry out twice: it re-reads the store, which has not been written
+// yet, so a family booking four evenings against a bundle with one entry left
+// would get four free ones.
+//
+// So the records are loaded once and marked in memory as they are allocated —
+// covers() then sees each spend when it decides the next date. Nothing is
+// written here; the caller writes the attendance first and the bundles after,
+// because a crash between the two must cost US a free session rather than cost
+// the family an entry.
+function allocateEntries(held, dates) {
+  const spend = {};
+  dates.forEach((date) => {
+    const b = held.filter((x) => B.covers(x, date))[0];
+    if (!b) return;
+    b.usedDates = (b.usedDates || []).concat([date]).sort();
+    spend[date] = b;
+  });
+  return spend;
+}
+
+// The bundles an allocation actually touched, stamped and saved. Called after
+// the attendance records are safely written.
+async function commitEntries(spend, accountId, note) {
+  const seen = [];
+  Object.keys(spend).forEach((date) => {
+    const b = spend[date];
+    if (seen.indexOf(b) === -1) seen.push(b);
+    b.history = (b.history || []).concat([{
+      iso: new Date().toISOString(), action: 'entry-spent', by: accountId, note: note || date
+    }]);
+  });
+  for (const b of seen) {
+    b.status = B.statusAfter(b, 0);
+    await bundleStore.saveBundle(b);
+  }
+  return seen;
 }
 
 // ONE ROW SHAPE, built once. The list and the single-registration view are two
@@ -348,16 +391,28 @@ exports.handler = async (event) => {
           return json(409, { error: 'That evening is full.', full: true });
         }
 
+        // ⚠ AN ENTRY IS SPENT BEFORE A PRICE IS CHARGED. A bundle covering this
+        // date freezes the evening at zero and the family owes nothing for it —
+        // that is what they bought. The lookup is by date, so a bundle that does
+        // not cover this one is simply not found and the standard price applies.
+        const held = await bundleStore.forParticipant(participant.participantId, activity.activityId);
+        const spend = allocateEntries(held, [body.sessionDate]);
+        const from = spend[body.sessionDate] || null;
+
         const att = attendance.newAttendance({
           activity: activity, participantId: participant.participantId,
-          accountId: me.accountId, groupId: reg.groupId, sessionDate: body.sessionDate
+          accountId: me.accountId, groupId: reg.groupId, sessionDate: body.sessionDate,
+          bundle: !!from, bundleId: from ? from.bundleId : null
         });
         // A re-booking after a cancellation lands on the same key, so the earlier
         // history is carried forward rather than overwritten — the same rule a
         // re-requested registration follows.
         if (existing) att.history = (existing.history || []).concat(att.history);
+        // THE BOOKING FIRST, THE BUNDLE SECOND. A crash between them costs us a
+        // free session; the other order costs the family an entry they paid for.
         await attendance.saveAttendance(att);
-        return json(200, { ok: true, session: att });
+        await commitEntries(spend, me.accountId);
+        return json(200, { ok: true, session: att, fromBundle: !!from });
       }
 
       // ⚠ REGISTERING FOR A DROP-IN IS ONE STEP, NOT THREE.
@@ -454,13 +509,20 @@ exports.handler = async (event) => {
           });
         }
 
+        // Entries are allocated across the WHOLE selection in one pass — see
+        // allocateEntries. A family with three entries left choosing five dates
+        // pays for two of them, and the other three are already bought.
+        const held = await bundleStore.forParticipant(participant.participantId, activity.activityId);
+        const spend = allocateEntries(held, dates);
+
         const bookedAt = new Date(now).toISOString();
         const booked = [];
         for (const d of dates) {
+          const from = spend[d] || null;
           const att = attendance.newAttendance({
             activity: activity, participantId: participant.participantId,
             accountId: me.accountId, groupId: reg.groupId, sessionDate: d,
-            bookedAt: bookedAt
+            bookedAt: bookedAt, bundle: !!from, bundleId: from ? from.bundleId : null
           });
           // A re-booking after a cancellation lands on the same key, so the
           // earlier history is carried forward rather than overwritten — the
@@ -469,6 +531,9 @@ exports.handler = async (event) => {
           await attendance.saveAttendance(att);
           booked.push(att);
         }
+
+        // Every booking is safely written, so the entries can be marked spent.
+        await commitEntries(spend, me.accountId);
 
         const rows = booked.map((a) => ({
           date: a.sessionDate, owedCents: a.payment.owedCents, priceBasis: a.frozen.priceBasis
@@ -544,6 +609,201 @@ exports.handler = async (event) => {
           return json(502, { error: 'Could not start the payment. Please try again.' });
         }
         return json(200, { ok: true, url: session.url });
+      }
+
+      // --- bundles -----------------------------------------------------------
+      //
+      // What is on offer, and what this participant already holds. The offer
+      // list is the STRICT one: a bundle the calendar ahead cannot cover in full
+      // is absent rather than shown smaller or shown with a warning. Auto-sizing
+      // it at the point of sale would mean a family choosing "10 sessions" and
+      // being charged for something with a different name.
+      case 'bundles': {
+        const participant = await mustGuard(body.participantId);
+        if (!participant) return json(404, { error: NOT_YOURS });
+        const activity = await published(body.slug);
+        if (!activity) return json(404, { error: 'No such activity.' });
+        if (activity.type !== 'dropin') {
+          return json(400, { error: 'Bundles are for pay-per-session activities.' });
+        }
+        const now = Date.now();
+        const held = await bundleStore.forParticipant(participant.participantId, activity.activityId);
+        const mine = {};
+        (await attendance.forParticipant(participant.participantId, activity.activityId))
+          .forEach((a) => { mine[a.sessionDate] = a; });
+
+        // WHERE EACH MOVEABLE ENTRY MAY GO, computed from the same function the
+        // server will apply when the move is asked for — so a date offered is a
+        // date that will be accepted. A client guessing the list would offer a
+        // full evening, or one outside the window that was sold.
+        const taken = Object.keys(mine).filter((d) => R.holdsASeat(mine[d]));
+        const views = held.map((b) => {
+          const view = B.bundleView(b, mine, now);
+          view.rows.forEach((row) => {
+            if (row.mayReschedule) {
+              row.targets = B.rescheduleTargets(b, activity, row.date, now, taken);
+            }
+          });
+          return view;
+        });
+
+        return json(200, {
+          ok: true,
+          offers: B.bundlesAvailable(activity, now).map((b) => ({
+            bundleId: b.bundleId, entries: b.entries, pricePerEntry: b.pricePerEntry,
+            validityDays: b.validityDays,
+            totalCents: Math.round(Number(b.pricePerEntry) * 100) * b.entries,
+            coveredDates: B.coverageFor(activity, b, now)
+          })),
+          held: views
+        });
+      }
+
+      case 'buyBundle': {
+        const participant = await mustGuard(body.participantId);
+        if (!participant) return json(404, { error: NOT_YOURS });
+        const activity = await published(body.slug);
+        if (!activity) return json(404, { error: 'No such activity.' });
+        if (activity.type !== 'dropin') {
+          return json(400, { error: 'Bundles are for pay-per-session activities.' });
+        }
+
+        // ⚠ THE OFFER IS RE-DECIDED HERE, from the activity, at this instant.
+        // The client sends an id and nothing else — never a price, never an
+        // entry count — so a bundle the admin has since removed or that the
+        // calendar can no longer cover is refused rather than sold.
+        const now = Date.now();
+        const offer = B.bundlesAvailable(activity, now)
+          .filter((b) => b.bundleId === String(body.bundleId || ''))[0];
+        if (!offer) {
+          return json(409, { error: 'That bundle is not available at the moment.', reason: 'unavailable' });
+        }
+
+        // Buying entries to an activity nobody may attend is a purchase that
+        // cannot be used, so this registers too — the same one-step shape the
+        // booking flow has, and the same stop when a person still has to decide.
+        const opened = await openRegistration({
+          activity: activity, participant: participant,
+          accountId: me.accountId, groupId: body.groupId || null
+        });
+        if (opened.status) return json(opened.status, opened.payload);
+        const reg = opened.reg;
+        if (reg.status !== 'approved') {
+          if (opened.created) await mail.sendReceived(reg, me);
+          return json(200, { ok: true, awaitingApproval: true, status: reg.status });
+        }
+
+        const coveredDates = B.coverageFor(activity, offer, now);
+        let session;
+        try {
+          session = await checkout.createBundleCheckout({
+            activity: activity, bundle: offer, coveredDates: coveredDates,
+            participantId: participant.participantId, accountId: me.accountId,
+            purchasedAt: now, lang: lang, email: me.email,
+            participantName: [participant.firstName, participant.lastName].filter(Boolean).join(' ')
+          });
+        } catch (err) {
+          console.error('account-registrations: bundle checkout failed:', err && err.message);
+          return json(502, { error: 'Could not start the payment. Please try again.' });
+        }
+        // NOTHING IS WRITTEN. The bundle does not exist until Stripe says it was
+        // paid for — see settleBundle in stripe-webhook.js.
+        return json(200, { ok: true, url: session.url, coveredDates: coveredDates });
+      }
+
+      // ⚠ MOVING ONE EVENING, WHICH IS NOT CANCELLING AND REBOOKING.
+      //
+      // Cancelling a bundle entry and booking another date would work on any
+      // ordinary evening and is wrong here: the cancellation credits nothing (a
+      // bundle entry is frozen at zero), so the entry would be spent and gone,
+      // and the family would be charged the standard price for the replacement.
+      // A move keeps the entry and relocates it.
+      //
+      // Twenty-four hours, fixed. Inside that window there is no move at all and
+      // the entry is spent exactly as a no-show spends it — the family has told
+      // us too late for the place to be offered to anybody else.
+      case 'rescheduleSession': {
+        const participant = await mustGuard(body.participantId);
+        if (!participant) return json(404, { error: NOT_YOURS });
+        const activity = await published(body.slug);
+        if (!activity) return json(404, { error: 'No such activity.' });
+        const bad = attendance.validate(activity, body.toDate);
+        if (bad) return json(400, { error: bad });
+
+        const att = await attendance.getAttendance(
+          participant.participantId, activity.activityId, body.fromDate);
+        if (!att) return json(404, { error: 'No such booking.' });
+
+        const now = Date.now();
+        const may = B.mayReschedule(att, now);
+        if (!may.may) {
+          return json(409, {
+            error: may.reason === 'too-late'
+              ? 'That session is too close to its start to be moved.'
+              : may.reason === 'not-a-bundle-entry'
+                ? 'Only a session paid for from a bundle can be moved.'
+                : 'That session cannot be moved.',
+            reason: may.reason, deadline: may.deadline || null
+          });
+        }
+
+        const held = await bundleStore.forParticipant(participant.participantId, activity.activityId);
+        const bundle = held.filter((b) => b.bundleId === att.frozen.bundleId &&
+                                          (b.usedDates || []).indexOf(body.fromDate) !== -1)[0];
+        if (!bundle) return json(409, { error: 'That session is not on a bundle we can find.' });
+
+        const mine = await attendance.forParticipant(participant.participantId, activity.activityId);
+        const taken = mine.filter((a) => R.holdsASeat(a)).map((a) => a.sessionDate);
+        const targets = B.rescheduleTargets(bundle, activity, body.fromDate, now, taken);
+        if (targets.indexOf(body.toDate) === -1) {
+          return json(409, { error: 'That date is not one this bundle can move to.',
+                             reason: 'not-a-target', targets: targets });
+        }
+
+        const all = await attendance.forActivity(activity.activityId, body.toDate);
+        const cap = R.capacityForDate(activity, all, body.toDate);
+        if (cap.left != null && cap.left <= 0) {
+          return json(409, { error: 'That session is full.', full: true });
+        }
+
+        // ORDER: the new booking, then the old one, then the bundle.
+        //
+        // A failure after the first leaves the family holding two evenings on
+        // one entry, which is visible on their own page and costs them nothing.
+        // Cancelling first and failing would take the evening away and give
+        // nothing back, which is the same failure pointing at the family.
+        const existing = await attendance.getAttendance(
+          participant.participantId, activity.activityId, body.toDate);
+        const moved = attendance.newAttendance({
+          activity: activity, participantId: participant.participantId,
+          accountId: me.accountId, groupId: att.groupId, sessionDate: body.toDate,
+          bookedAt: new Date(now).toISOString(), bundle: true, bundleId: bundle.bundleId
+        });
+        moved.history = (existing ? (existing.history || []) : [])
+          .concat([{ iso: new Date(now).toISOString(), action: 'moved-in',
+                     by: me.accountId, note: 'from ' + body.fromDate }])
+          .concat(moved.history.slice(1));
+        await attendance.saveAttendance(moved);
+
+        const released = attendance.transition(att, {
+          status: 'cancelled', by: me.accountId, note: 'moved to ' + body.toDate
+        });
+        await attendance.saveAttendance(released);
+
+        const after = B.afterReschedule(bundle, body.fromDate, body.toDate);
+        bundle.usedDates = after.usedDates;
+        bundle.coveredDates = after.coveredDates;
+        bundle.history = (bundle.history || []).concat([{
+          iso: new Date(now).toISOString(), action: 'rescheduled', by: me.accountId,
+          note: body.fromDate + ' → ' + body.toDate
+        }]);
+        bundle.status = B.statusAfter(bundle, 0);
+        await bundleStore.saveBundle(bundle);
+
+        const byDate = {};
+        (await attendance.forParticipant(participant.participantId, activity.activityId))
+          .forEach((a) => { byDate[a.sessionDate] = a; });
+        return json(200, { ok: true, session: moved, bundle: B.bundleView(bundle, byDate, now) });
       }
 
       case 'cancelSession': {

@@ -33,6 +33,8 @@ const credit = require('./_credit');
 const ledger = require('./_credit-ledger');
 const { cancelAndCredit } = require('./_registration-cancel');
 const attendance = require('./_session-attendance');
+const B = require('./_bundle');
+const bundleStore = require('./_bundle-store');
 const { recordAudit } = require('./_audit');
 const mail = require('./_registration-email');
 const { sanitiseRich } = require('./_sanitise-rich');
@@ -481,6 +483,47 @@ exports.handler = async (event) => {
           out.push({ sessionDate: date, url: SITE + '/checkin?t=' + encodeURIComponent(code.token) });
         }
         return json(200, { ok: true, activity: { slug: activity.slug, title: activity.title }, codes: out });
+      }
+
+      // ⚠ WHAT HAS BEEN BOUGHT IN ADVANCE, which the queue could not show.
+      //
+      // The queue is registrations, and a bundle is not one: it is a purchase
+      // against an activity, and a family can hold two. An admin looking at an
+      // evening where half the room owes nothing needs to be able to see why,
+      // and "they have a bundle" is only findable if something shows it.
+      //
+      // `access` rather than `approve`: reading what a family bought is part of
+      // answering their question about it, and it moves nothing.
+      //
+      // ⚠ IT GOES THROUGH bundleView(), THE SAME BUILDER THE FAMILY'S OWN CARD
+      // USES. Two builders would be two screens that can disagree about how many
+      // entries somebody has left — and the family would be reading one of them
+      // out to the admin reading the other.
+      case 'bundles': {
+        const activity = await published(body.slug);
+        if (!activity) return json(404, { error: 'No such activity.' });
+        if (activity.type !== 'dropin') {
+          return json(400, { error: 'This activity runs by the term, so nothing is bought in advance.' });
+        }
+        const now = Date.now();
+        const held = await bundleStore.forActivity(activity.activityId);
+        const att = await attendance.forActivity(activity.activityId);
+        const rows = [];
+        for (const bundle of held) {
+          const byDate = {};
+          att.filter((a) => a.participantId === bundle.participantId)
+             .forEach((a) => { byDate[a.sessionDate] = a; });
+          const participant = await participants.getParticipant(bundle.participantId);
+          rows.push(Object.assign(B.bundleView(bundle, byDate, now), {
+            participantName: participant
+              ? [participant.firstName, participant.lastName].filter(Boolean).join(' ')
+              : bundle.participantId
+          }));
+        }
+        // Newest purchase first: an admin opening this is almost always asking
+        // about something that has just happened.
+        rows.sort((a, b) => String(b.purchasedAt).localeCompare(String(a.purchasedAt)));
+        return json(200, { ok: true, bundles: rows });
       }
 
       // Marking the register. `approve` rather than `cancel`: recording who

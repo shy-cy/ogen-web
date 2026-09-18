@@ -39,6 +39,7 @@ const {
 const { migrate, normaliseFacts, normaliseVisibility, SHAPES } = require('./_activity-migrate');
 const SESSIONS = require('./_activity-sessions');
 const REG = require('./_activity-registration');
+const BUNDLE = require('./_bundle');
 
 // How many day+time rows a frequency asks for. 'custom' means "as many as the
 // admin adds", so it has no fixed count.
@@ -606,6 +607,13 @@ function validate(activity) {
   // The registration settings, refused on save rather than accepted and found
   // to be unusable at the moment a family is cancelling.
   REG.validateRegistration(activity).forEach((m) => errors.push(m));
+  // Bundles, for the same reason: a half-filled one is silently never offered,
+  // and "the bundle I set up does not appear" is a bug report rather than a
+  // message. Only on a drop-in, because a course draws no bundle fields and its
+  // stored list — if it has one from before a type switch — is not being edited.
+  if (activity.type === 'dropin') {
+    BUNDLE.validateBundles(((activity.facts) || {}).price).forEach((m) => errors.push(m));
+  }
 
   if (errors.length) {
     const err = new Error(errors[0]);

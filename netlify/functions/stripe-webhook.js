@@ -36,6 +36,7 @@
 const S = require('./_stripe');
 const store = require('./_registration-store');
 const attendance = require('./_session-attendance');
+const bundles = require('./_bundle-store');
 const R = require('./_registration');
 const accounts = require('./_account-store');
 const mail = require('./_registration-email');
@@ -165,6 +166,50 @@ async function settleOneSession(session, meta, date, cents) {
   await attendance.saveAttendance(next);
 }
 
+// ⚠ THE BUNDLE IS CREATED HERE, and this is the only place it is created.
+//
+// Everything else in this file settles a debt on a record that already exists. A
+// bundle has no record until it is paid for — see createBundleCheckout — so the
+// terms arrive in the metadata and the record is written on the way back in.
+//
+// Idempotent by KEY rather than by a settled-sessions list, because there is no
+// record yet to keep a list on. The purchase timestamp is the third part of the
+// key, so a redelivered event resolves to the same blob and finds it there. That
+// matters more here than elsewhere: by the time Stripe retries, entries may have
+// been spent, and rewriting the record would hand them back.
+async function settleBundle(session, meta) {
+  const cents = Math.round(Number(session.amount_total) || 0);
+  if (!(cents > 0)) {
+    console.error('stripe-webhook: bundle payment with no amount:', session.id);
+    return;
+  }
+  const purchasedAt = String(meta.purchased_at || '');
+  const dates = String(meta.covered_dates || '').split(',').map((d) => d.trim()).filter(Boolean);
+  const entries = Number(meta.bundle_entries);
+  if (!purchasedAt || !dates.length || !(entries > 0)) {
+    console.error('stripe-webhook: a bundle payment was missing its terms:', session.id);
+    return;
+  }
+  const existing = await bundles.getBundle(meta.participant_id, meta.activity_id, purchasedAt);
+  if (existing) return;
+
+  const rec = bundles.newBundle({
+    participantId: meta.participant_id,
+    activityId: meta.activity_id,
+    accountId: meta.account_id,
+    bundle: {
+      bundleId: meta.bundle_id,
+      entries: entries,
+      pricePerEntry: Number(meta.bundle_price_per_entry),
+      validityDays: Number(meta.bundle_validity_days)
+    },
+    coveredDates: dates,
+    purchasedAt: purchasedAt,
+    paymentRef: session.id
+  });
+  await bundles.saveBundle(rec);
+}
+
 async function settle(session) {
   // THE ORGANISATION CHECK, FIRST AND UNCONDITIONALLY.
   if (!S.isOurs(session)) return;
@@ -178,6 +223,7 @@ async function settle(session) {
   // worse than money nobody can place, because nobody goes looking for it.
   const meta = (session && session.metadata) || {};
   if (meta.ogen_kind === 'session') return settleSession(session, meta);
+  if (meta.ogen_kind === 'bundle') return settleBundle(session, meta);
 
   const ref = S.registrationRef(session);
   if (!ref) {

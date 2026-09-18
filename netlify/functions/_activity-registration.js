@@ -424,7 +424,15 @@ function mergeRegistration(base, incoming, type) {
 // the term and a drop-in quotes the session, so the form draws one of them —
 // and the other has to survive being undrawn exactly as the cutoffs do.
 const TYPE_SCOPED_FACT_KEYS = {
-  price: { fullPrice: ['course'], perSessionPrice: ['dropin'] }
+  // Four now, and the two new ones matter MORE than the first pair rather than
+  // less. A term price is one number an admin can retype; a bundle list is
+  // several products with their own ids, and a family's purchase points at one
+  // of those ids. Losing the list to a type switch would leave live bundles
+  // whose terms the activity no longer describes.
+  price: {
+    fullPrice: ['course'], perSessionPrice: ['dropin'],
+    lateDropIn: ['dropin'], bundles: ['dropin']
+  }
 };
 
 // Patch an incoming fact with the stored value of anything this type does not

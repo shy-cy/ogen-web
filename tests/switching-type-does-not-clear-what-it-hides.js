@@ -121,9 +121,18 @@ H.ok(/if \(!drawsField\(d, type\)\) return;/.test(adminJs),
 H.ok(/rec\.registration = readRegistration\(\)/.test(adminJs),
   'and the result reaches the record that is sent');
 
-// The price read-back is the client half of the same trap.
-H.ok(/if \(currentType\(\) === 'dropin'\) out\.perSessionPrice/.test(adminJs),
-  'the client sends only the price field it drew');
+// The price read-back is the client half of the same trap, and it now covers
+// FOUR fields rather than one. Two of them — the late price and the bundle list
+// — are drop-in only and are not one number an admin can retype: a bundle list
+// is several products, each with an id a family's purchase points at.
+H.ok(/if \(currentType\(\) === 'dropin'\) \{\s*\n\s*out\.perSessionPrice/.test(adminJs),
+  'the client sends only the price fields it drew');
+H.ok(/out\.bundles = syncBundles\(\);/.test(adminJs),
+  'including the bundle list, read from the model the editor keeps');
+H.ok(/out\.lateDropIn = \{/.test(adminJs), 'and the late price');
+const scoped = fs.readFileSync(path.join(R, 'netlify/functions/_activity-registration.js'), 'utf8');
+H.ok(/lateDropIn: \['dropin'\], bundles: \['dropin'\]/.test(scoped),
+  'and the server keeps both of them when a course does not send them');
 H.ok(!/perSessionPrice: readNum\('fact-price-perSessionPrice'\),\s*\n\s*fullPrice:/.test(adminJs),
   'and never both, which would send null for the one it did not show');
 

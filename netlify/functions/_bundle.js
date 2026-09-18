@@ -52,6 +52,44 @@ function normaliseBundles(price) {
     b.validityDays > 0);
 }
 
+// ⚠ REFUSED ON SAVE, not dropped on read.
+//
+// normaliseBundles() filters an incomplete bundle out, which is the right
+// behaviour at read time and the wrong one at save time: an admin who fills in
+// two of three boxes would publish an activity offering nothing, with the form
+// still showing what they typed and no explanation anywhere. So the same three
+// requirements are checked where a person is standing at a screen.
+//
+// The cap on entries is not arbitrary. A purchase carries its covered dates in
+// Stripe metadata, which allows 500 characters per value at 11 per date, so the
+// limit is what that field can actually hold — and thirty sessions is already
+// more than any term this site runs.
+const MAX_ENTRIES = 30;
+
+function validateBundles(price) {
+  const list = Array.isArray((price || {}).bundles) ? price.bundles : [];
+  const out = [];
+  const seen = {};
+  list.forEach((b, i) => {
+    const where = 'Bundle ' + (i + 1) + ': ';
+    const entries = num((b || {}).entries);
+    const per = num((b || {}).pricePerEntry);
+    const days = num((b || {}).validityDays);
+    if (!(entries > 0)) out.push(where + 'how many entries it holds is required.');
+    else if (entries > MAX_ENTRIES) out.push(where + 'at most ' + MAX_ENTRIES + ' entries.');
+    if (per == null || per < 0) out.push(where + 'a price per entry is required.');
+    if (!(days > 0)) out.push(where + 'a validity window in days is required.');
+    // Two bundles of the same size are two products a family cannot tell apart,
+    // and a purchase points at a bundleId — so the SIZE has to be unique even
+    // though the id already is.
+    if (entries > 0) {
+      if (seen[entries]) out.push(where + 'there is already a bundle of ' + entries + ' entries.');
+      seen[entries] = true;
+    }
+  });
+  return out;
+}
+
 // Every date this activity still meets on, from `now` forward, in order.
 //
 // `past()` rather than a comparison of strings, so "still ahead" means the end
@@ -276,6 +314,61 @@ function afterReschedule(bundle, fromDate, toDate) {
   };
 }
 
+// ⚠ ONE VIEW OF A BUNDLE, BUILT ONCE — read by the family's own card and by the
+// admin roster. Two builders would be two screens that can disagree about how
+// many entries somebody has left, and the family would be reading one of them
+// out to the admin reading the other.
+//
+// Pure: the attendance records are passed in, keyed by date.
+//
+// Four states, and the difference between the last two is the whole point of
+// the validity window. `gone` is a date the family simply did not book — the
+// entry is still theirs on paper and there is nothing left to spend it on,
+// which is the window doing its job. `available` is one they still can.
+function entryRows(bundle, attendanceByDate, now) {
+  const used = usedOf(bundle);
+  const byDate = attendanceByDate || {};
+  return coveredOf(bundle).map((date) => {
+    const att = byDate[date] || null;
+    const spent = used.indexOf(date) !== -1;
+    const gone = credit.past(date, now);
+    let state;
+    if (!spent) state = gone ? 'gone' : 'available';
+    else if (att && att.status === 'booked' && !gone) state = 'booked';
+    else state = 'used';
+    // Only a booking still ahead of its deadline can move, and the answer comes
+    // from the same function the server applies — so what is offered is what
+    // happens.
+    const may = state === 'booked' ? mayReschedule(att, now) : { may: false, reason: state };
+    return {
+      date: date, state: state,
+      mayReschedule: may.may === true,
+      reason: may.reason,
+      deadline: may.deadline == null ? null : may.deadline
+    };
+  });
+}
+
+// What a screen shows about one bundle. `remaining` is derived here as it is
+// everywhere; nothing reads a stored count.
+function bundleView(bundle, attendanceByDate, now) {
+  return {
+    bundleId: bundle.bundleId,
+    purchasedAt: bundle.purchasedAt,
+    participantId: bundle.participantId,
+    activityId: bundle.activityId,
+    status: bundle.status,
+    entries: (bundle.frozen || {}).entries || 0,
+    pricePerEntry: (bundle.frozen || {}).pricePerEntry,
+    totalCents: (bundle.frozen || {}).totalCents || 0,
+    validUntil: (bundle.frozen || {}).validUntil || null,
+    remaining: remaining(bundle),
+    used: usedOf(bundle).length,
+    shortfallCreditedCents: bundle.shortfallCreditedCents || 0,
+    rows: entryRows(bundle, attendanceByDate, now)
+  };
+}
+
 // A bundle is finished when every entry has been spent, or when the shortfall
 // has been settled and nothing is left to spend. `closed` is not `spent`: one
 // means the family used what they bought, the other means we could not offer it.
@@ -286,9 +379,9 @@ function statusAfter(bundle, shortfall) {
 }
 
 module.exports = {
-  DAY_MS, RESCHEDULE_HOURS,
-  normaliseBundles, datesAhead, coverageFor, bundlesAvailable,
-  remaining, covers, reconcile, statusAfter,
+  DAY_MS, RESCHEDULE_HOURS, MAX_ENTRIES,
+  normaliseBundles, validateBundles, datesAhead, coverageFor, bundlesAvailable,
+  remaining, covers, reconcile, statusAfter, entryRows, bundleView,
   rescheduleTargets, mayReschedule, afterReschedule,
   _eur: eur
 };

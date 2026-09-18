@@ -1,8 +1,13 @@
-// The nightly pass. TWO JOBS, and they share a schedule rather than a subject:
-// releasing registrations nobody answered, and completing activities that have
-// finished. Both are the same KIND of work — writing down something that has
-// already become true — which is why they run together and why neither is
-// load-bearing.
+// The nightly pass. THREE JOBS, and they share a schedule rather than a subject:
+// releasing registrations nobody answered, completing activities that have
+// finished, and keeping every bundle's promise against a calendar that moved.
+// All three are the same KIND of work — writing down something that has already
+// become true — which is why they run together and why none is load-bearing.
+//
+// The third is the one exception worth naming: when an activity is genuinely
+// over and a bundle could not be honoured in full, it writes a CREDIT. That is
+// money, so it follows the money rule rather than the cosmetic one — ledger
+// first, record second — and it is deliberately the last thing to run.
 //
 // IT IS THE COSMETIC HALF, AND SAYING SO IS THE POINT. holdsASpot() in
 // _registration.js already treats a lapsed pending registration as holding
@@ -22,6 +27,9 @@ const accounts = require('./_account-store');
 const R = require('./_registration');
 const mail = require('./_registration-email');
 const auto = require('./_activity-autocomplete');
+const B = require('./_bundle');
+const bundleStore = require('./_bundle-store');
+const ledger = require('./_credit-ledger');
 const { recordAudit } = require('./_audit');
 
 // Who the commit is by. A real name rather than a blank author, and one that
@@ -118,6 +126,103 @@ async function runRegistrations(now) {
   return { checked: all.length, expired: expired.length, keys: expired, at: new Date(at).toISOString() };
 }
 
+// ---- the third job: keep every bundle's promise ---------------------------
+//
+// THE PROMISE IS THE ENTRY COUNT, NOT THE WINDOW. A family bought ten sessions;
+// if we cancel one of the dates their bundle was holding, they are owed a
+// replacement — reaching PAST the validity window if it has to, because the
+// window exists to bound a promise rather than to break it.
+//
+// reconcile() is idempotent, which is what lets this run over every bundle every
+// night with no flag saying whether it has already looked. Most nights it
+// changes nothing.
+//
+// ⚠ AND THE SHORTFALL IS CREDITED ONLY WHEN THE ACTIVITY IS OVER.
+//
+// A shortfall today is not a shortfall: an admin who excludes a session this
+// week usually adds one next week, and crediting on the spot would pay a family
+// for a date they are about to be given back — and then hand them the date too.
+// So the trigger is that there are NO DATES AHEAD AT ALL. Nothing more can be
+// offered, so what is missing is missing for good.
+//
+// Note what does NOT produce a shortfall: a date the family simply let pass
+// unused. reconcile() keeps those in the coverage precisely so they cannot be
+// replaced, which is the window doing its job — the entry was theirs and they
+// did not use it. Only a date that LEFT THE CALENDAR is ours to make good.
+async function reconcileBundles(at) {
+  const admin = require('./activities-admin')._internal;
+  const published = await admin.allPublished();
+  const dropins = published.filter((a) => a && a.type === 'dropin');
+  const out = { considered: 0, adjusted: 0, credited: 0, creditedCents: 0, failed: [] };
+
+  for (const activity of dropins) {
+    const held = await bundleStore.forActivity(activity.activityId);
+    const ahead = B.datesAhead(activity, at).length;
+    for (const bundle of held) {
+      out.considered++;
+      try {
+        const result = B.reconcile(bundle, activity, at);
+        let dirty = false;
+        if (result.changed) {
+          bundle.coveredDates = result.coveredDates;
+          bundle.history = (bundle.history || []).concat([{
+            iso: new Date(at).toISOString(), action: 'reconciled', by: 'system',
+            note: 'coverage rebuilt: ' + result.coveredDates.length + ' of ' + (bundle.frozen || {}).entries
+          }]);
+          dirty = true;
+          out.adjusted++;
+        }
+
+        const owed = result.shortfallCents;
+        const already = bundle.shortfallCreditedCents || 0;
+        if (ahead === 0 && result.shortfall > 0 && owed > already) {
+          const amount = owed - already;
+          // ⚠ THE LEDGER FIRST, THE RECORD SECOND — the money rule, which is the
+          // opposite of the email rule and wins over it. A credit not written is
+          // money lost with nobody able to tell; a credit written twice is a
+          // visible line in an append-only record a person reads, and is
+          // reversible with an adjustment.
+          await ledger.append({
+            accountId: bundle.accountId, type: 'credit', amountCents: amount,
+            reason: 'bundle-shortfall',
+            basis: {
+              bundleId: bundle.bundleId, purchasedAt: bundle.purchasedAt,
+              entries: (bundle.frozen || {}).entries,
+              covered: result.coveredDates.length,
+              shortfall: result.shortfall,
+              // The rate that was PAID, not the standard one. A family who
+              // bought ten at the bundle rate and could use six is credited four
+              // at that rate; re-pricing the six they used at the standard rate
+              // would charge them more for a shortfall that was ours.
+              pricePerEntry: (bundle.frozen || {}).pricePerEntry
+            },
+            createdBy: 'system'
+          });
+          bundle.shortfallCreditedCents = owed;
+          bundle.history = (bundle.history || []).concat([{
+            iso: new Date(at).toISOString(), action: 'shortfall-credited', by: 'system',
+            note: result.shortfall + ' entries · ' + amount + 'c'
+          }]);
+          dirty = true;
+          out.credited++;
+          out.creditedCents += amount;
+        }
+
+        if (dirty) {
+          bundle.status = B.statusAfter(bundle, result.shortfall);
+          await bundleStore.saveBundle(bundle);
+        }
+      } catch (err) {
+        // One bundle failing must not take the rest down. It is found again
+        // tomorrow, and reconcile() is idempotent, so nothing is half-done.
+        out.failed.push({ bundle: bundle.bundleId, participantId: bundle.participantId,
+                          error: (err && err.message) || String(err) });
+      }
+    }
+  }
+  return out;
+}
+
 // ---- the nightly job: both halves -----------------------------------------
 //
 // The scheduled function's entry point, and nothing else should call it. The
@@ -136,7 +241,17 @@ async function run(now) {
     activities.error = (err && err.message) || String(err);
   }
 
-  return Object.assign({}, registrations, { activities: activities });
+  // THIRD, and independently. It touches no git and publishes nothing, so a
+  // failure in the activity half above must not stop a family's bundle being
+  // repaired — and its own failure must not stop anything either.
+  let bundles = { considered: 0, adjusted: 0, credited: 0, creditedCents: 0, failed: [], error: null };
+  try {
+    bundles = await reconcileBundles(at);
+  } catch (err) {
+    bundles.error = (err && err.message) || String(err);
+  }
+
+  return Object.assign({}, registrations, { activities: activities, bundles: bundles });
 }
 
-module.exports = { run, runRegistrations, completeFinishedActivities };
+module.exports = { run, runRegistrations, completeFinishedActivities, reconcileBundles };

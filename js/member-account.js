@@ -117,6 +117,19 @@
       datesGone: 'חלק מהמפגשים כבר אינם זמינים. אפשר לבחור שוב.',
       awaitingOk: 'ההרשמה נקלטה. נאשר את המקום לפני בחירת מפגשים — לא בוצע חיוב.',
       chooseSessions: 'מעבר לעמוד הפעילות',
+      bundleTitle: 'כרטיסיות',
+      bundleIntro: 'מפגשים שנרכשו מראש. מספר המפגשים הוא ההבטחה — אם ניאלץ לבטל מפגש שאי אפשר להחליף, הסכום יוחזר כזיכוי לפי המחיר ששולם.',
+      bundleLeft: 'נותרו', bundleOf: 'מתוך', bundleValid: 'בתוקף עד',
+      bundleCredited: 'הוחזר כזיכוי עבור מפגשים שלא יכולנו להציע:',
+      entryState: { used: 'נוצל', booked: 'רשום/ה', available: 'זמין', gone: 'לא נוצל' },
+      reschedule: 'שינוי מועד', rescheduleTo: 'להעביר לתאריך',
+      rescheduleGo: 'העברה', rescheduleDone: 'המפגש הועבר.',
+      fromBundle: 'מהכרטיסייה',
+      buyTitle: 'רכישת כרטיסייה',
+      buyNone: 'אין כרגע כרטיסייה זמינה לפעילות הזו.',
+      buyIntro: 'כרטיסייה מוצעת רק כשלוח המפגשים יכול לכסות את כולה בתוך תקופת התוקף.',
+      buySessions: 'מפגשים', buyGo: 'רכישה', buyOpening: 'פותח תשלום…',
+      buyValid: 'תוקף', buyDays: 'ימים',
       paySession: 'תשלום על המפגש', payingSession: 'פותח תשלום…',
       registerDone: 'ההרשמה בוצעה. קישור לתשלום יישלח אליכם בקרוב.',
       owes: 'לתשלום', paid: 'שולם', feeIncluded: 'כולל דמי הרשמה שנתיים',
@@ -206,6 +219,19 @@
       datesGone: 'Some of those sessions are no longer available. Please choose again.',
       awaitingOk: 'Registered. We will confirm the place before sessions can be booked \u2014 nothing has been charged.',
       chooseSessions: 'Go to the activity page',
+      bundleTitle: 'Bundles',
+      bundleIntro: 'Sessions bought in advance. The number of sessions is the promise — if we have to cancel one we cannot replace, it comes back as credit at the rate you paid.',
+      bundleLeft: 'left', bundleOf: 'of', bundleValid: 'Valid until',
+      bundleCredited: 'Credited back for sessions we could not offer:',
+      entryState: { used: 'used', booked: 'booked', available: 'available', gone: 'not used' },
+      reschedule: 'Move', rescheduleTo: 'Move to',
+      rescheduleGo: 'Move it', rescheduleDone: 'That session has been moved.',
+      fromBundle: 'from your bundle',
+      buyTitle: 'Buy a bundle',
+      buyNone: 'No bundle is available for this activity at the moment.',
+      buyIntro: 'A bundle is offered only when the calendar can cover every session inside its validity window.',
+      buySessions: 'sessions', buyGo: 'Buy', buyOpening: 'Opening payment…',
+      buyValid: 'valid', buyDays: 'days',
       paySession: 'Pay for this session', payingSession: 'Opening payment…',
       registerDone: 'Registered. We will send you a payment link shortly.',
       owes: 'To pay', paid: 'Paid', feeIncluded: 'includes the yearly registration fee',
@@ -295,6 +321,19 @@
       datesGone: 'Некоторые даты уже недоступны. Пожалуйста, выберите снова.',
       awaitingOk: 'Заявка принята. Мы подтвердим место до выбора дат \u2014 оплата не списана.',
       chooseSessions: 'Перейти к занятию',
+      bundleTitle: 'Абонементы',
+      bundleIntro: 'Занятия, оплаченные заранее. Обещание — это количество занятий: если нам придётся отменить занятие и заменить его нечем, сумма вернётся на счёт по оплаченной цене.',
+      bundleLeft: 'осталось', bundleOf: 'из', bundleValid: 'Действует до',
+      bundleCredited: 'Возвращено за занятия, которые мы не смогли предложить:',
+      entryState: { used: 'использовано', booked: 'записаны', available: 'доступно', gone: 'не использовано' },
+      reschedule: 'Перенести', rescheduleTo: 'Перенести на',
+      rescheduleGo: 'Перенести', rescheduleDone: 'Занятие перенесено.',
+      fromBundle: 'из абонемента',
+      buyTitle: 'Купить абонемент',
+      buyNone: 'Сейчас для этого занятия нет доступных абонементов.',
+      buyIntro: 'Абонемент предлагается только тогда, когда расписание покрывает все занятия в пределах срока действия.',
+      buySessions: 'занятий', buyGo: 'Купить', buyOpening: 'Открываем оплату…',
+      buyValid: 'срок', buyDays: 'дней',
       paySession: 'Оплатить это занятие', payingSession: 'Открываем оплату…',
       registerDone: 'Запись оформлена. Ссылку на оплату мы пришлём в ближайшее время.',
       owes: 'К оплате', paid: 'Оплачено', feeIncluded: 'включая годовой регистрационный взнос',
@@ -1329,7 +1368,13 @@
       // each one is, what it cost, and whether it can still be booked or given
       // back — an activity paid for one evening at a time is the only place
       // "attended" means anything.
-      if (r.type === 'dropin') renderEvenings(body, r, act);
+      if (r.type === 'dropin') {
+        // Bundles BEFORE the evenings. What a family holds decides how they read
+        // the list under it — an evening costing nothing makes sense once the
+        // bundle above it has been seen, and reads as a bug otherwise.
+        renderBundlePanel(body, r, act);
+        renderEvenings(body, r, act);
+      }
       else if (act && act.sessionRows && act.sessionRows.length) {
         body.appendChild(section(T.sessionsTitle, [courseSessions(act.sessionRows)]));
       }
@@ -1484,11 +1529,144 @@
     return el('div', { class: 'acc-scroll' }, [table]);
   }
 
+  // ---- bundles: what was bought in advance ----
+  //
+  // ⚠ ONE PANEL, TWO QUESTIONS — what I hold, and what I could buy — and they
+  // are drawn from one call because they are one decision. A family with two
+  // entries left is deciding whether to buy another bundle or pay per session,
+  // and splitting that across two screens makes them hold the first number in
+  // their head while reading the second.
+  //
+  // Every figure comes from the server's bundleView(), the same builder the
+  // admin roster reads. An admin and a family reading different numbers off the
+  // same purchase is the failure that shape exists to prevent.
+  function renderBundlePanel(where, r, act) {
+    var panel = el('div', {});
+    where.appendChild(panel);
+    if (!act) return;
+    draw();
+    return panel;
+
+    function draw() {
+      clear(panel);
+      post(REGS, { action: 'bundles', participantId: r.participantId, slug: act.slug })
+        .then(function (res) {
+          clear(panel);
+          if (!res.ok) return;      // a bundle panel that cannot load is not an error a family can act on
+          var held = res.data.held || [];
+          var offers = res.data.offers || [];
+          if (held.length) panel.appendChild(section(T.bundleTitle, [
+            el('p', { class: 'acc-intro', text: T.bundleIntro })
+          ].concat(held.map(function (b) { return heldCard(b); }))));
+          panel.appendChild(section(T.buyTitle, offers.length
+            ? [el('p', { class: 'acc-intro', text: T.buyIntro })]
+                .concat(offers.map(function (o) { return offerRow(o); }))
+            : [el('p', { class: 'acc-intro', text: T.buyNone })]));
+        });
+    }
+
+    function heldCard(b) {
+      var rows = el('table', { class: 'acc-table' });
+      b.rows.forEach(function (row) {
+        rows.appendChild(el('tr', {}, [
+          el('td', { text: dayMonth(row.date) }),
+          el('td', { class: 'acc-meta', text: T.entryState[row.state] || row.state }),
+          el('td', {}, [row.mayReschedule ? moveCell(b, row) : null])
+        ]));
+      });
+      return el('div', { class: 'acc-bundle' }, [
+        el('div', { class: 'acc-bundle-head' }, [
+          // The number a family opens this for, and the largest thing on the
+          // card. Derived on the server from the dates used — never a counter.
+          el('b', { class: 'acc-bundle-count', text: b.remaining + ' ' + T.bundleOf + ' ' + b.entries }),
+          el('span', { class: 'acc-meta', text: T.bundleLeft }),
+          b.validUntil
+            ? el('span', { class: 'acc-meta', text: T.bundleValid + ' ' + dayMonth(isoOf(b.validUntil)) })
+            : null
+        ]),
+        el('div', { class: 'acc-scroll' }, [rows]),
+        b.shortfallCreditedCents > 0
+          ? el('p', { class: 'acc-note', text: T.bundleCredited + ' ' + money(b.shortfallCreditedCents) })
+          : null
+      ]);
+    }
+
+    // ⚠ THE DATES OFFERED ARE THE SERVER'S OWN LIST. rescheduleTargets() decided
+    // it, and the same function decides the move — so a date on this menu is a
+    // date that will be accepted. A client filtering the calendar itself would
+    // offer a full evening, or one past the window that was sold.
+    function moveCell(b, row) {
+      var cell = el('span', {});
+      var open = el('button', { type: 'button', class: 'acc-link', text: T.reschedule,
+        onclick: function () {
+          clear(cell);
+          var pickDate = el('select', {});
+          (row.targets || []).forEach(function (d) {
+            pickDate.appendChild(el('option', { value: d, text: dayMonth(d) }));
+          });
+          var go = el('button', { type: 'button', class: 'acc-link', text: T.rescheduleGo,
+            onclick: function () {
+              go.disabled = true;
+              post(REGS, { action: 'rescheduleSession', participantId: r.participantId,
+                           slug: act.slug, fromDate: row.date, toDate: pickDate.value })
+                .then(function (res) {
+                  if (!res.ok) { go.disabled = false; return say('err', failure(res)); }
+                  say('ok', T.rescheduleDone);
+                  // Both panels move: the entry left one date and landed on
+                  // another, and the evenings table below is the other half of
+                  // the same fact.
+                  draw();
+                  if (typeof S.redrawEvenings === 'function') S.redrawEvenings();
+                });
+            } });
+          cell.appendChild(el('span', { class: 'acc-meta', text: T.rescheduleTo + ' ' }));
+          cell.appendChild(pickDate);
+          cell.appendChild(go);
+        } });
+      cell.appendChild(open);
+      return cell;
+    }
+
+    function offerRow(o) {
+      var go = el('button', { type: 'button', class: 'btn-primary', text: T.buyGo,
+        onclick: function () {
+          go.disabled = true;
+          go.textContent = T.buyOpening;
+          post(REGS, { action: 'buyBundle', participantId: r.participantId,
+                       slug: act.slug, bundleId: o.bundleId }).then(function (res) {
+            if (res.ok && res.data && res.data.url) { location.href = res.data.url; return; }
+            go.disabled = false;
+            go.textContent = T.buyGo;
+            say(res.ok ? 'ok' : 'err', res.ok ? T.awaitingOk : failure(res));
+          });
+        } });
+      return el('div', { class: 'acc-row' }, [
+        el('div', {}, [
+          el('b', { text: o.entries + ' ' + T.buySessions + ' · ' + money(o.totalCents) }),
+          el('span', { class: 'acc-meta',
+                       text: money(Math.round(Number(o.pricePerEntry) * 100)) + ' × ' + o.entries +
+                             ' · ' + T.buyValid + ' ' + o.validityDays + ' ' + T.buyDays })
+        ]),
+        el('div', { class: 'acc-actions' }, [go])
+      ]);
+    }
+  }
+
+  // An instant back to the ISO date the rest of this screen speaks. The bundle's
+  // deadline is stored as a number because a reschedule is bounded by an instant
+  // rather than by a day.
+  function isoOf(ms) {
+    var d = new Date(Number(ms));
+    return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+  }
+
   // ---- the evenings of a drop-in ----
   function renderEvenings(where, r, act) {
     var panel = el('div', {});
     where.appendChild(panel);
     if (!act) return;
+    // A move changes both panels, so the bundle card can ask this one to redraw.
+    S.redrawEvenings = draw;
     draw();
 
     function draw() {
@@ -1512,7 +1690,10 @@
                 ? el('span', { class: 'acc-pill is-s-' + s.status,
                                text: T.sessionStatus[s.status] || s.status })
                 : el('span', { class: 'acc-meta', text: '—' })]),
-              el('td', { class: 'is-num', text: money(s.owedCents) }),
+              // €0.00 on an evening a family paid for in advance reads as a
+              // mistake. The reason it is nothing is the interesting part.
+              el('td', { class: 'is-num', text: s.priceBasis === 'bundle'
+                ? T.fromBundle : money(s.owedCents) }),
               el('td', { class: 'is-num', text: money(s.paidCents) }),
               el('td', {}, [eveningAction(s, res.data, r, act, draw)])
             ]));

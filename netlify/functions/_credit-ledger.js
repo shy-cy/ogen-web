@@ -40,7 +40,12 @@ const REASONS = [
   'registration-cancelled-by-guardian',
   'registration-cancelled-by-admin',
   'credit-applied',        // debit: spent on a later registration
-  'admin-adjustment'
+  'admin-adjustment',
+  // A bundle we could not honour in full. Written by the nightly pass, only
+  // once the activity is genuinely over, at the rate the family PAID — see
+  // reconcileBundles() in _registration-sweep.js. It is its own reason rather
+  // than an adjustment because nobody adjusted anything: the calendar ran out.
+  'bundle-shortfall'
 ];
 
 const key = (accountId, iso) =>

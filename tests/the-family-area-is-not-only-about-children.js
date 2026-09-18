@@ -135,8 +135,17 @@ H.ok(!/activitySlugAtSubmission/.test(action),
 console.log('\n[one row shape, so a list and a page cannot disagree]');
 H.ok(/^function regRow\(reg, participant\)/m.test(regs),
   'the server builds a registration row in one place');
-H.eq((regs.match(/participantName:/g) || []).length, 1,
-  'and only one place names the participant');
+// ⚠ SCOPED TO THE ROW BUILDER. This counted the whole file once, which made it
+// a test about the string "participantName:" rather than about rows — and it
+// fired the first time a name was needed for something that is not a row (the
+// line description on a bundle's Stripe session, so a family buying for two
+// children can tell the two receipts apart). The property worth pinning is that
+// there is ONE row builder, not that a word appears once.
+const rowFn = regs.slice(regs.indexOf('function regRow(reg, participant)'), regs.indexOf('exports.handler'));
+H.eq((rowFn.match(/participantName:/g) || []).length, 1,
+  'and only one place names the participant INTO A ROW');
+H.eq((regs.match(/regRow\(/g) || []).length > 2, true,
+  'and both views go through it rather than composing their own');
 
 console.log('\n[the facts on the page are the PUBLIC facts, and nothing more]');
 // isPubliclyVisible() keeps its exact current meaning and its only caller. The
