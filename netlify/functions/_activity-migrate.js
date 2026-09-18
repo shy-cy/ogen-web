@@ -147,7 +147,28 @@ const SHAPES = {
     perSessionPrice: num(f.perSessionPrice),
     // Absent means off. Normalised to a real boolean so the checkbox has
     // something to bind to and a save cannot write undefined back.
-    showPerLesson: f.showPerLesson === true
+    showPerLesson: f.showPerLesson === true,
+    // ⚠ SHAPES ARE APPLIED ON EVERY READ AND EVERY SAVE, so a key missing from
+    // here is a key the next save DELETES. That is exactly how the session
+    // calendar was silently lost for a while — generated, stored, rendered, and
+    // gone on the following save. Both new fields are listed for that reason.
+    //
+    // Late drop-in pricing: absent means off, and `enabled: false` with the two
+    // numbers kept means an admin who switches it off does not lose what they
+    // typed. Same instinct as a cutoff an admin switched off staying off.
+    lateDropIn: {
+      enabled: (f.lateDropIn || {}).enabled === true,
+      hoursBefore: num((f.lateDropIn || {}).hoursBefore),
+      price: num((f.lateDropIn || {}).price)
+    },
+    // Bundles. A list, because "5 entries" and "10 entries" are two products on
+    // one activity — and the empty list is the ordinary case, not a special one.
+    bundles: (Array.isArray(f.bundles) ? f.bundles : []).map((b) => ({
+      bundleId: String((b || {}).bundleId || '').trim(),
+      entries: num((b || {}).entries),
+      pricePerEntry: num((b || {}).pricePerEntry),
+      validityDays: num((b || {}).validityDays)
+    })).filter((b) => b.bundleId)
   })
 };
 

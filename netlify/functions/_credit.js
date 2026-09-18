@@ -426,7 +426,19 @@ function creditForSession(att, now) {
 //
 // `resolveSessionInstant` is a parameter for the same reason it is there — the
 // caller knows which zone the wall-clock times were written in.
-function freezeSession(activity, sessionDate, resolveSessionInstant) {
+// ⚠ `opts` CARRIES THE MOMENT OF BOOKING, AND NOTHING IN HERE ASKS FOR IT.
+//
+// Late pricing is a comparison against a start time, so it needs to know when
+// the booking happened — and this file's whole contract is that it never asks
+// what time it is. `opts.bookedAt` is passed in, absent reads as "not late",
+// and the same booking re-frozen a year from now produces the same price.
+// Reading a blank as late would charge the higher figure in exactly the case
+// nobody can check.
+//
+// `opts.bundle` short-circuits both: an entry was bought in advance at a fixed
+// rate, which is what a bundle IS, so the evening costs nothing further and
+// late pricing cannot apply to it however late it is booked.
+function freezeSession(activity, sessionDate, resolveSessionInstant, opts) {
   const reg = (activity && activity.registration) || {};
   const facts = (activity && activity.facts) || {};
   const duration = facts.duration || {};
@@ -444,19 +456,56 @@ function freezeSession(activity, sessionDate, resolveSessionInstant) {
   const row = (Array.isArray(duration.sessionDates) ? duration.sessionDates : [])
     .filter((r) => r && r.date === sessionDate && r.status !== 'excluded')[0] || null;
   const defaultTime = ((times.sessions || [])[0] || {}).time || '';
-  const price = facts.price || {};
+  const startsAt = row ? resolve(sessionDate, row.time || defaultTime) : null;
+  const sessionPrice = priceForSession(activity, startsAt, opts);
 
   return {
     type: 'dropin',
     sessionDate: sessionDate,
-    startsAt: row ? resolve(sessionDate, row.time || defaultTime) : null,
+    startsAt: startsAt,
     // Null means "creditable until it starts", and absent must not become 0 —
     // zero hours and no rule are the same answer here, but only by accident, and
     // a later edit to either would separate them.
     cancelHours: reg.sessionCancelHours == null ? null : Number(reg.sessionCancelHours),
-    perSessionPrice: price.perSessionPrice == null ? null : Number(price.perSessionPrice),
+    perSessionPrice: sessionPrice.price,
+    // WHICH price this is, frozen beside the figure. A number with no basis is
+    // a number nobody can explain to a family six weeks later, and "why was I
+    // charged 10 and she was charged 12" is the question this answers.
+    priceBasis: sessionPrice.basis,
+    bundleId: (opts && opts.bundleId) || null,
     currency: 'EUR'
   };
+}
+
+// The standard price, the late price, or nothing at all.
+//
+// ONE FUNCTION, so the figure a screen shows and the figure a booking charges
+// cannot disagree — the same reason there is exactly one checkout builder.
+//
+// The cutoff is HOURS BEFORE A START TIME rather than the end of a day, because
+// a session is a moment where a cancellation cutoff is a day. It reuses the
+// instant already resolved above, so there is no second idea here of when a
+// session begins.
+function priceForSession(activity, startsAt, opts) {
+  const price = ((activity || {}).facts || {}).price || {};
+  const standard = price.perSessionPrice == null ? null : Number(price.perSessionPrice);
+  if (opts && opts.bundle) return { price: 0, basis: 'bundle' };
+
+  const late = price.lateDropIn || {};
+  const bookedAt = ms((opts || {}).bookedAt);
+  if (!late.enabled || late.price == null || startsAt == null || bookedAt == null) {
+    return { price: standard, basis: 'standard' };
+  }
+  const hours = Number(late.hoursBefore);
+  // No usable cutoff is not "late from the beginning of time" — it is a rule
+  // nobody finished configuring, and it resolves towards the family like every
+  // other blank here.
+  if (!Number.isFinite(hours) || hours < 0) return { price: standard, basis: 'standard' };
+
+  const cutoff = startsAt - hours * 60 * 60 * 1000;
+  return bookedAt >= cutoff
+    ? { price: Number(late.price), basis: 'late' }
+    : { price: standard, basis: 'standard' };
 }
 
 // One local wall-clock date and time in a zone, as an instant. Same two-pass
@@ -476,6 +525,6 @@ module.exports = {
   TZ, OFF,
   creditFor, basisFor, freezeCancellation,
   creditForSession, freezeSession,
-  splitPaid, share, past, endOfDay, resolveLocal, parseDateParts,
+  splitPaid, share, past, endOfDay, resolveLocal, parseDateParts, priceForSession,
   sessionInstants, hasStarted, remaining, ms
 };
