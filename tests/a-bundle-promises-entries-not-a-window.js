@@ -146,6 +146,31 @@ H.eq(out.shortfall, 3, 'so three entries cannot be honoured');
 // charge a family more for a shortfall that was ours.
 H.eq(out.shortfallCents, 2700, 'credited at the BUNDLE rate — 3 x €9, not the €12 single price');
 
+console.log('\n[⚠ a date that merely PASSED is not a date we cancelled]');
+// The first version could not tell the two apart, and gave entries away for it.
+// A covered date stops being "ahead" for two completely different reasons — we
+// excluded it, or nobody booked it in time — and only the first is a promise we
+// broke. Replacing the second would mean a family who let every date go by kept
+// being handed new ones, and the validity window would bound nothing at all.
+const lapsedOne = { frozen: { entries: 3, pricePerEntry: 9, validityDays: 60 },
+                    coveredDates: ['2026-10-06', '2026-10-13', '2026-10-20'],
+                    usedDates: [], status: 'active' };
+const afterTheSixth = Date.parse('2026-10-08T09:00:00Z');
+const lapsed = B.reconcile(lapsedOne, long, afterTheSixth);
+H.eq(lapsed.coveredDates.join(','), '2026-10-06,2026-10-13,2026-10-20',
+  'an evening nobody booked stays in the coverage, unusable — that is the window working');
+H.eq(lapsed.changed, false, 'and nothing is rewritten');
+H.eq(lapsed.shortfall, 0, 'nothing is owed: we did not break this promise');
+
+const pulledOut = JSON.parse(JSON.stringify(long));
+pulledOut.facts.duration.sessionDates = pulledOut.facts.duration.sessionDates
+  .map((r) => (r.date === '2026-10-20' ? { date: r.date, status: 'excluded', reason: 'holiday' } : r));
+const replaced = B.reconcile(lapsedOne, pulledOut, afterTheSixth);
+H.ok(replaced.coveredDates.indexOf('2026-10-20') === -1, 'a date we EXCLUDED leaves the coverage');
+H.ok(replaced.coveredDates.indexOf('2026-10-27') !== -1, 'and is replaced by the next one ahead');
+H.ok(replaced.coveredDates.indexOf('2026-10-06') !== -1,
+  'while the one that merely passed is left alone in the same pass');
+
 console.log('\n[reconcile is idempotent, which is what lets it run every night]');
 const first = B.reconcile(bought, holed, NOW);
 const second = B.reconcile(Object.assign({}, bought, { coveredDates: first.coveredDates }), holed, NOW);
@@ -196,5 +221,62 @@ const round = migrate(withBundles([B3], { lateDropIn: { enabled: true, hoursBefo
 H.eq(round.facts.price.bundles.length, 1, 'bundles survive');
 H.eq(round.facts.price.lateDropIn.hoursBefore, 2, 'and so does the late rule');
 H.eq(JSON.stringify(migrate(round)), JSON.stringify(round), 'and migrate() is still idempotent');
+
+// ------------------------------------------------------------- rescheduling
+console.log('\n[rescheduling: twenty-four hours, and the entry is spent either way]');
+const booked = (startsAt, over) => Object.assign(
+  { status: 'booked', frozen: { priceBasis: 'bundle', startsAt: startsAt } }, over || {});
+const starts = credit.freezeSession(long, '2026-10-13').startsAt;
+H.eq(B.mayReschedule(booked(starts), starts - 48 * 3600e3).may, true, 'two days before, yes');
+H.eq(B.mayReschedule(booked(starts), starts - 2 * 3600e3).may, false, 'two hours before, no');
+H.eq(B.mayReschedule(booked(starts), starts - 2 * 3600e3).reason, 'too-late', 'and says why');
+H.eq(B.mayReschedule(booked(starts), starts - 24 * 3600e3).may, false,
+  'exactly on the deadline is too late — "at least 24 hours notice" means strictly more');
+H.eq(B.mayReschedule(booked(starts, { status: 'attended' }), starts - 48 * 3600e3).reason,
+  'not-booked', 'an evening already attended cannot be moved');
+H.eq(B.mayReschedule(booked(starts, { frozen: { priceBasis: 'standard', startsAt: starts } }),
+  starts - 48 * 3600e3).reason, 'not-a-bundle-entry',
+  'and this is a bundle mechanism — a paid single session is cancelled, not moved');
+H.eq(B.mayReschedule(booked(null), starts - 48 * 3600e3).may, true,
+  'an evening with no resolvable start is misconfigured, which is not the family\'s doing');
+
+console.log('\n[where it may be moved to]');
+const held = { frozen: { entries: 3, pricePerEntry: 9, validityDays: 60,
+                         validUntil: Date.parse('2026-11-30T00:00:00Z') },
+               coveredDates: ['2026-10-06', '2026-10-13', '2026-10-20'],
+               usedDates: ['2026-10-13'], status: 'active' };
+const targets = B.rescheduleTargets(held, long, '2026-10-13', NOW, ['2026-10-13']);
+H.ok(targets.indexOf('2026-10-13') === -1, 'not the evening it is already on');
+H.ok(targets.indexOf('2026-10-20') !== -1, 'a date it already covers is fine');
+H.ok(targets.indexOf('2026-11-24') !== -1, 'and so is one it does not, inside the window');
+// ⚠ THE ONE PLACE THIS IS LESS GENEROUS THAN reconcile(). Without it, repeated
+// rescheduling would extend a bundle indefinitely.
+H.ok(targets.indexOf('2026-12-08') === -1,
+  'but NOT past the window that was sold — a guardian\'s own change of plan does not extend a bundle');
+H.ok(B.rescheduleTargets(held, long, '2026-10-13', NOW, ['2026-10-13', '2026-10-20'])
+      .indexOf('2026-10-20') === -1, 'an evening already booked is not somewhere to move to');
+
+console.log('\n[the swap: two different moves, and they are not the same]');
+// Treating them alike lost the family an entry. Moving INSIDE the coverage
+// changes which date is booked and nothing about which dates may be used;
+// removing fromDate there would give up the right to rebook that evening.
+const sameSet = B.afterReschedule(held, '2026-10-13', '2026-10-20');
+H.eq(sameSet.usedDates.join(','), '2026-10-20', 'the entry moves');
+H.eq(sameSet.coveredDates.join(','), '2026-10-06,2026-10-13,2026-10-20',
+  'and the coverage does NOT — the family still may book the evening they left');
+const outside = B.afterReschedule(held, '2026-10-13', '2026-10-27');
+H.eq(outside.coveredDates.join(','), '2026-10-06,2026-10-20,2026-10-27',
+  'moving outside the coverage relocates the slot');
+H.eq(outside.coveredDates.length, 3, 'and both branches keep the length');
+H.eq(sameSet.coveredDates.length, 3, 'so reconcile has nothing to refill afterwards');
+H.eq(B.reconcile(Object.assign({}, held, sameSet), long, NOW).changed, false,
+  'which is asserted rather than assumed');
+
+console.log('\n[rescheduling more than once is allowed]');
+let chain = Object.assign({}, held, B.afterReschedule(held, '2026-10-13', '2026-10-27'));
+chain = Object.assign({}, chain, B.afterReschedule(chain, '2026-10-27', '2026-11-03'));
+H.eq(chain.usedDates.join(','), '2026-11-03', 'the entry follows the family');
+H.eq(chain.coveredDates.length, 3, 'and the bundle is still three dates');
+H.eq(B.remaining(chain), 2, 'still one entry spent, not three');
 
 H.done();

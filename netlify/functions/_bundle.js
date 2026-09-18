@@ -136,12 +136,25 @@ function covers(bundle, sessionDate) {
 function reconcile(bundle, activity, now) {
   const used = usedOf(bundle);
   const entries = ((bundle || {}).frozen || {}).entries || 0;
+  const duration = ((activity || {}).facts || {}).duration || {};
+  // ⚠ STILL ON THE CALENDAR, past or future — NOT "still ahead".
+  //
+  // This is the distinction the first version got wrong, and getting it wrong
+  // gave entries away. A covered date stops being ahead for two completely
+  // different reasons: WE EXCLUDED IT, or IT SIMPLY PASSED AND NOBODY BOOKED
+  // IT. Only the first is a promise we broke. Replacing the second would mean a
+  // family who let every date go by kept being handed new ones, and the validity
+  // window would bound nothing at all.
+  //
+  // So a date that passed unused stays in the coverage, unusable, which is the
+  // window doing its job; a date that left the calendar is replaced.
+  const onCalendar = sessions.scheduled(duration.sessionDates).map((r) => r.date);
   const ahead = datesAhead(activity, now);
 
-  // Kept: what was spent, plus anything still on the calendar ahead. Sorted so
-  // the list reads as a calendar rather than as a history of edits.
-  const keep = coveredOf(bundle).filter((d) => used.indexOf(d) !== -1 || ahead.indexOf(d) !== -1);
+  const keep = coveredOf(bundle).filter((d) => used.indexOf(d) !== -1 || onCalendar.indexOf(d) !== -1);
   const next = keep.slice();
+  // A replacement can only be a date still to come: nobody can be given an
+  // evening that has already happened.
   for (const d of ahead) {
     if (next.length >= entries) break;
     if (next.indexOf(d) === -1) next.push(d);
@@ -162,6 +175,107 @@ function reconcile(bundle, activity, now) {
   };
 }
 
+// ---------------------------------------------------------------- rescheduling
+//
+// A guardian moving one booked evening to another date, with no admin in the
+// loop. Twenty-four hours' notice, and inside that window there is no
+// rescheduling at all — the entry is spent exactly as a no-show spends it.
+//
+// ⚠ THIS IS NOT reconcile() WITH A DIFFERENT TRIGGER, and the difference is the
+// whole reason it is a separate function. reconcile() repairs a promise WE
+// broke: it picks the replacement itself, it can never cost an entry, it has no
+// deadline, and it runs every night. This costs an entry when it is refused, the
+// guardian picks the date, and it happens once. Folding them together would give
+// the repair function the power to destroy an entry, which is the one thing it
+// must never have.
+//
+// They do not collide: a swap keeps coveredDates the same LENGTH in both of its
+// branches, so the next nightly reconcile has nothing to refill and will not
+// drag the abandoned date back in.
+//
+// A fixed twenty-four hours rather than a per-activity field, deliberately.
+// `sessionCancelHours` uses null to mean NO deadline — creditable until it
+// starts — so a reschedule field would have to read null as 24, and two nulls
+// meaning opposite things in one block is a trap this codebase keeps finding.
+const RESCHEDULE_HOURS = 24;
+
+// Where a guardian may move an entry to.
+//
+// ⚠ BOUNDED BY THE WINDOW THAT WAS SOLD, which is the one place this is
+// deliberately less generous than reconcile(). reconcile() reaches past the
+// window because the system failed; a guardian's own change of plan does not,
+// or repeated rescheduling would extend a bundle indefinitely. The bound is the
+// later of the frozen deadline and the furthest date the bundle already covers,
+// so a bundle reconcile() has already extended is not then narrowed by this.
+function rescheduleTargets(bundle, activity, fromDate, now, takenDates) {
+  const covered = coveredOf(bundle);
+  const used = usedOf(bundle);
+  const frozen = (bundle || {}).frozen || {};
+  const furthest = covered.length
+    ? Math.max.apply(null, covered.map((d) => credit.resolveLocal(d, '00:00', credit.TZ) || 0))
+    : 0;
+  const limit = Math.max(Number(frozen.validUntil) || 0, furthest);
+  const busy = Array.isArray(takenDates) ? takenDates : [];
+
+  return datesAhead(activity, now)
+    .filter((d) => d !== fromDate)
+    .filter((d) => credit.resolveLocal(d, '00:00', credit.TZ) <= limit)
+    // An evening this participant is already on is not somewhere to move to,
+    // and a date whose entry is already spent cannot take a second one.
+    .filter((d) => busy.indexOf(d) === -1 && used.indexOf(d) === -1)
+    // A date the bundle already covers but has NOT spent is a legal target: the
+    // swap simply reorders which of its own dates it is holding.
+    .filter((d) => covered.indexOf(d) === -1 || used.indexOf(d) === -1);
+}
+
+// May this booking be moved at all? Answered from the booking and one timestamp,
+// so the button a family is shown is decided by the function the server applies.
+function mayReschedule(att, now) {
+  if (!att || att.status !== 'booked') return { may: false, reason: 'not-booked' };
+  if (((att.frozen || {}).priceBasis) !== 'bundle') return { may: false, reason: 'not-a-bundle-entry' };
+  // ⚠ `== null` FIRST, because Number(null) is 0 and 0 is finite. Checking
+  // only for a finite number read a missing start time as the first instant of
+  // 1970, put the deadline before that, and refused every reschedule on a
+  // misconfigured evening — the exact opposite of the intended direction.
+  const raw = (att.frozen || {}).startsAt;
+  const startsAt = raw == null || raw === '' ? null : Number(raw);
+  // No resolvable start is a misconfigured evening rather than the family's
+  // doing, so it resolves towards them — the same direction every blank in
+  // _credit.js takes.
+  if (startsAt == null || !Number.isFinite(startsAt)) return { may: true, reason: 'no-start-time' };
+  const deadline = startsAt - RESCHEDULE_HOURS * 60 * 60 * 1000;
+  if (now >= deadline) return { may: false, reason: 'too-late', deadline: deadline };
+  return { may: true, reason: 'in-time', deadline: deadline };
+}
+
+// The swap itself, as data. The caller writes the records; this only says what
+// the bundle should look like afterwards.
+//
+// ⚠ TWO DIFFERENT MOVES, and treating them alike lost the family an entry.
+//
+// `usedDates` always moves: the entry was spent on `fromDate` and is spent on
+// `toDate` instead. `coveredDates` moves ONLY when the target is outside the
+// coverage — then one of the bundle's slots is genuinely being relocated.
+// Moving to a date the bundle already covers changes nothing about WHICH dates
+// it may be spent on, and the first version removed `fromDate` anyway: the
+// family gave up their booking on that evening and silently gave up the right
+// to rebook it too, so a three-entry bundle came back covering two dates.
+//
+// Both branches keep the coverage the same LENGTH, which is what lets
+// reconcile() run afterwards and find nothing to do.
+function afterReschedule(bundle, fromDate, toDate) {
+  const covered = coveredOf(bundle);
+  const move = (list) => {
+    const out = list.filter((d) => d !== fromDate);
+    if (out.indexOf(toDate) === -1) out.push(toDate);
+    return out.sort();
+  };
+  return {
+    usedDates: move(usedOf(bundle)),
+    coveredDates: covered.indexOf(toDate) === -1 ? move(covered) : covered.slice()
+  };
+}
+
 // A bundle is finished when every entry has been spent, or when the shortfall
 // has been settled and nothing is left to spend. `closed` is not `spent`: one
 // means the family used what they bought, the other means we could not offer it.
@@ -172,7 +286,9 @@ function statusAfter(bundle, shortfall) {
 }
 
 module.exports = {
-  DAY_MS,
+  DAY_MS, RESCHEDULE_HOURS,
   normaliseBundles, datesAhead, coverageFor, bundlesAvailable,
-  remaining, covers, reconcile, statusAfter, _eur: eur
+  remaining, covers, reconcile, statusAfter,
+  rescheduleTargets, mayReschedule, afterReschedule,
+  _eur: eur
 };
