@@ -124,4 +124,26 @@ const reg = { participantId: 'p-1', activityId: 'act-1',
     l + ': and links to the registration, addressed by id');
 });
 
+console.log('\n[the client offers the button under the same two conditions]');
+// Cosmetic, like every permission check on this side — the server re-decides
+// all of it. It exists so a family is not offered an action about to be
+// refused, and so a REFUSAL THEY CAN FIX is explained rather than hidden: a
+// missing button teaches nobody that their email needs confirming.
+const ui = fs.readFileSync(path.join(R, 'js/member-account.js'), 'utf8');
+H.ok(/action: 'pay', participantId: r\.participantId, activityId: r\.activityId/.test(ui),
+  'the client calls the pay action with the registration key');
+H.ok(/left > 0 && r\.status === 'approved' && S\.account && S\.account\.emailVerifiedAt/.test(ui),
+  'and draws the button only when both gates pass and something is owed');
+H.ok(/T\.payNeedsVerify/.test(ui), 'an unverified account is TOLD, not silently denied a button');
+H.ok(/T\.payNeedsApproval/.test(ui), 'and so is one still waiting on approval');
+// Checkout is a redirect. If the call fails the control must come back, or a
+// transient error leaves a dead button and a family who cannot pay.
+H.ok(/go\.disabled = false;[\s\S]{0,80}go\.textContent = T\.payNow;/.test(ui),
+  'a failed attempt re-enables the button rather than leaving it spent');
+H.ok(/location\.href = res\.data\.url/.test(ui), 'and a success redirects to Stripe');
+// S.account has to be populated before the activity view renders, or the gate
+// reads undefined and hides the button from a verified family.
+H.ok(/S\.account = res\.data\.account;[\s\S]{0,600}if \(view === 'activity'\) return renderActivity\(\);/.test(ui),
+  'boot() sets S.account before rendering the activity view');
+
 H.done();

@@ -91,6 +91,9 @@
       activityGone: 'הפעילות אינה מפורסמת כרגע. פרטי ההרשמה נשמרו.',
 
       costTitle: 'מה זה עולה', stillToPay: 'נותר לתשלום', credited: 'זוכה',
+      payNow: 'תשלום מאובטח', payOpening: 'פותח תשלום…',
+      payNeedsVerify: 'כדי לשלם, יש לאשר את כתובת האימייל. הקישור לאישור נמצא בעמוד החשבון.',
+      payNeedsApproval: 'נוכל לקבל תשלום לאחר אישור ההרשמה.',
       sessionsTitle: 'המפגשים', dateCol: 'תאריך', statusCol: 'סטטוס',
       book: 'הרשמה למפגש', cancelSession: 'ביטול מפגש',
       cancelSessionConfirm: 'לבטל את המפגש הזה?',
@@ -161,6 +164,9 @@
       activityGone: 'This activity is not published at the moment. Your registration details are kept.',
 
       costTitle: 'What it costs', stillToPay: 'Still to pay', credited: 'Credited',
+      payNow: 'Pay securely', payOpening: 'Opening payment…',
+      payNeedsVerify: 'To pay, please confirm your email address. The link to resend it is on your account page.',
+      payNeedsApproval: 'We can take payment once the registration is approved.',
       sessionsTitle: 'Sessions', dateCol: 'Date', statusCol: 'Status',
       book: 'Book', cancelSession: 'Cancel this session',
       cancelSessionConfirm: 'Cancel this session?',
@@ -231,6 +237,9 @@
       activityGone: 'Это занятие сейчас не опубликовано. Данные вашей записи сохранены.',
 
       costTitle: 'Сколько это стоит', stillToPay: 'Осталось оплатить', credited: 'Зачислено',
+      payNow: 'Оплатить', payOpening: 'Открываем оплату…',
+      payNeedsVerify: 'Чтобы оплатить, подтвердите адрес электронной почты. Ссылка для повторной отправки — на странице аккаунта.',
+      payNeedsApproval: 'Мы сможем принять оплату после подтверждения записи.',
       sessionsTitle: 'Занятия', dateCol: 'Дата', statusCol: 'Статус',
       book: 'Записаться', cancelSession: 'Отменить занятие',
       cancelSessionConfirm: 'Отменить это занятие?',
@@ -1159,6 +1168,42 @@
     kids.push(el('div', { class: 'acc-money is-sum' }, [
       el('span', { text: T.stillToPay }), el('b', { text: money(left) })
     ]));
+
+    // THE PAY BUTTON, and what decides whether it is drawn.
+    //
+    // Cosmetic, like every permission check on this side: the server re-decides
+    // all of it, and the copy exists so a family is not offered an action about
+    // to be refused. The three conditions mirror the two gates in the `pay`
+    // branch of account-registrations.js plus the obvious one.
+    //
+    // A refusal is SHOWN RATHER THAN HIDDEN when it is something the reader can
+    // fix. An unverified account gets a line saying so, because the resend
+    // button is on the dashboard and a missing button explains nothing; a
+    // registration still awaiting approval gets a line too, because "wait" is
+    // the answer and silence is not. Only a settled balance draws nothing,
+    // since the figures above already say why.
+    if (left > 0 && r.status === 'approved' && S.account && S.account.emailVerifiedAt) {
+      var go = el('button', { type: 'submit', class: 'btn-primary', text: T.payNow });
+      var payForm = el('form', { onsubmit: function (e) {
+        e.preventDefault();
+        go.disabled = true;
+        go.textContent = T.payOpening;
+        post(REGS, { action: 'pay', participantId: r.participantId, activityId: r.activityId })
+          .then(function (res) {
+            // Stripe Checkout is a redirect, not a fetch. On failure the button
+            // has to come back, or a transient error leaves a dead control.
+            if (res.ok && res.data && res.data.url) { location.href = res.data.url; return; }
+            go.disabled = false;
+            go.textContent = T.payNow;
+            say('err', failure(res));
+          });
+      } }, [go]);
+      kids.push(payForm);
+    } else if (left > 0 && r.status === 'approved') {
+      kids.push(el('p', { class: 'acc-note', text: T.payNeedsVerify }));
+    } else if (left > 0) {
+      kids.push(el('p', { class: 'acc-note', text: T.payNeedsApproval }));
+    }
     return section(T.costTitle, kids);
   }
 
