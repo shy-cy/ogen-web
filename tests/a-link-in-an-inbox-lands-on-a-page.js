@@ -56,7 +56,11 @@ function fileFor(url) {
   if (url.indexOf(SITE) !== 0) return null;
   const p = url.slice(SITE.length).split('?')[0].split('#')[0].replace(/^\//, '');
   if (!p) return 'index.html';
-  return p + '.html';
+  // Netlify serves /activities from either activities.html or
+  // activities/index.html, and the listing pages are the second shape — so a
+  // link to a directory is not a broken link. Whichever exists is the answer;
+  // the caller only asks whether ONE of them does.
+  return fs.existsSync(path.join(R, p + '.html')) ? p + '.html' : p + '/index.html';
 }
 
 let checked = 0;
@@ -78,6 +82,86 @@ LANGS.forEach((l) => {
   });
 });
 H.ok(checked >= 9, 'and there were real links to check (' + checked + ')');
+
+// ---------------------------------------------------------------------------
+console.log('\n[and so does every link a REGISTRATION email can send]');
+//
+// ⚠ THIS HALF WAS NOT CHECKED, AND EVERY LINK IN IT WAS BROKEN.
+//
+// The three messages that follow a live registration — registered, approved,
+// and the payment receipt — point at the family's own registration page, which
+// is addressed by a pair of query parameters rather than by a path. The file
+// existing is therefore not enough: `/account/activity` with the wrong
+// parameter names is a page that loads perfectly and says "that registration
+// was not found", which is the worst sentence in the system to meet after
+// paying.
+//
+// They were spelled `participantId` and `activityId` — the API's names, and
+// self-describing, and matching nothing. `js/member-account.js` reads
+// `param('p')` and `param('a')`. A test in another suite pinned the long
+// spelling as correct, because it read the email and never asked the page.
+//
+// So the two halves are compared here: every parameter an emailed link carries
+// must be one the screen actually reads.
+const regMail = require(H.fnPath('_registration-email'));
+const screenSrc = read('js/member-account.js');
+const reg = { participantId: 'p-1', activityId: 'act-1', expiryDays: 14,
+  frozen: { participantName: 'Noa', activityTitle: { he: 'עברית', en: 'Hebrew', ru: 'Иврит' } } };
+
+let pairs = 0;
+LANGS.forEach((l) => {
+  const acct = account(l);
+  const messages = [
+    ['registered', regMail.receivedMessage(reg, acct)],
+    ['approved', regMail.approvedMessage(reg, acct)],
+    ['rejected', regMail.rejectedMessage(reg, acct)],
+    ['expired', regMail.expiredMessage(reg, acct)],
+    ['paid', regMail.paidMessage(reg, acct, 15000, 20000)]
+  ];
+  messages.forEach(([name, msg]) => {
+    hrefsIn(msg).forEach((href) => {
+      const file = fileFor(href);
+      if (!file) return;
+      H.ok(fs.existsSync(path.join(R, file)),
+        l + ' ' + name + ': ' + href.replace(SITE, '') + ' → ' + file);
+      // The query, which is where the last one failed. `&amp;` because this is
+      // an href inside HTML, not a URL on its own.
+      const q = (href.split('?')[1] || '').split('#')[0];
+      if (!q) return;
+      q.split(/&amp;|&/).filter(Boolean).forEach((bit) => {
+        const key = bit.split('=')[0];
+        pairs++;
+        H.ok(screenSrc.indexOf("param('" + key + "')") !== -1,
+          l + ' ' + name + ': the page reads ?' + key + ' — the email is not inventing a name');
+      });
+    });
+  });
+});
+H.ok(pairs >= 18, 'and there were parameters to check (' + pairs + ')');
+
+// The same link, built a second time in a second file: where Stripe sends a
+// family back when Checkout is done. It is the one URL on the site a person
+// reaches at the exact moment they have parted with money.
+const payHandler = read('netlify/functions/account-registrations.js');
+const back = /\/account\/activity'\s*\n?\s*\+ '\?([a-z]+)=[\s\S]{0,120}?\+ '&([a-z]+)=/.exec(payHandler);
+H.ok(back, "Stripe's return URL is built where it is expected to be");
+if (back) {
+  H.ok(screenSrc.indexOf("param('" + back[1] + "')") !== -1,
+    'and its first parameter is one the page reads (?' + back[1] + ')');
+  H.ok(screenSrc.indexOf("param('" + back[2] + "')") !== -1,
+    'and so is its second (&' + back[2] + ')');
+}
+
+// #pay, and a card with that id to land on. The page is the activity, the
+// facts, the price and the sessions; a family opening a message about money has
+// one question, and it was several screens down.
+H.ok(/registrationHref[\s\S]{0,400}#pay/.test(read('netlify/functions/_registration-email.js')),
+  'the money messages point at the cost card, not at the top of the page');
+H.ok(/section\(T\.costTitle, kids, 'pay'\)/.test(screenSrc), 'and that card carries the id');
+H.ok(/location\.hash === '#pay'[\s\S]{0,260}scrollIntoView/.test(screenSrc),
+  'and the page scrolls to it ITSELF — the hash is resolved before any card exists');
+H.ok(/\.acc-card\[id\]\{[^}]*scroll-margin-block-start/.test(read('shared.css')),
+  'clearing the 96px fixed nav when it does');
 
 console.log('\n[the eighteen shells exist, one per view per language]');
 const VIEWS = { account: 'account.html', details: 'account/details.html',

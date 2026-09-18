@@ -46,10 +46,24 @@ const activityHref = (reg, l) => {
 // registration's key, never by the frozen slug. The frozen slug is audit data;
 // following it after a rename opens the wrong record or none, and tells a family
 // their registration does not exist.
+//
+// ⚠ `p` AND `a`, WHICH IS WHAT THE PAGE READS. It was `participantId` and
+// `activityId` — self-describing, agreeing with the API, and matching nothing:
+// `js/member-account.js` reads `param('p')` and `param('a')`, so every one of
+// these links landed a family on "that registration was not found". The test
+// that pinned this format only ever read the email, which is how two halves of
+// one link disagree in writing. There is one spelling now and a test compares
+// the two sides.
+//
+// `#pay` is why the link exists. The page is the activity, the facts, the
+// price, the sessions — and a family opening a message about money has one
+// question, which was several screens down. The hash scrolls the cost card
+// into view; a reader who wanted the rest scrolls up, which is the cheaper
+// mistake.
 const registrationHref = (reg, l) =>
   pathFor(l, '/account/activity') +
-  '?participantId=' + encodeURIComponent(reg.participantId || '') +
-  '&activityId=' + encodeURIComponent(reg.activityId || '');
+  '?p=' + encodeURIComponent(reg.participantId || '') +
+  '&a=' + encodeURIComponent(reg.activityId || '') + '#pay';
 
 // --- your child is registered ----------------------------------------------
 //

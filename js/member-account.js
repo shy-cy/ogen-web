@@ -373,8 +373,8 @@
     return el('div', { class: 'acc-actions' }, kids);
   }
 
-  function section(title, kids) {
-    return el('section', { class: 'acc-card' },
+  function section(title, kids, id) {
+    return el('section', { class: 'acc-card', id: id || null },
       [title ? el('h2', { text: title }) : null].concat(kids || []));
   }
 
@@ -1111,6 +1111,19 @@
         body.appendChild(section(T.sessionsTitle, [courseSessions(act.sessionRows)]));
       }
 
+      // A LINK FROM AN INBOX ARRIVES BEFORE THE PAGE EXISTS. The hash is
+      // resolved by the browser at load, and every card on this screen is drawn
+      // a fetch later — so the native anchor jump finds nothing and a family
+      // sent to #pay lands at the top, which is the behaviour this was meant to
+      // fix. Scrolling once the card is in the document is the whole mechanism.
+      //
+      // Guarded rather than assumed: scrollIntoView is a browser method and the
+      // DOM this script is tested in implements only what it uses.
+      if (window.location.hash === '#pay') {
+        var card = document.getElementById('pay');
+        if (card && card.scrollIntoView) card.scrollIntoView();
+      }
+
       // Offered only when the frozen terms allow it. The same creditFor() the
       // server will apply decided this, so what is shown is what happens.
       if ((r.status === 'pending' || r.status === 'approved') &&
@@ -1195,7 +1208,7 @@
     // since the figures above already say why.
     if (left > 0 && r.status === 'approved' && S.account && S.account.emailVerifiedAt) {
       var go = el('button', { type: 'submit', class: 'btn-primary', text: T.payNow });
-      var payForm = el('form', { onsubmit: function (e) {
+      var payForm = el('form', { class: 'acc-pay', onsubmit: function (e) {
         e.preventDefault();
         go.disabled = true;
         go.textContent = T.payOpening;
@@ -1215,7 +1228,11 @@
     } else if (left > 0) {
       kids.push(el('p', { class: 'acc-note', text: T.payNeedsApproval }));
     }
-    return section(T.costTitle, kids);
+    // ADDRESSABLE, because every message about money links straight to it. The
+    // page is the activity, the facts, the price and the sessions; a family
+    // opening an email about paying has one question and it was several screens
+    // down.
+    return section(T.costTitle, kids, 'pay');
   }
 
   // The dates a course meets on, exactly the list the published page carries —

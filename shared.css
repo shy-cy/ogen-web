@@ -1165,6 +1165,13 @@ html[lang="he"] .thankyou h1{ font-family: var(--font-he); font-weight:700; }
 .acc-money:last-child{ border-block-end:0; }
 .acc-money b{ font-variant-numeric:tabular-nums; white-space:nowrap; }
 .acc-money.is-sum b{ font-size:18px; }
+/* The pay button is an ACTION under a list of figures, not one more figure in
+   it. Level with the last row it read as part of the list; this is the gap that
+   says the reading stops and the doing starts. */
+.acc-pay{ margin-block-start:20px; }
+/* Every message about money links to #pay, and the nav is a fixed 96px — without
+   this the card it scrolls to arrives under the bar. */
+.acc-card[id]{ scroll-margin-block-start:112px; }
 /* The qualifier — "(10 sessions × 2 lessons)". Its own quiet line, because it is
    neither the label nor the figure, and glued onto either it reads as a second
    label or as part of the number. */

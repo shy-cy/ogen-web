@@ -117,10 +117,19 @@ const reg = { participantId: 'p-1', activityId: 'act-1',
   H.ok(part.html !== full.html, l + ': and the two say different things');
   H.ok(part.html.indexOf('200.00') !== -1, l + ': a part payment states what is still owed');
   // A receipt must open the page that shows what is paid — the family's own
-  // registration page, addressed by the registration's key. NEVER the frozen
-  // slug: that is audit data, and following it after a rename opens the wrong
-  // record or none, and tells a family their registration does not exist.
-  H.ok(/\/account\/activity\?participantId=p-1&amp;activityId=act-1/.test(part.html),
+  // registration page, addressed by participant and activity id, which is the
+  // registration's key. NEVER the frozen slug: that is audit data, and
+  // following it after a rename opens the wrong record or none, and tells a
+  // family their registration does not exist.
+  //
+  // ⚠ AND IN THE SPELLING THE PAGE READS. This assertion used to pin
+  // `?participantId=…&activityId=…`, which is the API's spelling and is not
+  // what `js/member-account.js` looks for — it reads `p` and `a`, so every one
+  // of these links landed on "that registration was not found" while a test
+  // sat here calling the format correct. A test that reads one half of a link
+  // proves nothing about the link. See the suite below, which compares the two
+  // sides instead of describing one.
+  H.ok(/\/account\/activity\?p=p-1&amp;a=act-1#pay/.test(part.html),
     l + ': and links to the registration, addressed by id');
 });
 

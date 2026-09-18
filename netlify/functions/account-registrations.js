@@ -522,9 +522,12 @@ exports.handler = async (event) => {
         // change what a family sees on the payment they are making.
         const title = (reg.frozen && facts.pick(reg.frozen.activityTitle, lang)) || 'Ogen';
         const base = lang === 'he' ? '' : '/' + lang;
+        // `p` and `a` — the spelling the PAGE reads. Spelled out in full this
+        // returned a family who had just paid to "that registration was not
+        // found", which is the worst moment on the site to be told that.
         const back = SITE + base + '/account/activity'
-          + '?participantId=' + encodeURIComponent(reg.participantId)
-          + '&activityId=' + encodeURIComponent(reg.activityId);
+          + '?p=' + encodeURIComponent(reg.participantId)
+          + '&a=' + encodeURIComponent(reg.activityId) + '#pay';
 
         let session;
         try {
