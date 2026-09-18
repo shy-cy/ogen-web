@@ -2480,6 +2480,97 @@ parent lands on the Russian page rather than in the Hebrew default with a
 language switch to find. There is **no override** — see the `ctaUrl` note under
 the status contract for why the field was removed.
 
+### ⚠ Registering for a drop-in is ONE step
+
+A term and a drop-in are two different decisions, and the family area was making
+the second walk the first: register for the activity, wait, come back, book dates
+one at a time, then find a way to pay for each. A term deserves that shape — one
+choice, for months, with a price agreed up front and a person deciding who gets a
+place. A drop-in is *we will come on Tuesday*.
+
+Two of those steps did not exist. **A drop-in registration owes nothing** —
+`owedCentsFor()` bills the yearly fee and, for a *course*, the term price — so
+"a payment link is on its way" was a promise about a debt of zero, and the panel
+could not say which session was being registered to because the honest answer was
+*none of them*.
+
+So `bookAndPay` does all of it in one call: who, which dates, Checkout. **The
+registration still exists underneath** — it carries the guardian link, the frozen
+terms and an admin's ability to say no — and a family never has to know that.
+`openRegistration()` is the one place a registration is created, called by both
+`submit` and this, because two copies are two places the fee waiver, the capacity
+rule and the carried-forward history can drift.
+
+Two orderings carry the weight, and they are opposite:
+
+- **Everything that can refuse, refuses before anything is written.** Every
+  chosen date is checked for room together; if any has gone, nothing is booked
+  and the family chooses again. Being given three of four dates plus a charge is
+  worse than being asked once more. Over-capacity is still *reported* rather than
+  prevented — there is no atomic increment — which is the rule everywhere here.
+- **The bookings are written, then the charge is made.** A Checkout failure
+  leaves evenings booked and unpaid, which the family can see and settle from
+  their own page. The other order takes money for a place that might not exist —
+  and reporting the failure as a failure would send them to book again and hold
+  two.
+
+`pending` stops the whole thing before any money moves. An activity that does not
+auto-approve, or a participant whose age cannot be confirmed, is a case where a
+person has something to decide, and the message explaining the wait already
+exists. **A free evening is not sent to a payment page for €0.00** either — a
+bundle entry freezes the price at zero, and saying so is the answer.
+
+The picker asks `sessions` rather than the activity view, because it needs each
+date's **price**, each date's **room**, and whether *this* participant already
+holds it. The price comes from `freezeSession()` with the same `bookedAt` the
+booking will use, so a screen quoting the standard price cannot be followed by a
+charge at the late one — which is also why `newAttendance()` now passes
+`bookedAt` through at all. A date that cannot be taken is dimmed and still says
+**which** reason: "full" and "already booked" are different answers.
+
+The next available date arrives **ticked**. A family pressing Register usually
+means the coming session, and a screen with nothing chosen and a dead button
+reads as a screen that has not loaded. The running total is **on the button**,
+because that is what it is the price of.
+
+**Several evenings are one payment, not several.** A family sent through Checkout
+four times abandons somewhere in the middle, and we would hold three paid
+evenings and a fourth booked and unpaid with nothing saying so. `build()` takes a
+list of lines — one per date, each named by its date, or ten identical charges
+appear on a statement — and the breakdown rides in `session_amounts`. **The
+webhook settles nothing unless that breakdown adds up to Stripe's own total**:
+splitting money across blobs by a figure nobody checked lands it against the
+wrong debt, which is worse than money nobody can place, because nobody goes
+looking for it. The cap is twelve, from the 500-character metadata limit rather
+than from a round number.
+
+The activity page still books **one evening at a time**, with a Pay button on
+each. That is the remaining surface running the old shape.
+
+### ⚠ The verified-address gate on paying is gone
+
+It read as a security property and was not one. `emailVerifiedAt` had been
+stored since Phase 2, shown as a banner since Phase 6 and enforced by nothing;
+payment was where it was finally enforced, and payment turns out to be the one
+place it buys nothing.
+
+It never protected anything on the paying direction — this is somebody signed
+into their own account settling their own bill, and an unverified address grants
+them nothing extra. What it was stated to buy, that messages about money reach a
+proved address, was **already untrue**: the registration confirmation goes to
+that same unverified address minutes earlier. And it was **already bypassable by
+design** — `/pay` is a link we ourselves email, deliberately exempt, on the
+reasoning that reading the inbox is what verification ever attested. A gate with
+a door we post through is not a gate.
+
+What it did cost was the only flow that ever hit it: **sign up, register, pay, in
+one sitting** — which is precisely the shape of a pay-per-session activity.
+
+Verification still exists, is still requested, and the dashboard still says when
+it is missing. `tests/paying-needs-an-approved-place.js` pins the **absence** on
+all three doors and pins that the feature itself survived, because this is the
+kind of thing somebody reinstates in good faith.
+
 ### Not built
 
 The public "places left" count on the static activity page, and
@@ -2523,16 +2614,20 @@ password-reset tokens is one forgotten `purpose` argument away from being
 redeemable as one, and `consumeToken(token)` takes that argument **optionally**.
 A store that does not contain the key cannot be talked into honouring it.
 
-**The two gates are still both satisfied.** The registration must be `approved`,
-re-read from the record on every redemption rather than trusted from the token —
-so an old email cannot charge for a place since cancelled, and a part payment
-opens a session for what is *left*, not for the figure that was outstanding when
-the message went out. The verified-address gate is satisfied **by construction
-and by something stronger**: the token was mailed to that address and nowhere
-else, so following it is itself proof of reading that inbox, which is all
-`emailVerifiedAt` ever attested. It is deliberately **not** treated as a
-verification — confirming an address is a separate act with separate
-consequences, and a payment must not quietly perform one.
+**The gate is still satisfied.** The registration must be `approved`, re-read
+from the record on every redemption rather than trusted from the token — so an
+old email cannot charge for a place since cancelled, and a part payment opens a
+session for what is *left*, not for the figure that was outstanding when the
+message went out.
+
+There was a second gate, a verified address, and this link was exempt from it
+**by construction and by something stronger**: the token was mailed to that
+address and nowhere else, so following it is itself proof of reading that inbox,
+which is all `emailVerifiedAt` ever attested. That exemption turned out to be the
+argument that removed the gate everywhere — see **The verified-address gate on
+paying is gone**. Following the link is still deliberately **not** treated as a
+verification: confirming an address is a separate act with separate consequences,
+and a payment must not quietly perform one.
 
 **Not single use**, the one place it parts company with the reset and verify
 tokens. Those grant something once; this names a debt, and a debt can
@@ -3018,8 +3113,10 @@ share image, Formspree wiring, domain) is done. Open items:
   `/account` entry.
 - **Registration is wired end to end.** The `open` CTA defaults to
   `/account?register=<slug>` in the reader's own tree, and the family area is
-  the public surface behind it, with no override field. What is still not built
-  is the **public
+  the public surface behind it, with no override field. **A drop-in registers
+  and pays in one step** — who, which dates, Checkout — rather than walking a
+  term's machinery; see **Registering for a drop-in is ONE step**. What is still
+  not built is the **public
   places-left count** on the static activity page and `memberVisibleRows()` —
   both deliberate, both described above.
   **Phase 1 is done** — the activity side: `activityId`, `type`, the

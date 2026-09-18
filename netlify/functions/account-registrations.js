@@ -75,15 +75,13 @@ function activityView(activity, report, lang) {
     capacity: activity.type === 'dropin' ? null : report.capacity,
     taken: activity.type === 'dropin' ? null : report.taken,
     left: activity.type === 'dropin' ? null : report.left,
+    // Which shape of panel to draw, and it is the ONLY thing this view says
+    // about the dates. A drop-in's register panel asks `sessions` for them,
+    // because it needs each date's price and each date's room and whether THIS
+    // participant already has it — none of which an activity-level view can
+    // answer. A three-date preview lived here for a day and was a second,
+    // poorer source for the same question.
     perSession: activity.type === 'dropin',
-    // ⚠ WHICH EVENINGS, because the panel could not say. Registering for a
-    // pay-per-session activity is the may-come decision and covers no date at
-    // all — so a family was being asked to sign up with nothing on screen about
-    // when anything happens. Three is enough to show what the rhythm is; the
-    // whole list is one tap away on the registration page.
-    nextDates: activity.type === 'dropin'
-      ? attendance.bookableDates(activity).filter((d) => !credit.past(d, Date.now())).slice(0, 3)
-      : null,
     full: activity.type !== 'dropin' && !R.hasRoom(report, null) && !report.named,
     groups: report.named
       ? report.named.map((g) => ({
@@ -96,6 +94,63 @@ function activityView(activity, report, lang) {
         }))
       : null
   };
+}
+
+// ONE PLACE A REGISTRATION IS CREATED, called by `submit` and by the drop-in's
+// one-step `bookAndPay`. Two copies would be two places the fee waiver, the
+// capacity rule and the carried-forward history could quietly drift apart.
+//
+// It returns the record rather than a response, because the two callers answer
+// differently about the ONE case they genuinely disagree on: a registration
+// that already holds a place is a refusal to `submit` and is simply the
+// registration to book against for `bookAndPay`.
+async function openRegistration({ activity, participant, accountId, groupId }) {
+  const errors = R.submissionErrors(activity, participant, groupId);
+  if (errors.length) return { status: 400, payload: { error: errors[0], errors: errors } };
+
+  const existing = await store.getRegistration(participant.participantId, activity.activityId);
+  if (existing && R.holdsASpot(existing)) return { reg: existing, already: true };
+
+  // ⚠ A DROP-IN REGISTRATION IS NOT CAPPED BY THE SIZE OF THE ROOM.
+  //
+  // For a course the two are the same question: a place is held for the whole
+  // term, so registrations and seats are one count. For a drop-in they are not.
+  // The room holds twenty on Tuesday; forty families can be registered and eight
+  // turn up. Counting registrations against the room refused the twenty-first
+  // family from ever registering, on an activity that was never more than half
+  // full on the night — and the refusal read as "this activity is full", which
+  // was untrue of every actual evening.
+  //
+  // The capacity that matters for a drop-in is per date, and it is checked where
+  // it belongs: in bookSession and in bookAndPay.
+  const regs = await store.forActivity(activity.activityId);
+  const report = R.capacityReport(activity, regs);
+  if (activity.type !== 'dropin' && !R.hasRoom(report, groupId)) {
+    // No waitlist yet. The design flagged one and did not build it: a waitlist
+    // has to choose who gets a freed place, tell them, and give them a deadline
+    // before it moves on again, and none of that is decided. Today the place is
+    // simply gone and the next submission takes it, first come.
+    return { status: 409, payload: { error: 'This activity is full.', full: true, capacity: report.capacity } };
+  }
+
+  const reg = R.newRegistration({
+    activity: activity, participant: participant, accountId: accountId, groupId: groupId,
+    // THIS PARTICIPANT'S OWN registrations, and nothing else. The fee is scoped
+    // to one participant, one activity, one academic year, so the waiver is
+    // answerable from a prefix scan of their own key space — no sibling lookup,
+    // no account aggregate, no ledger.
+    priorRegistrations: await store.forParticipant(participant.participantId)
+  });
+
+  // A record already existed for this pair — rejected, expired or cancelled —
+  // and the key is one per participant per activity, so the new request lands in
+  // the same blob. ITS HISTORY IS CARRIED FORWARD rather than overwritten: a
+  // refusal is something that happened, and an admin looking at a second request
+  // should be able to see the first.
+  if (existing) reg.history = (existing.history || []).concat(reg.history);
+
+  await store.saveRegistration(reg);
+  return { reg: reg, created: true };
 }
 
 // ONE ROW SHAPE, built once. The list and the single-registration view are two
@@ -191,6 +246,7 @@ exports.handler = async (event) => {
         all.filter((a) => a.participantId === participant.participantId)
            .forEach((a) => { mine[a.sessionDate] = a; });
 
+        const now = Date.now();
         return json(200, {
           ok: true,
           // Booking needs an approved registration behind it. The registration
@@ -201,15 +257,32 @@ exports.handler = async (event) => {
           sessions: attendance.bookableDates(activity).map((date) => {
             const cap = R.capacityForDate(activity, all, date);
             const own = mine[date] || null;
+            const frozen = own ? own.frozen : credit.freezeSession(activity, date, null, { bookedAt: now });
             return {
               date: date,
+              // ⚠ THE PRICE AN EVENING WOULD COST, from the SAME function that
+              // freezes it at booking and with the same `bookedAt` — or a screen
+              // offering the standard price would take the late one, on an
+              // activity where those differ. A booked evening quotes what it
+              // actually froze, never a recomputed figure: an admin raising the
+              // price must not change what was already agreed.
+              priceCents: own
+                ? (own.payment.owedCents || 0)
+                : Math.max(0, Math.round(Number(frozen.perSessionPrice || 0) * 100)),
+              priceBasis: frozen.priceBasis || null,
+              startsAt: frozen.startsAt || null,
+              // Booking a date that has gone is not a thing to offer. It is a
+              // flag rather than a filter because the registration page lists
+              // the whole term, past evenings included, and only the register
+              // panel needs them gone.
+              past: credit.past(date, now),
               left: cap.left, capacity: cap.capacity, full: cap.left != null && cap.left <= 0,
               status: own ? own.status : null,
               owedCents: own ? own.payment.owedCents : null,
               paidCents: own ? own.payment.paidCents : null,
               // What cancelling would do, from the SAME function the server will
               // apply — so what is shown is what happens.
-              cancellation: own ? credit.creditForSession(own, Date.now()) : null
+              cancellation: own ? credit.creditForSession(own, now) : null
             };
           })
         });
@@ -253,6 +326,140 @@ exports.handler = async (event) => {
         return json(200, { ok: true, session: att });
       }
 
+      // ⚠ REGISTERING FOR A DROP-IN IS ONE STEP, NOT THREE.
+      //
+      // A drop-in was being run through the course's shape: register for the
+      // activity, wait, then come back and book evenings, then find a way to pay
+      // for each. That is the machinery a term needs — a place held for months,
+      // an admin deciding who gets it, a price agreed up front — and a drop-in
+      // has none of it. You are choosing to come on Tuesday. The registration
+      // still exists underneath, because it is what carries the guardian link,
+      // the frozen terms and the admin's ability to say no, but a family should
+      // never have to know that: they pick who and which evenings, and pay.
+      //
+      // So this action does all of it, and the ORDER is the careful part.
+      //
+      //   1. everything that can refuse, refuses BEFORE anything is written —
+      //      the dates are validated, and every chosen evening is checked for
+      //      room together. A family choosing four dates and being given three
+      //      plus a charge is worse than being asked to choose again.
+      //   2. THE BOOKINGS ARE WRITTEN, THEN THE CHARGE IS MADE. If Checkout
+      //      fails we hold evenings that are booked and unpaid, which the family
+      //      can see and settle from their own page. The other order takes money
+      //      for a place that might not exist.
+      //
+      // Over-capacity is still REPORTED rather than prevented: two families can
+      // pass the check in the same few hundred milliseconds, and there is no
+      // atomic increment to stop them. That is the rule everywhere here.
+      case 'bookAndPay': {
+        const participant = await mustGuard(body.participantId);
+        if (!participant) return json(404, { error: NOT_YOURS });
+        const activity = await published(body.slug);
+        if (!activity) return json(404, { error: 'No such activity.' });
+        if (activity.type !== 'dropin') {
+          return json(400, { error: 'This activity is booked for the whole term, not by the session.' });
+        }
+
+        const wanted = Array.isArray(body.sessionDates) ? body.sessionDates.map(String) : [];
+        const dates = wanted.filter((d, i) => wanted.indexOf(d) === i).sort();
+        if (!dates.length) return json(400, { error: 'Choose at least one date.', reason: 'no-dates' });
+        if (dates.length > checkout.MAX_SESSION_LINES) {
+          return json(400, {
+            error: 'Up to ' + checkout.MAX_SESSION_LINES + ' dates can be paid for at once.',
+            reason: 'too-many'
+          });
+        }
+        for (const d of dates) {
+          const bad = attendance.validate(activity, d);
+          if (bad) return json(400, { error: bad });
+        }
+
+        const opened = await openRegistration({
+          activity: activity, participant: participant,
+          accountId: me.accountId, groupId: body.groupId || null
+        });
+        if (opened.status) return json(opened.status, opened.payload);
+        const reg = opened.reg;
+
+        // ⚠ AN ACTIVITY THAT DOES NOT AUTO-APPROVE STOPS HERE, and stops before
+        // any money moves. `pending` means an admin wants to look at this — an
+        // age outside the stated range, or auto-approve switched off — and
+        // booking evenings against a place that may be refused would mean an
+        // immediate refund and a family wondering what happened. Nothing is
+        // booked, nothing is charged, and the message that explains the wait is
+        // the one that already exists for exactly this case.
+        if (reg.status !== 'approved') {
+          if (opened.created) await mail.sendReceived(reg, me);
+          return json(200, {
+            ok: true, awaitingApproval: true, status: reg.status,
+            registration: regRow(reg, participant)
+          });
+        }
+
+        const now = Date.now();
+        const all = await attendance.forActivity(activity.activityId);
+        const mine = {};
+        all.filter((a) => a.participantId === participant.participantId)
+           .forEach((a) => { mine[a.sessionDate] = a; });
+
+        const refused = [];
+        dates.forEach((d) => {
+          if (credit.past(d, now)) return refused.push({ date: d, reason: 'past' });
+          if (mine[d] && R.holdsASeat(mine[d])) return refused.push({ date: d, reason: 'already-booked' });
+          const cap = R.capacityForDate(activity, all, d);
+          if (cap.left != null && cap.left <= 0) refused.push({ date: d, reason: 'full' });
+        });
+        if (refused.length) {
+          return json(409, {
+            error: 'Some of those evenings are no longer available.',
+            reason: 'unavailable', refused: refused
+          });
+        }
+
+        const bookedAt = new Date(now).toISOString();
+        const booked = [];
+        for (const d of dates) {
+          const att = attendance.newAttendance({
+            activity: activity, participantId: participant.participantId,
+            accountId: me.accountId, groupId: reg.groupId, sessionDate: d,
+            bookedAt: bookedAt
+          });
+          // A re-booking after a cancellation lands on the same key, so the
+          // earlier history is carried forward rather than overwritten — the
+          // same rule a re-requested registration follows.
+          if (mine[d]) att.history = (mine[d].history || []).concat(att.history);
+          await attendance.saveAttendance(att);
+          booked.push(att);
+        }
+
+        const rows = booked.map((a) => ({
+          date: a.sessionDate, owedCents: a.payment.owedCents, priceBasis: a.frozen.priceBasis
+        }));
+        const owing = booked.filter((a) => (a.payment.owedCents || 0) - (a.payment.paidCents || 0) > 0);
+        // Free evenings exist: a bundle entry freezes the price at zero. There is
+        // nothing to pay for and nothing to open, and saying so beats sending a
+        // family to a payment page for €0.00.
+        if (!owing.length) {
+          return json(200, { ok: true, booked: rows, url: null, nothingDue: true,
+                             activityId: activity.activityId });
+        }
+
+        let session;
+        try {
+          session = await checkout.createSessionsCheckout(owing, activity.title, lang, me.email);
+        } catch (err) {
+          console.error('account-registrations: Stripe session failed:', err && err.message);
+          // THE EVENINGS ARE BOOKED. Reporting this as a failure would be a lie
+          // in the direction that costs a family their place — they would book
+          // again and hold two. The refusal is about the payment only, and their
+          // own page carries the button to try it again.
+          return json(200, { ok: true, booked: rows, url: null, paymentFailed: true,
+                             activityId: activity.activityId });
+        }
+        return json(200, { ok: true, booked: rows, url: session.url,
+                           activityId: activity.activityId });
+      }
+
       // ⚠ PAYING FOR ONE EVENING, which a family simply could not do.
       //
       // `pay` reads a REGISTRATION, and a drop-in registration owes nothing:
@@ -262,19 +469,12 @@ exports.handler = async (event) => {
       // settle it, and the family area offered no button because there was no
       // action behind it.
       //
-      // The same two gates as `pay`, for the same reasons: a confirmed address,
-      // and an approved registration behind the booking. Approval is the "may
-      // come" decision and is made once; this must not quietly become a second
-      // way in.
+      // The same gate as `pay`, for the same reason: an approved registration
+      // behind the booking. Approval is the "may come" decision and is made
+      // once; this must not quietly become a second way in.
       case 'paySession': {
         const participant = await mustGuard(body.participantId);
         if (!participant) return json(404, { error: NOT_YOURS });
-        if (!me.emailVerifiedAt) {
-          return json(403, {
-            error: 'Please confirm your email address before paying.',
-            reason: 'email-unverified'
-          });
-        }
         const activity = await published(body.slug);
         if (!activity) return json(404, { error: 'No such activity.' });
         const reg = await store.getRegistration(participant.participantId, activity.activityId);
@@ -408,60 +608,21 @@ exports.handler = async (event) => {
         const activity = await published(body.slug);
         if (!activity) return json(404, { error: 'No such activity.' });
 
-        const groupId = body.groupId || null;
-        const errors = R.submissionErrors(activity, participant, groupId);
-        if (errors.length) return json(400, { error: errors[0], errors: errors });
-
-        const existing = await store.getRegistration(participant.participantId, activity.activityId);
-        if (existing && R.holdsASpot(existing)) {
+        const opened = await openRegistration({
+          activity: activity, participant: participant,
+          accountId: me.accountId, groupId: body.groupId || null
+        });
+        if (opened.status) return json(opened.status, opened.payload);
+        if (opened.already) {
           return json(409, {
-            error: existing.status === 'approved'
+            error: opened.reg.status === 'approved'
               ? 'This participant already has a place in this activity.'
               : 'There is already a request for this participant, waiting for an answer.',
-            status: existing.status
+            status: opened.reg.status
           });
         }
 
-        // ⚠ A DROP-IN REGISTRATION IS NOT CAPPED BY THE SIZE OF THE ROOM.
-        //
-        // For a course the two are the same question: a place is held for the
-        // whole term, so registrations and seats are one count. For a drop-in
-        // they are not. The room holds twenty on Tuesday; forty families can be
-        // registered and eight turn up. Counting registrations against the room
-        // refused the twenty-first family from ever registering, on an activity
-        // that was never more than half full on the night — and the refusal read
-        // as "this activity is full", which was untrue of every actual evening.
-        //
-        // The capacity that matters for a drop-in is per date, and it is checked
-        // where it belongs: in bookSession.
-        const regs = await store.forActivity(activity.activityId);
-        const report = R.capacityReport(activity, regs);
-        if (activity.type !== 'dropin' && !R.hasRoom(report, groupId)) {
-          // No waitlist yet. The design flagged one and did not build it: a
-          // waitlist has to choose who gets a freed place, tell them, and give
-          // them a deadline before it moves on again, and none of that is
-          // decided. Today the place is simply gone and the next submission
-          // takes it, first come.
-          return json(409, { error: 'This activity is full.', full: true, capacity: report.capacity });
-        }
-
-        const reg = R.newRegistration({
-          activity: activity, participant: participant, accountId: me.accountId, groupId: groupId,
-          // THIS PARTICIPANT'S OWN registrations, and nothing else. The fee is
-          // scoped to one participant, one activity, one academic year, so the
-          // waiver is answerable from a prefix scan of their own key space — no
-          // sibling lookup, no account aggregate, no ledger.
-          priorRegistrations: await store.forParticipant(participant.participantId)
-        });
-
-        // A record already existed for this pair — rejected, expired or
-        // cancelled — and the key is one per participant per activity, so the
-        // new request lands in the same blob. ITS HISTORY IS CARRIED FORWARD
-        // rather than overwritten: a refusal is something that happened, and an
-        // admin looking at a second request should be able to see the first.
-        if (existing) reg.history = (existing.history || []).concat(reg.history);
-
-        await store.saveRegistration(reg);
+        const reg = opened.reg;
         // Best effort, and after the write. An email that fails must not undo a
         // registration that succeeded.
         if (reg.status === 'approved') await mail.sendApproved(reg, me);
@@ -541,17 +702,30 @@ exports.handler = async (event) => {
       // matching its own history.
       // --- paying for a place -----------------------------------------------
       //
-      // TWO GATES, AND BOTH ARE ABOUT NOT TAKING MONEY WE SHOULD NOT HAVE.
+      // ONE GATE, AND IT IS ABOUT NOT TAKING MONEY WE SHOULD NOT HAVE.
       //
-      // 1. THE ACCOUNT MUST BE VERIFIED. This is the first place in the whole
-      //    system that enforces `emailVerifiedAt` — until now it has been
-      //    stored, shown as a banner, and acted on by nothing. Payment is the
-      //    right place to start: a receipt, and every later message about money,
-      //    goes to an address nobody has proved belongs to this person. It is
-      //    not a dead end — the dashboard already carries a resend button — so
-      //    the refusal names the reason and the client can act on it.
+      // ⚠ THE VERIFIED-ADDRESS GATE IS GONE, and it is worth writing down why,
+      // because it read as a security property and was not one.
       //
-      // 2. THE REGISTRATION MUST BE APPROVED. A `pending` registration is a
+      // It never protected anything on the paying direction: this is somebody
+      // signed into their own account, settling their own bill, and an
+      // unverified address grants nothing extra. What it was actually stated to
+      // buy — that messages about money reach an address somebody has proved is
+      // theirs — was already untrue, because the registration confirmation is
+      // sent to that same unverified address minutes earlier. And it was already
+      // bypassable BY DESIGN: /pay is a link we ourselves email, deliberately
+      // exempt, on the reasoning that reading the inbox is what verification
+      // ever attested. A gate with a door we post through is not a gate.
+      //
+      // What it did cost was the flow a family actually has: sign up, register,
+      // pay — in one sitting, on a pay-per-session activity where the whole
+      // point is deciding to come on Tuesday. That is the case it refused, every
+      // time, and the only one.
+      //
+      // Verification still matters and is still asked for. It is simply not what
+      // stands between a family and paying us.
+      //
+      // THE REGISTRATION MUST BE APPROVED. A `pending` registration is a
       //    request that may still be refused, and taking money for a place that
       //    might not exist means an immediate refund and a family wondering what
       //    happened. How it reached `approved` is irrelevant — auto-approval and
@@ -565,13 +739,6 @@ exports.handler = async (event) => {
       case 'pay': {
         const participant = await mustGuard(body.participantId);
         if (!participant) return json(404, { error: NOT_YOURS });
-
-        if (!me.emailVerifiedAt) {
-          return json(403, {
-            error: 'Please confirm your email address before paying.',
-            reason: 'email-unverified'
-          });
-        }
 
         const reg = await store.getRegistration(body.participantId, body.activityId);
         if (!reg) return json(404, { error: 'No such registration.' });

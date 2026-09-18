@@ -89,21 +89,67 @@ exports.handler = async (event) => {
 // than a branch inside it: the two read different blobs, write different
 // vocabularies of the same field names, and the one thing they must share — the
 // part-payment rule — is short enough to state twice and is pinned by a test.
+// ⚠ ONE PAYMENT MAY COVER SEVERAL EVENINGS, and each is its own blob.
+//
+// A family choosing four dates pays once, so `amount_total` is the sum of four
+// debts that have to be written down separately. The breakdown travels in the
+// metadata — and is NOT trusted on its own: it is settled only if it adds up to
+// the figure Stripe says was taken. If it does not, nothing is written and the
+// mismatch is logged loudly, because splitting money across blobs by an unchecked
+// figure is how a payment lands against the wrong debt, which is worse than a
+// payment nobody can place: nobody goes looking for it.
 async function settleSession(session, meta) {
-  const att = await attendance.getAttendance(meta.participant_id, meta.activity_id, meta.session_date);
+  // Stripe's figure, not ours.
+  const total = Math.round(Number(session.amount_total) || 0);
+  if (!(total > 0)) {
+    console.error('stripe-webhook: session with no amount:', session.id);
+    return;
+  }
+
+  const dates = String(meta.session_dates || meta.session_date || '')
+    .split(',').map((d) => d.trim()).filter(Boolean);
+  if (!dates.length) {
+    console.error('stripe-webhook: a session payment named no evening:', session.id);
+    return;
+  }
+
+  const amounts = String(meta.session_amounts || '')
+    .split(',').map((a) => Math.round(Number(a) || 0)).filter((a) => a > 0);
+
+  let parts;
+  if (dates.length === 1) {
+    // One evening: Stripe's total IS that evening's payment, and no breakdown is
+    // needed. This is also the shape of a Checkout opened before the breakdown
+    // existed, which must still settle.
+    parts = [total];
+  } else {
+    if (amounts.length !== dates.length) {
+      console.error('stripe-webhook: ' + dates.length + ' evenings and ' + amounts.length +
+                    ' amounts on', session.id, '— nothing settled');
+      return;
+    }
+    const sum = amounts.reduce((a, b) => a + b, 0);
+    if (sum !== total) {
+      console.error('stripe-webhook: breakdown ' + sum + 'c does not match Stripe\'s ' +
+                    total + 'c on', session.id, '— nothing settled');
+      return;
+    }
+    parts = amounts;
+  }
+
+  for (let i = 0; i < dates.length; i++) {
+    await settleOneSession(session, meta, dates[i], parts[i]);
+  }
+}
+
+async function settleOneSession(session, meta, date, cents) {
+  const att = await attendance.getAttendance(meta.participant_id, meta.activity_id, date);
   if (!att) {
-    console.error('stripe-webhook: no booking for', meta.participant_id, meta.session_date, session.id);
+    console.error('stripe-webhook: no booking for', meta.participant_id, date, session.id);
     return;
   }
   const settled = (att.payment && att.payment.settledSessions) || [];
   if (settled.indexOf(session.id) !== -1) return;          // already counted
-
-  // Stripe's figure, not ours.
-  const cents = Math.round(Number(session.amount_total) || 0);
-  if (!(cents > 0)) {
-    console.error('stripe-webhook: session with no amount:', session.id);
-    return;
-  }
 
   const paid = (att.payment.paidCents || 0) + cents;
   const next = attendance.transition(att, {

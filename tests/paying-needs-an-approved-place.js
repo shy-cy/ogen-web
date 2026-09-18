@@ -1,26 +1,34 @@
 // What this defends against:
 //
-// Two gates stand in front of taking a family's money, and both exist because
-// of what happens when money moves and shouldn't have.
+// ONE GATE STANDS IN FRONT OF TAKING A FAMILY'S MONEY: the place must be
+// approved. A `pending` registration is a request that may still be refused.
+// Taking money for it means an immediate refund and a family wondering what
+// happened — and on a store with no compare-and-swap, a refund racing a
+// rejection is a bad afternoon. How it reached `approved` does not matter:
+// auto-approval and an admin pressing the button produce the same status, which
+// is the whole point of the status being the single source of truth.
 //
-// 1. THE ACCOUNT MUST BE VERIFIED. `emailVerifiedAt` has been stored since
-//    Phase 2, shown as a banner on the dashboard since Phase 6, and ENFORCED BY
-//    NOTHING. This is the first place in the system that acts on it. Payment is
-//    the right place to start: the receipt, and every later message about money,
-//    goes to an address nobody has proved belongs to this person. If that
-//    address is a typo, a family pays and hears nothing — and the person who
-//    does hear is a stranger.
+// ⚠ THERE WAS A SECOND GATE — A CONFIRMED EMAIL ADDRESS — AND IT IS GONE. This
+// suite now pins its ABSENCE, because it is the kind of thing somebody
+// reinstates in good faith.
 //
-//    It must not be a dead end, which is why the refusal carries a reason the
-//    client can act on: the dashboard already has a resend button.
+// It read as a security property and was not one. It never protected anything
+// on the paying direction: this is a person signed into their own account
+// settling their own bill, and an unverified address grants them nothing extra.
+// What it was stated to buy — that messages about money reach an address
+// somebody has proved is theirs — was already untrue, because the registration
+// confirmation goes to that same unverified address minutes earlier. And it was
+// already bypassable BY DESIGN: /pay is a link we ourselves email, deliberately
+// exempt, on the reasoning that reading the inbox is what verification ever
+// attested. A gate with a door we post through is not a gate.
 //
-// 2. THE PLACE MUST BE APPROVED. A `pending` registration is a request that may
-//    still be refused. Taking money for it means an immediate refund and a
-//    family wondering what happened — and on a store with no compare-and-swap,
-//    a refund racing a rejection is a bad afternoon. How it reached `approved`
-//    does not matter: auto-approval and an admin pressing the button produce
-//    the same status, which is the whole point of the status being the single
-//    source of truth.
+// What it did cost was the only flow that ever hit it: sign up, register, pay,
+// in one sitting — which is exactly the shape of a pay-per-session activity,
+// where the whole decision is "we will come on Tuesday".
+//
+// Verification still exists, is still asked for, and is still shown on the
+// dashboard. It is simply not what stands between a family and paying us, and
+// the assertions below check both halves of that.
 //
 // And the amount is computed server-side. An amount in a request body is an
 // amount somebody can edit before sending it.
@@ -40,22 +48,35 @@ console.log('[the guardian link is checked before anything else]');
 // another, and the check is the FIRST thing, not a later filter.
 H.ok(/^\s*case 'pay': \{\s*const participant = await mustGuard\(body\.participantId\);/m.test(pay),
   'mustGuard runs first');
-H.ok(pay.indexOf('mustGuard') < pay.indexOf('emailVerifiedAt'),
-  'and before the verification gate — a stranger must not learn a registration exists');
+H.ok(pay.indexOf('mustGuard') < pay.indexOf('getRegistration'),
+  'and before the store is read — a stranger must not learn a registration exists');
 
-console.log('\n[gate 1: the account must be verified]');
-H.ok(/if \(!me\.emailVerifiedAt\)/.test(pay), 'unverified accounts are refused');
-H.ok(/reason: 'email-unverified'/.test(pay), 'with a machine-readable reason, so the client can offer the resend');
-H.ok(/json\(403/.test(pay), 'as a 403 — it is a permission, not a missing thing');
-// The field must be the one the rest of the system writes.
+console.log('\n[there is NO verification gate, on any door that takes money]');
+// All three: the term button, one session, and the one-step drop-in that
+// registers and pays in a single call.
+const paySession = bare.slice(bare.indexOf("case 'paySession'"), bare.indexOf("case 'cancelSession'"));
+const bookAndPay = bare.slice(bare.indexOf("case 'bookAndPay'"), bare.indexOf("case 'cancelSession'"));
+H.ok(paySession.length > 300 && bookAndPay.length > 600, 'found the other two branches');
+[['pay', pay], ['paySession', paySession], ['bookAndPay', bookAndPay]].forEach(([name, branch]) => {
+  H.ok(!/emailVerifiedAt/.test(branch), name + ' does not ask whether the address was confirmed');
+  H.ok(!/email-unverified/.test(branch), name + ' has no unverified refusal to return');
+});
+// ...and the emailed link never did, which is the argument the removal rests on.
+const payLink = fs.readFileSync(path.join(R, 'netlify/functions/pay-link.js'), 'utf8');
+H.ok(!/emailVerifiedAt/.test(payLink.replace(/^\s*\/\/.*$/gm, '')),
+  'and /pay — a link we email — never checked it either, by design');
+
+console.log('\n[but verification itself is untouched]');
+// Removing the gate must not quietly remove the feature. It is still set, still
+// requestable, and the dashboard still says when it is missing.
 const store = fs.readFileSync(path.join(R, 'netlify/functions/_account-store.js'), 'utf8');
 H.ok(/account\.emailVerifiedAt = new Date\(\)\.toISOString\(\)/.test(store),
-  'and it is the same field markEmailVerified() sets');
-// The escape hatch has to exist or the gate is a wall.
+  'markEmailVerified() still stamps the field');
 const auth = fs.readFileSync(path.join(R, 'netlify/functions/account-auth.js'), 'utf8');
-H.ok(/case 'resendVerification'/.test(auth), 'a blocked family can request a new verification mail');
+H.ok(/case 'resendVerification'/.test(auth), 'a family can still ask for a new verification mail');
 const client = fs.readFileSync(path.join(R, 'js/member-account.js'), 'utf8');
-H.ok(/resendVerification/.test(client), 'and the dashboard offers it');
+H.ok(/resendVerification/.test(client), 'and the dashboard still offers it');
+H.ok(/!account\.emailVerifiedAt/.test(client), 'and still says so when the address is unconfirmed');
 
 console.log('\n[gate 2: the place must be approved]');
 H.ok(/if \(reg\.status !== 'approved'\)/.test(pay), 'only an approved registration is payable');
@@ -63,8 +84,8 @@ H.ok(/reason: 'not-approved'/.test(pay), 'with a reason and the actual status');
 // AUTO-APPROVED COUNTS. Nothing here may ask HOW it was approved.
 H.ok(!/autoApproved/.test(pay),
   'and nothing asks whether it was auto-approved — the status is the single source of truth');
-H.ok(pay.indexOf('emailVerifiedAt') < pay.indexOf("!== 'approved'"),
-  'the cheap check runs before the store read');
+H.ok(pay.indexOf('mustGuard') < pay.indexOf("!== 'approved'"),
+  'and the guardian link is checked before the status');
 
 console.log('\n[the amount is ours, not the browser\'s]');
 // ⚠ AND IT IS BUILT IN ONE PLACE. There are two doors to this payment now — the
@@ -82,15 +103,15 @@ H.ok(!/amount|cents/i.test((/function createCheckout\(([^)]*)\)/.exec(checkout) 
 H.ok(!/body\.amount|body\.cents|body\.amountCents/.test(pay + checkout),
   'nor is one ever read from a request body');
 H.ok(/if \(!\(due > 0\)\)/.test(pay), 'nothing outstanding is refused rather than charged zero');
-H.ok(/unit_amount: amountCents/.test(checkout), 'and the computed figure is what Stripe is told');
+H.ok(/unit_amount: l\.amountCents/.test(checkout), 'and the computed figure is what Stripe is told');
 // There are two debts now — a term and one evening — and they go through ONE
 // builder, so the currency, the descriptor and the organisation tag cannot
 // drift between them. A drop-in registration owes nothing at all, so without the
 // second wrapper a family could book an evening and had no way to settle it.
 H.eq((checkout.match(/checkout\.sessions\.create/g) || []).length, 1,
   'through one builder, however many kinds of debt call it');
-H.ok(/ogen_kind: 'session'/.test(checkout) && /session_date: att\.sessionDate/.test(checkout),
-  'and an evening carries its DATE, so the webhook settles the right blob');
+H.ok(/ogen_kind: 'session'/.test(checkout) && /session_dates: list\.map/.test(checkout),
+  'and a session payment carries its DATES, so the webhook settles the right blobs');
 
 console.log('\n[the session is tagged so a shared account can tell it apart]');
 H.ok(/metadata: S\.meta\(/.test(checkout), 'metadata goes through S.meta, which always stamps the organisation');
@@ -159,26 +180,24 @@ const reg = { participantId: 'p-1', activityId: 'act-1',
     l + ': and links to the registration, addressed by id');
 });
 
-console.log('\n[the client offers the button under the same two conditions]');
+console.log('\n[the client offers the button under the same one condition]');
 // Cosmetic, like every permission check on this side — the server re-decides
-// all of it. It exists so a family is not offered an action about to be
-// refused, and so a REFUSAL THEY CAN FIX is explained rather than hidden: a
-// missing button teaches nobody that their email needs confirming.
+// it. It exists so a family is not offered an action about to be refused, and
+// so a REFUSAL THEY CAN ACT ON is explained rather than hidden.
 const ui = fs.readFileSync(path.join(R, 'js/member-account.js'), 'utf8');
 H.ok(/action: 'pay', participantId: r\.participantId, activityId: r\.activityId/.test(ui),
   'the client calls the pay action with the registration key');
-H.ok(/left > 0 && r\.status === 'approved' && S\.account && S\.account\.emailVerifiedAt/.test(ui),
-  'and draws the button only when both gates pass and something is owed');
-H.ok(/T\.payNeedsVerify/.test(ui), 'an unverified account is TOLD, not silently denied a button');
-H.ok(/T\.payNeedsApproval/.test(ui), 'and so is one still waiting on approval');
+H.ok(/left > 0 && r\.status === 'approved'\) \{/.test(ui),
+  'and draws the button when the place is approved and something is owed');
+H.ok(!/emailVerifiedAt/.test(ui.slice(ui.indexOf('THE PAY BUTTON'))),
+  'with no verification condition left anywhere below it');
+H.ok(!/payNeedsVerify/.test(ui),
+  'and the string that explained that refusal is deleted rather than left orphaned');
+H.ok(/T\.payNeedsApproval/.test(ui), 'a place still waiting on approval is TOLD, not silently denied a button');
 // Checkout is a redirect. If the call fails the control must come back, or a
 // transient error leaves a dead button and a family who cannot pay.
 H.ok(/go\.disabled = false;[\s\S]{0,80}go\.textContent = T\.payNow;/.test(ui),
   'a failed attempt re-enables the button rather than leaving it spent');
 H.ok(/location\.href = res\.data\.url/.test(ui), 'and a success redirects to Stripe');
-// S.account has to be populated before the activity view renders, or the gate
-// reads undefined and hides the button from a verified family.
-H.ok(/S\.account = res\.data\.account;[\s\S]{0,600}if \(view === 'activity'\) return renderActivity\(\);/.test(ui),
-  'boot() sets S.account before rendering the activity view');
 
 H.done();

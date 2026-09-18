@@ -118,9 +118,19 @@ function validate(activity, sessionDate) {
 // What one evening costs, frozen at booking. The price is frozen for the same
 // reason a term price is: an admin raising it in March must not change what a
 // family already booked in January owes.
-function newAttendance({ activity, participantId, accountId, groupId, sessionDate, resolveSessionInstant }) {
+function newAttendance({ activity, participantId, accountId, groupId, sessionDate,
+                         resolveSessionInstant, bookedAt, bundle, bundleId }) {
   const now = new Date().toISOString();
-  const frozen = credit.freezeSession(activity, sessionDate, resolveSessionInstant);
+  // ⚠ `bookedAt` IS WHAT MAKES LATE PRICING REAL. priceForSession() needs to
+  // know when the booking was made to tell a late one from an ordinary one, and
+  // without it every booking prices as standard — so a screen showing the late
+  // price and a booking charging the standard one would disagree about the same
+  // evening. It is passed in rather than read from the clock here for the reason
+  // the whole of _credit.js is: the same record and the same instant must give
+  // the same figure a year later.
+  const frozen = credit.freezeSession(activity, sessionDate, resolveSessionInstant, {
+    bookedAt: bookedAt || now, bundle: bundle || false, bundleId: bundleId || null
+  });
   const owed = eur(frozen.perSessionPrice);
   return {
     participantId: participantId,

@@ -48,20 +48,24 @@ function returnUrl(reg, lang) {
 // would let a caller put somebody else's address on a receipt.
 // The one place a Stripe session is built. Everything above decides WHAT is
 // being charged for; this decides how a charge is made, once.
-async function build({ lang, email, name, description, amountCents, back, meta }) {
+async function build({ lang, email, lines, back, meta }) {
   return S.stripe().checkout.sessions.create({
     mode: 'payment',
     customer_email: email || undefined,
     // Stripe Checkout has no Hebrew; 'auto' falls back to English.
     locale: lang === 'en' ? 'en' : 'auto',
-    line_items: [{
+    // ONE LINE PER THING BEING PAID FOR. A term is one line; four evenings
+    // bought together are four, each named by its date — so the Checkout page,
+    // the receipt and the card statement all say which evenings were paid for
+    // rather than showing one lump a family cannot break down.
+    line_items: lines.map((l) => ({
       quantity: 1,
       price_data: {
         currency: 'eur',
-        unit_amount: amountCents,
-        product_data: { name: name, description: description || undefined }
+        unit_amount: l.amountCents,
+        product_data: { name: l.name, description: l.description || undefined }
       }
-    }],
+    })),
     success_url: back + (back.indexOf('?') === -1 ? '?' : '&') + 'paid=1',
     cancel_url: back,
     // Tagged on the SESSION and mirrored onto the PaymentIntent. The account is
@@ -86,9 +90,9 @@ async function createCheckout(reg, lang, email) {
   const back = returnUrl(reg, lang);
 
   return build({
-    lang: lang, email: email, name: title,
-    description: (reg.frozen && reg.frozen.participantName) || undefined,
-    amountCents: due,
+    lang: lang, email: email,
+    lines: [{ name: title, description: (reg.frozen && reg.frozen.participantName) || undefined,
+              amountCents: due }],
     back: back.slice(0, back.indexOf('#')) || back,
     meta: {
       ogen_kind: 'registration',
@@ -100,7 +104,7 @@ async function createCheckout(reg, lang, email) {
   });
 }
 
-// ⚠ ONE EVENING, WHICH IS A DIFFERENT DEBT FROM A TERM.
+// ⚠ EVENINGS, WHICH ARE A DIFFERENT DEBT FROM A TERM.
 //
 // A drop-in registration owes nothing — owedCentsFor() charges the yearly fee
 // and, for a COURSE, the term price. The money on a pay-per-session activity
@@ -110,35 +114,79 @@ async function createCheckout(reg, lang, email) {
 //
 // It goes through the same builder, so the currency, the descriptor and the
 // organisation tag cannot drift between the two — and the webhook tells them
-// apart by `ogen_kind` plus the session date, which is what makes the
-// settlement land on the right blob.
-async function createSessionCheckout(att, activityTitle, lang, email) {
-  const p = (att && att.payment) || {};
-  const due = (p.owedCents || 0) - (p.paidCents || 0);
-  if (!(due > 0)) throw Object.assign(new Error('Nothing outstanding'), { reason: 'nothing-due' });
+// apart by `ogen_kind` plus the dates, which is what makes each settlement land
+// on the right blob.
+//
+// ⚠ SEVERAL EVENINGS ARE ONE PAYMENT, NOT SEVERAL. A family choosing four dates
+// and being sent through Checkout four times would abandon somewhere in the
+// middle, and we would hold three paid evenings and a fourth booked and unpaid
+// with nothing saying so. One session, one card entry, one receipt — and the
+// breakdown carried in the metadata so the webhook can still settle each blob
+// on its own.
+//
+// The cap is a real limit rather than a round number: Stripe allows 500
+// characters per metadata value, and the breakdown below is roughly 18 per
+// evening. Twelve is comfortably inside it and is already more evenings than a
+// term holds.
+const MAX_SESSION_LINES = 12;
+
+async function createSessionsCheckout(atts, activityTitle, lang, email) {
+  const list = (atts || []).filter(Boolean);
+  if (!list.length) throw Object.assign(new Error('Nothing to pay for'), { reason: 'nothing-due' });
+  if (list.length > MAX_SESSION_LINES) {
+    throw Object.assign(new Error('Too many evenings in one payment'), { reason: 'too-many' });
+  }
+
+  const dues = list.map((att) => {
+    const p = att.payment || {};
+    return (p.owedCents || 0) - (p.paidCents || 0);
+  });
+  if (dues.some((d) => !(d > 0))) {
+    throw Object.assign(new Error('Nothing outstanding'), { reason: 'nothing-due' });
+  }
 
   const title = facts.pick(activityTitle, lang) || 'Ogen';
   const base = lang === 'he' ? '' : '/' + lang;
+  const first = list[0];
   const back = SITE + base + '/account/activity'
-    + '?p=' + encodeURIComponent(att.participantId)
-    + '&a=' + encodeURIComponent(att.activityId);
+    + '?p=' + encodeURIComponent(first.participantId)
+    + '&a=' + encodeURIComponent(first.activityId);
 
   return build({
-    lang: lang, email: email, name: title,
-    // The DATE, because a family paying for one evening out of ten needs the
-    // receipt to say which. A line reading only "Folk dancing" is four
+    lang: lang, email: email,
+    // The DATE on every line, because a family paying for one evening out of ten
+    // needs the receipt to say which. Lines reading only "Folk dancing" are four
     // identical charges on a statement.
-    description: att.sessionDate,
-    amountCents: due,
+    lines: list.map((att, i) => ({
+      name: title, description: att.sessionDate, amountCents: dues[i]
+    })),
     back: back,
     meta: {
       ogen_kind: 'session',
-      participant_id: att.participantId,
-      activity_id: att.activityId,
-      session_date: att.sessionDate,
-      attendance: 'att-' + att.participantId + '__' + att.activityId + '__' + att.sessionDate
+      participant_id: first.participantId,
+      activity_id: first.activityId,
+      // `session_date` stays for one evening so a Checkout opened before this
+      // existed still settles; `session_dates` is what the webhook reads first.
+      session_date: list.length === 1 ? first.sessionDate : undefined,
+      session_dates: list.map((a) => a.sessionDate).join(','),
+      // OUR BREAKDOWN, which Stripe's total then has to agree with. The webhook
+      // refuses to settle anything if the two disagree — see settleSession —
+      // because splitting a payment across blobs by a figure nobody checked is
+      // how money lands against the wrong debt.
+      session_amounts: dues.join(','),
+      attendance: list.length === 1
+        ? 'att-' + first.participantId + '__' + first.activityId + '__' + first.sessionDate
+        : undefined
     }
   });
 }
 
-module.exports = { createCheckout, createSessionCheckout, dueCents, returnUrl };
+// One evening. The plural is the general case; this exists because two call
+// sites read better with it, and it is the same builder underneath.
+const createSessionCheckout = (att, activityTitle, lang, email) =>
+  createSessionsCheckout([att], activityTitle, lang, email);
+
+module.exports = {
+  createCheckout, createSessionCheckout, createSessionsCheckout,
+  dueCents, returnUrl, MAX_SESSION_LINES
+};

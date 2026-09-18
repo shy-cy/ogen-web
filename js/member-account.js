@@ -92,7 +92,6 @@
 
       costTitle: 'מה זה עולה', stillToPay: 'נותר לתשלום', credited: 'זוכה',
       payNow: 'תשלום מאובטח', payOpening: 'פותח תשלום…',
-      payNeedsVerify: 'כדי לשלם, יש לאשר את כתובת האימייל. הקישור לאישור נמצא בעמוד החשבון.',
       payNeedsApproval: 'קישור לתשלום יישלח אליכם בקרוב.',
       sessionsTitle: 'המפגשים', dateCol: 'תאריך', statusCol: 'סטטוס',
       book: 'הרשמה למפגש', cancelSession: 'ביטול מפגש',
@@ -107,10 +106,16 @@
       registerTitle: 'הרשמה לפעילות', registerWho: 'מי נרשם/ת?',
       registerGroup: 'קבוצה', registerGo: 'הרשמה',
       registerFull: 'הפעילות מלאה.',
-      perSessionIntro: 'ההרשמה כאן היא לפעילות. את המפגשים בוחרים אחד־אחד, ומשלמים על כל מפגש בנפרד.',
-      nextSessions: 'המפגשים הקרובים:',
-      registerDoneDropin: 'נרשמתם לפעילות. עכשיו אפשר לבחור מפגשים.',
-      chooseSessions: 'בחירת מפגשים ותשלום',
+      perSessionIntro: 'בוחרים מי מגיע/ה ולאילו מפגשים, ומשלמים רק עליהם. אפשר להוסיף מפגשים נוספים בכל עת.',
+      pickDates: 'לאילו מפגשים?', pickAtLeastOne: 'יש לבחור לפחות מפגש אחד.',
+      dateFull: 'מלא', dateBooked: 'כבר נרשמתם',
+      noDates: 'עדיין לא פורסמו מפגשים קרובים.',
+      bookAndPay: 'הרשמה ותשלום',
+      bookedFree: 'נרשמתם. אין תשלום על המפגשים האלה.',
+      bookedUnpaid: 'המפגשים נשמרו, אבל לא הצלחנו לפתוח את דף התשלום. אפשר לשלם מעמוד הפעילות.',
+      datesGone: 'חלק מהמפגשים כבר אינם זמינים. אפשר לבחור שוב.',
+      awaitingOk: 'ההרשמה נקלטה. נאשר את המקום לפני בחירת מפגשים — לא בוצע חיוב.',
+      chooseSessions: 'מעבר לעמוד הפעילות',
       paySession: 'תשלום על המפגש', payingSession: 'פותח תשלום…',
       registerDone: 'ההרשמה בוצעה. קישור לתשלום יישלח אליכם בקרוב.',
       owes: 'לתשלום', paid: 'שולם', feeIncluded: 'כולל דמי הרשמה שנתיים',
@@ -175,7 +180,6 @@
 
       costTitle: 'What it costs', stillToPay: 'Still to pay', credited: 'Credited',
       payNow: 'Pay securely', payOpening: 'Opening payment…',
-      payNeedsVerify: 'To pay, please confirm your email address. The link to resend it is on your account page.',
       payNeedsApproval: 'We will send you a payment link shortly.',
       sessionsTitle: 'Sessions', dateCol: 'Date', statusCol: 'Status',
       book: 'Book', cancelSession: 'Cancel this session',
@@ -190,11 +194,17 @@
       registerTitle: 'Register for an activity', registerWho: 'Who is registering?',
       registerGroup: 'Group', registerGo: 'Register',
       registerFull: 'This activity is full.',
-      perSessionIntro: 'Registering here joins the activity. You then choose evenings one at a time and pay for each one.',
-      nextSessions: 'Next sessions:',
-      registerDoneDropin: 'You have joined the activity. You can choose evenings now.',
-      chooseSessions: 'Choose evenings and pay',
-      paySession: 'Pay for this evening', payingSession: 'Opening payment…',
+      perSessionIntro: 'Choose who is coming and which sessions. You pay only for the sessions you pick, and you can book more at any time.',
+      pickDates: 'Which sessions?', pickAtLeastOne: 'Choose at least one session.',
+      dateFull: 'full', dateBooked: 'already booked',
+      noDates: 'No upcoming sessions have been published yet.',
+      bookAndPay: 'Register and pay',
+      bookedFree: 'Booked. There is nothing to pay for these sessions.',
+      bookedUnpaid: 'The sessions are booked, but we could not open the payment page. You can pay from the activity page.',
+      datesGone: 'Some of those sessions are no longer available. Please choose again.',
+      awaitingOk: 'Registered. We will confirm the place before sessions can be booked \u2014 nothing has been charged.',
+      chooseSessions: 'Go to the activity page',
+      paySession: 'Pay for this session', payingSession: 'Opening payment…',
       registerDone: 'Registered. We will send you a payment link shortly.',
       owes: 'To pay', paid: 'Paid', feeIncluded: 'includes the yearly registration fee',
       feeAlready: 'yearly registration fee already paid',
@@ -258,7 +268,6 @@
 
       costTitle: 'Сколько это стоит', stillToPay: 'Осталось оплатить', credited: 'Зачислено',
       payNow: 'Оплатить', payOpening: 'Открываем оплату…',
-      payNeedsVerify: 'Чтобы оплатить, подтвердите адрес электронной почты. Ссылка для повторной отправки — на странице аккаунта.',
       payNeedsApproval: 'Ссылку на оплату мы пришлём в ближайшее время.',
       sessionsTitle: 'Занятия', dateCol: 'Дата', statusCol: 'Статус',
       book: 'Записаться', cancelSession: 'Отменить занятие',
@@ -273,10 +282,16 @@
       registerTitle: 'Запись на занятие', registerWho: 'Кто записывается?',
       registerGroup: 'Группа', registerGo: 'Записаться',
       registerFull: 'Свободных мест нет.',
-      perSessionIntro: 'Здесь вы записываетесь на занятие. Даты выбираются по одной, и каждая оплачивается отдельно.',
-      nextSessions: 'Ближайшие даты:',
-      registerDoneDropin: 'Вы записаны на занятие. Теперь можно выбрать даты.',
-      chooseSessions: 'Выбрать даты и оплатить',
+      perSessionIntro: 'Выберите, кто придёт и на какие занятия. Вы платите только за выбранные даты и можете добавить другие в любой момент.',
+      pickDates: 'Какие занятия?', pickAtLeastOne: 'Выберите хотя бы одно занятие.',
+      dateFull: 'мест нет', dateBooked: 'уже записаны',
+      noDates: 'Ближайшие занятия пока не опубликованы.',
+      bookAndPay: 'Записаться и оплатить',
+      bookedFree: 'Вы записаны. За эти занятия платить не нужно.',
+      bookedUnpaid: 'Занятия забронированы, но страницу оплаты открыть не удалось. Оплатить можно на странице занятия.',
+      datesGone: 'Некоторые даты уже недоступны. Пожалуйста, выберите снова.',
+      awaitingOk: 'Заявка принята. Мы подтвердим место до выбора дат \u2014 оплата не списана.',
+      chooseSessions: 'Перейти к занятию',
       paySession: 'Оплатить это занятие', payingSession: 'Открываем оплату…',
       registerDone: 'Запись оформлена. Ссылку на оплату мы пришлём в ближайшее время.',
       owes: 'К оплате', paid: 'Оплачено', feeIncluded: 'включая годовой регистрационный взнос',
@@ -324,6 +339,18 @@
     return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : null;
   }
   var full = function (p) { return [p.firstName, p.lastName].filter(Boolean).join(' '); };
+  // A date a family reads, in their own language, from the ISO date the calendar
+  // stores. It falls back to the ISO string rather than throwing: a plain
+  // 2026-09-22 is worse than "Tuesday, 22 September" and very much better than a
+  // panel that does not render.
+  function longDate(iso) {
+    var d = new Date(String(iso) + 'T00:00:00');
+    if (isNaN(d.getTime())) return String(iso || '');
+    try {
+      return d.toLocaleDateString({ he: 'he-IL', en: 'en-GB', ru: 'ru-RU' }[lang] || 'en-GB',
+                                  { weekday: 'long', day: 'numeric', month: 'long' });
+    } catch (err) { return String(iso); }
+  }
 
   // A date in the reader's language. The PUBLISHED activity page formats its
   // session table on the server, because it is static HTML built once for three
@@ -680,6 +707,19 @@
   }
 
   // ---- registering for an activity ----
+  //
+  // ⚠ A DROP-IN AND A TERM ARE TWO DIFFERENT DECISIONS, AND THIS DRAWS BOTH.
+  //
+  // A term is one choice — this child, this activity, for months — and it is
+  // made once. A drop-in is "we will come on Tuesday": who, which dates, pay.
+  // Running the second through the first meant registering, waiting, coming
+  // back, booking dates one at a time and then hunting for a way to pay each of
+  // them, which is a term's machinery charged to somebody buying one evening.
+  //
+  // So the drop-in panel asks the whole question at once and ends at Checkout.
+  // The registration still exists underneath — it carries the guardian link, the
+  // frozen terms and an admin's ability to say no — and a family never has to
+  // know that.
   function renderRegister(where, slug, onDone) {
     clear(where);
     where.appendChild(section(T.registerTitle, [el('p', { class: 'acc-intro', text: T.loading })]));
@@ -693,100 +733,182 @@
         [el('p', { class: 'acc-notice is-err', text: failure(act) })]));
       var a = act.data.activity;
       var people = (fam.data && fam.data.participants) || [];
+      var title = T.registerTitle + ' · ' + pick(a.title);
 
-      var who = el('select', {});
-      people.forEach(function (c) {
-        // "Noa Levi" and "Michal Shinitzky (me)" in the same list, because they
-        // are the same kind of thing — a person this account may register.
-        who.appendChild(el('option', { value: c.participantId,
-          text: full(c) + (c.isSelf ? ' (' + T.me + ')' : '') }));
-      });
-
-      var groupSel = null;
-      if (a.groups) {
-        groupSel = el('select', {});
-        a.groups.forEach(function (g) {
-          groupSel.appendChild(el('option', {
-            value: g.groupId, text: g.label + (g.full ? ' — ' + T.registerFull : ''),
-            disabled: g.full || null
-          }));
-        });
+      if (!people.length) {
+        return where.appendChild(section(title, [
+          el('p', { class: 'acc-intro' }, [
+            el('span', { text: T.noParticipants + ' ' }),
+            el('a', { class: 'acc-link', href: url('/account/details', 'tab=family'),
+                      text: T.addSomeone })
+          ])
+        ]));
       }
 
-      var go = el('button', { type: 'submit', class: 'btn-primary', text: T.registerGo,
-                              disabled: !people.length || null });
-      var form = el('form', { onsubmit: function (e) {
-        e.preventDefault();
-        go.disabled = true;
-        post(REGS, { action: 'submit', slug: slug, participantId: who.value,
-                     groupId: groupSel ? groupSel.value : null }).then(function (res) {
-          go.disabled = false;
-          if (!res.ok) return say('err', failure(res));
-          // IN PLACE, not a reboot. Rebooting the dashboard threw away the
-          // notice that had just been written into it, so the one thing a family
-          // needed to see — that the child is registered and a payment link is
-          // coming — was on screen for the length of one repaint.
-          clear(where);
-          // ⚠ A DROP-IN OWES NOTHING AT REGISTRATION, so "a payment link is on
-          // its way" is untrue there: owedCentsFor() bills the yearly fee and,
-          // for a COURSE, the term price. The money on a pay-per-session
-          // activity lives on each evening. What follows registering is
-          // therefore not a payment — it is choosing a date — and the panel says
-          // that and offers the way through.
-          // From the ACTIVITY this panel was drawn for, not from the saved
-          // record: `type` on a registration lives inside the frozen block, and
-          // reading it off the top level would be undefined — always false, and
-          // silently the course wording on every drop-in.
-          var perSession = !!a.perSession;
-          where.appendChild(section(null, [
-            el('p', { class: 'acc-notice is-ok',
-                      text: perSession ? T.registerDoneDropin : T.registerDone }),
-            perSession
-              ? el('p', {}, [el('a', { class: 'acc-link',
-                  href: url('/account/activity', 'p=' + encodeURIComponent(who.value) +
-                                                 '&a=' + encodeURIComponent(a.activityId)),
-                  text: T.chooseSessions })])
-              : null
-          ]));
-          if (onDone) onDone();
-        });
-      } }, [
-        el('div', { class: 'acc-field' }, [el('label', { text: T.registerWho }), who]),
-        groupSel ? el('div', { class: 'acc-field' }, [el('label', { text: T.registerGroup }), groupSel]) : null,
-        go
-      ]);
-
-      // ⚠ A DROP-IN IS NOT A TERM, AND THE PANEL USED TO PRETEND IT WAS.
-      //
-      // The server has always answered `perSession: true` with a null capacity,
-      // and nothing here read it — so registering for a pay-per-session activity
-      // showed a places-left line for a term nobody buys, and said nothing at
-      // all about evenings. A family could not tell which session they were
-      // signing up to, because the answer is "none of them": this is the
-      // may-come decision, and the evenings are chosen one at a time afterwards.
-      //
-      // So the count is replaced by what actually happens next, and the first
-      // dates are named. A count of places on an activity that is counted per
-      // EVENING would be a number about nothing.
-      var left = a.perSession
-        ? T.perSessionIntro
-        : (a.left == null ? T.unlimited : a.left + ' ' + T.places);
-      var upcoming = a.perSession && (a.nextDates || []).length
-        ? el('p', { class: 'acc-note', text: T.nextSessions + ' ' +
-                    a.nextDates.slice(0, 3).map(longDate).join(' · ') })
-        : null;
-      where.appendChild(section(T.registerTitle + ' · ' + pick(a.title), [
-        el('p', { class: 'acc-intro', text: left }),
-        upcoming,
-        people.length
-          ? form
-          : el('p', { class: 'acc-intro' }, [
-              el('span', { text: T.noParticipants + ' ' }),
-              el('a', { class: 'acc-link', href: url('/account/details', 'tab=family'),
-                        text: T.addSomeone })
-            ])
-      ]));
+      if (a.perSession) registerPerSession(where, a, people, slug, title);
+      else registerTerm(where, a, people, slug, title, onDone);
     });
+  }
+
+  // Who is coming. One list for both shapes, because "Noa Levi" and "Michal
+  // Shinitzky (me)" are the same kind of thing — a person this account may
+  // register.
+  function peopleSelect(people) {
+    var who = el('select', {});
+    people.forEach(function (c) {
+      who.appendChild(el('option', { value: c.participantId,
+        text: full(c) + (c.isSelf ? ' (' + T.me + ')' : '') }));
+    });
+    return who;
+  }
+
+  function registerTerm(where, a, people, slug, title, onDone) {
+    var who = peopleSelect(people);
+
+    var groupSel = null;
+    if (a.groups) {
+      groupSel = el('select', {});
+      a.groups.forEach(function (g) {
+        groupSel.appendChild(el('option', {
+          value: g.groupId, text: g.label + (g.full ? ' — ' + T.registerFull : ''),
+          disabled: g.full || null
+        }));
+      });
+    }
+
+    var go = el('button', { type: 'submit', class: 'btn-primary', text: T.registerGo });
+    var form = el('form', { onsubmit: function (e) {
+      e.preventDefault();
+      go.disabled = true;
+      post(REGS, { action: 'submit', slug: slug, participantId: who.value,
+                   groupId: groupSel ? groupSel.value : null }).then(function (res) {
+        go.disabled = false;
+        if (!res.ok) return say('err', failure(res));
+        // IN PLACE, not a reboot. Rebooting the dashboard threw away the notice
+        // that had just been written into it, so the one thing a family needed
+        // to see — that the child is registered and a payment link is coming —
+        // was on screen for the length of one repaint.
+        clear(where);
+        where.appendChild(section(null, [
+          el('p', { class: 'acc-notice is-ok', text: T.registerDone })
+        ]));
+        if (onDone) onDone();
+      });
+    } }, [
+      el('div', { class: 'acc-field' }, [el('label', { text: T.registerWho }), who]),
+      groupSel ? el('div', { class: 'acc-field' }, [el('label', { text: T.registerGroup }), groupSel]) : null,
+      go
+    ]);
+
+    where.appendChild(section(title, [
+      el('p', { class: 'acc-intro',
+                text: a.left == null ? T.unlimited : a.left + ' ' + T.places }),
+      form
+    ]));
+  }
+
+  // ⚠ ONE SCREEN: WHO, WHICH DATES, PAY.
+  //
+  // The dates carry their own price and their own room, so they are fetched per
+  // person rather than baked into the panel — a participant who already booked
+  // the 22nd must not be offered it again and charged twice. The server refuses
+  // that anyway; this is so it is never asked for.
+  function registerPerSession(where, a, people, slug, title) {
+    var who = peopleSelect(people);
+    var dates = el('div', { class: 'acc-dates' });
+    var go = el('button', { type: 'submit', class: 'btn-primary', text: T.bookAndPay,
+                            disabled: true });
+    var rows = [];
+
+    who.addEventListener('change', load);
+
+    var form = el('form', { onsubmit: function (e) {
+      e.preventDefault();
+      var chosen = rows.filter(function (row) { return row.box.checked; })
+                       .map(function (row) { return row.date; });
+      if (!chosen.length) return say('err', T.pickAtLeastOne);
+      go.disabled = true;
+      go.textContent = T.payOpening;
+      post(REGS, { action: 'bookAndPay', slug: slug, participantId: who.value,
+                   sessionDates: chosen }).then(function (res) {
+        if (!res.ok) {
+          go.disabled = false;
+          go.textContent = T.bookAndPay;
+          // A refusal naming dates is worth re-reading the list for: what
+          // changed is on the screen the family is looking at.
+          if (res.data && res.data.reason === 'unavailable') { load(); return say('err', T.datesGone); }
+          return say('err', failure(res));
+        }
+        var d = res.data || {};
+        // Checkout is a redirect, not a fetch.
+        if (d.url) { location.href = d.url; return; }
+        clear(where);
+        var link = el('p', {}, [el('a', { class: 'acc-link',
+          href: url('/account/activity', 'p=' + encodeURIComponent(who.value) +
+                                         '&a=' + encodeURIComponent(a.activityId)),
+          text: T.chooseSessions })]);
+        var note = d.awaitingApproval ? T.awaitingOk
+                 : d.paymentFailed ? T.bookedUnpaid
+                 : T.bookedFree;
+        where.appendChild(section(null, [
+          el('p', { class: 'acc-notice is-ok', text: note }), link
+        ]));
+      });
+    } }, [
+      el('div', { class: 'acc-field' }, [el('label', { text: T.registerWho }), who]),
+      el('div', { class: 'acc-field' }, [el('label', { text: T.pickDates }), dates]),
+      go
+    ]);
+
+    where.appendChild(section(title, [
+      el('p', { class: 'acc-intro', text: T.perSessionIntro }),
+      form
+    ]));
+    load();
+
+    // The running total is on the button, because that is what it is the price
+    // of. A separate "Total" line beside a button reading only "Pay" asks a
+    // reader to connect two things that could have been one.
+    function retotal() {
+      var sum = 0, n = 0;
+      rows.forEach(function (row) { if (row.box.checked) { sum += row.price; n++; } });
+      go.disabled = !n;
+      go.textContent = n ? T.bookAndPay + ' · ' + money(sum) : T.bookAndPay;
+    }
+
+    function load() {
+      rows = [];
+      clear(dates);
+      dates.appendChild(el('p', { class: 'acc-note', text: T.loading }));
+      post(REGS, { action: 'sessions', slug: slug, participantId: who.value }).then(function (res) {
+        clear(dates);
+        if (!res.ok) return dates.appendChild(el('p', { class: 'acc-notice is-err', text: failure(res) }));
+        var list = (res.data.sessions || []).filter(function (s) { return !s.past; });
+        if (!list.length) {
+          go.disabled = true;
+          return dates.appendChild(el('p', { class: 'acc-note', text: T.noDates }));
+        }
+        var firstFree = null;
+        list.forEach(function (s) {
+          var taken = s.status === 'booked' || s.status === 'attended';
+          var off = taken || s.full;
+          var box = el('input', { type: 'checkbox', value: s.date, disabled: off || null,
+                                  onchange: retotal });
+          var why = taken ? T.dateBooked : s.full ? T.dateFull : money(s.priceCents);
+          dates.appendChild(el('label', { class: 'acc-date' + (off ? ' is-off' : '') }, [
+            box,
+            el('span', { class: 'acc-date-when', text: longDate(s.date) }),
+            el('span', { class: 'acc-date-what', text: why })
+          ]));
+          if (!off) { rows.push({ date: s.date, price: s.priceCents || 0, box: box }); if (!firstFree) firstFree = box; }
+        });
+        // THE NEXT ONE IS TICKED. A family arriving from a Register button
+        // usually means the coming session, and a screen with nothing chosen
+        // and a dead button reads as a screen that has not loaded.
+        if (firstFree) firstFree.checked = true;
+        retotal();
+      });
+    }
   }
 
   // ---- what this account is registered to ----
@@ -1294,17 +1416,19 @@
     // THE PAY BUTTON, and what decides whether it is drawn.
     //
     // Cosmetic, like every permission check on this side: the server re-decides
-    // all of it, and the copy exists so a family is not offered an action about
-    // to be refused. The three conditions mirror the two gates in the `pay`
-    // branch of account-registrations.js plus the obvious one.
+    // both conditions, and the copy exists so a family is not offered an action
+    // about to be refused.
     //
     // A refusal is SHOWN RATHER THAN HIDDEN when it is something the reader can
-    // fix. An unverified account gets a line saying so, because the resend
-    // button is on the dashboard and a missing button explains nothing; a
-    // registration still awaiting approval gets a line too, because "wait" is
-    // the answer and silence is not. Only a settled balance draws nothing,
-    // since the figures above already say why.
-    if (left > 0 && r.status === 'approved' && S.account && S.account.emailVerifiedAt) {
+    // act on: a registration still awaiting approval gets a line, because "wait"
+    // is the answer and silence is not. A settled balance draws nothing, since
+    // the figures above already say why.
+    //
+    // There used to be a third condition — a confirmed email address — and it is
+    // gone from both sides. See the `pay` branch of account-registrations.js: it
+    // guarded nothing on the paying direction, and the one case it refused was
+    // the family who signed up, registered and wanted to pay in one sitting.
+    if (left > 0 && r.status === 'approved') {
       var go = el('button', { type: 'submit', class: 'btn-primary', text: T.payNow });
       var payForm = el('form', { class: 'acc-pay', onsubmit: function (e) {
         e.preventDefault();
@@ -1321,8 +1445,6 @@
           });
       } }, [go]);
       kids.push(payForm);
-    } else if (left > 0 && r.status === 'approved') {
-      kids.push(el('p', { class: 'acc-note', text: T.payNeedsVerify }));
     } else if (left > 0) {
       kids.push(el('p', { class: 'acc-note', text: T.payNeedsApproval }));
     }
@@ -1403,7 +1525,7 @@
       // and should not be the only thing offered beside a debt.
       var owing = (s.owedCents || 0) - (s.paidCents || 0);
       var acts = [];
-      if (owing > 0 && S.account && S.account.emailVerifiedAt) {
+      if (owing > 0) {
         var payBtn = el('button', { type: 'button', class: 'acc-link', text: T.paySession,
           onclick: function () {
             payBtn.disabled = true;
@@ -1419,8 +1541,6 @@
             });
           } });
         acts.push(payBtn);
-      } else if (owing > 0) {
-        acts.push(el('span', { class: 'acc-meta', text: T.payNeedsVerify }));
       }
       acts.push(el('button', { type: 'button', class: 'acc-link is-danger', text: T.cancelSession,
         onclick: function () {

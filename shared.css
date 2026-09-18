@@ -1007,6 +1007,30 @@ html[lang="he"] .thankyou h1{ font-family: var(--font-he); font-weight:700; }
 }
 
 .acc-check{ display:flex; gap:10px; align-items:flex-start; margin:4px 0 18px; }
+
+/* THE DATES OF A DROP-IN, chosen where the registration is made.
+   A list of pressable rows rather than a multi-select: a family is picking two
+   or three evenings out of eight, and a select that has to be told to allow
+   more than one is the control people get wrong. The whole row is the label, so
+   the date and the price are both targets and not just the box.
+   No physical inset anywhere in here — the tick sits at the reading start and
+   the price at the reading end in all three languages, which `justify-content`
+   and source order give for free. */
+.acc-dates{ border:1px solid var(--stone); border-radius:10px; overflow:hidden; background:#fff; }
+.acc-date{
+  display:flex; align-items:center; gap:11px;
+  padding:11px 13px; border-bottom:1px solid var(--stone);
+  font-size:15px; cursor:pointer;
+}
+.acc-date:last-child{ border-bottom:0; }
+.acc-date input{ flex:0 0 auto; width:18px; height:18px; margin:0; }
+.acc-date-when{ flex:1 1 auto; }
+.acc-date-what{ flex:0 0 auto; color:var(--camel); font-size:14px; font-variant-numeric:tabular-nums; }
+/* A date that cannot be taken is dimmed and not pressable, and still says why —
+   "full" and "already booked" are different answers and a family should not
+   have to work out which one applies. */
+.acc-date.is-off{ cursor:default; color:var(--camel); }
+
 .acc-check input{ margin-top:4px; flex:0 0 auto; width:18px; height:18px; }
 .acc-check label{ font-size:14.5px; }
 

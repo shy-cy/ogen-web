@@ -46,7 +46,20 @@ function makeDom(opts) {
           this.add(c); return true;
         }
       },
-      get value() { return n.attributes.value || ''; },
+      // A SELECT'S VALUE IS ITS SELECTED OPTION, and with nothing selected that
+      // is the first one — which is what a browser does and what every form
+      // here relies on, since none of them touch `selected`. Returning '' for a
+      // select nobody had clicked meant a test could submit a form and never
+      // find out which person it named.
+      get value() {
+        if ('value' in n.attributes) return n.attributes.value;
+        if (n.tagName === 'SELECT') {
+          const opt = n.childNodes.filter((c) =>
+            c.tagName === 'OPTION' && c.attributes.disabled == null)[0];
+          return opt ? (opt.attributes.value || '') : '';
+        }
+        return '';
+      },
       set value(v) { n.attributes.value = v; },
       // REFLECTED PROPERTIES. The real DOM mirrors these between the property
       // and the attribute, and real code uses whichever is shorter — js/nav.js
@@ -59,6 +72,21 @@ function makeDom(opts) {
       set id(v) { n.attributes.id = String(v); },
       get type() { return n.attributes.type || ''; },
       set type(v) { n.attributes.type = String(v); },
+      // A checkbox's state is a PROPERTY in the real DOM, not an attribute —
+      // `box.checked = true` does not write `checked="true"` — so it is one
+      // here too, or a test could read back its own setup and learn nothing.
+      get checked() { return !!n._checked; },
+      set checked(v) { n._checked = !!v; },
+      // `disabled` IS reflected, and that difference is not pedantry: real code
+      // writes `button.disabled = false` to bring a control back, and a shim
+      // that filed it as a plain property left the attribute sitting there — so
+      // a test asking whether a button is pressable would read `disabled` on a
+      // button a browser shows as live.
+      get disabled() { return n.attributes.disabled != null; },
+      set disabled(v) {
+        if (v) n.attributes.disabled = 'true';
+        else delete n.attributes.disabled;
+      },
       get textContent() {
         return n._text + n.childNodes.map((c) => c.textContent).join('');
       },
@@ -102,6 +130,16 @@ function makeDom(opts) {
       // What a test clicks. Missing handler is an error, not a no-op: a button
       // nothing is listening to looks identical to a working one on screen.
       click() {
+        // A CHECKBOX IS NOT A BUTTON. Clicking one toggles it and fires
+        // `change`, which is what the date picker listens for — so without this
+        // a test could only assign `.checked` and would never run the handler
+        // that reads it, which is the half that computes the total.
+        if (n.tagName === 'INPUT' && n.attributes.type === 'checkbox') {
+          if (n.attributes.disabled != null) return;
+          n._checked = !n._checked;
+          (n._handlers.change || []).forEach((f) => f({ target: n, currentTarget: n }));
+          return;
+        }
         const fns = n._handlers.click || [];
         if (!fns.length) throw new Error('clicked a ' + n.tagName + ' with no click handler');
         fns.forEach((f) => f({ preventDefault() {}, stopPropagation() {}, currentTarget: n, target: n }));
