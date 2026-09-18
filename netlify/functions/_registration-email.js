@@ -170,30 +170,40 @@ const REJECTED = {
 //
 // THE APOLOGY IS OURS, and the copy has to say so. It is tempting to write "your
 // request expired", which reads as the family having let something lapse — but
-// the thing that expired is a request WE did not answer. The hold is released so
-// the place is not tied up indefinitely; the family did nothing wrong and the
-// message should not imply they did.
+// the thing that lapsed is a registration WE did not answer. The place is
+// released so it is not tied up indefinitely; the family did nothing wrong and
+// the message must not imply they did.
+//
+// ⚠ IT NO LONGER SAYS "REQUEST" EITHER, and that costs this message more than
+// it costs the others. The family was told they were REGISTERED, so this one
+// takes something away — which is exactly why it has to use the same word for
+// the thing it is taking. "Your request expired" would be a second, quieter
+// falsehood on top of the first: it would imply they had been waiting on an
+// answer all along. They were not; we told them it was done.
+//
+// The compensating change is not in this table. DEFAULT_EXPIRY_DAYS went from
+// 14 to 45, so answering a queue beats this message in any ordinary week.
 
 const EXPIRED = {
   he: {
-    subject: (child, act) => `בקשת ההרשמה של ${child} · ${act}`,
+    subject: (child, act) => `ההרשמה של ${child} · ${act}`,
     heading: 'לא הספקנו לחזור אליכם',
-    body: (child, act) => `הבקשה עבור ${child} ל${act} נשארה ללא מענה מצדנו, והמקום שהיה שמור שוחרר.`,
-    again: 'מצטערים. אם הפעילות עדיין מעניינת אתכם, אפשר להירשם שוב או פשוט להשיב להודעה הזו.',
+    body: (child, act) => `ההרשמה של ${child} ל${act} נשארה ללא מענה מצדנו, והמקום שוחרר.`,
+    again: 'מצטערים — זו טעות שלנו. אם הפעילות עדיין מעניינת אתכם, אפשר להירשם שוב או פשוט להשיב להודעה הזו.',
     button: 'לעמוד הפעילות'
   },
   en: {
-    subject: (child, act) => `About the request for ${child} · ${act}`,
+    subject: (child, act) => `About ${child}'s registration · ${act}`,
     heading: 'We did not get back to you in time',
-    body: (child, act) => `The request for ${child} for ${act} went unanswered on our side, and the place that was being held has been released.`,
-    again: 'We are sorry. If the activity still interests you, you can register again, or simply reply to this message.',
+    body: (child, act) => `${child}'s registration for ${act} went unanswered on our side, and the place has been released.`,
+    again: 'We are sorry — this one is ours. If the activity still interests you, you can register again, or simply reply to this message.',
     button: 'Go to the activity'
   },
   ru: {
-    subject: (child, act) => `О заявке для ${child} · ${act}`,
+    subject: (child, act) => `О записи ${child} · ${act}`,
     heading: 'Мы не успели вам ответить',
-    body: (child, act) => `Заявка для ${child} на ${act} осталась без ответа с нашей стороны, и удерживаемое место освобождено.`,
-    again: 'Приносим извинения. Если занятие вам всё ещё интересно, можно записаться снова или просто ответить на это письмо.',
+    body: (child, act) => `Запись ${child} на ${act} осталась без ответа с нашей стороны, и место освобождено.`,
+    again: 'Приносим извинения — это наша вина. Если занятие вам всё ещё интересно, можно записаться снова или просто ответить на это письмо.',
     button: 'Страница занятия'
   }
 };

@@ -35,7 +35,29 @@ const DEFAULT_MODE = 'flat';
 
 // The floor, in code. resolveExpiryDays() prefers the activity's own value,
 // then the site-wide env, then this.
-const DEFAULT_EXPIRY_DAYS = 14;
+//
+// ⚠ FORTY-FIVE, AND THE REASON IS WHAT THE FAMILY WAS TOLD. It was 14, chosen
+// while the confirmation promised an answer within that many days — the number
+// and the sentence were one thing. The words changed: a family that signs a
+// child up is told they are REGISTERED, because that is what they did, and the
+// queue's waiting is ours. A registration released a fortnight later now
+// contradicts the message that created it.
+//
+// Off is not the answer, and it is worth writing down why. Capacity is counted
+// from `holdsASpot()`, so an unanswered pending registration that never expires
+// holds a place on a capped activity FOREVER and the family is never told
+// anything at all — limbo with no message beats no limbo, but it loses to an
+// apology. The expiry is also the only thing that frees that place.
+//
+// So the pressure moves rather than disappearing: long enough that nobody meets
+// it in the ordinary course of answering a queue, short enough that a place is
+// not held for a term by a request somebody forgot. An activity that genuinely
+// fills in a week still sets its own shorter value, which is what the
+// per-activity field is for.
+//
+// Changing this is NOT retroactive: `expiresAt` is stamped at submission, so
+// every registration already taken keeps the deadline it was given.
+const DEFAULT_EXPIRY_DAYS = 45;
 // Calendar days before the start date, not sessions and not working days.
 const FEE_CUTOFF_DAYS = 14;
 // The share of the course after which nothing is creditable. ceil, so the
@@ -285,10 +307,11 @@ function validateRegistration(activity) {
 const FIELDS = [
     { key: 'autoApprove', kind: 'check', label: 'Approve registrations automatically',
       hint: 'Off means every request waits for an admin. An out-of-range age always waits, whatever this says.' },
-    { key: 'pendingExpiryDays', kind: 'days', label: 'Unanswered requests expire after',
+    { key: 'pendingExpiryDays', kind: 'days', label: 'Unanswered registrations are released after',
       unit: 'days',
-      hint: 'Counted from each family\'s own submission. Leave blank to use the site default (' +
-            DEFAULT_EXPIRY_DAYS + ' days).' },
+      hint: 'Counted from each family\'s own submission, and the family is told and apologised to. ' +
+            'They were told they are registered, so keep this long enough that answering the queue ' +
+            'always beats it. Leave blank for the site default (' + DEFAULT_EXPIRY_DAYS + ' days).' },
     { key: 'registrationFeeCutoffDate', kind: 'cutoff', types: ['course'],
       label: 'Registration fee stops being creditable on',
       hint: 'One date, the same for every family however late they registered. Pre-filled to ' +

@@ -1646,13 +1646,27 @@ difference is already expressed where it matters: a pay button on one, "a
 payment link is on its way" on the other. `pending` survives in the admin queue,
 which is the only place that word belongs.
 
-One consequence is worth knowing rather than discovering: **the expiry sweep now
-contradicts what the family was told.** It releases an unanswered `pending`
-registration after `pendingExpiryDays` and mails the apology — which was
-coherent while the family had been promised an answer by a date, and now lands
-on somebody who believes they are registered. It is a safety net against a place
-tied up forever, so it stays; the honest fix on an activity a person actually
-works the queue for is to raise the number or to auto-approve.
+**That moved `DEFAULT_EXPIRY_DAYS` from 14 to 45**, because the number and the
+sentence were one thing. The confirmation used to promise an answer within the
+same fortnight the sweep then acted on; a family now told they are *registered*
+and released a fortnight later is met by a message contradicting the one that
+created it.
+
+**Off was the wrong answer, and why is worth keeping.** Capacity is counted from
+`holdsASpot()`, so a pending registration that never expires holds a place on a
+capped activity **forever** and the family is never told anything at all —
+limbo with no message beats no limbo, but it loses to an apology, and the expiry
+is also the only thing that frees that place. So the pressure moved rather than
+disappearing: long enough that answering a queue beats it in any ordinary week,
+short enough that a place is not held for a term by a request somebody forgot.
+An activity that genuinely fills in a week still sets its own shorter value.
+
+Changing it is **not retroactive** — `expiresAt` is stamped at submission, so
+every registration already taken keeps the deadline it was given. The expiry
+message stopped saying "request" too, and that word costs more there than
+anywhere else: it is the one message that takes something away, so implying the
+family had been waiting on an answer all along would be a second, quieter
+falsehood on top of the first.
 
 **Three of the five now link to the family's own registration page** rather than
 the public activity page: registered, approved and the receipt are each partly

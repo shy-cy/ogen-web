@@ -223,7 +223,12 @@ H.eq(REG.defaultIfBlank(postponed).registrationFeeCutoffDate, '2026-09-30',
   'dates it was given until a person clicks recompute');
 
 console.log('\n[expiry: three levels, first one that answers wins]');
-H.eq(REG.resolveExpiryDays({}, {}).days, 14, 'the floor is in code');
+H.eq(REG.resolveExpiryDays({}, {}).days, REG.DEFAULT_EXPIRY_DAYS, 'the floor is in code');
+// 45, not 14. The confirmation tells a family they are REGISTERED, so a place
+// released inside a fortnight contradicts the message that created it. Off is
+// not the alternative — capacity counts holdsASpot(), so a hold that never
+// expires ties up a place forever and tells the family nothing at all.
+H.eq(REG.DEFAULT_EXPIRY_DAYS, 45, 'and it is long enough that answering a queue beats it');
 H.eq(REG.resolveExpiryDays({}, {}).source, 'default', 'and says where it came from');
 H.eq(REG.resolveExpiryDays({}, { PENDING_EXPIRY_DAYS: '7' }).source, 'env', 'the site default is next');
 H.eq(REG.resolveExpiryDays({ registration: { pendingExpiryDays: 3 } }, { PENDING_EXPIRY_DAYS: '7' }).days, 3,

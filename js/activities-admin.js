@@ -389,12 +389,12 @@
         d.hint ? el('div', { class: 'hint', text: d.hint }) : null]);
     }
     // 'days' — a number and a unit. The label ends in "after" and the unit
-    // follows the box, which is what keeps it from being read as the other
-    // fourteen on this panel: pendingExpiryDays counts from each family's own
-    // submission, the fee cutoff is one date shared by everyone.
+    // follows the box, which is what keeps it from being read as the fee
+    // cutoff: pendingExpiryDays counts from each family's own submission, the
+    // fee cutoff is one date shared by everyone.
     var input = el('input', { type: 'number', min: '1', step: '1', id: regId(d.key),
                               placeholder: d.key === 'pendingExpiryDays'
-                                ? String(S.schema.defaultExpiryDays || 14) : '' });
+                                ? String(S.schema.defaultExpiryDays || 45) : '' });
     input.value = value == null ? '' : value;
     input.addEventListener('input', function () { S.dirty = true; });
     return el('div', {}, [

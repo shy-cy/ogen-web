@@ -40,6 +40,11 @@ process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
 
 const child = (n) => ({ participantId: 'p-' + n, firstName: 'Child' + n, dateOfBirth: '2017-04-02' });
 
+// Read from the module rather than typed here. A test that copies the default
+// into itself passes when the two agree and says nothing about which is right;
+// this one asserts the VALUE separately, once, with the reason beside it.
+const REG_DEFAULT_DAYS = require(H.fnPath('_activity-registration')).DEFAULT_EXPIRY_DAYS;
+
 (async () => {
   const blobs = H.makeBlobs();
   const pooledCourse = F.course({ facts: Object.assign(F.course().facts, { groupSize: F.POOLED }) });
@@ -94,7 +99,11 @@ const child = (n) => ({ participantId: 'p-' + n, firstName: 'Child' + n, dateOfB
 
   // The half that needs no infrastructure. The record still SAYS pending — only
   // the clock has moved — and the place is already free.
-  const lapsed = NOW + 15 * 24 * 3600e3;
+  // Past the default, whatever the default is — the point of this half is the
+  // derived rule, not the number. (It is 45 days now; see DEFAULT_EXPIRY_DAYS
+  // for why a family told they are REGISTERED must not be released in a
+  // fortnight.)
+  const lapsed = NOW + (REG_DEFAULT_DAYS + 1) * 24 * 3600e3;
   H.eq(pending.status, 'pending', 'the stored status is untouched');
   H.eq(R.holdsASpot(pending, lapsed), false,
     'and the place is free the instant it lapses, before any job has run');
@@ -104,7 +113,10 @@ const child = (n) => ({ participantId: 'p-' + n, firstName: 'Child' + n, dateOfB
     'a pending hold with NO deadline stamped keeps its place rather than being silently released');
 
   console.log('\n[the deadline is stamped at submission, with the number and its source]');
-  H.eq(pending.expiryDays, 14, 'fourteen days by default');
+  H.eq(pending.expiryDays, REG_DEFAULT_DAYS,
+    'the module\'s own default, not a number copied into a test');
+  H.eq(REG_DEFAULT_DAYS, 45,
+    'and it is 45 — the family is told they are REGISTERED, so a fortnight contradicts the message');
   H.eq(pending.expirySource, 'default', 'and the record says where that came from');
   const perActivity = R.newRegistration({
     activity: F.course({ registration: Object.assign(F.course().registration, { pendingExpiryDays: 3 }) }),
