@@ -20,7 +20,7 @@
 // whether or not the message about it goes.
 
 const email = require('./_email');
-const { lang, pathFor, esc, strip, shell, SITE } = require('./_email-shell');
+const { lang, pathFor, esc, strip, shell, shellRaw, SITE } = require('./_email-shell');
 const { pick } = require('./_activity-facts');
 
 const titleOf = (reg, l) => pick(((reg && reg.frozen) || {}).activityTitle, l) || '';
@@ -246,14 +246,50 @@ function approvedMessage(reg, account, payUrl) {
   return { to: account.email, subject: T.subject(child, act), html: html, text: strip(html) };
 }
 
-function rejectedMessage(reg, account) {
+// THE ONLY MESSAGE AN ADMIN MAY REWRITE BEFORE IT GOES, and the reason is in
+// the note above REJECTED: approval is binary and carries no reason code, so
+// this message cannot explain itself. The generated text opens a door — reply
+// and we will talk it through — and an admin who already knows what to say
+// should be able to say it here rather than in a second email the family has to
+// connect to the first.
+//
+// ⚠ THE DRAFT IS IN THE FAMILY'S LANGUAGE, NOT THE ADMIN'S. That is the whole
+// awkwardness of the feature and it is not hidden: an admin editing a message
+// to a Russian-reading family is editing Russian, so the draft carries `lang`
+// and the screen says so plainly. Sending the generated text unchanged is
+// always available and is the default.
+//
+// The body is returned as the MARKUP the shell would have rendered, so what the
+// editor opens on is what would have been sent — not a plain-text
+// approximation that silently loses its paragraphs on the way back.
+function rejectedDraft(reg, account) {
   const l = lang(((account || {}).profile || {}).preferredLanguage);
   const T = REJECTED[l];
   const child = childOf(reg), act = titleOf(reg, l);
-  const html = shell(l, T.heading,
-    [esc(T.body(child, act)), esc(T.talk)],
-    { href: pathFor(l, '/activities'), label: T.button });
-  return { to: account.email, subject: T.subject(child, act), html: html, text: strip(html) };
+  return {
+    lang: l,
+    subject: T.subject(child, act),
+    heading: T.heading,
+    // Bare <p>, which is what the editor produces and what sanitiseRich()
+    // allows through. The shell applies the spacing on the way out, so this is
+    // both what the editor opens on and what it can hand back unchanged.
+    bodyHtml: [esc(T.body(child, act)), esc(T.talk)].map((p) => `<p>${p}</p>`).join('\n')
+  };
+}
+
+// `override` is {subject, bodyHtml} and arrives ALREADY SANITISED — the caller
+// does it, because the caller is the handler that assumes a hostile client and
+// this module is also called from places where nothing came from a browser.
+function rejectedMessage(reg, account, override) {
+  const l = lang(((account || {}).profile || {}).preferredLanguage);
+  const T = REJECTED[l];
+  const child = childOf(reg), act = titleOf(reg, l);
+  const cta = { href: pathFor(l, '/activities'), label: T.button };
+  const html = (override && override.bodyHtml)
+    ? shellRaw(l, T.heading, override.bodyHtml, cta)
+    : shell(l, T.heading, [esc(T.body(child, act)), esc(T.talk)], cta);
+  const subject = (override && override.subject) || T.subject(child, act);
+  return { to: account.email, subject: subject, html: html, text: strip(html) };
 }
 
 function expiredMessage(reg, account) {
@@ -362,9 +398,9 @@ const sendApproved = (reg, account) =>
     email.send(approvedMessage(reg, account, await payUrlFor(reg, account)),
       { template: 'registration-approved', lang: langOf(account) }));
 
-const sendRejected = (reg, account) =>
+const sendRejected = (reg, account, override) =>
   email.settle('registration-rejected', account.email, () =>
-    email.send(rejectedMessage(reg, account),
+    email.send(rejectedMessage(reg, account, override),
       { template: 'registration-rejected', lang: langOf(account) }));
 
 const sendExpired = (reg, account) =>
@@ -381,7 +417,7 @@ const sendPaid = (reg, account, paidCents, outstandingCents) =>
 module.exports = {
   payUrlFor,
   sendReceived, sendApproved, sendRejected, sendExpired,
-  receivedMessage, approvedMessage, rejectedMessage, expiredMessage,
+  receivedMessage, approvedMessage, rejectedMessage, expiredMessage, rejectedDraft,
   RECEIVED, APPROVED, REJECTED, EXPIRED,
   paidMessage, sendPaid
 };

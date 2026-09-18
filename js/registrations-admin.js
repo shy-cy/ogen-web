@@ -18,6 +18,9 @@
 (function () {
   var API = '/api/admin-registrations';
   var S = { activities: [], slug: null, queue: null, canApprove: false, canCancel: false };
+  // Written out rather than shown as a code: "ru" beside a draft is something an
+  // admin has to decode, and this line is the whole warning.
+  var LANG_NAME = { he: 'Hebrew', en: 'English', ru: 'Russian' };
 
   function $(id) { return document.getElementById(id); }
 
@@ -139,7 +142,7 @@
     }));
     acts.push(el('button', {
       disabled: !S.canApprove || !decidable || r.status === 'rejected' || null,
-      onclick: function () { act('reject', r, 'Rejected'); }, text: 'Reject'
+      onclick: function () { reject(r); }, text: 'Reject'
     }));
     // Cancel is its own axis because it moves money — it writes a credit a
     // family can spend and cannot be undone, only compensated.
@@ -216,6 +219,106 @@
         message('ok', 'Cancelled · ' + r.name + (c ? ' · credited ' + money(c.amountCents) : ' · nothing credited'));
         loadQueue(S.slug);
       });
+  }
+
+  // ---------- rejecting: read it before it goes ----------
+  //
+  // The ONLY message on this site an admin may rewrite before it is sent, and
+  // the reason is in _registration-email.js: approval is binary and carries no
+  // reason code, so the generated refusal cannot explain itself. It opens a door
+  // instead. An admin who already knows what to say should be able to say it
+  // here, rather than in a second email the family has to connect to the first.
+  //
+  // ⚠ THE DRAFT IS IN THE FAMILY'S LANGUAGE. An admin rejecting a
+  // Russian-reading family is handed Russian. That is not hidden and not worked
+  // around — the panel names the language, and Send unchanged is the default.
+  // Rewriting it in the admin's own language would send a family a message they
+  // cannot read, which is worse than a formal one they can.
+  //
+  // Quill, the same editor and version the activity body uses, falling back to a
+  // textarea when the CDN is unavailable. The server sanitises either way.
+  function reject(r) {
+    send({ action: 'rejectPreview', participantId: r.participantId, activityId: r.activityId })
+      .then(function (res) {
+        if (!res.ok) return message('err', (res.data && res.data.error) || 'That did not work');
+        openRejectPanel(r, res.data);
+      });
+  }
+
+  function openRejectPanel(r, draft) {
+    var back = el('div', { class: 'modal-back' });
+    var close = function () { if (back.parentNode) back.parentNode.removeChild(back); };
+
+    var subject = el('input', { type: 'text', class: 'modal-subject', value: draft.subject });
+    subject.value = draft.subject;
+
+    var host = el('div', { class: 'modal-editor' });
+    var area = el('textarea', { class: 'modal-editor' });
+    var quill = null;
+    var go = el('button', { class: 'no', text: 'Reject and send' });
+
+    var panel = el('div', { class: 'modal' }, [
+      el('h3', { text: 'Reject · ' + r.name }),
+      el('p', { class: 'hint', text:
+        'This is what ' + (draft.to || 'the family') + ' will receive, in ' +
+        LANG_NAME[draft.lang] + ' — the language they read. Send it as it is, or ' +
+        'add a reason. The decision is recorded either way; a rejection is never ' +
+        'resent, so this is the one time it can be worded.' }),
+      el('label', { class: 'modal-label', text: 'Subject' }), subject,
+      el('label', { class: 'modal-label', text: 'Message' }),
+      window.Quill ? host : area,
+      el('div', { class: 'modal-acts' }, [
+        el('button', { class: 'ghost', onclick: close, text: 'Cancel' }), go
+      ])
+    ]);
+    back.appendChild(panel);
+    // ⚠ Clicking the backdrop does NOT close it. Half a written message thrown
+    // away by a stray click is the thing this panel exists to prevent.
+    back.addEventListener('click', function (e) { if (e.target === back) e.stopPropagation(); });
+    document.body.appendChild(back);
+
+    // Quill attaches to a node already in the document, which is why this runs
+    // after the append rather than while the panel is being built.
+    if (window.Quill) {
+      quill = new window.Quill(host, {
+        theme: 'snow',
+        modules: { toolbar: [['bold', 'italic', 'underline'], [{ list: 'bullet' }, { list: 'ordered' }],
+                             ['link'], ['clean']] }
+      });
+      quill.root.innerHTML = draft.bodyHtml;
+      // The editor writes the reader's direction, so a Hebrew or Russian draft
+      // is edited the way it will be read rather than mirrored.
+      quill.root.setAttribute('dir', draft.lang === 'he' ? 'rtl' : 'ltr');
+    } else {
+      area.value = draft.bodyHtml;
+      area.setAttribute('dir', draft.lang === 'he' ? 'rtl' : 'ltr');
+    }
+
+    go.addEventListener('click', function () {
+      var html = quill ? quill.root.innerHTML : area.value;
+      // Quill's empty document. Sending it would be a blank refusal; the server
+      // refuses it too, and this only saves the round trip.
+      if (!html || html === '<p><br></p>' || !html.replace(/<[^>]*>/g, '').trim()) {
+        return message('err', 'A rejection needs something to say.');
+      }
+      go.disabled = true;
+      send({ action: 'reject', participantId: r.participantId, activityId: r.activityId,
+             message: { subject: subject.value, bodyHtml: html } })
+        .then(function (res) {
+          go.disabled = false;
+          if (!res.ok) return message('err', (res.data && res.data.error) || 'That did not work');
+          close();
+          // WHETHER IT WENT, not just whether it was decided. An admin who has
+          // written a message by hand must not be left believing a family was
+          // told something nobody told them. The decision stands regardless —
+          // an email failure has never blocked an action here.
+          message(res.data.emailed === false ? 'err' : 'ok',
+            res.data.emailed === false
+              ? 'Rejected · ' + r.name + ' — BUT THE EMAIL DID NOT GO. Tell them another way.'
+              : 'Rejected · ' + r.name + ' · message sent');
+          loadQueue(S.slug);
+        });
+    });
   }
 
   // ---------- the money panel ----------

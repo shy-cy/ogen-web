@@ -332,3 +332,37 @@ input:disabled,textarea:disabled,select:disabled{background:#f2f0ea;color:#8b8b8
 .ledger .amt.debit{color:var(--danger);}
 .ledger .why{color:var(--muted);font-size:11.5px;}
 .balance{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;}
+
+/* ---- the review-before-sending panel --------------------------------------
+   Rejecting is the one decision on this screen whose MESSAGE can be written by
+   hand, so it is the one that gets a panel rather than a confirm(). It is a
+   modal rather than an inline form because the thing being reviewed is a whole
+   email: it needs the room, and it must not be half-read behind a table.
+
+   Deliberately no click-outside-to-close — half a written refusal thrown away
+   by a stray click is exactly what this panel exists to prevent. */
+.modal-back{
+  position:fixed; inset:0; background:rgba(26,32,36,.55);
+  display:flex; align-items:flex-start; justify-content:center;
+  padding:48px 16px; overflow-y:auto; z-index:200;
+}
+.modal{
+  background:#fff; border-radius:10px; padding:22px 24px;
+  width:100%; max-width:640px; box-shadow:0 18px 50px rgba(0,0,0,.28);
+}
+.modal h3{ margin:0 0 8px; font-size:17px; }
+.modal .hint{ margin:0 0 16px; }
+.modal-label{ display:block; font-size:12px; font-weight:800; letter-spacing:.04em;
+              text-transform:uppercase; color:#6B705C; margin:14px 0 6px; }
+.modal-subject{ width:100%; font:inherit; padding:9px 11px;
+                border:1px solid #E4DFD3; border-radius:6px; }
+/* The editor and its fallback are the same box, so a CDN outage changes what is
+   inside it and not the shape of the panel around it. */
+.modal-editor{ width:100%; min-height:190px; font:inherit; border-radius:6px; }
+textarea.modal-editor{ padding:9px 11px; border:1px solid #E4DFD3; resize:vertical; }
+.modal .ql-container{ font:inherit; font-size:14px; min-height:150px; }
+.modal-acts{ display:flex; gap:10px; justify-content:flex-end; margin-top:18px; }
+.modal-acts button{ font:inherit; font-weight:700; padding:9px 18px; border-radius:6px;
+                    border:1px solid #E4DFD3; background:#fff; cursor:pointer; }
+.modal-acts .no{ background:#B3402B; border-color:#B3402B; color:#fff; }
+.modal-acts button[disabled]{ opacity:.5; cursor:default; }

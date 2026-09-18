@@ -2582,6 +2582,77 @@ screen sends is a `case` the server handles, and the three money actions are
 behind `canCancel` on both sides. An unknown action answers 400 and that failure
 is otherwise invisible until somebody presses the button.
 
+### The nav says Roster, and Admins
+
+`Registrations` became **Roster** and `Accounts` became **Admins**. The filenames
+did not move — `admin/registrations.html` is still the page, so nothing
+bookmarked broke.
+
+*Manage Activities* was the alternative and was refused: the bar would have read
+**Activities · Manage Activities · Admins**, and a reader would have had to work
+out which of the two they wanted — when the honest answer ("one edits the page,
+one lists the people") is exactly what that label fails to say. The CMS is also
+the entry that genuinely manages activities. Two entries sharing a word is worse
+than one vague word.
+
+**Admins** because that page is admin logins and roles, and has nothing to do
+with the family accounts this screen is full of. Once the roster started showing
+account emails, `Accounts` was not vague, it was wrong.
+
+### ⚠ A refusal is read before it is sent
+
+The one message on this site an admin may rewrite before it goes, edited in the
+**same Quill build `admin/activities.html` loads** for the activity body, with the
+same textarea fallback when the CDN is unavailable.
+
+The reason is the one already written above `REJECTED`: approval is binary and
+carries no reason code, so the generated message **cannot explain itself** — it
+opens a door instead ("reply and we will talk it through"). That is the right
+default and a poor answer when the admin pressing the button already knows the
+reason, because the alternative is a second email the family has to connect to
+the first. Nothing else is editable: a confirmation and a receipt state facts,
+and an expiry message is an apology.
+
+Four things hold it together.
+
+**⚠ THE DRAFT IS IN THE FAMILY'S LANGUAGE, NOT THE ADMIN'S.** An admin rejecting
+a Russian-reading family is handed Russian to edit. That is the awkward part of
+the feature and it is not hidden or worked around — `rejectPreview` returns
+`lang` and the panel names it in words rather than as a code, and sending the
+generated text untouched is the default. Rewriting it in the admin's own
+language would send a family a message they cannot read, which is worse than a
+formal one they can.
+
+**The shell owns the typography, the author owns the words.** Quill strips inline
+styles and so does `sanitiseRich()` — correctly, since `style` is exactly what an
+allowlist exists to remove — so a body coming back from the editor carries bare
+`<p>` tags, and an email has no stylesheet. Authoring the spacing into the draft
+would mean every reviewed message arrived spaced unlike every generated one. So
+`shellRaw()` applies it on the way out, and the draft is bare markup: **what the
+editor opens on is what it can hand back unchanged**. A test asserts a draft
+opened and sent with no edit is **byte-identical** to the generated message, in
+all three languages — the property `preview-matches-publish` asserts about a page.
+
+**A blank message is refused before the decision is taken.** Refusing afterwards
+would leave a family rejected with nothing sent, and a rejection is the one
+message `_email-log.js` marks unresendable. The check is on `strip()`ped text,
+not on the markup's length: `<p><br></p>` is three tags and no words.
+
+**`emailed` is reported.** `settle()` already answered whether a send succeeded
+and nothing read it. The decision still stands when mail fails — that rule is
+untouched — but an admin who has just written a refusal by hand must not be left
+believing a family was told something nobody told them, so the row says so
+loudly and tells them to make contact another way.
+
+**`sanitiseRich()` moved into `_sanitise-rich.js`**, unchanged, and
+`activities-admin.js` re-exports it so nothing that imported it from there had to
+change. There are two callers now — a published page and an inbox — and both
+print the markup unescaped, so a second implementation would be a second
+allowlist to keep in step; a test asserts there is exactly one. It was lifted
+rather than imported because requiring `activities-admin.js` would drag GitHub,
+Blobs, the template and the image pipeline into a handler with ten seconds to
+answer in, to clean one string.
+
 ### ⚠ Why this shipped a release before the family area
 
 The guardian-facing area (Phase 6) is a **public registration surface**, and at

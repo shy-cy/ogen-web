@@ -35,6 +35,8 @@ const { cancelAndCredit } = require('./_registration-cancel');
 const attendance = require('./_session-attendance');
 const { recordAudit } = require('./_audit');
 const mail = require('./_registration-email');
+const { sanitiseRich } = require('./_sanitise-rich');
+const { strip } = require('./_email-shell');
 const sweep = require('./_registration-sweep');
 
 const TOOL = 'registrations';
@@ -202,21 +204,77 @@ exports.handler = async (event) => {
         });
       }
 
+      // WHAT THE REFUSAL WILL SAY, BEFORE IT SAYS IT.
+      //
+      // Approval is binary and carries no reason code, by design, so the
+      // generated message cannot explain itself — it opens a door instead
+      // ("reply and we will talk it through"). An admin who already knows what
+      // to say should be able to say it here rather than in a second email the
+      // family has to connect to the first.
+      //
+      // ⚠ IT ANSWERS IN THE FAMILY'S LANGUAGE, and says which. An admin
+      // rejecting a Russian-reading family is handed Russian to edit. That is
+      // awkward and is not hidden: the screen names the language, and sending
+      // the generated text untouched is the default.
+      //
+      // Reads only. It writes nothing and decides nothing, so opening the
+      // preview and closing it again leaves the registration exactly as it was.
+      case 'rejectPreview': {
+        if (!canApprove(session)) {
+          return json(403, { error: 'Your role may open the queue but not decide on it' });
+        }
+        const reg = await store.getRegistration(body.participantId, body.activityId);
+        if (!reg) return json(404, { error: 'No such registration.' });
+        const account = await accounts.getAccount(reg.accountId);
+        if (!account) return json(404, { error: 'That registration has no account behind it.' });
+        return json(200, Object.assign({ ok: true, to: account.email }, mail.rejectedDraft(reg, account)));
+      }
+
       case 'approve':
       case 'reject': {
         if (!canApprove(session)) {
           return json(403, { error: 'Your role may open the queue but not decide on it' });
         }
         const status = body.action === 'approve' ? 'approved' : 'rejected';
+
+        // ⚠ SANITISED HERE, ALWAYS, AND BEFORE ANYTHING IS DECIDED. The markup
+        // arrives in a request body like every other field and is printed into
+        // an inbox unescaped, so the client is assumed hostile exactly as it is
+        // for the About field — same allowlist, same module. Doing it before
+        // decide() also means a body that sanitises to nothing is refused while
+        // the registration is still untouched, rather than after it has been
+        // rejected with no message to send.
+        let override = null;
+        if (status === 'rejected' && body.message) {
+          const bodyHtml = sanitiseRich(body.message.bodyHtml);
+          const subject = String(body.message.subject || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+          // An empty edit is a mistake, not an instruction to send a blank
+          // refusal. strip() rather than a length check on the markup: '<p></p>'
+          // is four tags and no words.
+          if (!strip(bodyHtml).trim() || !subject) {
+            return json(400, { error: 'A rejection message needs a subject and something to say.' });
+          }
+          override = { subject: subject, bodyHtml: bodyHtml };
+        }
+
         const out = await decide(body, session, status, null);
         if (out.code === 200 && out.payload.registration && out.payload.registration.status === status) {
           const account = await accounts.getAccount(out.payload.registration.accountId);
+          let emailed = null;
           if (account) {
-            if (status === 'approved') await mail.sendApproved(out.payload.registration, account);
-            else await mail.sendRejected(out.payload.registration, account);
+            // settle() answers whether it went. The DECISION stands either way —
+            // that rule is not being touched — but an admin who has just written
+            // a message by hand must be told if it did not leave, or they will
+            // believe a family has been told something nobody has told them.
+            emailed = status === 'approved'
+              ? await mail.sendApproved(out.payload.registration, account)
+              : await mail.sendRejected(out.payload.registration, account, override);
           }
+          out.payload.emailed = emailed;
           await recordAudit(session, 'registrations.' + body.action,
-            body.participantId + '__' + body.activityId, 'ok', { detail: out.payload.registration.frozen.participantName });
+            body.participantId + '__' + body.activityId, 'ok',
+            { detail: out.payload.registration.frozen.participantName +
+                      (override ? ' · message edited by hand' : '') });
         }
         return json(out.code, out.payload);
       }

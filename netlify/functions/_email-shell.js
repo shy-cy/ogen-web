@@ -42,8 +42,63 @@ const strip = (html) => html
   .replace(/\n{3,}/g, '\n\n')
   .trim();
 
+// ⚠ THE SHELL OWNS THE TYPOGRAPHY, NOT THE AUTHOR.
+//
+// One caller: the rejection message, which an admin may edit in the same
+// WYSIWYG the activity body uses before it is sent. That editor strips inline
+// styles and so does sanitiseRich() — correctly, since `style` is one of the
+// attributes an allowlist exists to remove — so a body that came back from it
+// carries bare <p> tags. Emails have no stylesheet: a bare <p> in an inbox is
+// whatever the client decides, and the message would arrive spaced differently
+// from every other mail Ogen sends.
+//
+// So the spacing is applied HERE, to the markup as it arrives, rather than
+// being authored into it and hoping it survives. The author owns the words; the
+// shell owns how they look. That also makes the round trip exact: a draft
+// opened and sent unedited is byte-identical to the generated message, which a
+// test pins — the same property preview-matches-publish asserts about a page.
+const EMAIL_STYLE = {
+  p: 'margin:0 0 14px;',
+  h2: 'font-size:17px;margin:20px 0 10px;',
+  h3: 'font-size:15px;margin:18px 0 8px;',
+  ul: 'margin:0 0 14px;padding-inline-start:22px;',
+  ol: 'margin:0 0 14px;padding-inline-start:22px;',
+  li: 'margin:0 0 4px;',
+  blockquote: 'margin:0 0 14px;padding-inline-start:14px;border-inline-start:3px solid #E4DFD3;color:#6B705C;',
+  a: 'color:#C8674A;'
+};
+
+// Opening tags only, and only ones already carrying no attributes — which is
+// every tag sanitiseRich() lets through, apart from <a href>. An <a> that
+// already has its href keeps it and gains the colour.
+function styleForEmail(html) {
+  return String(html == null ? '' : html).replace(/<([a-z0-9]+)((?:\s[^>]*)?)>/gi, (whole, tag, attrs) => {
+    const style = EMAIL_STYLE[tag.toLowerCase()];
+    if (!style || /\sstyle\s*=/i.test(attrs)) return whole;
+    return '<' + tag + attrs + ' style="' + style + '">';
+  });
+}
+
+// The same chrome, wrapped around a body somebody WROTE rather than a list of
+// sentences this codebase built.
+//
+// The wrapper is identical to shell()'s, deliberately. The whole reason this
+// file exists is that there is one shell and the messages cannot drift apart
+// visually — and a hand-edited message is the one most likely to be taken for a
+// forgery if it arrives looking unlike every other mail Ogen sends.
+//
+// ⚠ THE CALLER SANITISES. Nothing is escaped here, exactly as `paragraphs` is
+// not escaped here: shell() has always trusted its caller, and every caller does
+// it with esc(). The rich caller does it with sanitiseRich().
+function shellRaw(l, heading, bodyHtml, button) {
+  return render(l, heading, styleForEmail(bodyHtml), button);
+}
+
 function shell(l, heading, paragraphs, button) {
-  const body = paragraphs.map((p) => `<p style="margin:0 0 14px;">${p}</p>`).join('\n');
+  return render(l, heading, paragraphs.map((p) => `<p style="margin:0 0 14px;">${p}</p>`).join('\n'), button);
+}
+
+function render(l, heading, body, button) {
   const cta = button
     ? `<p style="margin:24px 0;"><a href="${esc(button.href)}" style="background:#C8674A;color:#ffffff;` +
       `padding:12px 22px;border-radius:6px;text-decoration:none;display:inline-block;">${esc(button.label)}</a></p>`
@@ -58,4 +113,4 @@ ${cta}
 </div>`;
 }
 
-module.exports = { SITE, LANGS, lang, pathFor, DIR, FOOT, esc, strip, shell };
+module.exports = { SITE, LANGS, lang, pathFor, DIR, FOOT, esc, strip, shell, shellRaw, styleForEmail };
