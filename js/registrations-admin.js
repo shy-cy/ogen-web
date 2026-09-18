@@ -162,6 +162,9 @@
     $('queue-title').textContent = titleOf(q.activity.title, q.activity.slug) +
       ' · ' + q.registrations.length + ' registration' + (q.registrations.length === 1 ? '' : 's');
     renderCapacity(q.capacity);
+    // A course has no register, so it gets no button rather than a dead one.
+    $('btn-codes').hidden = q.activity.type !== 'dropin';
+    if (q.activity.type !== 'dropin') $('codes-panel').hidden = true;
 
     var box = $('queue');
     box.innerHTML = '';
@@ -219,6 +222,58 @@
         message('ok', 'Cancelled · ' + r.name + (c ? ' · credited ' + money(c.amountCents) : ' · nothing credited'));
         loadQueue(S.slug);
       });
+  }
+
+  // ---------- the codes on the wall ----------
+  //
+  // One QR per bookable evening, for a DROP-IN only: a course has no register to
+  // mark, because it creates no per-session records at all. The button is absent
+  // rather than disabled on a course, since there is nothing there to enable.
+  //
+  // ⚠ THE PICTURE IS MADE HERE AND THE URL IS PRINTED UNDER IT. A QR code is a
+  // picture of a string, and a browser can draw one without the server doing
+  // anything — so the handler returns the string. If the CDN that draws it is
+  // unavailable the URL is still on screen, still correct, and still typeable,
+  // which is the same trade the Quill fallback makes.
+  function loadCodes() {
+    send({ action: 'checkinCodes', slug: S.slug }).then(function (res) {
+      if (!res.ok) return message('err', (res.data && res.data.error) || 'That did not work');
+      renderCodes(res.data);
+    });
+  }
+
+  function renderCodes(d) {
+    var box = $('codes');
+    box.innerHTML = '';
+    $('codes-panel').hidden = false;
+    if (!d.codes.length) {
+      box.appendChild(el('p', { class: 'hint', text: 'This activity has no dates in its calendar yet.' }));
+      return;
+    }
+    box.appendChild(el('p', { class: 'hint', text:
+      'One code per evening. Print or show the one for the date — each works only ' +
+      'on its own day, and stops working when that day ends. Anyone holding it can ' +
+      'see the names booked for that evening and mark any of them present; nobody ' +
+      'can book, cancel or see money with it.' }));
+
+    d.codes.forEach(function (c) {
+      var art = el('div', { class: 'qr-art' });
+      var card = el('div', { class: 'qr-card' }, [
+        el('h3', { text: c.sessionDate }),
+        art,
+        // Selectable, so it can be copied onto something else if the picture
+        // cannot be. It is long; it wraps rather than being cut off, because a
+        // truncated URL is worse than an ugly one.
+        el('code', { class: 'qr-url', text: c.url })
+      ]);
+      box.appendChild(card);
+      if (window.QRCode) {
+        // eslint-disable-next-line no-new
+        new window.QRCode(art, { text: c.url, width: 190, height: 190, correctLevel: window.QRCode.CorrectLevel.M });
+      } else {
+        art.appendChild(el('p', { class: 'hint', text: 'The code drawer did not load — use the address below.' }));
+      }
+    });
   }
 
   // ---------- rejecting: read it before it goes ----------
@@ -452,6 +507,7 @@
   // The scheduled function cannot be triggered from a browser — Netlify's edge
   // answers 403 to every external request to one — so this calls the same run()
   // through the admin API instead of fetching the endpoint.
+  $('btn-codes').addEventListener('click', loadCodes);
   $('btn-sweep').addEventListener('click', function () {
     send({ action: 'sweep' }).then(function (res) {
       if (!res.ok) return message('err', (res.data && res.data.error) || 'That did not work');

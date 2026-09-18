@@ -2533,6 +2533,111 @@ for the same reason: static analysis can assert a descriptor suffix is set, and
 only *executing* the thing catches an endpoint building a session for the wrong
 registration.
 
+## QR check-in (drop-ins)
+
+A code on a wall at the venue. Somebody scans it, sees who is expected that
+evening, taps their own name, and is marked present.
+
+```
+checkin.html                    /checkin — ONE page, three languages
+js/checkin.js                   the screen, and the one {he,en,ru} table
+netlify/functions/
+  _checkin-token.js   ogen-checkin-tokens; chk-<token>; arms the legal gate
+  checkin.js          /api/checkin — reads names and writes, with NO session
+```
+
+**It writes into the register that already existed** — the same
+`att-<pid>__<aid>__<date>` blob, through the same `transition()` — so the admin
+register, the money and the ledger see one thing. It deliberately does **not**
+reuse `admin-registrations`' `markAttendance`, which is gated on `canApprove` and
+stamps the admin's own address: sharing it would have meant either opening an
+admin action to the public or writing a fictitious identity into the history.
+What differs is one field — `by: 'self'`, note `QR check-in` — so an admin
+reading the register can tell who marked themselves from who the staff marked.
+
+**Drop-ins only, because only drop-ins have the data.** A course creates no
+per-session records at all; its `sessionDates` are a published timetable, not a
+register. The admin button is **absent** on a course rather than disabled, and
+the action answers 400.
+
+### ⚠ What "no login" costs, exactly
+
+The coarse description is "anyone with the link could mark any name present".
+The accepted version is narrower and is what the tests pin:
+
+| | |
+|---|---|
+| **Read** | the names booked for **one evening of one activity**. **Full names** — chosen over first-name-plus-initial, because two children called Noa cannot otherwise tap the right row. Nothing else: no dates of birth, no contacts, no amounts, no other date. A test asserts each of those is absent from the payload. |
+| **Write** | mark a listed name present. This **moves no money** — what an evening costs is decided when it is booked and a no-show owes it too — so the worst case is a wrong register, never a wrong bill. |
+| **Never** | book, cancel, create a participant, read a balance, or reach any other date. There is no action that does any of those, and a test calls four that do not exist. |
+
+It names children and places them somewhere at a time, and that is the part that
+cannot be taken back. It was accepted knowingly, and the name format was widened
+afterwards with the disclosure already on the table.
+
+**Two guards turn a photographable code into a key to one evening:**
+
+- it **expires when its session's day ends** in `Asia/Nicosia`, through the same
+  `endOfDay()` the cancellation cutoffs use — not a second timezone, and not
+  UTC, which on a Tuesday-evening class would kill it mid-class;
+- it **does not open until that day begins**, so a code photographed a week early
+  lists nobody and instead says which evening it is for.
+
+A tighter window keyed to the start time was considered and dropped: a session's
+start is frozen **per booking**, so an evening with nothing booked yet has no
+instant to measure from — and the person that would refuse is the admin scanning
+the sheet to check it works.
+
+### The parts that look cosmetic and are not
+
+**`codeFor()` is idempotent per (activity, date)**, through a `for-` pointer. If
+re-opening the admin panel minted a fresh token, every poster already on a wall
+would stop working the moment somebody looked at the screen.
+
+**The title and slug are frozen onto the token**, so the public endpoint reads no
+repository at all. A public handler holding a GitHub credential is a different
+class of thing, for a string that was printed weeks ago and cannot change on the
+wall anyway.
+
+**An invented token and an expired one answer identically**, and so do "not on
+this list", "cancelled" and "some other evening" — telling them apart would say
+whether a code ever existed, or let the list be probed for names it does not
+show.
+
+**Tapping twice is a success.** Two people scanning one poster in the same
+minute, or one person tapping again because the first tap was not obviously
+received, must not produce a failure on a screen held in a doorway. A name
+already marked **stays on the list, shown as done** rather than disappearing — a
+name that vanishes after a tap reads as a tap that went wrong.
+
+**A walk-in is told to speak to a teacher.** Creating a participant here would be
+an unauthenticated stranger writing a child's record in the EU, which is the one
+thing this project is most careful about. Out of scope, deliberately, and said on
+the page rather than left to be discovered.
+
+### ⚠ One page, three languages — the exception to the rule
+
+Every other trilingual screen has a file per language, because the reader arrives
+from a link or a menu that already knows which language they read. **Nobody
+arrives here from a link.** They arrive from a code on a wall, and one poster
+cannot be three posters.
+
+So the language is chosen **on** the page and the toggle **re-renders in place
+rather than navigating** — which also means it cannot drop the token out of the
+query string, the exact bug that shipped once on the account pages and turned a
+valid invitation into a dead one. It opens in the browser's own language when
+that is one of the three, and Hebrew otherwise.
+
+There is **no nav and no footer**, which is not an omission: this is opened in a
+doorway, one-handed, to do one thing, and a site menu here is a way to leave the
+only screen that matters. Rows are 60px.
+
+**The QR picture is drawn in the browser** and the URL is printed under every
+code. A QR is a picture of a string, so the handler returns the string; if the
+CDN that draws it is unavailable the address is still on screen, still correct
+and still typeable — the same trade the Quill fallback makes. `admin.css` carries
+a `@media print` block, because a card is a thing that gets pinned to a wall.
+
 ## The approval queue (admin)
 
 `admin/registrations.html` + `js/registrations-admin.js`, against

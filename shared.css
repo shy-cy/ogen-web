@@ -1200,3 +1200,65 @@ html[lang="he"] .thankyou h1{ font-family: var(--font-he); font-weight:700; }
   margin-block-start:6px; padding-block-start:14px;
   border-block-start:1px solid var(--stone); color:var(--terracotta);
 }
+
+/* ============================== CHECK-IN ==============================
+   The QR screen. Opened in a doorway, on a phone, one-handed, by somebody who
+   did not plan to use a website — so the whole design is one decision: make the
+   tap targets big and put nothing else on the page.
+
+   No nav and no footer here, so this block owns its own centring and padding
+   rather than sitting inside .inner-body like every other page. */
+.checkin-wrap{
+  max-width:520px; margin:0 auto; padding:28px 20px 60px;
+  display:flex; flex-direction:column; gap:18px;
+}
+.checkin-logo{ display:block; height:auto; margin-inline:auto; }
+/* The language buttons keep one physical order and one place in all three
+   languages, exactly as the nav's do — the reader who needs them most is the one
+   who cannot read what is currently on screen. */
+.checkin-langs{ direction:ltr; display:flex; gap:8px; justify-content:center; }
+.checkin-lang{
+  font-family: var(--font-latin); font-size:13px; font-weight:700; letter-spacing:.05em;
+  border:1px solid var(--stone); background: var(--paper); color: var(--navy);
+  padding:7px 13px; border-radius:6px; cursor:pointer;
+}
+.checkin-lang.is-on{ background: var(--navy); color: var(--paper); border-color: var(--navy); }
+.checkin-card{
+  background: var(--paper); border:1px solid var(--stone); border-radius:12px;
+  padding:20px 22px; text-align:center;
+}
+.checkin-h{ font-size:22px; margin:0; }
+.checkin-note{ color: var(--camel); margin:6px 0 0; font-size:15px; }
+.checkin-who{ font-size:16px; font-weight:700; margin:4px 0 0; text-align:center; }
+.checkin-list{ display:flex; flex-direction:column; gap:10px; }
+/* 60px tall, which is the whole point: a name tapped with a coat in one hand.
+   Nothing on this page is a link, so nothing here needs to look like text. */
+.checkin-person{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  min-height:60px; width:100%; text-align:start;
+  font:inherit; font-size:17px; font-weight:700; color: var(--ink);
+  background: var(--paper); border:1px solid var(--stone); border-radius:10px;
+  padding:12px 18px; cursor:pointer;
+}
+.checkin-person:hover{ border-color: var(--camel); }
+/* Already here: shown, not hidden. A name that vanishes after a tap reads as a
+   tap that went wrong, and the person standing there needs to see that it did
+   not. Not pressable, so it does not offer what it cannot do. */
+.checkin-person.is-done{ cursor:default; opacity:.62; background:transparent; }
+.checkin-person.is-done:hover{ border-color: var(--stone); }
+.checkin-badge{
+  font-size:12.5px; font-weight:700; color:#4E6B52; white-space:nowrap;
+  border:1px solid color-mix(in srgb, var(--olive) 45%, transparent);
+  background: color-mix(in srgb, var(--olive) 12%, transparent);
+  padding:4px 10px; border-radius:6px;
+}
+/* The confirmation is the WHOLE screen, not a line among a list somebody no
+   longer needs to read. */
+.checkin-card.is-done{ padding:38px 22px; border-color: color-mix(in srgb, var(--olive) 45%, transparent); }
+.checkin-tick{
+  width:64px; height:64px; margin:0 auto 14px; border-radius:50%;
+  background: var(--olive); color: var(--paper);
+  font-size:34px; line-height:64px; font-weight:700;
+}
+.checkin-err{ color: var(--danger); font-weight:700; margin:12px 0 0; text-align:center; }
+.checkin-foot{ text-align:center; margin-top:10px; font-size:14px; }

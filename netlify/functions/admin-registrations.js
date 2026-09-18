@@ -36,7 +36,8 @@ const attendance = require('./_session-attendance');
 const { recordAudit } = require('./_audit');
 const mail = require('./_registration-email');
 const { sanitiseRich } = require('./_sanitise-rich');
-const { strip } = require('./_email-shell');
+const codes = require('./_checkin-token');
+const { strip, SITE } = require('./_email-shell');
 const sweep = require('./_registration-sweep');
 
 const TOOL = 'registrations';
@@ -384,6 +385,33 @@ exports.handler = async (event) => {
           capacity: date ? R.capacityForDate(activity, all, date) : null,
           register: rows
         });
+      }
+
+      // THE CODES ON THE WALL. One per bookable evening, minted once and
+      // returned unchanged afterwards — so re-opening this panel shows the same
+      // code as the sheet already pinned up, rather than silently retiring it.
+      //
+      // `access` rather than `approve`: a code opens a list of names, which is
+      // what `access` already gates on this tool. Marking the register is the
+      // action, and that stays behind `approve`.
+      //
+      // It returns the URL and not an image. Rendering a QR is a picture of a
+      // string, and a picture is the one thing a browser can make without this
+      // handler doing anything — while a server-side renderer would be a
+      // dependency, a content type and a cache header to get wrong.
+      case 'checkinCodes': {
+        const activity = await published(body.slug);
+        if (!activity) return json(404, { error: 'No such activity.' });
+        if (activity.type !== 'dropin') {
+          return json(400, { error: 'This activity runs by the term, so it has a queue rather than a register.' });
+        }
+        const dates = attendance.bookableDates(activity);
+        const out = [];
+        for (const date of dates) {
+          const code = await codes.codeFor(activity, date);
+          out.push({ sessionDate: date, url: SITE + '/checkin?t=' + encodeURIComponent(code.token) });
+        }
+        return json(200, { ok: true, activity: { slug: activity.slug, title: activity.title }, codes: out });
       }
 
       // Marking the register. `approve` rather than `cancel`: recording who

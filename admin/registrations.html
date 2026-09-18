@@ -37,6 +37,9 @@
       <div class="panel">
         <h2>Activities</h2>
         <div class="picker" id="picker"></div>
+        <!-- Drop-in only, and hidden on a course: a course creates no
+             per-session records, so there is no register to open. -->
+        <button type="button" class="add-btn" id="btn-codes" style="margin-top:12px;" hidden>Check-in codes</button>
         <button type="button" class="add-btn" id="btn-sweep" style="margin-top:12px;">Expire unanswered requests</button>
         <div class="hint" id="sweep-hint" style="margin-top:6px;">
           Runs nightly on its own. The place is already free either way — this only
@@ -54,6 +57,11 @@
         <div id="queue"></div>
       </div>
 
+      <div class="panel" id="codes-panel" hidden>
+        <h2>Check-in codes</h2>
+        <div id="codes"></div>
+      </div>
+
       <div class="panel" id="account-panel" hidden>
         <h2 id="account-title">Account</h2>
         <div id="account-body"></div>
@@ -63,6 +71,11 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.min.js"></script>
+<!-- Draws the check-in QR codes. A QR is a picture of a string, so the server
+     returns the string and this makes the picture; js/registrations-admin.js
+     prints the address under every code, so a CDN outage costs the picture and
+     not the ability to use it. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="/js/admin-session.js"></script>
 <script src="/js/registrations-admin.js"></script>
 </body>

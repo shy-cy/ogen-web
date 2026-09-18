@@ -366,3 +366,27 @@ textarea.modal-editor{ padding:9px 11px; border:1px solid #E4DFD3; resize:vertic
                     border:1px solid #E4DFD3; background:#fff; cursor:pointer; }
 .modal-acts .no{ background:#B3402B; border-color:#B3402B; color:#fff; }
 .modal-acts button[disabled]{ opacity:.5; cursor:default; }
+
+/* ---- the check-in codes ---------------------------------------------------
+   Laid out to be PRINTED as much as looked at: each card is one evening, and a
+   card is what gets pinned to a wall. Wrapping rather than a fixed column count
+   so two fit on a laptop and four on a wide screen with nothing to configure. */
+.qr-card{
+  display:inline-block; vertical-align:top; margin:0 14px 18px 0;
+  border:1px solid #E4DFD3; border-radius:10px; padding:16px; text-align:center;
+  background:#fff;
+}
+.qr-card h3{ margin:0 0 10px; font-size:15px; font-variant-numeric:tabular-nums; }
+.qr-art{ min-height:190px; display:flex; align-items:center; justify-content:center; }
+.qr-art img, .qr-art canvas{ display:block; }
+/* The address under every code, always. If the drawer did not load this is the
+   whole feature, so it is selectable and it WRAPS — a truncated URL is worse
+   than an ugly one. */
+.qr-url{
+  display:block; max-width:190px; margin:10px auto 0; font-size:10.5px;
+  color:#6B705C; word-break:break-all; user-select:all;
+}
+@media print{
+  .admin-bar, .picker, .add-btn, .hint, #queue-panel, #account-panel{ display:none !important; }
+  .qr-card{ page-break-inside:avoid; }
+}

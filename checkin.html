@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>נוכחות · מרכז עוגן</title>
+
+<!-- THE CHECK-IN PAGE. Reached only by scanning a QR code at the venue, and
+     deliberately noindex and absent from sitemap.xml: there is nothing here for
+     a search engine, and what a valid token opens is a list of children.
+
+     ⚠ ONE PAGE, THREE LANGUAGES, NOT THREE PAGES. Every other trilingual thing
+     on this site has a file per language, because a reader arrives from a link
+     or a menu that already knows which language they read. Nobody arrives here
+     from anything — they arrive from a code on a wall, and one poster cannot be
+     three posters. So the language is a choice made ON the page, and switching
+     it re-renders in place rather than navigating: the token is in the query
+     string, and the language toggle dropping the query is a bug this codebase
+     has already shipped once, on exactly these pages.
+
+     No nav and no footer, and that is not an omission. This is opened in a
+     doorway, with a coat in one hand, to do one thing. A site menu here is a way
+     to leave the only screen that matters. -->
+<meta name="robots" content="noindex, nofollow">
+
+<link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/images/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/images/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared.css">
+</head>
+<body>
+<div id="page" dir="rtl">
+
+<div class="checkin-wrap">
+  <img class="checkin-logo" src="/images/logos/logo-he.svg" alt="מרכז עוגן" width="180" height="60">
+  <div class="checkin-langs" id="checkin-langs"></div>
+  <div id="checkin-mount"></div>
+</div>
+
+<script src="/js/checkin.js"></script>
+</div>
+</body>
+</html>
