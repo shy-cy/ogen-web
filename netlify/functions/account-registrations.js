@@ -452,6 +452,23 @@ exports.handler = async (event) => {
           by: me.accountId, source: 'guardian',
           note: body.reason ? String(body.reason).slice(0, 500) : null
         });
+
+        // AFTER THE LEDGER, NEVER BEFORE, and with no review panel. The email
+        // rule is that a send never blocks the action it accompanies; the money
+        // rule is the opposite, and the money rule is the one that decides the
+        // ORDER. A credit not written is money lost with nobody able to tell; a
+        // message not sent leaves a person who can ask.
+        //
+        // The figure comes from the ENTRY that was just written, never from a
+        // second call to creditFor(). Two computations of one number is how an
+        // email and a ledger come to disagree, and the family reads the email.
+        //
+        // Nobody reviews this one because nobody is at a screen: the person who
+        // pressed cancel is the person it is about. The admin's cancellation
+        // goes through a panel, which is the only difference between the two.
+        await mail.sendCancelled(done.registration, me,
+          (done.entry && done.entry.amountCents) || 0);
+
         return json(200, {
           ok: true, registration: done.registration, credit: done.credit,
           entry: done.entry,

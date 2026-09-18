@@ -280,6 +280,29 @@ exports.handler = async (event) => {
         return json(out.code, out.payload);
       }
 
+      // WHAT THE CANCELLATION WILL SAY, and what it will credit.
+      //
+      // Same shape as rejectPreview: reads only, decides nothing, and answers in
+      // the FAMILY's language. The difference is that this draft carries a
+      // figure, so it also carries the figure it was built from — see the
+      // re-check in `cancel`.
+      case 'cancelPreview': {
+        if (!canCancel(session)) {
+          return json(403, { error: 'Your role may approve but not cancel' });
+        }
+        const reg = await store.getRegistration(body.participantId, body.activityId);
+        if (!reg) return json(404, { error: 'No such registration.' });
+        const account = await accounts.getAccount(reg.accountId);
+        if (!account) return json(404, { error: 'That registration has no account behind it.' });
+        // What the cancellation WOULD credit, from the same pure function the
+        // cancellation itself will use a moment later.
+        const owed = credit.creditFor(reg);
+        const entitled = owed.guardianMayCancel !== false;
+        return json(200, Object.assign(
+          { ok: true, to: account.email },
+          mail.cancelledDraft(reg, account, entitled ? owed.total : 0)));
+      }
+
       case 'cancel': {
         if (!canCancel(session)) {
           return json(403, { error: 'Your role may approve but not cancel' });
@@ -299,11 +322,57 @@ exports.handler = async (event) => {
         // here — the cancellation goes through and credits nothing — rather than
         // a refusal.
         const owed = credit.creditFor(reg);
+        const entitled = owed.guardianMayCancel !== false;
+
+        // ⚠ THE DRAFT'S FIGURE MUST STILL BE THE TRUE FIGURE.
+        //
+        // A reviewed message is an editable box with money in it, in front of an
+        // action that cannot be undone — only compensated. creditFor() is pure
+        // and reads a frozen block, so the only input that moves between opening
+        // the panel and pressing send is the clock; but the cutoffs are days, so
+        // a panel opened at 23:59 and sent at 00:01 can straddle one. Then the
+        // family would be told a number nobody credited them.
+        //
+        // So the client sends back the figure it drafted against and it is
+        // compared here, BEFORE anything is cancelled — the same shape as the
+        // optimistic lock on an activity record, and the same answer: 409, with
+        // the new figure, and nothing touched.
+        let override = null;
+        if (body.message) {
+          const want = entitled ? owed.total : 0;
+          if (Number(body.message.basedOnCreditCents) !== want) {
+            return json(409, {
+              error: 'What this cancellation credits has changed since the message was drafted. ' +
+                     'Re-open it and check the figure.',
+              reason: 'credit-moved', creditCents: want
+            });
+          }
+          // Sanitised here, always, and BEFORE the cancellation: the markup
+          // arrives in a request body and is printed into an inbox unescaped,
+          // and a body that sanitises to nothing must be refused while the
+          // registration is still standing.
+          const bodyHtml = sanitiseRich(body.message.bodyHtml);
+          const subject = String(body.message.subject || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+          if (!strip(bodyHtml).trim() || !subject) {
+            return json(400, { error: 'A cancellation message needs a subject and something to say.' });
+          }
+          override = { subject: subject, bodyHtml: bodyHtml };
+        }
+
         const done = await cancelAndCredit(reg, {
           by: session.email, source: 'admin',
           note: body.note ? String(body.note).slice(0, 500) : null,
-          entitled: owed.guardianMayCancel !== false
+          entitled: entitled
         });
+
+        // After the ledger, never before, and with the figure the ENTRY
+        // recorded rather than the one predicted above.
+        let emailed = null;
+        const account = await accounts.getAccount(reg.accountId);
+        if (account) {
+          emailed = await mail.sendCancelled(done.registration, account,
+            (done.entry && done.entry.amountCents) || 0, override);
+        }
         await recordAudit(session, 'registrations.cancel',
           body.participantId + '__' + body.activityId, 'ok',
           { detail: reg.frozen.participantName +
@@ -311,7 +380,7 @@ exports.handler = async (event) => {
                     (body.note ? ' · ' + body.note : '') });
         return json(200, {
           ok: true, registration: done.registration, credit: done.credit, entry: done.entry,
-          sessions: done.sessions
+          sessions: done.sessions, emailed: emailed
         });
       }
 

@@ -139,6 +139,19 @@ const settle = () => new Promise((r) => setTimeout(r, 30));
 const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
 
 (async () => {
+  // ⚠ A REFUSAL NOBODY CAN SEE IS A DEAD BUTTON.
+  //
+  // Sign-up is the tallest form in the area, so its submit button sits near the
+  // fold while the one notice renders above the heading. "An account with that
+  // email already exists" was being written off screen, and what a person saw
+  // was: pressed Create account, nothing happened. It is scrolled into view now,
+  // and announced.
+  const src = fs.readFileSync(path.join(R, 'js/member-account.js'), 'utf8');
+  H.ok(/function say\(kind, text\)[\s\S]{0,420}scrollIntoView/.test(src),
+    'every notice is brought into view — the button and the message are a screen apart');
+  H.ok(/function say\(kind, text\)[\s\S]{0,420}aria-live/.test(src),
+    'and announced, because off-screen and unannounced are the same failure twice');
+
   console.log('[the dashboard]');
   let dom = await screen({ view: 'account', lang: 'en' });
   H.ok(has(dom, 'Hello, Michal'), 'it greets you by name');

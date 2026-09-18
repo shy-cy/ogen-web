@@ -390,3 +390,12 @@ textarea.modal-editor{ padding:9px 11px; border:1px solid #E4DFD3; resize:vertic
   .admin-bar, .picker, .add-btn, .hint, #queue-panel, #account-panel{ display:none !important; }
   .qr-card{ page-break-inside:avoid; }
 }
+/* What the ledger will record, on its own line rather than buried in the prose.
+   Absent when there is nothing to credit: "credits €0.00" reads as a decision
+   taken against the family rather than as the arithmetic of an activity nobody
+   has paid for. */
+.modal-credit{
+  margin:0 0 4px; font-weight:800; font-variant-numeric:tabular-nums;
+  color:#8A3E12; background:#FBF2EC; border:1px solid #F0DDD0;
+  border-radius:6px; padding:9px 12px;
+}

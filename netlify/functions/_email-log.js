@@ -61,7 +61,13 @@ const TEMPLATES = {
   'registration-received': { label: 'Registration request received', resend: false },
   'registration-approved': { label: 'Registration confirmed', resend: true },
   'registration-rejected': { label: 'Registration not offered', resend: false },
-  'registration-expired': { label: 'Registration request expired', resend: false }
+  'registration-expired': { label: 'Registration request expired', resend: false },
+  // Not resendable for the same reason a refusal is not: it describes a moment
+  // that has passed, and a second copy arriving a fortnight later would read as
+  // a second cancellation. It carries a figure as well, and a figure re-read out
+  // of context is the one thing in this table that could be acted on wrongly.
+  'registration-cancelled': { label: 'Registration cancelled', resend: false },
+  'registration-paid': { label: 'Payment received', resend: false }
 };
 
 function templateLabel(t) { return (TEMPLATES[t] && TEMPLATES[t].label) || String(t || 'Email'); }

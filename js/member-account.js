@@ -355,10 +355,29 @@
   }
 
   var notice = null;
+  // ⚠ THE NOTICE IS AT THE TOP OF THE MOUNT, AND THE BUTTON IS AT THE BOTTOM.
+  //
+  // This looked like a dead button and was not. Sign-up is the tallest form in
+  // the area — seven fields, a language picker and the terms — so on a laptop
+  // the submit button sits near the fold and the notice renders somewhere above
+  // the heading, off screen. A refusal that says exactly what is wrong ("an
+  // account with that email already exists") was being written to a part of the
+  // page nobody was looking at, and the honest description of what a person saw
+  // is: they pressed Create account and nothing happened.
+  //
+  // Scrolled into view rather than moved next to each button, because there is
+  // one notice and a dozen forms, and the next tall form would reintroduce it.
+  // Guarded because scrollIntoView is a browser method and the DOM this script
+  // is tested in implements only what it uses.
+  //
+  // aria-live for the same reason in the other direction: a message that appears
+  // outside the viewport is also a message a screen reader never announces.
   function say(kind, text) {
     if (!notice) return;
     clear(notice);
+    notice.setAttribute('aria-live', kind === 'err' ? 'assertive' : 'polite');
     notice.appendChild(el('p', { class: 'acc-notice is-' + kind, text: text }));
+    if (notice.scrollIntoView) notice.scrollIntoView({ block: 'center' });
     if (kind === 'ok') window.setTimeout(function () { if (notice) clear(notice); }, 5000);
   }
   // WHY A PAYMENT LINK DID NOT OPEN STRIPE.

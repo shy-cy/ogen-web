@@ -172,6 +172,54 @@ const REJECTED = {
   }
 };
 
+// --- the place has been cancelled ------------------------------------------
+//
+// ⚠ IT DID NOT EXIST, AND THE SILENCE WAS THE BUG. A family could cancel and
+// receive nothing at all; the only record was a reason typed into the history
+// for an admin to read later. That was survivable while the confirmation called
+// a registration a "request", and stopped being survivable the moment the
+// confirmation started saying REGISTERED — a place you were told you had, taken
+// away with no message, is the one gap in this sequence a family would notice
+// and could not explain.
+//
+// ⚠ THE CREDIT SENTENCE IS OMITTED WHEN THE CREDIT IS ZERO, and that is not
+// tidiness. Nothing on this site has collected money yet, so every cancellation
+// today credits exactly nothing — and "credited EUR 0.00" reads as a refusal,
+// as a decision taken against the family, rather than as the arithmetic of an
+// activity nobody has paid for. A figure appears only once there is one.
+//
+// The amount comes from the LEDGER ENTRY that was already written, never from a
+// second call to creditFor(). Two computations of one figure is how an email and
+// a ledger come to disagree about what somebody is owed, and the family reads
+// the email.
+
+const CANCELLED = {
+  he: {
+    subject: (child, act) => `ההרשמה של ${child} בוטלה · ${act}`,
+    heading: 'ההרשמה בוטלה',
+    body: (child, act) => `ההרשמה של ${child} ל${act} בוטלה.`,
+    credited: (amount) => `זוכיתם ב-${amount}. הסכום שמור בחשבון שלכם וניתן להשתמש בו בהרשמה הבאה.`,
+    talk: 'אם זה נעשה בטעות או שתרצו לחזור, השיבו להודעה הזו ונשמח לעזור.',
+    button: 'לפעילויות נוספות'
+  },
+  en: {
+    subject: (child, act) => `${child}'s registration for ${act} has been cancelled`,
+    heading: 'The registration has been cancelled',
+    body: (child, act) => `${child}'s place in ${act} has been cancelled.`,
+    credited: (amount) => `${amount} has been credited to your account. It stays there and can be used towards a future registration.`,
+    talk: 'If this was a mistake, or you would like to come back, reply to this message and we will help.',
+    button: 'Other activities'
+  },
+  ru: {
+    subject: (child, act) => `Запись ${child} на ${act} отменена`,
+    heading: 'Запись отменена',
+    body: (child, act) => `Запись ${child} на ${act} отменена.`,
+    credited: (amount) => `На ваш счёт зачислено ${amount}. Эта сумма сохраняется и может быть использована при следующей записи.`,
+    talk: 'Если это произошло по ошибке или вы захотите вернуться, ответьте на это письмо — мы поможем.',
+    button: 'Другие занятия'
+  }
+};
+
 // --- nobody answered in time -----------------------------------------------
 //
 // THE APOLOGY IS OURS, and the copy has to say so. It is tempting to write "your
@@ -292,6 +340,42 @@ function rejectedMessage(reg, account, override) {
   return { to: account.email, subject: subject, html: html, text: strip(html) };
 }
 
+// The paragraphs, in the family's language. `creditCents` is what the ledger
+// entry actually recorded — 0, or absent, means no credit line at all.
+function cancelledLines(reg, account, creditCents) {
+  const l = lang(((account || {}).profile || {}).preferredLanguage);
+  const T = CANCELLED[l];
+  const child = childOf(reg), act = titleOf(reg, l);
+  const lines = [T.body(child, act)];
+  if (creditCents > 0) lines.push(T.credited(money(creditCents)));
+  lines.push(T.talk);
+  return { l: l, T: T, child: child, act: act, lines: lines };
+}
+
+// Bare <p>, like the rejection draft: the editor strips styles and so does the
+// sanitiser, so the shell applies the spacing on the way out and what the editor
+// opens on is what it can hand back unchanged.
+function cancelledDraft(reg, account, creditCents) {
+  const { l, T, child, act, lines } = cancelledLines(reg, account, creditCents);
+  return {
+    lang: l,
+    subject: T.subject(child, act),
+    heading: T.heading,
+    creditCents: creditCents || 0,
+    bodyHtml: lines.map((p) => `<p>${esc(p)}</p>`).join('\n')
+  };
+}
+
+function cancelledMessage(reg, account, creditCents, override) {
+  const { l, T, child, act, lines } = cancelledLines(reg, account, creditCents);
+  const cta = { href: pathFor(l, '/activities'), label: T.button };
+  const html = (override && override.bodyHtml)
+    ? shellRaw(l, T.heading, override.bodyHtml, cta)
+    : shell(l, T.heading, lines.map(esc), cta);
+  const subject = (override && override.subject) || T.subject(child, act);
+  return { to: account.email, subject: subject, html: html, text: strip(html) };
+}
+
 function expiredMessage(reg, account) {
   const l = lang(((account || {}).profile || {}).preferredLanguage);
   const T = EXPIRED[l];
@@ -408,6 +492,15 @@ const sendExpired = (reg, account) =>
     email.send(expiredMessage(reg, account),
       { template: 'registration-expired', lang: langOf(account) }));
 
+// TWO CALLERS, ONE MESSAGE. A guardian cancelling their own place gets it
+// immediately with no review, because nobody is at a screen to review it; an
+// admin cancelling somebody else's gets the panel first, exactly as a rejection
+// does. The difference is one optional argument, not a second message.
+const sendCancelled = (reg, account, creditCents, override) =>
+  email.settle('registration-cancelled', account.email, () =>
+    email.send(cancelledMessage(reg, account, creditCents, override),
+      { template: 'registration-cancelled', lang: langOf(account) }));
+
 const sendPaid = (reg, account, paidCents, outstandingCents) =>
   email.settle('registration-paid', account.email, async () =>
     email.send(paidMessage(reg, account, paidCents, outstandingCents,
@@ -416,8 +509,9 @@ const sendPaid = (reg, account, paidCents, outstandingCents) =>
 
 module.exports = {
   payUrlFor,
-  sendReceived, sendApproved, sendRejected, sendExpired,
+  sendReceived, sendApproved, sendRejected, sendExpired, sendCancelled,
   receivedMessage, approvedMessage, rejectedMessage, expiredMessage, rejectedDraft,
-  RECEIVED, APPROVED, REJECTED, EXPIRED,
+  cancelledMessage, cancelledDraft,
+  RECEIVED, APPROVED, REJECTED, EXPIRED, CANCELLED,
   paidMessage, sendPaid
 };
