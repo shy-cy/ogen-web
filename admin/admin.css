@@ -399,3 +399,11 @@ textarea.modal-editor{ padding:9px 11px; border:1px solid #E4DFD3; resize:vertic
   color:#8A3E12; background:#FBF2EC; border:1px solid #F0DDD0;
   border-radius:6px; padding:9px 12px;
 }
+
+/* The two closed lists: languages of instruction, and level. Tick boxes rather
+   than a multi-select, because a class taught in two languages is ordinary here
+   and a multi-select hides the unchosen options behind a control most people do
+   not know is multiple. */
+.fact-checks{ display:flex; flex-wrap:wrap; gap:10px 18px; margin-bottom:14px; }
+.fact-check{ display:flex; align-items:center; gap:7px; font-size:14px; cursor:pointer; }
+.fact-check input{ margin:0; }

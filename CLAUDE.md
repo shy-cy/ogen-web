@@ -445,6 +445,35 @@ is the one place a fact becomes display text, built per language — so
 Hebrew and "2 groups / up to 7 students per group" in English, and the three
 languages cannot drift.
 
+**⚠ EVERY FACT IS STRUCTURED NOW — `TEXT_FACTS` IS EMPTY.** `instructionLanguage`
+and `prerequisites` were the last two free-text facts: a Hebrew box, an English
+box and a Russian box holding whatever somebody typed. That is the shape this
+module exists to replace — an admin who fills in one language publishes one
+language, three pages can disagree about what a class requires, and "Beginners"
+is spelled four ways across four activities.
+
+They are a **closed list plus an optional line** now. `instructionLanguage` is
+`{codes:['he','ru'], text}` over `he | en | ru | el` (Greek, because the centre
+is in Cyprus, and a class taught in two languages picks two); `prerequisites` is
+`{level, text}` over `beginner | intermediate | advanced`. Both render per
+language in `_activity-facts.js`, the list first and the free text on a second
+line — the list answers the question, the sentence adds to it. The Hebrew levels
+are `מתחילים / ממשיכים / מתקדמים`, the idiomatic Israeli triple rather than a
+word-for-word translation, the same choice the schedule headings make.
+
+Nothing typed before this is lost: `liftBareText()` moves an old bare `{he,en,ru}`
+bag into `text`, detected by shape rather than by a version flag, so an activity
+that said "No experience needed" goes on saying it until somebody picks a level.
+The `text` half is in `LANG_SUBKEYS` and the list half deliberately is not — a
+Russian-only role may translate the sentence and cannot change which languages a
+class is taught in.
+
+⚠ **The loop that copies these two through `migrate()` used to iterate
+`TEXT_FACTS`**, which was exactly them — so emptying that list stopped copying
+them at all, and every record came back blank with nothing erroring. They are
+named explicitly now. A list that is correct today and becomes a silent deletion
+tomorrow is the shape to avoid.
+
 **Several facts are more than one line.** Group size splits the count from the
 size; duration puts the date range above the sessions. The value stays plain
 **escaped text with a `\n` in it** — never markup — and `.sidebar-facts span`
@@ -1175,10 +1204,23 @@ The 300 was this rule working: it is what made a permanent broken image into a
 five-minute one. But five minutes is still visible, and visible to precisely the
 wrong person — **whoever just pressed Publish and opened the page**, who is the
 first request for every new URL and therefore the one who fills the edge cache
-with whatever the origin happens to say at that instant. It is now **60**, the
-same trade one notch tighter, and a test pins the ceiling rather than the exact
-number. The real fix is purging Cloudflare on deploy; that needs an API token
-and a build hook, lives outside this repository, and does not exist yet.
+with whatever the origin happens to say at that instant. It went to **60**.
+
+⚠ **And sixty was still visible, so it is ZERO now.** Reported a second time from
+the other side of the same window: a newly published activity showed a broken
+image on the listing while the file itself answered 200 to `curl`. Sixty seconds
+of somebody else's 404, held by the browser that asked first.
+
+There was nothing left to trade away. These names carry a **content hash**, so a
+URL's bytes never change — caching them buys one saved round trip and nothing
+else, and `max-age=0, must-revalidate` still answers **304** in a few hundred
+bytes for every unchanged file. What it stops buying is the ability to hold a
+404. Netlify applying path headers to error responses is what made this class of
+bug possible, and is now what fixes it: the transient 404 carries `max-age=0`
+too, so the next request re-asks and gets the picture.
+
+The complete fix is still purging Cloudflare on deploy; that needs an API token
+and a deploy webhook, lives outside this repository, and does not exist yet.
 
 ⚠ **`www.ogen.cy` is proxied through Cloudflare, so measure cache behaviour
 against the domain, never against `ogen-web.netlify.app`.** A CDN sits between

@@ -34,6 +34,29 @@ function num(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+// The languages a class can be taught in, and the levels it can be pitched at.
+//
+// A closed list rather than free text, so the three pages cannot disagree and so
+// "Beginners" is spelled one way across every activity. Greek is here because
+// the centre is in Cyprus; a class taught in two languages picks two.
+const INSTRUCTION_LANGUAGES = ['he', 'en', 'ru', 'el'];
+const LANGUAGE_NAMES = {
+  he: { he: 'עברית', en: 'אנגלית', ru: 'רוסית', el: 'יוונית' },
+  en: { he: 'Hebrew', en: 'English', ru: 'Russian', el: 'Greek' },
+  ru: { he: 'иврит', en: 'английский', ru: 'русский', el: 'греческий' }
+};
+
+// מתחילים / ממשיכים / מתקדמים is the idiomatic Israeli triple for course
+// levels, and "ממשיכים" is literally "continuing" rather than "intermediate" —
+// the natural word in that language rather than a word-for-word translation,
+// the same choice the schedule headings already make.
+const LEVELS = ['beginner', 'intermediate', 'advanced'];
+const LEVEL_NAMES = {
+  he: { beginner: 'מתחילים', intermediate: 'ממשיכים', advanced: 'מתקדמים' },
+  en: { beginner: 'Beginners', intermediate: 'Intermediate', advanced: 'Advanced' },
+  ru: { beginner: 'Начинающие', intermediate: 'Средний уровень', advanced: 'Продвинутые' }
+};
+
 // --- language data ---------------------------------------------------------
 
 const DAYS = {
@@ -130,11 +153,25 @@ const FACT_ORDER = [
   'instructionLanguage', 'prerequisites', 'location', 'address', 'price'
 ];
 
-// Facts that are plain translated text rather than structured values. They moved
-// out of the main column into the sidebar: they are things to scan, not to read.
-const TEXT_FACTS = ['instructionLanguage', 'prerequisites'];
+// ⚠ EMPTY, AND THAT IS THE POINT. Every fact on this site is now structured.
+//
+// `instructionLanguage` and `prerequisites` were the last two free-text facts —
+// a Hebrew box, an English box and a Russian box, each holding whatever somebody
+// typed. That is the shape this whole module exists to replace: an admin who
+// fills in one language publishes one language, three pages can disagree about
+// what a class requires, and "Beginners" is spelled four ways across four
+// activities.
+//
+// They are a code and a level now, chosen from a list and rendered per language
+// here, with an OPTIONAL free-text line for anything the list cannot say. The
+// list answers the question; the sentence adds to it.
+//
+// The constant is kept rather than deleted: factText() still branches on it, and
+// an empty list is a truthful statement that nothing is free text any more.
+const TEXT_FACTS = [];
 
-const STRUCTURED_FACTS = ['ages', 'schedule', 'duration', 'groupSize', 'location', 'address', 'price'];
+const STRUCTURED_FACTS = ['ages', 'schedule', 'duration', 'groupSize',
+                          'instructionLanguage', 'prerequisites', 'location', 'address', 'price'];
 
 // Where an activity happens is two different facts with two different answers.
 // "Limassol" tells a family whether it is near them and belongs on a public
@@ -617,6 +654,36 @@ function formatPrice(f, lang, duration) {
 
 // --- the one entry point ---------------------------------------------------
 
+// The languages a class is taught in, named in the reader's own language, with
+// an optional line of detail under them.
+//
+// The detail is a SECOND LINE rather than a continuation of the first: the list
+// answers "which languages", and anything else is a different sentence. Multi-
+// line fact values are already the house style — group size splits the count
+// from the size, duration puts the date range above the sessions — and
+// `.sidebar-facts span` carries white-space:pre-line for exactly this.
+function formatInstructionLanguage(f, lang) {
+  const names = LANGUAGE_NAMES[lang] || LANGUAGE_NAMES.en;
+  const codes = (Array.isArray(f.codes) ? f.codes : [])
+    .filter((c) => INSTRUCTION_LANGUAGES.indexOf(c) !== -1);
+  // Written order, not the order somebody happened to tick: the same activity
+  // reads the same way on all three pages.
+  const listed = INSTRUCTION_LANGUAGES.filter((c) => codes.indexOf(c) !== -1).map((c) => names[c]);
+  return [listed.join(' · '), pick(f.text, lang)].filter(Boolean).join('\n');
+}
+
+// The level, from the list, plus whatever else a family needs to know.
+//
+// Either half alone is a complete answer: an activity can say "Beginners" and
+// nothing more, or say nothing about level and carry a sentence about what to
+// bring to it. An activity with neither renders nothing and its card drops the
+// row, which is what every empty fact here does.
+function formatPrerequisites(f, lang) {
+  const names = LEVEL_NAMES[lang] || LEVEL_NAMES.en;
+  const level = LEVELS.indexOf(f.level) !== -1 ? names[f.level] : '';
+  return [level, pick(f.text, lang)].filter(Boolean).join('\n');
+}
+
 // Display text for one fact in one language. Falls back to the words an admin
 // typed before this field was structured, so migrating a record is something
 // that can happen later without the page going blank in the meantime.
@@ -632,6 +699,8 @@ function factText(activity, key, lang) {
   else if (key === 'schedule') text = formatSchedule(f, lang);
   else if (key === 'duration') text = formatDuration(f, lang);
   else if (key === 'groupSize') text = formatGroupSize(f, lang);
+  else if (key === 'instructionLanguage') text = formatInstructionLanguage(f, lang);
+  else if (key === 'prerequisites') text = formatPrerequisites(f, lang);
   else if (key === 'location' || key === 'address') text = pick(f.text, lang);
   else if (key === 'price') text = formatPrice(f, lang, facts.duration);
 
@@ -712,6 +781,8 @@ function sidebarGroups(activity, lang) {
 }
 
 module.exports = {
+  INSTRUCTION_LANGUAGES, LANGUAGE_NAMES, LEVELS, LEVEL_NAMES,
+  formatInstructionLanguage, formatPrerequisites,
   namedGroups, namedGroupLine, totalCapacity,
   FACT_ORDER, TEXT_FACTS, STRUCTURED_FACTS, DEFAULT_VISIBILITY,
   ACADEMIC_MINUTES, CURRENCY,

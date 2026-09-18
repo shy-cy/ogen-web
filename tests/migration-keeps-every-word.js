@@ -98,7 +98,26 @@ H.ok(moved.programLength === undefined, 'programLength is gone from the top leve
 H.ok(moved.instructionLanguage === undefined, 'and instructionLanguage');
 H.ok(moved.prerequisites === undefined, 'and prerequisites');
 H.ok(!isLangObject(moved.facts.location), 'location is a structured fact, not a bare lang object');
-H.ok(isLangObject(moved.facts.prerequisites), 'text facts stay lang objects, because they are words');
+// ⚠ AND NEITHER OF THESE IS A LANG OBJECT ANY MORE. They were the last two
+// free-text facts — three boxes holding whatever somebody typed, which is the
+// shape the whole module exists to replace. A code and a level now, with the
+// typed words CARRIED into `text` rather than dropped: an admin who wrote
+// "Beginners" three times still has those words on the page until somebody
+// picks the level from the list.
+H.ok(!isLangObject(moved.facts.prerequisites), 'prerequisites is structured now');
+H.ok(moved.facts.prerequisites.text, 'and keeps its words in text');
+H.ok(!isLangObject(moved.facts.instructionLanguage), 'and so is the language of instruction');
+const lifted = migrate({ facts: {
+  instructionLanguage: { he: 'עברית', en: 'Hebrew', ru: '' },
+  prerequisites: { he: 'אין צורך בניסיון', en: '', ru: '' } } });
+H.eq(lifted.facts.instructionLanguage.text.en, 'Hebrew',
+  'a bare lang object is lifted into text, word for word');
+H.eq(lifted.facts.prerequisites.text.he, 'אין צורך בניסיון', 'and so is the other');
+H.eq(lifted.facts.prerequisites.level, null, 'with no level invented for it');
+// ⚠ The loop that copies these used to iterate TEXT_FACTS, which was exactly
+// these two — so emptying that list stopped copying them at all, and every
+// record came back blank with nothing erroring.
+H.ok(lifted.facts.instructionLanguage.text.he, 'and they are COPIED AT ALL, which they briefly were not');
 
 console.log('\n[visibility is filled in for every fact]');
 const vis = moved.factVisibility;

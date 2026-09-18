@@ -835,6 +835,8 @@
       return pos(f.registrationFee) || pos(f.fullPrice) || f.perHourOverride != null;
     }
     if (kind === 'location') return anyLang(f.text);
+    if (kind === 'languages') return (f.codes || []).length > 0;
+    if (kind === 'level') return !!f.level;
     return false;
   }
 
@@ -1012,6 +1014,39 @@
 
     if (d.kind === 'text') {
       body = fieldRow({ label: 'Text', textarea: true }, langObj(fact), 'fact-' + d.key);
+    } else if (d.kind === 'languages') {
+      // Tick boxes rather than a multi-select: a class taught in two languages
+      // is ordinary here, and a multi-select hides the options that were not
+      // chosen behind a control most people do not know is multiple.
+      var langBox = el('div', { class: 'fact-checks' });
+      (S.schema.instructionLanguages || []).forEach(function (o) {
+        var id = 'fact-lang-' + o.key;
+        var box = el('input', { type: 'checkbox', id: id, value: o.key });
+        box.checked = (fact.codes || []).indexOf(o.key) !== -1;
+        box.addEventListener('change', function () { S.dirty = true; refreshLegacyNotes(); });
+        langBox.appendChild(el('label', { class: 'fact-check', for: id }, [box, el('span', { text: o.label })]));
+      });
+      body = el('div', {}, [
+        langBox,
+        // The free text is SECOND and optional. The list answers the question;
+        // this adds to it, and it renders on its own line under the languages.
+        fieldRow({ label: 'Anything else (optional)', textarea: true },
+                 langObj(fact.text), 'fact-' + d.key)
+      ]);
+    } else if (d.kind === 'level') {
+      var levelSel = el('select', { id: 'fact-level' });
+      levelSel.appendChild(el('option', { value: '', text: '— not stated —' }));
+      (S.schema.levels || []).forEach(function (o) {
+        levelSel.appendChild(el('option', {
+          value: o.key, text: o.label, selected: o.key === fact.level || null
+        }));
+      });
+      levelSel.addEventListener('change', function () { S.dirty = true; refreshLegacyNotes(); });
+      body = el('div', {}, [
+        el('div', { class: 'fact-grid' }, [el('div', {}, [el('label', { text: 'Level' }), levelSel])]),
+        fieldRow({ label: 'Anything else (optional)', textarea: true },
+                 langObj(fact.text), 'fact-' + d.key)
+      ]);
     } else if (d.kind === 'location') {
       // Keyed by the fact, not by the kind. There are two facts of this kind now
       // — the general location and the exact address — and a hardcoded id gave
@@ -1371,6 +1406,23 @@
       var out;
       if (d.kind === 'text') out = readLangField('fact-' + d.key);
       else if (d.kind === 'location') out = { text: readLangField('fact-' + d.key) };
+      // ⚠ READ BACK FROM THE SAME GROUPS THE FORM DREW. A field the form renders
+      // and the read-back misses saves successfully and loses the value, with
+      // nothing looking wrong — which is why these two are here the moment they
+      // were drawn above.
+      else if (d.kind === 'languages') {
+        out = {
+          codes: (S.schema.instructionLanguages || []).map(function (o) { return o.key; })
+            .filter(function (k) {
+              var box = document.getElementById('fact-lang-' + k);
+              return box && box.checked;
+            }),
+          text: readLangField('fact-' + d.key)
+        };
+      } else if (d.kind === 'level') {
+        var lvl = document.getElementById('fact-level');
+        out = { level: (lvl && lvl.value) || null, text: readLangField('fact-' + d.key) };
+      }
       else if (d.kind === 'ages') out = { min: readNum('fact-ages-min'), max: readNum('fact-ages-max') };
       else if (d.kind === 'schedule') {
         out = {

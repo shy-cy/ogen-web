@@ -103,15 +103,30 @@
 # therefore the one who fills the cache with whatever the origin says at that
 # instant.
 #
-# Sixty is the same trade one notch tighter. Revalidation costs nothing here:
-# the names carry a content hash, so an unchanged file answers 304 in a few
-# hundred bytes. The real fix is purging Cloudflare on deploy, which needs an
-# API token and a build hook and lives outside this repository; until that
-# exists, this is the cheap half.
+# ⚠ AND SIXTY WAS STILL VISIBLE — IT IS ZERO NOW.
+#
+# Reported a second time, from the other side of the same window: an activity
+# published with a new photograph showed a broken image on the listing while the
+# file itself answered 200 to curl. Sixty seconds of somebody else's 404, held by
+# the browser that asked first, which is always the person who just pressed
+# Publish.
+#
+# There is nothing left to trade away. These names carry a CONTENT HASH, so a
+# URL's bytes never change: caching them buys a saved round trip and nothing
+# else, and `max-age=0, must-revalidate` still answers 304 in a few hundred bytes
+# for every unchanged file. What it stops buying is the ability to hold a 404,
+# and that is the entire cost of the bug.
+#
+# Netlify applies path headers to ERROR responses too, which is what made this
+# class of bug possible at all — and is now what fixes it: the transient 404
+# carries max-age=0 as well, so the next request re-asks and gets the picture.
+#
+# The complete fix is still purging Cloudflare on deploy. That needs an API token
+# and a deploy webhook and lives outside this repository.
 [[headers]]
   for = "/images/activities/*"
   [headers.values]
-    Cache-Control = "public, max-age=60, must-revalidate"
+    Cache-Control = "public, max-age=0, must-revalidate"
 
 # The admin's own assets are NEVER cached.
 #

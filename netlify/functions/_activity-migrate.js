@@ -14,7 +14,8 @@
 // Everything here is pure. migrate() is idempotent: running it on an
 // already-migrated record returns the same record.
 
-const { FACT_ORDER, TEXT_FACTS, DEFAULT_VISIBILITY, num } = require('./_activity-facts');
+const { FACT_ORDER, TEXT_FACTS, DEFAULT_VISIBILITY, num,
+        INSTRUCTION_LANGUAGES, LEVELS } = require('./_activity-facts');
 const sessionsModule = require('./_activity-sessions');
 const registration = require('./_activity-registration');
 
@@ -135,6 +136,28 @@ const SHAPES = {
     if (named.length) out.named = named;
     return out;
   },
+  // ⚠ THE LAST TWO FREE-TEXT FACTS, STRUCTURED.
+  //
+  // Both were a Hebrew box, an English box and a Russian box holding whatever
+  // somebody typed — the exact shape the rest of this file exists to replace.
+  // An admin filling in one language published one language, three pages could
+  // disagree about what a class required, and "Beginners" was spelled a
+  // different way on every activity.
+  //
+  // A code and a level now, rendered per language in _activity-facts.js, with
+  // the free text KEPT as an optional extra line. Nothing typed before this is
+  // lost: an old value was a bare {he,en,ru} bag, and it lands in `text` exactly
+  // as it was — the same promise legacyText makes for the facts that were
+  // converted before these.
+  instructionLanguage: (f) => ({
+    codes: (Array.isArray(f.codes) ? f.codes : [])
+      .filter((c) => INSTRUCTION_LANGUAGES.indexOf(c) !== -1),
+    text: langObject(f.text)
+  }),
+  prerequisites: (f) => ({
+    level: LEVELS.indexOf(f.level) !== -1 ? f.level : null,
+    text: langObject(f.text)
+  }),
   location: (f) => ({ text: langObject(f.text) }),
   address: (f) => ({ text: langObject(f.text) }),
   price: (f) => ({
@@ -178,8 +201,22 @@ function isoDate(value) {
 }
 
 // Coerce one fact into its canonical shape, carrying legacyText through.
+// The two facts that used to BE a language bag and now hold one. An old record
+// carries {he:'…', en:'…'} where the new shape expects {text:{he:'…'}}, so the
+// bare bag is lifted into `text` on the way past. Detected by shape rather than
+// by a version flag: a record with no `text`, `codes` or `level` and at least
+// one language key is unambiguously the old form, and a record already
+// converted has `text` and is left alone.
+const WAS_TEXT = { instructionLanguage: 1, prerequisites: 1 };
+function liftBareText(key, raw) {
+  if (!WAS_TEXT[key] || !raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
+  if (raw.text != null || raw.codes != null || raw.level != null) return raw;
+  return hasAnyText(langObject(raw)) ? { text: raw } : raw;
+}
+
 function normaliseFact(key, raw) {
   if (TEXT_FACTS.indexOf(key) !== -1) return langObject(raw);
+  raw = liftBareText(key, raw);
   const f = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
   const out = SHAPES[key] ? SHAPES[key](f) : {};
   const legacy = langObject(f.legacyText);
@@ -332,12 +369,21 @@ function migrate(record, options) {
     facts.duration = hasAnyText(from) ? { legacyText: from } : {};
   }
 
-  // These two were sections in the main column. They are facts to scan, so they
-  // move to the sidebar — same text, new home.
-  TEXT_FACTS.forEach((key) => {
-    const inFacts = old[key];
-    if (inFacts && hasAnyText(langObject(inFacts))) facts[key] = langObject(inFacts);
-    else facts[key] = langObject(out[key]);
+  // ⚠ NAMED EXPLICITLY, NOT DRIVEN OFF TEXT_FACTS.
+  //
+  // This loop used to iterate TEXT_FACTS, which was exactly these two. Emptying
+  // that list when they became structured therefore stopped copying them at all
+  // — every record came back with a blank language and a blank level, and
+  // nothing errored. A smoke test caught it; a list that is correct today and
+  // becomes a silent deletion tomorrow is the shape to avoid, so the two keys
+  // are written out.
+  //
+  // Three historical forms are carried: the structured fact, the free-text fact
+  // that preceded it, and the top-level field that preceded that.
+  // liftBareText() inside normaliseFact() moves a bare {he,en,ru} bag into
+  // `text`, so nothing an admin typed is lost in either conversion.
+  ['instructionLanguage', 'prerequisites'].forEach((key) => {
+    facts[key] = old[key] != null ? old[key] : langObject(out[key]);
   });
 
   out.facts = normaliseFacts(facts);

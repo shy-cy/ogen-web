@@ -31,10 +31,11 @@ const {
   filePathFor, pathFor, renderActivityPage
 } = require('./_activity-template');
 const { buildDerivedFiles, isPublic } = require('./_activity-index');
+const FACTS = require('./_activity-facts');
 const {
   FACT_ORDER, TEXT_FACTS, DEFAULT_VISIBILITY, ACADEMIC_MINUTES,
   num, pricePerHour
-} = require('./_activity-facts');
+} = FACTS;
 const { migrate, normaliseFacts, normaliseVisibility, SHAPES } = require('./_activity-migrate');
 const SESSIONS = require('./_activity-sessions');
 const REG = require('./_activity-registration');
@@ -129,8 +130,14 @@ const FIELD_SCHEMA = {
     { key: 'duration', label: 'Duration', kind: 'duration',
       hint: 'Start, end, how many sessions, and how long each one runs' },
     { key: 'groupSize', label: 'Group size', kind: 'groupSize' },
-    { key: 'instructionLanguage', label: 'Language of instruction', kind: 'text' },
-    { key: 'prerequisites', label: 'Prerequisites / level', kind: 'text' },
+    // ⚠ NOT `text` ANY MORE. These were the last two free-text facts — three
+    // boxes holding whatever somebody typed — which meant an admin filling in
+    // one language published one language, and "Beginners" was spelled a
+    // different way on every activity. A list answers the question and is
+    // rendered per language; the text box stays for anything the list cannot
+    // say, which is the half an admin genuinely has to write.
+    { key: 'instructionLanguage', label: 'Language of instruction', kind: 'languages' },
+    { key: 'prerequisites', label: 'Prerequisites / level', kind: 'level' },
     { key: 'location', label: 'Location', kind: 'location',
       hint: 'The general area — "Limassol". Shown to everyone' },
     { key: 'address', label: 'Exact address', kind: 'location',
@@ -153,6 +160,10 @@ const FIELD_SCHEMA = {
   cancellationModes: REG.CANCELLATION_MODES,
   cutoffOff: REG.OFF,
   defaultExpiryDays: REG.DEFAULT_EXPIRY_DAYS,
+  // The two closed lists the form draws from, labelled in English because the
+  // admin is. The page renders them in the reader's own language.
+  instructionLanguages: FACTS.INSTRUCTION_LANGUAGES.map((c) => ({ key: c, label: FACTS.LANGUAGE_NAMES.en[c] })),
+  levels: FACTS.LEVELS.map((k) => ({ key: k, label: FACTS.LEVEL_NAMES.en[k] })),
   frequencies: FREQUENCIES,
   weeksOfMonth: WEEKS_OF_MONTH,
   visibilities: ['public', 'members'],
@@ -506,7 +517,13 @@ function mergeByPermission(current, incoming, session) {
   // Russian-only role could never translate the address — the numbers path took
   // it from the stored record and the merge never ran. A list makes forgetting
   // one a visible omission instead of a silent read-only field.
-  const LANG_SUBKEYS = { location: ['text'], address: ['text'], groupSize: ['overrideText'] };
+  // Which sub-keys of a structured fact are WORDS. A role that may only edit
+  // Russian may translate these and nothing else — so the language codes and the
+  // level, which are one answer for all three pages, are deliberately absent.
+  const LANG_SUBKEYS = {
+    location: ['text'], address: ['text'], groupSize: ['overrideText'],
+    instructionLanguage: ['text'], prerequisites: ['text']
+  };
 
   const baseFacts = (base && base.facts) || {};
   const incFacts = incoming.facts || {};

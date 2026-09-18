@@ -48,8 +48,11 @@ const ACT = {
     // showPerLesson opts this fixture in, so the assertions below keep
     // exercising the full four-row shape. Default-off is covered on its own.
     price: { registrationFee: 50, fullPrice: 360, showPerLesson: true },
-    instructionLanguage: { he: 'עברית', en: 'Hebrew', ru: 'Иврит' },
-    prerequisites: { he: 'מתחילים', en: 'Beginners', ru: 'Начинающие' }
+    // Structured now, not three boxes of free text: the last two facts to be
+    // converted. A code and a level, rendered per language, with the free text
+    // kept as an optional extra line.
+    instructionLanguage: { codes: ['he'], text: { he: '', en: '', ru: '' } },
+    prerequisites: { level: 'beginner', text: { he: '', en: '', ru: '' } }
   }
 };
 const text = (key, lang) => F.factText(ACT, key, lang);

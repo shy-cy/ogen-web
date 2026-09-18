@@ -76,7 +76,10 @@ console.log('\n[the paths that had their own rules still do]');
 // Cache-Control must not read as permission to collapse them.
 const specific = {
   '/images/*': /max-age=31536000/,
-  '/images/activities/*': /max-age=(60|300)\b/,
+  // ZERO. A content hash means these bytes never change under a URL, so caching
+  // buys one saved round trip — and costs the ability to hold a transient 404
+  // through a deploy, which is what broke a freshly published photograph twice.
+  '/images/activities/*': /max-age=0\b/,
   '/admin/*': /no-cache/
 };
 Object.keys(specific).forEach((p) => {
@@ -98,10 +101,21 @@ H.ok(!/immutable/.test(up),
 // seconds between the HTML reaching an edge and the image doing so. This
 // number is the whole length of that broken window, and the person who sees it
 // is whoever just pressed Publish.
+// ⚠ ZERO, after the same bug was reported a SECOND time: an activity published
+// with a new photograph showed a broken image on the listing while the file
+// itself answered 200 to curl. Sixty seconds of somebody else's 404, held by
+// whoever asked first — which is always the person who just pressed Publish.
+//
+// There is nothing left to trade. These names carry a CONTENT HASH, so a URL's
+// bytes never change: caching them buys one saved round trip, and must-revalidate
+// still answers 304 in a few hundred bytes. What it stops buying is the ability
+// to hold a 404 through a deploy, which is the entire cost of the bug.
 const upAge = parseInt((up.match(/max-age=(\d+)/) || [0, 0])[1], 10);
-H.ok(upAge > 0 && upAge <= 60,
-  'and its max-age is 60s or less (' + upAge + 's) — that is how long a ' +
-  'transient 404 stays cached at the edge');
+H.eq(upAge, 0,
+  'and its max-age is ZERO — a hashed name gains nothing from being cached and ' +
+  'loses a transient 404 to every visitor who asked during the deploy');
+H.ok(/must-revalidate/.test(up),
+  'with must-revalidate, so an unchanged picture still answers 304 rather than re-sending');
 
 console.log('\n[the security headers survived the edit]');
 ['X-Frame-Options', 'X-Content-Type-Options', 'Referrer-Policy'].forEach((h) => {
