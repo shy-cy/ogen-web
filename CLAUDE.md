@@ -1623,10 +1623,44 @@ time — it only ever rewrites what the derived rule already released.
 
 **The expiry email apologises.** The thing that expired is a request *we* did not
 answer, so "your request expired" — which reads as the family having let
-something lapse — is the wrong sentence. Four messages in
+something lapse — is the wrong sentence. Five messages in
 `_registration-email.js`, and only the confirmation is resendable: a family
 legitimately loses "you have a place", whereas re-delivering a refusal a
 fortnight later is the clearest case in that table of a resend doing harm.
+
+**⚠ AND NOTHING ELSE IN THAT TABLE SAYS "REQUEST" ANY MORE.** The submission
+message opened with "your request has arrived" and promised an answer within
+`expiryDays`; the family area's submit button said "send the request", its
+confirmation said one had been sent, and a `pending` registration showed the
+family the words "waiting for an answer". All of that describes **the shape of
+our queue, not the shape of what the family did** — they signed a child up, and
+being told a decision is pending reads as a decision that might go either way
+over something they consider settled. If we cannot take the place we write and
+say so, and that message already exists.
+
+So the button is `הרשמה` / Register / `Записаться`, the confirmation and the
+email both say the child is registered and a payment link is coming, and
+**`pending` and `approved` both read "registered" to a family**. The two are a
+real distinction on our side — approved is what opens payment — and the
+difference is already expressed where it matters: a pay button on one, "a
+payment link is on its way" on the other. `pending` survives in the admin queue,
+which is the only place that word belongs.
+
+One consequence is worth knowing rather than discovering: **the expiry sweep now
+contradicts what the family was told.** It releases an unanswered `pending`
+registration after `pendingExpiryDays` and mails the apology — which was
+coherent while the family had been promised an answer by a date, and now lands
+on somebody who believes they are registered. It is a safety net against a place
+tied up forever, so it stays; the honest fix on an activity a person actually
+works the queue for is to raise the number or to auto-approve.
+
+**Three of the five now link to the family's own registration page** rather than
+the public activity page: registered, approved and the receipt are each partly
+about paying, and that page is the only one showing what is owed. The two about
+*not* having a place still point at the activity, which needs nothing signed in.
+The approval subject says CONFIRMED in all three languages, because a manually
+approved registration sends both messages days apart and the Russian pair was
+word-for-word identical for a moment.
 
 **`_email-shell.js`** was lifted out of `_account-email.js` when these arrived.
 That file had said from the beginning that there is one shell "so they cannot
@@ -2175,6 +2209,20 @@ exactly one `<h1>`.
   two declarations doing what `start` does in one, and it is the shape rule 2
   forbids. Ogen's block has no per-language override at all, and a test asserts
   there is not one physical inset in it.
+
+⚠ **The chevron is the one thing in that block that must NOT mirror, and it
+did.** Built from `border-inline-end` plus `border-block-end` and rotated 45°,
+it turns about a corner that moves with the direction — so it pointed down in
+English and **left** in Hebrew when collapsed, right when open. That is a link's
+gesture, on a control that is not one. Logical properties are for things
+positioned relative to a side; a caret meaning "this opens downwards" is
+vertical in all three languages, so its borders are physical on purpose and
+there is nothing to flip. A test pins that, and pins that the rail and the
+indent stay logical.
+
+It also sat at the far end of the row on a `margin-inline-start:auto`, which on
+a wide menu is most of a screen away from the word it labels. It is beside the
+label now; the row keeps `width:100%` so all of it is still pressable.
 
 Also fixed in passing: the sister's toggle is a `<button>` with no
 `aria-expanded`, so a screen reader is never told the group opened. Ogen's sets
