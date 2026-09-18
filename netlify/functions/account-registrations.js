@@ -76,6 +76,14 @@ function activityView(activity, report, lang) {
     taken: activity.type === 'dropin' ? null : report.taken,
     left: activity.type === 'dropin' ? null : report.left,
     perSession: activity.type === 'dropin',
+    // ⚠ WHICH EVENINGS, because the panel could not say. Registering for a
+    // pay-per-session activity is the may-come decision and covers no date at
+    // all — so a family was being asked to sign up with nothing on screen about
+    // when anything happens. Three is enough to show what the rhythm is; the
+    // whole list is one tap away on the registration page.
+    nextDates: activity.type === 'dropin'
+      ? attendance.bookableDates(activity).filter((d) => !credit.past(d, Date.now())).slice(0, 3)
+      : null,
     full: activity.type !== 'dropin' && !R.hasRoom(report, null) && !report.named,
     groups: report.named
       ? report.named.map((g) => ({
@@ -243,6 +251,53 @@ exports.handler = async (event) => {
         if (existing) att.history = (existing.history || []).concat(att.history);
         await attendance.saveAttendance(att);
         return json(200, { ok: true, session: att });
+      }
+
+      // ⚠ PAYING FOR ONE EVENING, which a family simply could not do.
+      //
+      // `pay` reads a REGISTRATION, and a drop-in registration owes nothing:
+      // owedCentsFor() charges the yearly fee and, for a course, the term price.
+      // All the money on a pay-per-session activity sits on the attendance
+      // record for each evening — so booking one created a debt with no way to
+      // settle it, and the family area offered no button because there was no
+      // action behind it.
+      //
+      // The same two gates as `pay`, for the same reasons: a confirmed address,
+      // and an approved registration behind the booking. Approval is the "may
+      // come" decision and is made once; this must not quietly become a second
+      // way in.
+      case 'paySession': {
+        const participant = await mustGuard(body.participantId);
+        if (!participant) return json(404, { error: NOT_YOURS });
+        if (!me.emailVerifiedAt) {
+          return json(403, {
+            error: 'Please confirm your email address before paying.',
+            reason: 'email-unverified'
+          });
+        }
+        const activity = await published(body.slug);
+        if (!activity) return json(404, { error: 'No such activity.' });
+        const reg = await store.getRegistration(participant.participantId, activity.activityId);
+        if (!reg || reg.status !== 'approved') {
+          return json(409, { error: 'You need an approved registration for this activity first.',
+                             reason: 'not-approved' });
+        }
+        const att = await attendance.getAttendance(
+          participant.participantId, activity.activityId, body.sessionDate);
+        if (!att) return json(404, { error: 'That evening is not booked.' });
+
+        let session;
+        try {
+          session = await checkout.createSessionCheckout(att, activity.title, lang, me.email);
+        } catch (err) {
+          if (err && err.reason === 'nothing-due') {
+            return json(409, { error: 'There is nothing outstanding on that evening.',
+                               reason: 'nothing-due' });
+          }
+          console.error('account-registrations: Stripe session failed:', err && err.message);
+          return json(502, { error: 'Could not start the payment. Please try again.' });
+        }
+        return json(200, { ok: true, url: session.url });
       }
 
       case 'cancelSession': {

@@ -82,7 +82,15 @@ H.ok(!/amount|cents/i.test((/function createCheckout\(([^)]*)\)/.exec(checkout) 
 H.ok(!/body\.amount|body\.cents|body\.amountCents/.test(pay + checkout),
   'nor is one ever read from a request body');
 H.ok(/if \(!\(due > 0\)\)/.test(pay), 'nothing outstanding is refused rather than charged zero');
-H.ok(/unit_amount: due/.test(checkout), 'and the computed figure is what Stripe is told');
+H.ok(/unit_amount: amountCents/.test(checkout), 'and the computed figure is what Stripe is told');
+// There are two debts now — a term and one evening — and they go through ONE
+// builder, so the currency, the descriptor and the organisation tag cannot
+// drift between them. A drop-in registration owes nothing at all, so without the
+// second wrapper a family could book an evening and had no way to settle it.
+H.eq((checkout.match(/checkout\.sessions\.create/g) || []).length, 1,
+  'through one builder, however many kinds of debt call it');
+H.ok(/ogen_kind: 'session'/.test(checkout) && /session_date: att\.sessionDate/.test(checkout),
+  'and an evening carries its DATE, so the webhook settles the right blob');
 
 console.log('\n[the session is tagged so a shared account can tell it apart]');
 H.ok(/metadata: S\.meta\(/.test(checkout), 'metadata goes through S.meta, which always stamps the organisation');

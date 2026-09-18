@@ -107,6 +107,11 @@
       registerTitle: 'הרשמה לפעילות', registerWho: 'מי נרשם/ת?',
       registerGroup: 'קבוצה', registerGo: 'הרשמה',
       registerFull: 'הפעילות מלאה.',
+      perSessionIntro: 'ההרשמה כאן היא לפעילות. את המפגשים בוחרים אחד־אחד, ומשלמים על כל מפגש בנפרד.',
+      nextSessions: 'המפגשים הקרובים:',
+      registerDoneDropin: 'נרשמתם לפעילות. עכשיו אפשר לבחור מפגשים.',
+      chooseSessions: 'בחירת מפגשים ותשלום',
+      paySession: 'תשלום על המפגש', payingSession: 'פותח תשלום…',
       registerDone: 'ההרשמה בוצעה. קישור לתשלום יישלח אליכם בקרוב.',
       owes: 'לתשלום', paid: 'שולם', feeIncluded: 'כולל דמי הרשמה שנתיים',
       feeAlready: 'דמי ההרשמה השנתיים כבר שולמו',
@@ -185,6 +190,11 @@
       registerTitle: 'Register for an activity', registerWho: 'Who is registering?',
       registerGroup: 'Group', registerGo: 'Register',
       registerFull: 'This activity is full.',
+      perSessionIntro: 'Registering here joins the activity. You then choose evenings one at a time and pay for each one.',
+      nextSessions: 'Next sessions:',
+      registerDoneDropin: 'You have joined the activity. You can choose evenings now.',
+      chooseSessions: 'Choose evenings and pay',
+      paySession: 'Pay for this evening', payingSession: 'Opening payment…',
       registerDone: 'Registered. We will send you a payment link shortly.',
       owes: 'To pay', paid: 'Paid', feeIncluded: 'includes the yearly registration fee',
       feeAlready: 'yearly registration fee already paid',
@@ -263,6 +273,11 @@
       registerTitle: 'Запись на занятие', registerWho: 'Кто записывается?',
       registerGroup: 'Группа', registerGo: 'Записаться',
       registerFull: 'Свободных мест нет.',
+      perSessionIntro: 'Здесь вы записываетесь на занятие. Даты выбираются по одной, и каждая оплачивается отдельно.',
+      nextSessions: 'Ближайшие даты:',
+      registerDoneDropin: 'Вы записаны на занятие. Теперь можно выбрать даты.',
+      chooseSessions: 'Выбрать даты и оплатить',
+      paySession: 'Оплатить это занятие', payingSession: 'Открываем оплату…',
       registerDone: 'Запись оформлена. Ссылку на оплату мы пришлём в ближайшее время.',
       owes: 'К оплате', paid: 'Оплачено', feeIncluded: 'включая годовой регистрационный взнос',
       feeAlready: 'годовой регистрационный взнос уже оплачен',
@@ -712,8 +727,26 @@
           // needed to see — that the child is registered and a payment link is
           // coming — was on screen for the length of one repaint.
           clear(where);
+          // ⚠ A DROP-IN OWES NOTHING AT REGISTRATION, so "a payment link is on
+          // its way" is untrue there: owedCentsFor() bills the yearly fee and,
+          // for a COURSE, the term price. The money on a pay-per-session
+          // activity lives on each evening. What follows registering is
+          // therefore not a payment — it is choosing a date — and the panel says
+          // that and offers the way through.
+          // From the ACTIVITY this panel was drawn for, not from the saved
+          // record: `type` on a registration lives inside the frozen block, and
+          // reading it off the top level would be undefined — always false, and
+          // silently the course wording on every drop-in.
+          var perSession = !!a.perSession;
           where.appendChild(section(null, [
-            el('p', { class: 'acc-notice is-ok', text: T.registerDone })
+            el('p', { class: 'acc-notice is-ok',
+                      text: perSession ? T.registerDoneDropin : T.registerDone }),
+            perSession
+              ? el('p', {}, [el('a', { class: 'acc-link',
+                  href: url('/account/activity', 'p=' + encodeURIComponent(who.value) +
+                                                 '&a=' + encodeURIComponent(a.activityId)),
+                  text: T.chooseSessions })])
+              : null
           ]));
           if (onDone) onDone();
         });
@@ -723,11 +756,28 @@
         go
       ]);
 
-      // A COUNT, never a list. How many places are left is public-ish; who is in
-      // them is not.
-      var left = a.left == null ? T.unlimited : a.left + ' ' + T.places;
+      // ⚠ A DROP-IN IS NOT A TERM, AND THE PANEL USED TO PRETEND IT WAS.
+      //
+      // The server has always answered `perSession: true` with a null capacity,
+      // and nothing here read it — so registering for a pay-per-session activity
+      // showed a places-left line for a term nobody buys, and said nothing at
+      // all about evenings. A family could not tell which session they were
+      // signing up to, because the answer is "none of them": this is the
+      // may-come decision, and the evenings are chosen one at a time afterwards.
+      //
+      // So the count is replaced by what actually happens next, and the first
+      // dates are named. A count of places on an activity that is counted per
+      // EVENING would be a number about nothing.
+      var left = a.perSession
+        ? T.perSessionIntro
+        : (a.left == null ? T.unlimited : a.left + ' ' + T.places);
+      var upcoming = a.perSession && (a.nextDates || []).length
+        ? el('p', { class: 'acc-note', text: T.nextSessions + ' ' +
+                    a.nextDates.slice(0, 3).map(longDate).join(' · ') })
+        : null;
       where.appendChild(section(T.registerTitle + ' · ' + pick(a.title), [
         el('p', { class: 'acc-intro', text: left }),
+        upcoming,
         people.length
           ? form
           : el('p', { class: 'acc-intro' }, [
@@ -1344,7 +1394,35 @@
   // decided that before this button was drawn.
   function eveningAction(s, data, r, act, redraw) {
     if (s.status === 'booked') {
-      return el('button', { type: 'button', class: 'acc-link is-danger', text: T.cancelSession,
+      // ⚠ AN EVENING THAT IS BOOKED AND UNPAID HAD NO WAY TO BE PAID.
+      //
+      // `pay` reads a registration, and a drop-in registration owes nothing —
+      // all of the money on a pay-per-session activity sits on the evening. So a
+      // family could book one, be shown what it costs, and find nothing to press.
+      // Pay comes FIRST here: giving the place back is the destructive option
+      // and should not be the only thing offered beside a debt.
+      var owing = (s.owedCents || 0) - (s.paidCents || 0);
+      var acts = [];
+      if (owing > 0 && S.account && S.account.emailVerifiedAt) {
+        var payBtn = el('button', { type: 'button', class: 'acc-link', text: T.paySession,
+          onclick: function () {
+            payBtn.disabled = true;
+            payBtn.textContent = T.payingSession;
+            post(REGS, { action: 'paySession', participantId: r.participantId,
+                         slug: act.slug, sessionDate: s.date }).then(function (res) {
+              // Checkout is a redirect, not a fetch. On failure the control has
+              // to come back, or a transient error leaves a dead button.
+              if (res.ok && res.data && res.data.url) { location.href = res.data.url; return; }
+              payBtn.disabled = false;
+              payBtn.textContent = T.paySession;
+              say('err', failure(res));
+            });
+          } });
+        acts.push(payBtn);
+      } else if (owing > 0) {
+        acts.push(el('span', { class: 'acc-meta', text: T.payNeedsVerify }));
+      }
+      acts.push(el('button', { type: 'button', class: 'acc-link is-danger', text: T.cancelSession,
         onclick: function () {
           if (!window.confirm(T.cancelSessionConfirm)) return;
           post(REGS, { action: 'cancelSession', participantId: r.participantId,
@@ -1352,7 +1430,8 @@
             if (!c.ok) return say('err', failure(c));
             redraw();
           });
-        } });
+        } }));
+      return el('div', { class: 'acc-evening-acts' }, acts);
     }
     if (s.status === 'attended' || s.status === 'no-show') return null;
     if (!data.mayBook || s.full) return null;

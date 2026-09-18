@@ -35,6 +35,7 @@
 
 const S = require('./_stripe');
 const store = require('./_registration-store');
+const attendance = require('./_session-attendance');
 const R = require('./_registration');
 const accounts = require('./_account-store');
 const mail = require('./_registration-email');
@@ -84,9 +85,53 @@ exports.handler = async (event) => {
   return json(200, { received: true });
 };
 
+// One evening, on its own record. Deliberately a sibling of settle() rather
+// than a branch inside it: the two read different blobs, write different
+// vocabularies of the same field names, and the one thing they must share — the
+// part-payment rule — is short enough to state twice and is pinned by a test.
+async function settleSession(session, meta) {
+  const att = await attendance.getAttendance(meta.participant_id, meta.activity_id, meta.session_date);
+  if (!att) {
+    console.error('stripe-webhook: no booking for', meta.participant_id, meta.session_date, session.id);
+    return;
+  }
+  const settled = (att.payment && att.payment.settledSessions) || [];
+  if (settled.indexOf(session.id) !== -1) return;          // already counted
+
+  // Stripe's figure, not ours.
+  const cents = Math.round(Number(session.amount_total) || 0);
+  if (!(cents > 0)) {
+    console.error('stripe-webhook: session with no amount:', session.id);
+    return;
+  }
+
+  const paid = (att.payment.paidCents || 0) + cents;
+  const next = attendance.transition(att, {
+    status: att.status, by: 'stripe', note: 'paid ' + cents + 'c · ' + session.id
+  });
+  next.payment = Object.assign({}, next.payment, {
+    paidCents: paid,
+    paidAt: new Date().toISOString(),
+    status: next.payment.owedCents != null && paid >= next.payment.owedCents ? 'paid' : 'owed',
+    settledSessions: settled.concat([session.id]),
+    stripeSessionId: session.id
+  });
+  await attendance.saveAttendance(next);
+}
+
 async function settle(session) {
   // THE ORGANISATION CHECK, FIRST AND UNCONDITIONALLY.
   if (!S.isOurs(session)) return;
+
+  // ⚠ WHICH KIND OF DEBT THIS SETTLES, decided before anything is read.
+  //
+  // A pay-per-session activity charges per evening, on its own attendance blob,
+  // and those payments carry `ogen_kind: 'session'` with the date. Settling one
+  // against the REGISTRATION would credit a term that owes nothing and leave the
+  // evening unpaid — money in the right account against the wrong debt, which is
+  // worse than money nobody can place, because nobody goes looking for it.
+  const meta = (session && session.metadata) || {};
+  if (meta.ogen_kind === 'session') return settleSession(session, meta);
 
   const ref = S.registrationRef(session);
   if (!ref) {
