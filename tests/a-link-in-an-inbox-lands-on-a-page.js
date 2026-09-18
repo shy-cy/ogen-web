@@ -142,7 +142,7 @@ H.ok(pairs >= 18, 'and there were parameters to check (' + pairs + ')');
 // The same link, built a second time in a second file: where Stripe sends a
 // family back when Checkout is done. It is the one URL on the site a person
 // reaches at the exact moment they have parted with money.
-const payHandler = read('netlify/functions/account-registrations.js');
+const payHandler = read('netlify/functions/_checkout.js');
 const back = /\/account\/activity'\s*\n?\s*\+ '\?([a-z]+)=[\s\S]{0,120}?\+ '&([a-z]+)=/.exec(payHandler);
 H.ok(back, "Stripe's return URL is built where it is expected to be");
 if (back) {

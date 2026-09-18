@@ -26,8 +26,7 @@ const credit = require('./_credit');
 const ledger = require('./_credit-ledger');
 const { cancelAndCredit } = require('./_registration-cancel');
 const attendance = require('./_session-attendance');
-const S = require('./_stripe');
-const { SITE } = require('./_email-shell');
+const checkout = require('./_checkout');
 const facts = require('./_activity-facts');
 const { LABELS } = require('./_activity-template');
 
@@ -511,64 +510,20 @@ exports.handler = async (event) => {
           });
         }
 
-        const owed = (reg.payment && reg.payment.owedCents) || 0;
-        const paid = (reg.payment && reg.payment.paidCents) || 0;
-        const due = owed - paid;
+        // ONE BUILDER, TWO DOORS. The emailed pay link charges the same
+        // registration with no session at all, so the session itself — the
+        // amount, the currency, the metadata, the descriptor, the return URL —
+        // is built in _checkout.js and nowhere else. Two copies would be two
+        // copies that can drift, and the way that drift surfaces is a family
+        // charged a figure nobody on this side can explain.
+        const due = checkout.dueCents(reg);
         if (!(due > 0)) {
           return json(409, { error: 'There is nothing outstanding on this registration.', reason: 'nothing-due' });
         }
 
-        // The FROZEN title, not the activity's current one: a rename must not
-        // change what a family sees on the payment they are making.
-        const title = (reg.frozen && facts.pick(reg.frozen.activityTitle, lang)) || 'Ogen';
-        const base = lang === 'he' ? '' : '/' + lang;
-        // `p` and `a` — the spelling the PAGE reads. Spelled out in full this
-        // returned a family who had just paid to "that registration was not
-        // found", which is the worst moment on the site to be told that.
-        const back = SITE + base + '/account/activity'
-          + '?p=' + encodeURIComponent(reg.participantId)
-          + '&a=' + encodeURIComponent(reg.activityId) + '#pay';
-
         let session;
         try {
-          session = await S.stripe().checkout.sessions.create({
-            mode: 'payment',
-            customer_email: me.email,
-            // Stripe Checkout has no Hebrew; 'auto' falls back to English.
-            locale: lang === 'en' ? 'en' : 'auto',
-            line_items: [{
-              quantity: 1,
-              price_data: {
-                currency: 'eur',
-                unit_amount: due,
-                product_data: {
-                  name: title,
-                  description: (reg.frozen && reg.frozen.participantName) || undefined
-                }
-              }
-            }],
-            success_url: back + '&paid=1',
-            cancel_url: back,
-            // Tagged on the SESSION and mirrored onto the PaymentIntent. The
-            // account is shared with another organisation, so an untagged
-            // object is indistinguishable from theirs — and a session-only tag
-            // is invisible on the PaymentIntent a dispute arrives attached to.
-            metadata: S.meta({
-              ogen_kind: 'registration',
-              participant_id: reg.participantId,
-              activity_id: reg.activityId,
-              registration: 'reg-' + reg.participantId + '__' + reg.activityId,
-              activity_slug: reg.frozen && reg.frozen.activitySlugAtSubmission
-            }),
-            payment_intent_data: {
-              statement_descriptor_suffix: S.STATEMENT_DESCRIPTOR_SUFFIX,
-              metadata: S.meta({
-                ogen_kind: 'registration',
-                participant_id: reg.participantId,
-                activity_id: reg.activityId
-              })
-            }
-          });
+          session = await checkout.createCheckout(reg, lang, me.email);
         } catch (err) {
           console.error('account-registrations: Stripe session failed:', err && err.message);
           return json(502, { error: 'Could not start the payment. Please try again.' });

@@ -111,6 +111,10 @@
       owes: 'לתשלום', paid: 'שולם', feeIncluded: 'כולל דמי הרשמה שנתיים',
       feeAlready: 'דמי ההרשמה השנתיים כבר שולמו',
       places: 'מקומות פנויים', unlimited: 'ללא הגבלה',
+      payLink: { expired: 'קישור התשלום פג או כבר אינו בתוקף. אפשר להתחבר ולשלם כאן.',
+                 'not-approved': 'לא ניתן לשלם על ההרשמה הזו כרגע.',
+                 'nothing-due': 'אין יתרה לתשלום בהרשמה הזו.',
+                 failed: 'לא הצלחנו לפתוח את דף התשלום. נסו שוב.' },
       loading: 'טוען…', problem: 'משהו השתבש. נסו שוב.',
       offline: 'אין חיבור לשרת. נסו שוב בעוד רגע.',
       status: { pending: 'רשום/ה', approved: 'רשום/ה', rejected: 'לא אושר',
@@ -185,6 +189,10 @@
       owes: 'To pay', paid: 'Paid', feeIncluded: 'includes the yearly registration fee',
       feeAlready: 'yearly registration fee already paid',
       places: 'places left', unlimited: 'no limit',
+      payLink: { expired: 'That payment link has expired or is no longer valid. You can sign in and pay here.',
+                 'not-approved': 'This registration cannot be paid for at the moment.',
+                 'nothing-due': 'There is nothing outstanding on this registration.',
+                 failed: 'We could not open the payment page. Please try again.' },
       loading: 'Loading…', problem: 'Something went wrong. Please try again.',
       offline: 'Could not reach the server. Try again in a moment.',
       status: { pending: 'Registered', approved: 'Registered', rejected: 'Not offered',
@@ -259,6 +267,10 @@
       owes: 'К оплате', paid: 'Оплачено', feeIncluded: 'включая годовой регистрационный взнос',
       feeAlready: 'годовой регистрационный взнос уже оплачен',
       places: 'свободных мест', unlimited: 'без ограничения',
+      payLink: { expired: 'Ссылка на оплату истекла или больше не действует. Вы можете войти и оплатить здесь.',
+                 'not-approved': 'Эту запись сейчас нельзя оплатить.',
+                 'nothing-due': 'По этой записи нет задолженности.',
+                 failed: 'Не удалось открыть страницу оплаты. Попробуйте ещё раз.' },
       loading: 'Загрузка…', problem: 'Что-то пошло не так. Попробуйте ещё раз.',
       offline: 'Не удалось связаться с сервером. Попробуйте через минуту.',
       status: { pending: 'Записан(а)', approved: 'Записан(а)', rejected: 'Не предложено',
@@ -349,6 +361,22 @@
     notice.appendChild(el('p', { class: 'acc-notice is-' + kind, text: text }));
     if (kind === 'ok') window.setTimeout(function () { if (notice) clear(notice); }, 5000);
   }
+  // WHY A PAYMENT LINK DID NOT OPEN STRIPE.
+  //
+  // /pay answers a 302 and never a body, so a refusal has nowhere to put its
+  // own words — it lands here instead, with a reason in the query, and this is
+  // where the reason becomes a sentence. Every one of them is recoverable by
+  // signing in, which is why the page underneath is the family's own and not an
+  // error screen: an expired link is a slower route to the same payment, not a
+  // dead end.
+  function payLinkNotice() {
+    var reason = param('pay');
+    if (!reason) return;
+    var table = T.payLink || {};
+    // 'nothing-due' is the one that is good news — somebody already paid.
+    say(reason === 'nothing-due' ? 'ok' : 'warn', table[reason] || T.problem);
+  }
+
   // One place decides what a failed call says. A network failure and a refusal
   // are different things and a family should not be told "something went wrong"
   // when the truth is "you are offline".
@@ -1077,6 +1105,7 @@
     mount.appendChild(head(T.activitiesTitle, backLink(url('/account'))));
     mount.appendChild(notice);
     mount.appendChild(body);
+    payLinkNotice();
     if (!p || !a) return body.appendChild(section(null,
       [el('p', { class: 'acc-notice is-err', text: T.regNotFound })]));
 
@@ -1436,6 +1465,7 @@
     if (view === 'reset') return renderReset();
     if (view === 'invite') return renderInvite();
 
+    if (view !== 'activity') payLinkNotice();
     if (!window.MemberSession.token()) return renderSignedOut(body, {});
     post(AUTH, { action: 'me' }).then(function (res) {
       if (!res.ok) return renderSignedOut(body, {});

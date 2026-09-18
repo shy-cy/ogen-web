@@ -96,5 +96,11 @@ function registrationRef(obj) {
 
 module.exports = {
   ORGANIZATION, STATEMENT_DESCRIPTOR_SUFFIX,
-  stripe, meta, isOurs, registrationRef
+  stripe, meta, isOurs, registrationRef,
+  // A test seam, the same one _email.js carries and for the same reason: the
+  // code that decides what a family is CHARGED should be runnable without a
+  // network and without a key. Static analysis can assert that a descriptor
+  // suffix is set; only executing it catches an endpoint that builds a session
+  // for the wrong registration.
+  _internal: { setClient: (c) => { cached = c; } }
 };

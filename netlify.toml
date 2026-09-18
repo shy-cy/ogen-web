@@ -151,10 +151,32 @@
   [headers.values]
     Cache-Control = "no-cache"
 
+# ⚠ THE PAYMENT LINK MUST NEVER BE CACHED BY ANYTHING.
+#
+# /* above carries s-maxage=60 so a shared cache may serve a minute of repeat
+# HTML traffic itself. Applied to /pay that is a serious bug rather than a
+# saving: the response is a 302 to a ONE-TIME Stripe Checkout URL minted for one
+# family, and a shared cache holding it for sixty seconds would hand the next
+# reader of the next payment email somebody else's session. The function sets
+# no-store itself; this makes sure nothing here quietly puts s-maxage back.
+[[headers]]
+  for = "/pay"
+  [headers.values]
+    Cache-Control = "no-store, max-age=0"
+    X-Robots-Tag = "noindex, nofollow"
+
 # Friendly function routes. Must come BEFORE the catch-all 404 rule.
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
+  status = 200
+
+# The emailed payment link. A short path because it is a URL a person sees, and
+# a rewrite rather than a redirect so the function's own 302 — to Stripe, or to
+# a page that explains why not — is what the reader follows.
+[[redirects]]
+  from = "/pay"
+  to = "/.netlify/functions/pay-link"
   status = 200
 
 # Admin pages are static files; the gate is on the API, not the route.

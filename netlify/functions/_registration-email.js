@@ -20,7 +20,7 @@
 // whether or not the message about it goes.
 
 const email = require('./_email');
-const { lang, pathFor, esc, strip, shell } = require('./_email-shell');
+const { lang, pathFor, esc, strip, shell, SITE } = require('./_email-shell');
 const { pick } = require('./_activity-facts');
 
 const titleOf = (reg, l) => pick(((reg && reg.frozen) || {}).activityTitle, l) || '';
@@ -118,21 +118,27 @@ const APPROVED = {
     heading: 'ההרשמה אושרה',
     body: (child, act) => `${child} רשום/ה ל${act}. נשמח לראותכם.`,
     next: 'מועדי המפגשים והתשלום נמצאים בעמוד ההרשמה. אם משהו לא מתאים, כתבו לנו.',
-    button: 'לתשלום ולפרטים'
+    button: 'לתשלום ולפרטים',
+    pay: 'אפשר לשלם כאן, בלי להתחבר. מועדי המפגשים נמצאים בעמוד ההרשמה.',
+    payButton: 'לתשלום'
   },
   en: {
     subject: (child, act) => `${child}'s place in ${act} is confirmed`,
     heading: 'The registration is confirmed',
     body: (child, act) => `${child} has a place in ${act}. We look forward to seeing you.`,
     next: 'The session dates and the payment are on your registration page. If anything does not fit, write to us.',
-    button: 'Pay and see the details'
+    button: 'Pay and see the details',
+    pay: 'You can pay here, without signing in. The session dates are on your registration page.',
+    payButton: 'Pay now'
   },
   ru: {
     subject: (child, act) => `Запись ${child} подтверждена · ${act}`,
     heading: 'Запись подтверждена',
     body: (child, act) => `${child} записан(а) на ${act}. Будем рады видеть вас.`,
     next: 'Даты занятий и оплата — на странице записи. Если что-то не подходит, напишите нам.',
-    button: 'Оплата и подробности'
+    button: 'Оплата и подробности',
+    pay: 'Оплатить можно здесь, без входа в учётную запись. Даты занятий — на странице записи.',
+    payButton: 'Оплатить'
   }
 };
 
@@ -218,13 +224,25 @@ function receivedMessage(reg, account) {
   return { to: account.email, subject: T.subject(child, act), html: html, text: strip(html) };
 }
 
-function approvedMessage(reg, account) {
+// ⚠ THE BUILDERS STAY PURE, AND THE SENDERS DO THE MINTING.
+//
+// A pay link is a row in a Blobs store, so building one inside a message would
+// make every one of these functions open a store — and they are the part of
+// this file a test can run with no infrastructure at all, in three languages,
+// in a loop. `payUrl` is therefore a parameter: absent, the button points at
+// the family's own registration page and the message is exactly what it was.
+//
+// That absence is also the failure mode. Minting is best effort inside
+// settle(), so a Blobs outage costs a family one password rather than the
+// email itself.
+function approvedMessage(reg, account, payUrl) {
   const l = lang(((account || {}).profile || {}).preferredLanguage);
   const T = APPROVED[l];
   const child = childOf(reg), act = titleOf(reg, l);
   const html = shell(l, T.heading,
-    [esc(T.body(child, act)), esc(T.next)],
-    { href: registrationHref(reg, l), label: T.button });
+    [esc(T.body(child, act)), esc(payUrl ? T.pay : T.next)],
+    payUrl ? { href: payUrl, label: T.payButton }
+           : { href: registrationHref(reg, l), label: T.button });
   return { to: account.email, subject: T.subject(child, act), html: html, text: strip(html) };
 }
 
@@ -273,7 +291,8 @@ const PAID = {
     body: (child, act, amount) => `קיבלנו ${amount} עבור ${child} ב${act}. תודה.`,
     settled: 'התשלום הושלם במלואו.',
     remaining: (amount) => `נותר לתשלום: ${amount}.`,
-    button: 'לעמוד ההרשמה'
+    button: 'לעמוד ההרשמה',
+    payButton: 'לתשלום היתרה'
   },
   en: {
     subject: (act) => `Payment received · ${act}`,
@@ -281,7 +300,8 @@ const PAID = {
     body: (child, act, amount) => `We have received ${amount} for ${child} in ${act}. Thank you.`,
     settled: 'This registration is now paid in full.',
     remaining: (amount) => `Still to pay: ${amount}.`,
-    button: 'Go to the registration'
+    button: 'Go to the registration',
+    payButton: 'Pay the balance'
   },
   ru: {
     subject: (act) => `Платёж получен · ${act}`,
@@ -289,21 +309,28 @@ const PAID = {
     body: (child, act, amount) => `Мы получили ${amount} за ${child} — ${act}. Спасибо.`,
     settled: 'Оплата внесена полностью.',
     remaining: (amount) => `Осталось оплатить: ${amount}.`,
-    button: 'Страница записи'
+    button: 'Страница записи',
+    payButton: 'Оплатить остаток'
   }
 };
 
 // The same shape as js/member-account.js's money(), deliberately.
 const money = (cents) => '\u20AC' + (Math.round(Number(cents) || 0) / 100).toFixed(2);
 
-function paidMessage(reg, account, paidCents, outstandingCents) {
+// The pay link is offered only when a BALANCE REMAINS, and that condition is
+// the amount rather than the caller's intention — a receipt for a settled
+// registration carrying a "pay the balance" button would be asking for money
+// that is not owed.
+function paidMessage(reg, account, paidCents, outstandingCents, payUrl) {
   const l = lang(((account || {}).profile || {}).preferredLanguage);
   const T = PAID[l];
   const child = childOf(reg), act = titleOf(reg, l);
-  const tail = outstandingCents > 0 ? T.remaining(money(outstandingCents)) : T.settled;
-  const html = shell(l, T.heading,
-    [esc(T.body(child, act, money(paidCents))), esc(tail)],
-    { href: registrationHref(reg, l), label: T.button });
+  const owing = outstandingCents > 0;
+  const tail = owing ? T.remaining(money(outstandingCents)) : T.settled;
+  const cta = (owing && payUrl)
+    ? { href: payUrl, label: T.payButton }
+    : { href: registrationHref(reg, l), label: T.button };
+  const html = shell(l, T.heading, [esc(T.body(child, act, money(paidCents))), esc(tail)], cta);
   return { to: account.email, subject: T.subject(act), html: html, text: strip(html) };
 }
 
@@ -314,9 +341,25 @@ const sendReceived = (reg, account) =>
     email.send(receivedMessage(reg, account),
       { template: 'registration-received', lang: langOf(account) }));
 
+// MINTED HERE, INSIDE settle(). The link is a row in a Blobs store and the
+// message is not — so the store is opened by the sender, never by the builder,
+// and a failure to open it costs the family one password rather than the email.
+// `payUrl` stays null on that path and the button falls back to the
+// registration page, which is where it pointed before any of this existed.
+async function payUrlFor(reg, account) {
+  try {
+    const l = langOf(account);
+    const link = await require('./_pay-link').createPayLink(reg, l);
+    return SITE + '/pay?t=' + encodeURIComponent(link.token) + '&l=' + l;
+  } catch (err) {
+    console.warn('[registration-email] pay link not minted: ' + (err && err.message));
+    return null;
+  }
+}
+
 const sendApproved = (reg, account) =>
-  email.settle('registration-approved', account.email, () =>
-    email.send(approvedMessage(reg, account),
+  email.settle('registration-approved', account.email, async () =>
+    email.send(approvedMessage(reg, account, await payUrlFor(reg, account)),
       { template: 'registration-approved', lang: langOf(account) }));
 
 const sendRejected = (reg, account) =>
@@ -330,11 +373,13 @@ const sendExpired = (reg, account) =>
       { template: 'registration-expired', lang: langOf(account) }));
 
 const sendPaid = (reg, account, paidCents, outstandingCents) =>
-  email.settle('registration-paid', account.email, () =>
-    email.send(paidMessage(reg, account, paidCents, outstandingCents),
+  email.settle('registration-paid', account.email, async () =>
+    email.send(paidMessage(reg, account, paidCents, outstandingCents,
+                           outstandingCents > 0 ? await payUrlFor(reg, account) : null),
       { template: 'registration-paid', lang: langOf(account) }));
 
 module.exports = {
+  payUrlFor,
   sendReceived, sendApproved, sendRejected, sendExpired,
   receivedMessage, approvedMessage, rejectedMessage, expiredMessage,
   RECEIVED, APPROVED, REJECTED, EXPIRED,

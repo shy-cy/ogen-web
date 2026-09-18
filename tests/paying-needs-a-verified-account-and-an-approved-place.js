@@ -67,26 +67,44 @@ H.ok(pay.indexOf('emailVerifiedAt') < pay.indexOf("!== 'approved'"),
   'the cheap check runs before the store read');
 
 console.log('\n[the amount is ours, not the browser\'s]');
-H.ok(/const due = owed - paid;/.test(pay), 'due = owedCents - paidCents, computed here');
-H.ok(!/body\.amount|body\.cents|body\.amountCents/.test(pay),
-  'and no amount is ever read from the request body');
+// ⚠ AND IT IS BUILT IN ONE PLACE. There are two doors to this payment now — the
+// button on the family's own page and an emailed link that needs no password —
+// and they must charge the same amount against the same metadata with the same
+// descriptor. Two copies would be two copies that can drift, and that drift
+// surfaces as a family charged a figure nobody on this side can explain. So the
+// assertions below read _checkout.js, and the last one in this block is that
+// nothing else builds a session at all.
+const checkout = fs.readFileSync(path.join(R, 'netlify/functions/_checkout.js'), 'utf8');
+H.ok(/\(p\.owedCents \|\| 0\) - \(p\.paidCents \|\| 0\)/.test(checkout),
+  'due = owedCents - paidCents, computed from the record');
+H.ok(!/amount|cents/i.test((/function createCheckout\(([^)]*)\)/.exec(checkout) || [, ''])[1]),
+  'and no amount is a parameter — this is reachable from an endpoint with no session');
+H.ok(!/body\.amount|body\.cents|body\.amountCents/.test(pay + checkout),
+  'nor is one ever read from a request body');
 H.ok(/if \(!\(due > 0\)\)/.test(pay), 'nothing outstanding is refused rather than charged zero');
-H.ok(/unit_amount: due/.test(pay), 'and the computed figure is what Stripe is told');
+H.ok(/unit_amount: due/.test(checkout), 'and the computed figure is what Stripe is told');
 
 console.log('\n[the session is tagged so a shared account can tell it apart]');
-H.ok(/metadata: S\.meta\(/.test(pay), 'metadata goes through S.meta, which always stamps the organisation');
-H.eq((pay.match(/S\.meta\(/g) || []).length, 2,
+H.ok(/metadata: S\.meta\(/.test(checkout), 'metadata goes through S.meta, which always stamps the organisation');
+H.eq((checkout.match(/S\.meta\(/g) || []).length, 2,
   'twice: on the session AND on payment_intent_data — a session-only tag is ' +
   'invisible on the PaymentIntent a dispute arrives attached to');
-H.ok(/statement_descriptor_suffix: S\.STATEMENT_DESCRIPTOR_SUFFIX/.test(pay),
+H.ok(/statement_descriptor_suffix: S\.STATEMENT_DESCRIPTOR_SUFFIX/.test(checkout),
   'and the descriptor suffix is set, or the charge reads as the other organisation');
-H.ok(/participant_id: reg\.participantId/.test(pay) && /activity_id: reg\.activityId/.test(pay),
+H.ok(/participant_id: reg\.participantId/.test(checkout) && /activity_id: reg\.activityId/.test(checkout),
   'the join keys travel with it, so the webhook need not guess');
 
 console.log('\n[the frozen title is what the payer sees]');
-H.ok(/reg\.frozen && facts\.pick\(reg\.frozen\.activityTitle, lang\)/.test(pay),
+H.ok(/reg\.frozen && facts\.pick\(reg\.frozen\.activityTitle, lang\)/.test(checkout),
   'the FROZEN title, not the activity\'s current one — a rename must not change ' +
   'what a family sees on the payment they are making');
+
+console.log('\n[and exactly one file builds a checkout session]');
+const fnDir = path.join(R, 'netlify/functions');
+const builders = fs.readdirSync(fnDir).filter((f) => f.endsWith('.js')).filter((f) =>
+  /checkout\.sessions\.create/.test(fs.readFileSync(path.join(fnDir, f), 'utf8')));
+H.eq(builders.join(','), '_checkout.js',
+  'one, and it is the shared builder — a second would be a second amount to keep in step');
 
 console.log('\n[a Stripe failure is a 502, not a crash]');
 H.ok(/catch \(err\)[\s\S]{0,200}json\(502/.test(pay), 'a failed session creation answers 502');

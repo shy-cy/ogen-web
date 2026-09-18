@@ -2447,6 +2447,92 @@ places-left count on the register panel, from an authenticated call; the *static
 page still says nothing, and `isPubliclyVisible()` keeps its exact current
 meaning and its only caller.
 
+## The emailed payment link
+
+`/pay?t=<token>` — a link in a payment email that opens Stripe Checkout with no
+sign-in. It was asked for as *"can we auto-login the client via this link and
+send him to the payment page"*, and the honest version of that — a magic link
+minting a session — was refused.
+
+```
+netlify/functions/
+  _checkout.js    the ONE Stripe Checkout session; both doors call it; no store
+  _pay-link.js    ogen-pay-links; pay-<token>; arms the legal gate
+  pay-link.js     /pay — the only endpoint here that acts with no session at all
+```
+
+**A magic link hands whoever opens a forwarded message the whole family
+record** — children's names, dates of birth, medical notes, the members-only
+address. Family inboxes get forwarded. This project already refuses that shape
+once, in the guardian invitation, which is bound to the address it was sent to
+for exactly that reason. **This link hands them a bill instead.**
+
+What holding one lets you do, in full: start a Checkout for the amount
+outstanding on one approved registration. **It never returns a body** — the only
+successful answer is a 302 to Stripe, and every refusal is a 302 to a page that
+asks for a password — so trying tokens can never read a name, a date of birth or
+a balance.
+
+**Its own Blobs store, and that is the security argument.** The obvious
+implementation is `createToken('pay', …)` in `_member-session.js`: same shape,
+same TTL machinery, no new file. It is refused for the reason the admin and
+member *session* stores are refused a merge — a token filed beside the
+password-reset tokens is one forgotten `purpose` argument away from being
+redeemable as one, and `consumeToken(token)` takes that argument **optionally**.
+A store that does not contain the key cannot be talked into honouring it.
+
+**The two gates are still both satisfied.** The registration must be `approved`,
+re-read from the record on every redemption rather than trusted from the token —
+so an old email cannot charge for a place since cancelled, and a part payment
+opens a session for what is *left*, not for the figure that was outstanding when
+the message went out. The verified-address gate is satisfied **by construction
+and by something stronger**: the token was mailed to that address and nowhere
+else, so following it is itself proof of reading that inbox, which is all
+`emailVerifiedAt` ever attested. It is deliberately **not** treated as a
+verification — confirming an address is a separate act with separate
+consequences, and a payment must not quietly perform one.
+
+**Not single use**, the one place it parts company with the reset and verify
+tokens. Those grant something once; this names a debt, and a debt can
+legitimately be looked at twice — a family interrupted halfway through Checkout,
+or paying a balance a week later, must not find the link dead. It stops working
+when the debt does. Thirty days, matching a guardian invitation rather than a
+password reset: a reset is minutes of work by somebody at a screen, a payment
+waits on a household and a payday.
+
+**Minted per message, not per registration**, so a re-send does not kill the copy
+already in an inbox. Several live tokens for one registration is harmless — each
+is scoped to the same single debt, and the debt decides.
+
+**The senders mint; the builders stay pure.** `approvedMessage()` and
+`paidMessage()` take the URL as a parameter, so the message table is still
+runnable in three languages with no store. Minting happens inside `settle()`, so
+a Blobs outage costs a family one password rather than the email itself — the
+button falls back to the registration page. The receipt offers it only when a
+**balance remains**, decided by the amount rather than by the caller: a settled
+receipt carrying "pay the balance" asks for money that is not owed.
+
+⚠ **`_checkout.js` exists because there are now two doors to one payment.** The
+button on the family's page and the emailed link must charge the same amount in
+the same currency against the same metadata with the same descriptor. Two copies
+would drift, and that drift surfaces as a family charged a figure nobody here can
+explain. The amount is computed **inside** it, from the record, and is never a
+parameter — this is reachable from an endpoint with no session, so an amount that
+can be passed in is an amount somebody can edit. A test asserts exactly one file
+in `netlify/functions` calls `checkout.sessions.create`.
+
+⚠ **`/pay` MUST NEVER BE CACHED.** `/*` carries `s-maxage=60` so a shared cache
+can serve a minute of repeat HTML traffic. Applied here that is not a saving: the
+response is a 302 to a **one-time** Checkout URL minted for one family, and sixty
+seconds of shared cache hands the next reader somebody else's session. The
+function sets `no-store` and `netlify.toml` sets it again for the path, and a
+test pins that the block carries no `s-maxage`.
+
+`_stripe.js` gained `_internal.setClient()`, the same seam `_email.js` has and
+for the same reason: static analysis can assert a descriptor suffix is set, and
+only *executing* the thing catches an endpoint building a session for the wrong
+registration.
+
 ## The approval queue (admin)
 
 `admin/registrations.html` + `js/registrations-admin.js`, against
