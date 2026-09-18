@@ -1,34 +1,36 @@
 // What this defends against:
 //
-// ONE GATE STANDS IN FRONT OF TAKING A FAMILY'S MONEY: the place must be
-// approved. A `pending` registration is a request that may still be refused.
-// Taking money for it means an immediate refund and a family wondering what
-// happened — and on a store with no compare-and-swap, a refund racing a
-// rejection is a bad afternoon. How it reached `approved` does not matter:
-// auto-approval and an admin pressing the button produce the same status, which
-// is the whole point of the status being the single source of truth.
+// TWO GATES STAND IN FRONT OF TAKING A FAMILY'S MONEY, and one of them applies
+// to only half the activities.
 //
-// ⚠ THERE WAS A SECOND GATE — A CONFIRMED EMAIL ADDRESS — AND IT IS GONE. This
-// suite now pins its ABSENCE, because it is the kind of thing somebody
-// reinstates in good faith.
+// 1. THE PLACE MUST BE APPROVED, always. A `pending` registration is a request
+//    that may still be refused. Taking money for it means an immediate refund
+//    and a family wondering what happened — and on a store with no
+//    compare-and-swap, a refund racing a rejection is a bad afternoon. How it
+//    reached `approved` does not matter: auto-approval and an admin pressing the
+//    button produce the same status, which is the whole point of the status
+//    being the single source of truth.
 //
-// It read as a security property and was not one. It never protected anything
-// on the paying direction: this is a person signed into their own account
-// settling their own bill, and an unverified address grants them nothing extra.
-// What it was stated to buy — that messages about money reach an address
-// somebody has proved is theirs — was already untrue, because the registration
-// confirmation goes to that same unverified address minutes earlier. And it was
-// already bypassable BY DESIGN: /pay is a link we ourselves email, deliberately
-// exempt, on the reasoning that reading the inbox is what verification ever
-// attested. A gate with a door we post through is not a gate.
+// 2. A COURSE NEEDS A CONFIRMED ADDRESS; A DROP-IN DOES NOT.
 //
-// What it did cost was the only flow that ever hit it: sign up, register, pay,
-// in one sitting — which is exactly the shape of a pay-per-session activity,
-// where the whole decision is "we will come on Tuesday".
+// ⚠ THAT SPLIT IS THE PART THIS SUITE EXISTS FOR, because it has been wrong in
+// both directions inside a week.
 //
-// Verification still exists, is still asked for, and is still shown on the
-// dashboard. It is simply not what stands between a family and paying us, and
-// the assertions below check both halves of that.
+// It was on everything first. `emailVerifiedAt` had been stored since Phase 2,
+// shown as a banner since Phase 6 and enforced by nothing, and payment was where
+// it was finally enforced — which turned out to refuse exactly one flow and no
+// others: sign up, register, pay, in one sitting. That is not an edge case on a
+// pay-per-session activity, it is the ONLY case. A walk-up decision made and
+// paid for in a single visit is what a drop-in is.
+//
+// Then it came off everything, which was too far the other way. A term is a
+// considered commitment — hundreds of euros, months of attendance, a place an
+// admin agreed to — and it can carry a minute of friction once, in exchange for
+// a receipt and every later message about that money reaching an address
+// somebody has proved is theirs.
+//
+// So the rule is the activity's shape, it lives in ONE function, and the
+// assertions below check both halves of it and the direction a blank falls.
 //
 // And the amount is computed server-side. An amount in a request body is an
 // amount somebody can edit before sending it.
@@ -51,32 +53,61 @@ H.ok(/^\s*case 'pay': \{\s*const participant = await mustGuard\(body\.participan
 H.ok(pay.indexOf('mustGuard') < pay.indexOf('getRegistration'),
   'and before the store is read — a stranger must not learn a registration exists');
 
-console.log('\n[there is NO verification gate, on any door that takes money]');
-// All three: the term button, one session, and the one-step drop-in that
-// registers and pays in a single call.
-const paySession = bare.slice(bare.indexOf("case 'paySession'"), bare.indexOf("case 'cancelSession'"));
-const bookAndPay = bare.slice(bare.indexOf("case 'bookAndPay'"), bare.indexOf("case 'cancelSession'"));
+console.log('\n[the verification gate is a COURSE rule, decided in one place]');
+const bare2 = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+const helper = bare2.slice(bare2.indexOf('function verificationRefusal'),
+                           bare2.indexOf('function regRow'));
+H.ok(helper.length > 80, 'there is one verificationRefusal()');
+H.ok(/if \(type === 'dropin'\) return null;/.test(helper), 'a drop-in is never asked');
+H.ok(/if \(me\.emailVerifiedAt\) return null;/.test(helper), 'and a confirmed address passes');
+H.ok(/reason: 'email-unverified'/.test(helper), 'the refusal carries a reason the client can act on');
+H.ok(/json\(403/.test(helper), 'as a 403 — it is a permission, not a missing thing');
+// ONE function, or the condition is written at three call sites and the third
+// one is added later without it.
+H.eq((bare2.match(/emailVerifiedAt/g) || []).length, 1,
+  'and the field is read in exactly one place in the whole file');
+
+console.log('\n[and every paying branch is wired to it, or provably cannot need it]');
+const paySession = bare2.slice(bare2.indexOf("case 'paySession'"), bare2.indexOf("case 'cancelSession'"));
+const bookAndPay = bare2.slice(bare2.indexOf("case 'bookAndPay'"), bare2.indexOf("case 'paySession'"));
 H.ok(paySession.length > 300 && bookAndPay.length > 600, 'found the other two branches');
-[['pay', pay], ['paySession', paySession], ['bookAndPay', bookAndPay]].forEach(([name, branch]) => {
-  H.ok(!/emailVerifiedAt/.test(branch), name + ' does not ask whether the address was confirmed');
-  H.ok(!/email-unverified/.test(branch), name + ' has no unverified refusal to return');
-});
-// ...and the emailed link never did, which is the argument the removal rests on.
+// A course: from the FROZEN type on the record, which is what the family
+// registered under — and this branch never opens the activity at all.
+H.ok(/verificationRefusal\(me, \(reg\.frozen && reg\.frozen\.type\) \|\| 'course'\)/.test(pay),
+  'pay asks, from the frozen type on the registration');
+H.ok(pay.indexOf('verificationRefusal') < pay.indexOf("!== 'approved'"),
+  'and the cheap check runs before the status one');
+// ⚠ A MISSING TYPE READS AS `course`. This inverts the usual rule in this
+// project, where every blank resolves towards the family — and deliberately: a
+// record with no type was written before drop-ins existed, so it IS a course,
+// and the errors are not symmetric. Guessing drop-in skips a gate somebody
+// asked for; guessing course costs one verification email.
+H.ok(/\|\| 'course'/.test(pay), 'with a blank falling to the gated side, not the open one');
+// Present today only so a future course-by-the-session inherits the rule
+// instead of it being something somebody has to remember.
+H.ok(/verificationRefusal\(me, activity\.type\)/.test(paySession),
+  'paySession asks too, from the activity it was called for');
+// And the one-step drop-in does not, because the line above it has already
+// refused everything that is not a drop-in.
+H.ok(!/verificationRefusal/.test(bookAndPay),
+  'bookAndPay does not — the flow the gate used to block is the flow it is exempt from');
+H.ok(/activity\.type !== 'dropin'/.test(bookAndPay),
+  'and it is exempt BY CONSTRUCTION: it refuses anything that is not a drop-in first');
+// The emailed link never asked, and that exemption is the argument the whole
+// split rests on — following it is itself proof of reading the inbox.
 const payLink = fs.readFileSync(path.join(R, 'netlify/functions/pay-link.js'), 'utf8');
 H.ok(!/emailVerifiedAt/.test(payLink.replace(/^\s*\/\/.*$/gm, '')),
-  'and /pay — a link we email — never checked it either, by design');
+  'and /pay — a link we email — never checked it, by design');
 
-console.log('\n[but verification itself is untouched]');
-// Removing the gate must not quietly remove the feature. It is still set, still
-// requestable, and the dashboard still says when it is missing.
+console.log('\n[verification itself is untouched either way]');
 const store = fs.readFileSync(path.join(R, 'netlify/functions/_account-store.js'), 'utf8');
 H.ok(/account\.emailVerifiedAt = new Date\(\)\.toISOString\(\)/.test(store),
   'markEmailVerified() still stamps the field');
 const auth = fs.readFileSync(path.join(R, 'netlify/functions/account-auth.js'), 'utf8');
 H.ok(/case 'resendVerification'/.test(auth), 'a family can still ask for a new verification mail');
-const client = fs.readFileSync(path.join(R, 'js/member-account.js'), 'utf8');
-H.ok(/resendVerification/.test(client), 'and the dashboard still offers it');
-H.ok(/!account\.emailVerifiedAt/.test(client), 'and still says so when the address is unconfirmed');
+const client0 = fs.readFileSync(path.join(R, 'js/member-account.js'), 'utf8');
+H.ok(/resendVerification/.test(client0), 'and the dashboard still offers it');
+H.ok(/!account\.emailVerifiedAt/.test(client0), 'and still says so when the address is unconfirmed');
 
 console.log('\n[gate 2: the place must be approved]');
 H.ok(/if \(reg\.status !== 'approved'\)/.test(pay), 'only an approved registration is payable');
@@ -180,20 +211,29 @@ const reg = { participantId: 'p-1', activityId: 'act-1',
     l + ': and links to the registration, addressed by id');
 });
 
-console.log('\n[the client offers the button under the same one condition]');
-// Cosmetic, like every permission check on this side — the server re-decides
-// it. It exists so a family is not offered an action about to be refused, and
-// so a REFUSAL THEY CAN ACT ON is explained rather than hidden.
+console.log('\n[the client draws the same split, from the same field]');
+// Cosmetic, like every permission check on this side — the server re-decides it.
+// It exists so a family is not offered an action about to be refused, and so a
+// REFUSAL THEY CAN ACT ON is explained rather than hidden.
 const ui = fs.readFileSync(path.join(R, 'js/member-account.js'), 'utf8');
 H.ok(/action: 'pay', participantId: r\.participantId, activityId: r\.activityId/.test(ui),
   'the client calls the pay action with the registration key');
-H.ok(/left > 0 && r\.status === 'approved'\) \{/.test(ui),
-  'and draws the button when the place is approved and something is owed');
-H.ok(!/emailVerifiedAt/.test(ui.slice(ui.indexOf('THE PAY BUTTON'))),
-  'with no verification condition left anywhere below it');
-H.ok(!/payNeedsVerify/.test(ui),
-  'and the string that explained that refusal is deleted rather than left orphaned');
-H.ok(/T\.payNeedsApproval/.test(ui), 'a place still waiting on approval is TOLD, not silently denied a button');
+H.ok(/var needsVerify = r\.type !== 'dropin' && !\(S\.account && S\.account\.emailVerifiedAt\)/.test(ui),
+  'the term card asks for a confirmed address, and only on a term');
+H.ok(/left > 0 && r\.status === 'approved' && !needsVerify/.test(ui),
+  'and draws the button when both gates pass and something is owed');
+// ⚠ THE SAME FIELD AS THE SERVER. regRow() sends the FROZEN type, defaulting to
+// course — if the client read anything else it would hide a button the server
+// would have honoured, which reads as a broken page rather than as a rule.
+const api = fs.readFileSync(path.join(R, 'netlify/functions/account-registrations.js'), 'utf8');
+H.ok(/type: reg\.frozen\.type \|\| 'course'/.test(api),
+  'and that field is the frozen type, with the same default on both sides');
+H.ok(/T\.payNeedsVerify/.test(ui), 'an unverified account is TOLD, not silently denied a button');
+H.ok(/T\.payNeedsApproval/.test(ui), 'and so is one still waiting on approval');
+// The per-session button is the drop-in half, and must NOT ask.
+const evening = ui.slice(ui.indexOf('function eveningAction'));
+H.ok(!/emailVerifiedAt/.test(evening.slice(0, evening.indexOf('cancelSession'))),
+  'paying for one session asks for no confirmed address — that is the walk-up half');
 // Checkout is a redirect. If the call fails the control must come back, or a
 // transient error leaves a dead button and a family who cannot pay.
 H.ok(/go\.disabled = false;[\s\S]{0,80}go\.textContent = T\.payNow;/.test(ui),

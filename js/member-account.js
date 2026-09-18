@@ -92,6 +92,7 @@
 
       costTitle: 'מה זה עולה', stillToPay: 'נותר לתשלום', credited: 'זוכה',
       payNow: 'תשלום מאובטח', payOpening: 'פותח תשלום…',
+      payNeedsVerify: 'כדי לשלם, יש לאשר את כתובת האימייל. הקישור לאישור נמצא בעמוד החשבון.',
       payNeedsApproval: 'קישור לתשלום יישלח אליכם בקרוב.',
       sessionsTitle: 'המפגשים', dateCol: 'תאריך', statusCol: 'סטטוס',
       book: 'הרשמה למפגש', cancelSession: 'ביטול מפגש',
@@ -180,6 +181,7 @@
 
       costTitle: 'What it costs', stillToPay: 'Still to pay', credited: 'Credited',
       payNow: 'Pay securely', payOpening: 'Opening payment…',
+      payNeedsVerify: 'To pay, please confirm your email address. The link to resend it is on your account page.',
       payNeedsApproval: 'We will send you a payment link shortly.',
       sessionsTitle: 'Sessions', dateCol: 'Date', statusCol: 'Status',
       book: 'Book', cancelSession: 'Cancel this session',
@@ -268,6 +270,7 @@
 
       costTitle: 'Сколько это стоит', stillToPay: 'Осталось оплатить', credited: 'Зачислено',
       payNow: 'Оплатить', payOpening: 'Открываем оплату…',
+      payNeedsVerify: 'Чтобы оплатить, подтвердите адрес электронной почты. Ссылка для повторной отправки — на странице аккаунта.',
       payNeedsApproval: 'Ссылку на оплату мы пришлём в ближайшее время.',
       sessionsTitle: 'Занятия', dateCol: 'Дата', statusCol: 'Статус',
       book: 'Записаться', cancelSession: 'Отменить занятие',
@@ -1424,11 +1427,17 @@
     // is the answer and silence is not. A settled balance draws nothing, since
     // the figures above already say why.
     //
-    // There used to be a third condition — a confirmed email address — and it is
-    // gone from both sides. See the `pay` branch of account-registrations.js: it
-    // guarded nothing on the paying direction, and the one case it refused was
-    // the family who signed up, registered and wanted to pay in one sitting.
-    if (left > 0 && r.status === 'approved') {
+    // The third condition — a confirmed email address — is A COURSE RULE and
+    // applies here only. See verificationRefusal() in account-registrations.js:
+    // a term is a considered commitment that can carry a minute of friction, and
+    // a drop-in is a walk-up decided and paid for in one sitting. This card is
+    // the term's, so it asks; the per-session button below does not.
+    //
+    // `r.type` is the FROZEN type, which is what the server decides from too —
+    // the two must not read different fields, or the client hides a button the
+    // server would have honoured.
+    var needsVerify = r.type !== 'dropin' && !(S.account && S.account.emailVerifiedAt);
+    if (left > 0 && r.status === 'approved' && !needsVerify) {
       var go = el('button', { type: 'submit', class: 'btn-primary', text: T.payNow });
       var payForm = el('form', { class: 'acc-pay', onsubmit: function (e) {
         e.preventDefault();
@@ -1445,6 +1454,11 @@
           });
       } }, [go]);
       kids.push(payForm);
+    } else if (left > 0 && r.status === 'approved') {
+      // SHOWN RATHER THAN HIDDEN, because it is something the reader can fix:
+      // the resend button is on the dashboard, and a missing button teaches
+      // nobody that their address needs confirming.
+      kids.push(el('p', { class: 'acc-note', text: T.payNeedsVerify }));
     } else if (left > 0) {
       kids.push(el('p', { class: 'acc-note', text: T.payNeedsApproval }));
     }

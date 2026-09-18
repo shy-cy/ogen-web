@@ -2547,29 +2547,60 @@ than from a round number.
 The activity page still books **one evening at a time**, with a Pay button on
 each. That is the remaining surface running the old shape.
 
-### ⚠ The verified-address gate on paying is gone
+### ⚠ The verified-address gate is a COURSE rule
 
-It read as a security property and was not one. `emailVerifiedAt` had been
-stored since Phase 2, shown as a banner since Phase 6 and enforced by nothing;
-payment was where it was finally enforced, and payment turns out to be the one
-place it buys nothing.
+It has been wrong in both directions inside a week, which is why it is now one
+function with a test around it: `verificationRefusal()` in
+`account-registrations.js`.
 
-It never protected anything on the paying direction — this is somebody signed
-into their own account settling their own bill, and an unverified address grants
-them nothing extra. What it was stated to buy, that messages about money reach a
-proved address, was **already untrue**: the registration confirmation goes to
-that same unverified address minutes earlier. And it was **already bypassable by
-design** — `/pay` is a link we ourselves email, deliberately exempt, on the
-reasoning that reading the inbox is what verification ever attested. A gate with
-a door we post through is not a gate.
+**A course asks for a confirmed address. A drop-in does not.** The split is the
+friction each one can carry, not a difference in how much the payer is trusted.
+A term is a considered commitment — hundreds of euros, months of attendance, a
+place an admin agreed to — and a minute spent clicking a link in an inbox buys
+something real in return: the receipt, the reminders and every later message
+about that money reach an address somebody has proved is theirs. A drop-in is a
+walk-up: decided and paid for in one sitting, often by a family who signed up
+minutes earlier.
 
-What it did cost was the only flow that ever hit it: **sign up, register, pay, in
-one sitting** — which is precisely the shape of a pay-per-session activity.
+It was on **everything** first. `emailVerifiedAt` had been stored since Phase 2,
+shown as a banner since Phase 6 and enforced by nothing; payment was where it was
+finally enforced, and it turned out to refuse exactly one flow and no others —
+sign up, register, pay, in one visit. On a pay-per-session activity that is not an
+edge case, it is **the** case.
 
-Verification still exists, is still requested, and the dashboard still says when
-it is missing. `tests/paying-needs-an-approved-place.js` pins the **absence** on
-all three doors and pins that the feature itself survived, because this is the
-kind of thing somebody reinstates in good faith.
+Then it came off everything, which was too far. The argument for removing it —
+that `/pay` is a link we ourselves email and is deliberately exempt, so a gate
+with a door we post through is not a gate — is a good argument about the
+**emailed** door and not a reason to drop the check where the friction is
+affordable and the message trail matters.
+
+Four things hold the rule together:
+
+- **One function, three call sites decided by it.** `pay` asks, from the
+  **frozen** type on the registration — it never opens the activity. `paySession`
+  asks, from the activity, and today that always passes, because an attendance
+  record exists only for a drop-in; the call is there anyway so a course that
+  ever becomes payable by the session inherits the rule instead of it being
+  something to remember. `bookAndPay` does not ask, and cannot need to: the line
+  above it has already refused everything that is not a drop-in.
+- **⚠ A missing type reads as `course`, which inverts this file's usual rule.**
+  Every blank in `_credit.js` resolves towards the family; this one resolves
+  towards the gate. A record with no `type` was written before drop-ins existed,
+  so it *is* a course — and the errors are not symmetric: guessing drop-in skips
+  a gate somebody asked for, guessing course costs one verification email.
+- **The client reads the same field.** `regRow()` sends `frozen.type` with the
+  same `|| 'course'` default. Reading anything else would hide a button the
+  server would have honoured, which reads as a broken page rather than as a rule.
+- **The refusal is shown, not hidden.** An unverified family on a term gets a
+  line saying so, because the resend button is on the dashboard and a missing
+  button teaches nobody anything.
+
+`tests/what-stands-between-a-family-and-paying.js` pins both halves, the
+direction a blank falls, and that `emailVerifiedAt` is read in exactly one place
+in that file. The drop-in half is also *executed*, by
+`tests/a-drop-in-is-booked-and-paid-in-one-step.js`, whose account is unverified
+throughout — it walks the whole booking flow to Checkout and is still asked to
+confirm its address on a term.
 
 ### Not built
 
@@ -2614,20 +2645,22 @@ password-reset tokens is one forgotten `purpose` argument away from being
 redeemable as one, and `consumeToken(token)` takes that argument **optionally**.
 A store that does not contain the key cannot be talked into honouring it.
 
-**The gate is still satisfied.** The registration must be `approved`, re-read
+**Both gates are still satisfied.** The registration must be `approved`, re-read
 from the record on every redemption rather than trusted from the token — so an
 old email cannot charge for a place since cancelled, and a part payment opens a
 session for what is *left*, not for the figure that was outstanding when the
 message went out.
 
-There was a second gate, a verified address, and this link was exempt from it
+The second gate, a verified address, applies to a course — and this link is
+exempt from it
 **by construction and by something stronger**: the token was mailed to that
 address and nowhere else, so following it is itself proof of reading that inbox,
-which is all `emailVerifiedAt` ever attested. That exemption turned out to be the
-argument that removed the gate everywhere — see **The verified-address gate on
-paying is gone**. Following the link is still deliberately **not** treated as a
-verification: confirming an address is a separate act with separate consequences,
-and a payment must not quietly perform one.
+which is all `emailVerifiedAt` ever attested. That exemption is the argument the
+whole split rests on — see **The verified-address gate is a COURSE rule**.
+Following the link is still deliberately **not** treated as a verification:
+confirming an address is a separate act with separate consequences, and a payment
+must not quietly perform one. So an emailed link pays a **course** without the
+gate; nothing else does.
 
 **Not single use**, the one place it parts company with the reset and verify
 tokens. Those grant something once; this names a debt, and a debt can

@@ -74,7 +74,25 @@ const ANSWERS = {
   activity: (b) => ({ ok: true, activity: b.slug === 'folk' ? DROPIN : COURSE }),
   sessions: () => ({ ok: true, mayBook: true, registrationStatus: 'approved', sessions: SESSIONS }),
   bookAndPay: () => ({ ok: true, url: 'https://checkout.stripe.com/c/pay/xyz', booked: [] }),
-  submit: () => ({ ok: true, registration: {} })
+  submit: () => ({ ok: true, registration: {} }),
+  // The activity page, for the one assertion that needs a rendered cost card.
+  registration: (b) => ({
+    ok: true,
+    registration: {
+      participantId: 'p-1', participantName: 'Michal Shinitzky', activityId: b.activityId,
+      slug: b.activityId === 'act-2' ? 'folk' : 'hebrew',
+      title: { en: b.activityId === 'act-2' ? 'Folk dancing' : 'Hebrew for kids' },
+      type: b.activityId === 'act-2' ? 'dropin' : 'course',
+      status: 'approved', holdsASpot: true,
+      owedCents: 35000, paidCents: 0, creditedCents: 0, feeCharged: true,
+      cancellation: { guardianMayCancel: false }
+    },
+    activity: {
+      activityId: b.activityId, slug: b.activityId === 'act-2' ? 'folk' : 'hebrew',
+      type: b.activityId === 'act-2' ? 'dropin' : 'course',
+      title: { en: 'Folk dancing' }, facts: [], priceRows: [], sessionRows: []
+    }
+  })
 };
 
 function fetchFor(overrides) {
@@ -297,6 +315,23 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
   H.eq(c.payment.paidCents, 0,
     'money is not split across blobs by a figure nobody checked — that lands it ' +
     'against the wrong debt, which is worse than money nobody can place');
+
+  console.log('\n[and the gate that stopped all this is now a COURSE rule]');
+  // THE SAME UNVERIFIED ACCOUNT as every screen above. That is the point: it
+  // walked the whole drop-in flow to Checkout, and on a term it is still asked
+  // to confirm its address first — a considered commitment can carry a minute of
+  // friction once; a walk-up cannot carry it at all.
+  const term = await screen({ view: 'activity', lang: 'en', search: '?p=p-1&a=act-1' });
+  H.ok(term.mount.textContent.indexOf('confirm your email address') !== -1,
+    'a term tells an unverified family to confirm their address');
+  H.eq(D.byTag(term.mount, 'button').filter((b) => /Pay securely/.test(b.textContent)).length, 0,
+    'and draws no pay button — shown rather than hidden, because the resend is on the dashboard');
+
+  const walk = await screen({ view: 'activity', lang: 'en', search: '?p=p-1&a=act-2' });
+  H.ok(walk.mount.textContent.indexOf('confirm your email address') === -1,
+    'a drop-in asks the same family for nothing');
+  H.eq(D.byTag(walk.mount, 'button').filter((b) => /Pay securely/.test(b.textContent)).length, 1,
+    'and gives them the button');
 
   H.done();
 })();
