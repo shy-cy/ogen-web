@@ -144,8 +144,12 @@ const NOW = Date.parse('2026-08-01T09:00:00Z');
 
   console.log('\n[the family is told which of the two happened]');
   const subjects = sent.map((m) => m.subject);
-  H.ok(subjects.some((s) => /רשום/.test(s)), 'an approval is confirmed');
-  H.ok(subjects.some((s) => /קיבלנו את הבקשה/.test(s)), 'a pending request is acknowledged instead');
+  H.ok(subjects.some((s) => /אושרה/.test(s)), 'an approval is confirmed');
+  // NOT "we have your request". A family that signed a child up has registered
+  // them; the word waiting on our side is ours, and the message says so only
+  // when we come back to say we cannot take the place.
+  H.ok(subjects.some((s) => /נרשם\/ה/.test(s)), 'and the other is told they are registered');
+  H.ok(!subjects.some((s) => /בקשה/.test(s)), 'neither calls a registration a request');
   H.ok(sent.every((m) => m.text && m.text.length), 'and every message carries a plain-text twin');
 
   // ---------------------------------------------------------------- freezing

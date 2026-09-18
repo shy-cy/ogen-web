@@ -1,5 +1,5 @@
-// The four messages a registration sends: we have your request, you have a
-// place, we cannot offer one, and nobody answered in time.
+// The five messages a registration sends: you are registered, you have a
+// place, we cannot offer one, nobody answered in time, and money arrived.
 //
 // Copy lives here in all three languages, one table per message, the same
 // discipline the nav, the footer, the contact form and the account messages
@@ -26,77 +26,99 @@ const { pick } = require('./_activity-facts');
 const titleOf = (reg, l) => pick(((reg && reg.frozen) || {}).activityTitle, l) || '';
 const childOf = (reg) => ((reg && reg.frozen) || {}).participantName || '';
 
-// Every message ends somewhere a family can act. There is no family area yet —
-// that is Phase 6 — so the link is the activity page, which is real today and
-// stays right when the area arrives.
+// Where the messages about NOT having a place land: the public activity page,
+// which needs nothing signed in. The expiry message points here because the
+// registration it names has been released — sending someone to a registration
+// page to read that it is over is a worse door than the activity itself.
 const activityHref = (reg, l) => {
   const slug = ((reg && reg.frozen) || {}).activitySlugAtSubmission;
   return slug ? pathFor(l, '/activities/' + slug) : pathFor(l, '/activities');
 };
 
-// WHERE A RECEIPT SHOULD LAND, which is not where an announcement should.
+// WHERE MONEY LIVES, which is not where an announcement lives.
 //
-// The other four messages point at the public activity page, and rightly: they
-// are about the place, and the reader may not be signed in. A payment receipt is
-// about the MONEY, and the only page that shows what has been paid and what is
-// left is the family's own registration page — addressed by participant and
-// activity id, which is the registration's key, never by the frozen slug. The
-// frozen slug is audit data; following it after a rename opens the wrong record
-// or none, and tells a family their registration does not exist.
+// The two messages about NOT having a place — rejected and expired — point at
+// the public activity page, and rightly: they are about the place, and there may
+// be nothing signed in to show. The three that follow a live registration point
+// here instead, because every one of them is now partly about paying, and the
+// only page showing what is owed, what is paid and what is left is the family's
+// own registration page — addressed by participant and activity id, which is the
+// registration's key, never by the frozen slug. The frozen slug is audit data;
+// following it after a rename opens the wrong record or none, and tells a family
+// their registration does not exist.
 const registrationHref = (reg, l) =>
   pathFor(l, '/account/activity') +
   '?participantId=' + encodeURIComponent(reg.participantId || '') +
   '&activityId=' + encodeURIComponent(reg.activityId || '');
 
+// --- your child is registered ----------------------------------------------
+//
+// ⚠ IT DOES NOT SAY "REQUEST", AND IT NAMES NO DEADLINE. It used to open "your
+// request has arrived" and promise an answer within `expiryDays` — which is
+// the shape of our queue, not the shape of what the family did. They signed a
+// child up; from their side that is a registration, and being told it is
+// pending review reads as a decision that might go either way over something
+// they consider settled. If we cannot take the place we write and say so, and
+// that message already exists — REJECTED, below.
+//
+// So this one confirms, and promises the one thing a family is now waiting
+// for: the payment link. An activity that auto-approves sends APPROVED instead
+// and the link is live the moment they open the page.
 // --- we have your request --------------------------------------------------
 
 const RECEIVED = {
   he: {
-    subject: (child, act) => `קיבלנו את הבקשה עבור ${child} · ${act}`,
-    heading: 'הבקשה התקבלה',
-    body: (child, act) => `קיבלנו את בקשת ההרשמה של ${child} ל${act}.`,
-    wait: (days) => `נחזור אליכם בתוך ${days} ימים. המקום שמור עד אז.`,
-    button: 'לעמוד הפעילות'
+    subject: (child, act) => `${child} נרשם/ה ל${act}`,
+    heading: 'ההרשמה בוצעה',
+    body: (child, act) => `${child} נרשם/ה ל${act}.`,
+    next: 'קישור לתשלום יישלח אליכם בקרוב.',
+    button: 'לעמוד ההרשמה'
   },
   en: {
-    subject: (child, act) => `We have your request for ${child} · ${act}`,
-    heading: 'Your request has arrived',
-    body: (child, act) => `We have received the registration request for ${child} for ${act}.`,
-    wait: (days) => `We will come back to you within ${days} days. The place is held until then.`,
-    button: 'Go to the activity'
+    subject: (child, act) => `${child} is registered for ${act}`,
+    heading: 'Registered',
+    body: (child, act) => `${child} is registered for ${act}.`,
+    next: 'We will send you a payment link shortly.',
+    button: 'Go to the registration'
   },
   ru: {
-    subject: (child, act) => `Мы получили заявку для ${child} · ${act}`,
-    heading: 'Заявка получена',
-    body: (child, act) => `Мы получили заявку на запись ${child} на ${act}.`,
-    wait: (days) => `Мы ответим в течение ${days} дней. Место сохраняется за вами до этого момента.`,
-    button: 'Страница занятия'
+    subject: (child, act) => `${child} записан(а) на ${act}`,
+    heading: 'Запись оформлена',
+    body: (child, act) => `${child} записан(а) на ${act}.`,
+    next: 'Ссылку на оплату мы пришлём в ближайшее время.',
+    button: 'Страница записи'
   }
 };
 
 // --- you have a place ------------------------------------------------------
+//
+// ⚠ ITS SUBJECT MUST NOT CONVERGE WITH RECEIVED's. A manually-approved
+// registration sends both, days apart, and "X is registered for Y" followed by
+// "X is registered for Y" is one message appearing to arrive twice. This one
+// says CONFIRMED in all three languages; the Russian pair was word-for-word
+// identical for a moment while that was being worked out.
 
 const APPROVED = {
   he: {
-    subject: (child, act) => `${child} רשום/ה ל${act}`,
+    subject: (child, act) => `ההרשמה של ${child} אושרה · ${act}`,
     heading: 'ההרשמה אושרה',
     body: (child, act) => `${child} רשום/ה ל${act}. נשמח לראותכם.`,
-    next: 'פרטי המפגשים והתשלום נמצאים בעמוד הפעילות. אם משהו לא מתאים, כתבו לנו.',
-    button: 'לעמוד הפעילות'
+    next: 'מועדי המפגשים והתשלום נמצאים בעמוד ההרשמה. אם משהו לא מתאים, כתבו לנו.',
+    button: 'לתשלום ולפרטים'
   },
   en: {
-    subject: (child, act) => `${child} has a place in ${act}`,
+    subject: (child, act) => `${child}'s place in ${act} is confirmed`,
     heading: 'The registration is confirmed',
     body: (child, act) => `${child} has a place in ${act}. We look forward to seeing you.`,
-    next: 'The session dates and the cost are on the activity page. If anything does not fit, write to us.',
-    button: 'Go to the activity'
+    next: 'The session dates and the payment are on your registration page. If anything does not fit, write to us.',
+    button: 'Pay and see the details'
   },
   ru: {
-    subject: (child, act) => `${child} записан(а) на ${act}`,
+    subject: (child, act) => `Запись ${child} подтверждена · ${act}`,
     heading: 'Запись подтверждена',
     body: (child, act) => `${child} записан(а) на ${act}. Будем рады видеть вас.`,
-    next: 'Даты занятий и стоимость указаны на странице занятия. Если что-то не подходит, напишите нам.',
-    button: 'Страница занятия'
+    next: 'Даты занятий и оплата — на странице записи. Если что-то не подходит, напишите нам.',
+    button: 'Оплата и подробности'
   }
 };
 
@@ -167,8 +189,8 @@ function receivedMessage(reg, account) {
   const T = RECEIVED[l];
   const child = childOf(reg), act = titleOf(reg, l);
   const html = shell(l, T.heading,
-    [esc(T.body(child, act)), esc(T.wait(reg.expiryDays))],
-    { href: activityHref(reg, l), label: T.button });
+    [esc(T.body(child, act)), esc(T.next)],
+    { href: registrationHref(reg, l), label: T.button });
   return { to: account.email, subject: T.subject(child, act), html: html, text: strip(html) };
 }
 
@@ -178,7 +200,7 @@ function approvedMessage(reg, account) {
   const child = childOf(reg), act = titleOf(reg, l);
   const html = shell(l, T.heading,
     [esc(T.body(child, act)), esc(T.next)],
-    { href: activityHref(reg, l), label: T.button });
+    { href: registrationHref(reg, l), label: T.button });
   return { to: account.email, subject: T.subject(child, act), html: html, text: strip(html) };
 }
 

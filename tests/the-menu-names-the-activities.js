@@ -110,8 +110,21 @@ H.ok(rawBlock.length > 400, 'the block is there');
 H.eq((block.match(/(^|[^-])(left|right)\s*:/g) || []).length, 0,
   'not one directional property — the sister project uses a pair of rules per element');
 H.ok(!/\[lang=/.test(block), 'and no per-language override at all');
-H.ok(/padding-inline-start/.test(block) && /border-inline-start/.test(block) &&
-     /margin-inline-start:auto/.test(block), 'the indent, the rail and the chevron are all logical');
+H.ok(/padding-inline-start/.test(block) && /border-inline-start/.test(block),
+  'the indent and the rail are logical');
+// ⚠ THE CHEVRON IS THE EXCEPTION, and it is an exception because it was a bug.
+// Built from border-inline-end it rotated about a corner that moves with the
+// direction, so in Hebrew it pointed left when collapsed and right when open —
+// a link's gesture on a control that is not one. Down is down in all three
+// languages, so the borders are physical on purpose.
+H.ok(/\.menu-chev\{[^}]*border-right[^}]*border-bottom/.test(block),
+  'the chevron is built from PHYSICAL borders, so down stays down in Hebrew');
+// It also sits next to the label rather than at the far end of the row: on a
+// wide menu an auto margin put it most of a screen away from its own word.
+H.ok(!/margin-inline-start:auto/.test(block),
+  'and beside the label, not pushed to the far edge by an auto margin');
+H.ok(/\.menu-group-toggle\{[^}]*width:100%/.test(block),
+  'while the row stays full width, so all of it is still pressable');
 // ⚠ The one the sister project gets wrong.
 H.ok(!/max-height/.test(block),
   'collapsed by display:none, never by a max-height clamp that leaves rows reachable and invisible');

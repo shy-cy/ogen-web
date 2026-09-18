@@ -183,17 +183,29 @@ html[lang="he"] .nav-signout svg{ transform:scaleX(-1); }
    NOT ONE DIRECTIONAL PROPERTY. The sister project does this with a pair of
    rules per element — [lang="he"] {text-align:right; padding-right:44px} and an
    LTR twin — which is two declarations doing what `start` does in one, and is
-   the shape rule 2 forbids. The rail, the indent and the chevron all mirror on
-   their own here. */
+   the shape rule 2 forbids. The rail and the indent mirror on their own here.
+   The chevron deliberately does not — see its own note below. */
 .mobile-menu .menu-group{ display:flex; flex-direction:column; }
 .mobile-menu .menu-group-toggle{
   display:flex; align-items:center; gap:8px; width:100%;
   font:inherit; font-weight:700; font-size:16px; color:var(--navy);
   background:none; border:0; padding:0; cursor:pointer; text-align:start;
 }
+/* THE CHEVRON IS THE ONE THING IN THIS BLOCK THAT MUST NOT MIRROR, and it is
+   the one thing that was. It says "this opens downwards", and down is down in
+   all three languages — but built from border-inline-end it rotated about a
+   corner that moves with the direction, so in Hebrew it pointed LEFT collapsed
+   and RIGHT open. That reads as "go this way", which is a link, next to a
+   control that is not one. Physical borders are the right answer for a shape
+   whose meaning is vertical; there is nothing here to flip.
+
+   And it sits BESIDE the label. margin-inline-start:auto pushed it to the far
+   end of a full-width row, which on a wide menu is most of a screen away from
+   the word it belongs to. The row stays 100% wide so all of it stays
+   pressable — only the chevron moved. */
 .mobile-menu .menu-chev{
-  margin-inline-start:auto; width:7px; height:7px;
-  border-inline-end:2px solid var(--camel); border-block-end:2px solid var(--camel);
+  width:7px; height:7px;
+  border-right:2px solid var(--camel); border-bottom:2px solid var(--camel);
   transform:rotate(45deg); transform-origin:60% 60%; transition:transform .18s ease;
 }
 .mobile-menu .menu-group.open .menu-chev{ transform:rotate(-135deg); }

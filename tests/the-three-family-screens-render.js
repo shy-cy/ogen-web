@@ -282,7 +282,10 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
     'and you are in the who-is-registering list — folk dancing is not only for the kids');
   D.byTag(dom.mount, 'form')[0].submit();
   await settle();
-  H.ok(has(dom, 'Your request has been sent'),
+  // A REGISTRATION, NOT A REQUEST. The confirmation says the place is taken and
+  // the payment link is coming — being told a decision is pending is the shape
+  // of our queue, not of what the family just did.
+  H.ok(has(dom, 'Registered. We will send you a payment link shortly.'),
     'the confirmation is still on screen — rebooting the dashboard used to throw it away');
 
   H.done();

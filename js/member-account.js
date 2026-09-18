@@ -93,7 +93,7 @@
       costTitle: 'מה זה עולה', stillToPay: 'נותר לתשלום', credited: 'זוכה',
       payNow: 'תשלום מאובטח', payOpening: 'פותח תשלום…',
       payNeedsVerify: 'כדי לשלם, יש לאשר את כתובת האימייל. הקישור לאישור נמצא בעמוד החשבון.',
-      payNeedsApproval: 'נוכל לקבל תשלום לאחר אישור ההרשמה.',
+      payNeedsApproval: 'קישור לתשלום יישלח אליכם בקרוב.',
       sessionsTitle: 'המפגשים', dateCol: 'תאריך', statusCol: 'סטטוס',
       book: 'הרשמה למפגש', cancelSession: 'ביטול מפגש',
       cancelSessionConfirm: 'לבטל את המפגש הזה?',
@@ -105,14 +105,15 @@
       changePassword: 'שינוי סיסמה',
       currentPassword: 'סיסמה נוכחית', saved: 'נשמר.',
       registerTitle: 'הרשמה לפעילות', registerWho: 'מי נרשם/ת?',
-      registerGroup: 'קבוצה', registerGo: 'שליחת בקשה',
-      registerFull: 'הפעילות מלאה.', registerDone: 'הבקשה נשלחה.',
+      registerGroup: 'קבוצה', registerGo: 'הרשמה',
+      registerFull: 'הפעילות מלאה.',
+      registerDone: 'ההרשמה בוצעה. קישור לתשלום יישלח אליכם בקרוב.',
       owes: 'לתשלום', paid: 'שולם', feeIncluded: 'כולל דמי הרשמה שנתיים',
       feeAlready: 'דמי ההרשמה השנתיים כבר שולמו',
       places: 'מקומות פנויים', unlimited: 'ללא הגבלה',
       loading: 'טוען…', problem: 'משהו השתבש. נסו שוב.',
       offline: 'אין חיבור לשרת. נסו שוב בעוד רגע.',
-      status: { pending: 'ממתין לאישור', approved: 'מאושר', rejected: 'לא אושר',
+      status: { pending: 'רשום/ה', approved: 'רשום/ה', rejected: 'לא אושר',
                 expired: 'פג תוקף', cancelled: 'בוטל' }
     },
     en: {
@@ -166,7 +167,7 @@
       costTitle: 'What it costs', stillToPay: 'Still to pay', credited: 'Credited',
       payNow: 'Pay securely', payOpening: 'Opening payment…',
       payNeedsVerify: 'To pay, please confirm your email address. The link to resend it is on your account page.',
-      payNeedsApproval: 'We can take payment once the registration is approved.',
+      payNeedsApproval: 'We will send you a payment link shortly.',
       sessionsTitle: 'Sessions', dateCol: 'Date', statusCol: 'Status',
       book: 'Book', cancelSession: 'Cancel this session',
       cancelSessionConfirm: 'Cancel this session?',
@@ -178,14 +179,15 @@
       changePassword: 'Change password',
       currentPassword: 'Current password', saved: 'Saved.',
       registerTitle: 'Register for an activity', registerWho: 'Who is registering?',
-      registerGroup: 'Group', registerGo: 'Send the request',
-      registerFull: 'This activity is full.', registerDone: 'Your request has been sent.',
+      registerGroup: 'Group', registerGo: 'Register',
+      registerFull: 'This activity is full.',
+      registerDone: 'Registered. We will send you a payment link shortly.',
       owes: 'To pay', paid: 'Paid', feeIncluded: 'includes the yearly registration fee',
       feeAlready: 'yearly registration fee already paid',
       places: 'places left', unlimited: 'no limit',
       loading: 'Loading…', problem: 'Something went wrong. Please try again.',
       offline: 'Could not reach the server. Try again in a moment.',
-      status: { pending: 'Waiting for an answer', approved: 'Confirmed', rejected: 'Not offered',
+      status: { pending: 'Registered', approved: 'Registered', rejected: 'Not offered',
                 expired: 'Expired', cancelled: 'Cancelled' }
     },
     ru: {
@@ -239,7 +241,7 @@
       costTitle: 'Сколько это стоит', stillToPay: 'Осталось оплатить', credited: 'Зачислено',
       payNow: 'Оплатить', payOpening: 'Открываем оплату…',
       payNeedsVerify: 'Чтобы оплатить, подтвердите адрес электронной почты. Ссылка для повторной отправки — на странице аккаунта.',
-      payNeedsApproval: 'Мы сможем принять оплату после подтверждения записи.',
+      payNeedsApproval: 'Ссылку на оплату мы пришлём в ближайшее время.',
       sessionsTitle: 'Занятия', dateCol: 'Дата', statusCol: 'Статус',
       book: 'Записаться', cancelSession: 'Отменить занятие',
       cancelSessionConfirm: 'Отменить это занятие?',
@@ -251,14 +253,15 @@
       changePassword: 'Изменить пароль',
       currentPassword: 'Текущий пароль', saved: 'Сохранено.',
       registerTitle: 'Запись на занятие', registerWho: 'Кто записывается?',
-      registerGroup: 'Группа', registerGo: 'Отправить заявку',
-      registerFull: 'Свободных мест нет.', registerDone: 'Заявка отправлена.',
+      registerGroup: 'Группа', registerGo: 'Записаться',
+      registerFull: 'Свободных мест нет.',
+      registerDone: 'Запись оформлена. Ссылку на оплату мы пришлём в ближайшее время.',
       owes: 'К оплате', paid: 'Оплачено', feeIncluded: 'включая годовой регистрационный взнос',
       feeAlready: 'годовой регистрационный взнос уже оплачен',
       places: 'свободных мест', unlimited: 'без ограничения',
       loading: 'Загрузка…', problem: 'Что-то пошло не так. Попробуйте ещё раз.',
       offline: 'Не удалось связаться с сервером. Попробуйте через минуту.',
-      status: { pending: 'Ожидает ответа', approved: 'Подтверждено', rejected: 'Не предложено',
+      status: { pending: 'Записан(а)', approved: 'Записан(а)', rejected: 'Не предложено',
                 expired: 'Истекло', cancelled: 'Отменено' }
     }
   }[lang];
@@ -375,6 +378,14 @@
       [title ? el('h2', { text: title }) : null].concat(kids || []));
   }
 
+  // ⚠ `pending` AND `approved` BOTH READ "registered" TO A FAMILY, on purpose.
+  // The two are a real distinction on our side — approved is what opens
+  // payment — but "waiting for an answer" is not the state a parent is in.
+  // They have registered; if we cannot take the place we write to them and say
+  // so, which is the rejection message. The difference between the two is
+  // already expressed where it matters: a pay button on one, "a payment link
+  // is on its way" on the other. Do not put the word "pending" back in front
+  // of a family — the admin queue is where that word belongs.
   function pill(status, table) {
     return el('span', { class: 'acc-pill is-' + status, text: (table || T.status)[status] || status });
   }
@@ -651,8 +662,8 @@
           if (!res.ok) return say('err', failure(res));
           // IN PLACE, not a reboot. Rebooting the dashboard threw away the
           // notice that had just been written into it, so the one thing a family
-          // needed to see — that the request was sent — was on screen for the
-          // length of one repaint.
+          // needed to see — that the child is registered and a payment link is
+          // coming — was on screen for the length of one repaint.
           clear(where);
           where.appendChild(section(null, [
             el('p', { class: 'acc-notice is-ok', text: T.registerDone })
