@@ -1,0 +1,173 @@
+{
+  "slug": "folk-dance",
+  "status": "open",
+  "motif": "leaf",
+  "corner": "bl",
+  "cardImage": "/images/activities/folk-dance-card-8c92d249.jpg",
+  "shareImage": "/images/activities/folk-dance-share-d54264be.jpg",
+  "robots": "index",
+  "type": "dropin",
+  "registration": {
+    "autoApprove": true,
+    "pendingExpiryDays": null,
+    "registrationFeeCutoffDate": "2026-09-30",
+    "cancellationPolicy": {
+      "mode": "flat",
+      "cancellationCutoffDate": null
+    },
+    "defaultBasis": {
+      "startDate": "2026-10-14",
+      "sessionCount": 6
+    },
+    "sessionCancelHours": 24
+  },
+  "seriesId": "act-a17993ff6a2b4f4f",
+  "title": {
+    "he": "ריקודי עם",
+    "en": "Israeli Folk Dancing",
+    "ru": "Израильские народные танцы"
+  },
+  "summary": {
+    "he": "רוקדים יחד לצלילי מוזיקה ישראלית, לומדים ריקודי עם מוכרים וחדשים ונהנים מפעילות חברתית, שמחה ואנרגטית. אין צורך בניסיון קודם - פשוט באים ורוקדים!",
+    "en": "Dance together to Israeli music, learn popular folk dances and discover new ones in a friendly and lively social setting. Open to everyone - no previous experience needed.",
+    "ru": "Танцуем под израильскую музыку, разучиваем любимые народные танцы и знакомимся с новыми. Лёгкая, дружелюбная и весёлая атмосфера. Подходит для всех, независимо от уровня подготовки."
+  },
+  "about": {
+    "he": "<p><strong>רוקדים, שמחים ומכירים את ישראל דרך הרגליים.</strong></p><p>ריקודי עם הם חלק בלתי נפרד מהתרבות הישראלית - מהמוזיקה, מהשירים ומהווי הקהילתי. בפעילות נלמד ריקודי עם מוכרים ואהובים, נרקוד יחד לצלילי מוזיקה ישראלית ונכיר גם ריקודים חדשים שנוצרו כאן לאורך השנים.</p><p>הפעילות פתוחה לכולם - צעירים ומבוגרים, מתחילים ומנוסים. לומדים את הצעדים בקצב נעים, רוקדים יחד ובעיקר נהנים מהתנועה, מהמוזיקה ומהחברה.</p><p><strong>בפעילות נרקוד, נלמד ונכיר:</strong></p><ul><li>ריקודי עם ישראליים אהובים</li><li>מוזיקה ישראלית ושירים מוכרים</li><li>צעדים, מקצבים וריקודים חדשים</li><li>ריקוד במעגל ובקבוצה</li><li>ובעיקר - הרבה שמחה, תנועה וכיף</li></ul><p><strong>לא צריך לדעת לרקוד. פשוט באים ורוקדים!</strong></p>",
+    "en": "<p><strong>Dance, connect and enjoy Israeli music together.</strong></p><p><strong>Israeli folk dancing is an important part of Israeli culture, bringing together music, movement and community. In our sessions, we’ll dance popular Israeli folk dances, learn new ones and enjoy a great selection of Israeli music.</strong></p><p><strong>The activity is open to everyone — beginners and experienced dancers alike. We’ll learn the steps at a comfortable pace, dance together and, most importantly, have a great time.</strong></p><p><strong>In our sessions we’ll:</strong></p><ul><li>Learn well-loved Israeli folk dances</li><li>Discover new and varied dances</li><li>Dance to Israeli music</li><li>Dance together in circles and groups</li><li>Enjoy a friendly, social and lively atmosphere</li></ul><p><strong>No previous experience needed — just come and dance!</strong></p>",
+    "ru": "<p><strong>Танцуем, знакомимся и наслаждаемся израильской музыкой!</strong></p><p>Израильские народные танцы - это особая часть израильской культуры, в которой соединяются музыка, движение и общение. На наших встречах мы будем разучивать популярные израильские танцы, знакомиться с новыми и просто хорошо проводить время вместе под израильскую музыку.</p><p>Занятия подходят для всех - независимо от возраста и уровня подготовки. Шаги и движения разучиваем постепенно, в комфортном темпе. Здесь неважно, насколько хорошо вы танцуете - главное желание двигаться, слушать музыку и получать удовольствие.</p><p><strong>На встречах мы будем:</strong></p><ul><li>разучивать любимые израильские народные танцы;</li><li>знакомиться с новыми танцами и ритмами;</li><li>танцевать под израильскую музыку;</li><li>танцевать в кругу и вместе с группой;</li><li>общаться, двигаться и весело проводить время.</li></ul><p><strong>Никогда не танцевали? Не проблема — приходите и попробуйте!</strong></p>"
+  },
+  "metaTitle": {
+    "he": "ריקודי עם | מרכז עוגן לימסול",
+    "en": "Israeli Folk Dancing | OGEN Limassol",
+    "ru": "Израильские народные танцы | Центр OGEN"
+  },
+  "metaDescription": {
+    "he": "הצטרפו לריקודי עם ישראליים במרכז עוגן בלימסול. לומדים ריקודים מהנים, מכירים מוזיקה ותרבות ישראלית, מפתחים ביטחון וקצב ונהנים יחד.",
+    "en": "Join Israeli folk dancing at OGEN in Limassol. Learn fun dances, explore Israeli music and culture, build confidence and enjoy moving together.",
+    "ru": "Израильские народные танцы в центре OGEN в Лимассоле - танцуем под израильскую музыку, разучиваем любимые танцы и приятно проводим время вместе."
+  },
+  "facts": {
+    "ages": {
+      "min": 12,
+      "max": 120
+    },
+    "schedule": {
+      "frequency": "biweekly",
+      "sessions": [
+        {
+          "day": 3,
+          "time": "20:30"
+        }
+      ]
+    },
+    "duration": {
+      "startDate": "2026-10-14",
+      "endDate": "2026-12-23",
+      "sessionCount": null,
+      "sessionMinutes": null,
+      "sessionDates": [
+        {
+          "date": "2026-10-14",
+          "status": "scheduled"
+        },
+        {
+          "date": "2026-10-28",
+          "status": "scheduled"
+        },
+        {
+          "date": "2026-11-11",
+          "status": "scheduled"
+        },
+        {
+          "date": "2026-11-25",
+          "status": "scheduled"
+        },
+        {
+          "date": "2026-12-09",
+          "status": "scheduled"
+        },
+        {
+          "date": "2026-12-23",
+          "status": "scheduled"
+        }
+      ]
+    },
+    "groupSize": {
+      "groups": 1,
+      "maxPerGroup": null,
+      "overrideText": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      }
+    },
+    "instructionLanguage": {
+      "he": "",
+      "en": "",
+      "ru": ""
+    },
+    "prerequisites": {
+      "he": "",
+      "en": "",
+      "ru": ""
+    },
+    "location": {
+      "text": {
+        "he": "לימסול",
+        "en": "Limassol",
+        "ru": "Limassol"
+      }
+    },
+    "address": {
+      "text": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      }
+    },
+    "price": {
+      "registrationFee": null,
+      "fullPrice": null,
+      "perHourOverride": null,
+      "perSessionPrice": 7,
+      "showPerLesson": false,
+      "lateDropIn": {
+        "enabled": false,
+        "hoursBefore": null,
+        "price": null
+      },
+      "bundles": []
+    }
+  },
+  "factVisibility": {
+    "ages": "public",
+    "schedule": "public",
+    "duration": "public",
+    "groupSize": "public",
+    "instructionLanguage": "public",
+    "prerequisites": "public",
+    "location": "public",
+    "address": "members",
+    "price": "public"
+  },
+  "faq": [],
+  "teachers": [
+    {
+      "id": "tea-mu73t79f-1",
+      "name": {
+        "he": "מורה 1",
+        "en": "Teacher",
+        "ru": "Teacher"
+      },
+      "photo": "/images/activities/folk-dance-teachers-tea-mu73t79f-1-cb74b50f.png"
+    }
+  ],
+  "sponsors": [],
+  "isoUpdated": "2026-09-18T15:36:40.995Z",
+  "isoCreated": "2026-09-18T15:36:40.995Z",
+  "lastEditedBy": "michal@ogen.cy",
+  "lastEditedByName": "Michal",
+  "activityId": "act-a17993ff6a2b4f4f",
+  "lastPublishedAt": "2026-09-18T15:36:40.995Z"
+}

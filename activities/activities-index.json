@@ -1,5 +1,29 @@
 [
   {
+    "slug": "folk-dance",
+    "activityId": "act-a17993ff6a2b4f4f",
+    "seriesId": "act-a17993ff6a2b4f4f",
+    "type": "dropin",
+    "status": "open",
+    "langs": [
+      "he",
+      "en",
+      "ru"
+    ],
+    "title": {
+      "he": "ריקודי עם",
+      "en": "Israeli Folk Dancing",
+      "ru": "Израильские народные танцы"
+    },
+    "summary": {
+      "he": "רוקדים יחד לצלילי מוזיקה ישראלית, לומדים ריקודי עם מוכרים וחדשים ונהנים מפעילות חברתית, שמחה ואנרגטית. אין צורך בניסיון קודם - פשוט באים ורוקדים!",
+      "en": "Dance together to Israeli music, learn popular folk dances and discover new ones in a friendly and lively social setting. Open to everyone - no previous experience needed.",
+      "ru": "Танцуем под израильскую музыку, разучиваем любимые народные танцы и знакомимся с новыми. Лёгкая, дружелюбная и весёлая атмосфера. Подходит для всех, независимо от уровня подготовки."
+    },
+    "cardImage": "/images/activities/folk-dance-card-8c92d249.jpg",
+    "isoUpdated": "2026-09-18T15:36:40.995Z"
+  },
+  {
     "slug": "hebrew4kids",
     "activityId": "act-ac164520eacd1b92",
     "seriesId": "act-ac164520eacd1b92",
