@@ -2687,6 +2687,69 @@ screen sends is a `case` the server handles, and the three money actions are
 behind `canCancel` on both sides. An unknown action answers 400 and that failure
 is otherwise invisible until somebody presses the button.
 
+### ⚠ A cancellation used to send nothing at all
+
+Every other state change on a registration sent a message — registered,
+confirmed, not offered, we did not answer in time, payment received — and
+**cancelling sent silence**. The only trace was a reason typed into the history
+for an admin to read later.
+
+That was survivable while the confirmation called a registration a *request*. It
+stopped being survivable the moment the confirmation started saying
+**registered**: a place a family was told they had, taken away with no message,
+is the one gap in the sequence they would notice and could not explain.
+
+`sendCancelled` is the sixth message. Four rules carry it:
+
+- **The figure comes from the ledger entry that was written**, never from a
+  second call to `creditFor()`. Two computations of one number is how an email
+  and a ledger come to disagree about what somebody is owed, and the family reads
+  the email.
+- **After the ledger, never before.** The email rule here is that a send never
+  blocks the action; the money rule is the opposite, and **the money rule decides
+  the order**. A credit not written is money lost with nobody able to tell; a
+  message not sent leaves a person who can ask.
+- **No credit line when the credit is zero.** Nothing on this site has collected
+  money yet, so every cancellation today credits nothing — and *"credited
+  €0.00"* reads as a decision taken against the family rather than as the
+  arithmetic of an activity nobody has paid for. The sentence appears only once
+  there is a figure.
+- **Two send paths, one message.** A guardian cancelling their own place gets it
+  immediately, because nobody is at a screen to review it. An admin cancelling
+  somebody else's reviews it first, exactly as a rejection is reviewed. The
+  difference is one optional argument, not a second message.
+
+**One panel now serves both decisions.** Rejecting and cancelling have different
+permissions and different consequences, and the review is the same job in both.
+A second copy would be a second place for the sanitise contract, the language
+warning and the did-the-email-go reporting to drift. The `window.prompt` that
+used to collect a cancellation reason is gone — a prompt cannot show a family
+the message about to be sent to them — and its job survives as an explicit
+**internal note** field, which goes to the history and the audit trail and never
+into the family's copy.
+
+⚠ **This draft carries money, which the rejection draft does not.** The cutoffs
+are days, so a panel opened at 23:59 and sent at 00:01 can straddle one, and the
+family would be told a figure nobody credited them. So the draft's number travels
+back with the message and is compared **before anything is cancelled** — the
+same shape as the optimistic lock on an activity record, and the same answer:
+409, `reason: 'credit-moved'`, nothing touched.
+
+### ⚠ A refusal nobody can see is a dead button
+
+Reported as *"clicking Create account does nothing"*. The API was fine: the
+address already had an account and the server answered 409 saying so, in words.
+
+Sign-up is the tallest form in the family area — seven fields, a language picker
+and the terms — so the submit button sits near the fold while the one notice
+renders above the heading, off screen. The refusal explained itself perfectly to
+a part of the page nobody was looking at.
+
+`say()` scrolls the notice into view and sets `aria-live`: off screen and
+unannounced are the same failure twice. Fixed in the one place rather than by
+moving a message next to one button, because there is one notice and a dozen
+forms, and the next tall form would bring it straight back.
+
 ### The nav says Roster, and Admins
 
 `Registrations` became **Roster** and `Accounts` became **Admins**. The filenames

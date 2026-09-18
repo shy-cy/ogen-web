@@ -142,13 +142,13 @@
     }));
     acts.push(el('button', {
       disabled: !S.canApprove || !decidable || r.status === 'rejected' || null,
-      onclick: function () { reject(r); }, text: 'Reject'
+      onclick: function () { review('reject', r); }, text: 'Reject'
     }));
     // Cancel is its own axis because it moves money — it writes a credit a
     // family can spend and cannot be undone, only compensated.
     acts.push(el('button', {
       class: 'no', disabled: !S.canCancel || !live || null,
-      onclick: function () { cancel(r); }, text: 'Cancel'
+      onclick: function () { review('cancel', r); }, text: 'Cancel'
     }));
     acts.push(el('button', {
       onclick: function () { openAccount(r); }, text: 'Money'
@@ -203,23 +203,6 @@
       .then(function (res) {
         if (!res.ok) return message('err', (res.data && res.data.error) || 'That did not work');
         message('ok', said + ' · ' + r.name);
-        loadQueue(S.slug);
-      });
-  }
-
-  function cancel(r) {
-    // Typed confirmation rather than a plain OK, because this one writes money
-    // into a ledger that cannot be edited afterwards.
-    var note = window.prompt(
-      'Cancelling ' + r.name + '. This credits whatever they are owed under the terms ' +
-      'frozen on their registration, and the credit cannot be edited afterwards — only ' +
-      'corrected with another entry.\n\nWhy? (recorded in the history)');
-    if (note === null) return;
-    send({ action: 'cancel', participantId: r.participantId, activityId: r.activityId, note: note })
-      .then(function (res) {
-        if (!res.ok) return message('err', (res.data && res.data.error) || 'That did not work');
-        var c = res.data.entry;
-        message('ok', 'Cancelled · ' + r.name + (c ? ' · credited ' + money(c.amountCents) : ' · nothing credited'));
         loadQueue(S.slug);
       });
   }
@@ -292,33 +275,70 @@
   //
   // Quill, the same editor and version the activity body uses, falling back to a
   // textarea when the CDN is unavailable. The server sanitises either way.
-  function reject(r) {
-    send({ action: 'rejectPreview', participantId: r.participantId, activityId: r.activityId })
+  // ONE PANEL, TWO DECISIONS. Rejecting and cancelling have different
+  // permissions and different consequences, and the review is the same job in
+  // both: read what the family will receive, in their own language, before
+  // something irreversible happens. A second copy of this would be a second
+  // place for the sanitise contract, the language warning and the
+  // did-the-email-go reporting to drift out of step.
+  var REVIEW = {
+    reject: {
+      preview: 'rejectPreview', action: 'reject', verb: 'Reject', go: 'Reject and send',
+      said: 'Rejected', note: false,
+      hint: 'The decision is recorded either way; a rejection is never resent, so this ' +
+            'is the one time it can be worded.'
+    },
+    cancel: {
+      preview: 'cancelPreview', action: 'cancel', verb: 'Cancel', go: 'Cancel and send',
+      said: 'Cancelled', note: true,
+      hint: 'This writes a credit into a ledger that cannot be edited afterwards — only ' +
+            'corrected with another entry.'
+    }
+  };
+
+  function review(kind, r) {
+    var K = REVIEW[kind];
+    send({ action: K.preview, participantId: r.participantId, activityId: r.activityId })
       .then(function (res) {
         if (!res.ok) return message('err', (res.data && res.data.error) || 'That did not work');
-        openRejectPanel(r, res.data);
+        openReviewPanel(K, r, res.data);
       });
   }
 
-  function openRejectPanel(r, draft) {
+  function openReviewPanel(K, r, draft) {
     var back = el('div', { class: 'modal-back' });
     var close = function () { if (back.parentNode) back.parentNode.removeChild(back); };
 
     var subject = el('input', { type: 'text', class: 'modal-subject', value: draft.subject });
     subject.value = draft.subject;
 
+    // The INTERNAL note, which the typed prompt this panel replaced used to
+    // collect on a cancellation. It goes to the history and the audit trail and
+    // never to the family — the paragraphs below are the family's copy, and
+    // conflating the two would put "mother says they are moving abroad" into
+    // somebody's inbox.
+    var note = el('input', { type: 'text', class: 'modal-subject' });
     var host = el('div', { class: 'modal-editor' });
     var area = el('textarea', { class: 'modal-editor' });
     var quill = null;
-    var go = el('button', { class: 'no', text: 'Reject and send' });
+    var go = el('button', { class: 'no', text: K.go });
 
     var panel = el('div', { class: 'modal' }, [
-      el('h3', { text: 'Reject · ' + r.name }),
+      el('h3', { text: K.verb + ' · ' + r.name }),
       el('p', { class: 'hint', text:
         'This is what ' + (draft.to || 'the family') + ' will receive, in ' +
         LANG_NAME[draft.lang] + ' — the language they read. Send it as it is, or ' +
-        'add a reason. The decision is recorded either way; a rejection is never ' +
-        'resent, so this is the one time it can be worded.' }),
+        'add a reason. ' + K.hint }),
+      // What the ledger will record, on its own line rather than left to be
+      // spotted inside the prose. ABSENT when there is nothing to credit:
+      // "credits €0.00" reads as a decision taken against the family rather
+      // than as the arithmetic of an activity nobody has paid for, and today
+      // that is every cancellation on the site.
+      draft.creditCents > 0
+        ? el('p', { class: 'modal-credit', text: 'Credits ' + money(draft.creditCents) })
+        : null,
+      K.note ? el('label', { class: 'modal-label', text: 'Why (recorded internally, not sent)' }) : null,
+      K.note ? note : null,
       el('label', { class: 'modal-label', text: 'Subject' }), subject,
       el('label', { class: 'modal-label', text: 'Message' }),
       window.Quill ? host : area,
@@ -357,8 +377,13 @@
         return message('err', 'A rejection needs something to say.');
       }
       go.disabled = true;
-      send({ action: 'reject', participantId: r.participantId, activityId: r.activityId,
-             message: { subject: subject.value, bodyHtml: html } })
+      send({ action: K.action, participantId: r.participantId, activityId: r.activityId,
+             note: K.note ? note.value : null,
+             message: { subject: subject.value, bodyHtml: html,
+                        // The figure this draft was written against. The server
+                        // refuses the whole action if it has moved since, rather
+                        // than telling a family a number nobody credited them.
+                        basedOnCreditCents: draft.creditCents || 0 } })
         .then(function (res) {
           go.disabled = false;
           if (!res.ok) return message('err', (res.data && res.data.error) || 'That did not work');
@@ -367,10 +392,11 @@
           // written a message by hand must not be left believing a family was
           // told something nobody told them. The decision stands regardless —
           // an email failure has never blocked an action here.
+          var credited = res.data.entry ? ' · credited ' + money(res.data.entry.amountCents) : '';
           message(res.data.emailed === false ? 'err' : 'ok',
             res.data.emailed === false
-              ? 'Rejected · ' + r.name + ' — BUT THE EMAIL DID NOT GO. Tell them another way.'
-              : 'Rejected · ' + r.name + ' · message sent');
+              ? K.said + ' · ' + r.name + credited + ' — BUT THE EMAIL DID NOT GO. Tell them another way.'
+              : K.said + ' · ' + r.name + credited + ' · message sent');
           loadQueue(S.slug);
         });
     });

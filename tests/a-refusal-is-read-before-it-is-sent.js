@@ -176,7 +176,13 @@ const read = (p) => fs.readFileSync(path.join(R, p), 'utf8');
 
   console.log('\n[the screen and the sanitiser]');
   const ui = read('js/registrations-admin.js');
-  H.ok(/action: 'rejectPreview'/.test(ui), 'the screen asks for the draft');
+  H.ok(/preview: 'rejectPreview'/.test(ui), 'the screen asks for the draft');
+  // ONE panel, two decisions. A second copy would be a second place for the
+  // sanitise contract and the language warning to drift.
+  H.ok(/preview: 'cancelPreview'/.test(ui), 'and the same panel serves a cancellation');
+  H.eq((ui.match(/function openReviewPanel/g) || []).length, 1, 'there is one panel, not two');
+  H.ok(!/window\.prompt/.test(ui),
+    'and the typed prompt is gone — a prompt cannot show a family the message about to be sent to them');
   H.ok(/window\.Quill/.test(ui), 'and edits it in Quill');
   H.ok(/quill \? quill\.root\.innerHTML : area\.value/.test(ui),
     'falling back to a textarea when the CDN is unavailable, exactly as the activity body does');
