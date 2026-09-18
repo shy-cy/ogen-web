@@ -1,5 +1,29 @@
 [
   {
+    "slug": "bnei-mitzvah-2027",
+    "activityId": "act-b6728af43e70352b",
+    "seriesId": "act-b6728af43e70352b",
+    "type": "course",
+    "status": "announcement",
+    "langs": [
+      "he",
+      "en",
+      "ru"
+    ],
+    "title": {
+      "he": "תוכנית בני ובנות מצווה",
+      "en": "Bar & Bat Mitzvah Program",
+      "ru": "Программа Бар- и Бат-мицвы"
+    },
+    "summary": {
+      "he": "מסע אישי וקבוצתי של גילוי, זהות והתבגרות, המשלב היכרות עם הסיפור המשפחתי, התרבות היהודית, ערכים, חברות ושייכות - בדרך לטקס משמעותי שנבנה יחד.",
+      "en": "A personal and shared journey of growing up, exploring identity, family stories, Jewish culture, values, friendship and belonging - leading to a meaningful ceremony created together.",
+      "ru": "Совместный путь взросления и поиска себя через семейные истории, еврейскую культуру, ценности, дружбу и чувство принадлежности - к своей собственной значимой церемонии."
+    },
+    "cardImage": "/images/activities/bnei-mitzvah-2027-card-0a618b5b.jpg",
+    "isoUpdated": "2026-09-18T16:54:58.015Z"
+  },
+  {
     "slug": "folk-dance",
     "activityId": "act-a17993ff6a2b4f4f",
     "seriesId": "act-a17993ff6a2b4f4f",
