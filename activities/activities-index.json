@@ -4,7 +4,7 @@
     "activityId": "act-b6728af43e70352b",
     "seriesId": "act-b6728af43e70352b",
     "type": "course",
-    "status": "announcement",
+    "status": "open",
     "langs": [
       "he",
       "en",
@@ -21,7 +21,7 @@
       "ru": "Совместный путь взросления и поиска себя через семейные истории, еврейскую культуру, ценности, дружбу и чувство принадлежности - к своей собственной значимой церемонии."
     },
     "cardImage": "/images/activities/bnei-mitzvah-2027-card-0a618b5b.jpg",
-    "isoUpdated": "2026-09-19T11:42:02.769Z"
+    "isoUpdated": "2026-09-19T11:43:09.093Z"
   },
   {
     "slug": "folk-dance",
