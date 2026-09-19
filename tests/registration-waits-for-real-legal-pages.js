@@ -105,7 +105,19 @@ const NAME_RE = /^_?(member|account|participant|guardian|registration)/i;
 // constant — `optionalStore(ACCOUNTS)`, which is how _account-store.js actually
 // does it — is invisible to it, and was. Both signals now fire, and the second
 // catches the name wherever it is declared.
-const PEOPLE_STORES = 'accounts|participants|guardian-links|guardian-invites|registrations|member-sessions|member-tokens';
+// ⚠ SIX FILES SAID "Arms the legal gate, correctly" AND NONE OF THEM DID.
+//
+// Every phase after the first added a store that names a participant, wrote the
+// marker comment at the top, and did not appear in this list — so the attendance
+// register, the bundles, the check-in tokens, the pay links and the credit
+// ledger were all invisible to the gate while each file claimed otherwise.
+//
+// It fired anyway, because the files that DO match are enough to arm it, which
+// is exactly why nobody noticed: a gate that is already armed cannot tell you
+// what it is failing to see. The list is the thing that has to be complete, not
+// the count of signals.
+const PEOPLE_STORES = 'accounts|participants|guardian-links|guardian-invites|registrations|' +
+  'member-sessions|member-tokens|session-attendance|bundles|checkin-tokens|pay-links|account-credits';
 const STORE_RE = new RegExp(
   '(?:requireStore|optionalStore)\\(\\s*[\'"](?:' + PEOPLE_STORES + ')[\'"]' +
   '|=\\s*[\'"](?:' + PEOPLE_STORES + ')[\'"]\\s*;');

@@ -31,6 +31,7 @@ const store = require('./_registration-store');
 const R = require('./_registration');
 const credit = require('./_credit');
 const ledger = require('./_credit-ledger');
+const spend = require('./_spend-credit');
 const { cancelAndCredit } = require('./_registration-cancel');
 const attendance = require('./_session-attendance');
 const B = require('./_bundle');
@@ -619,35 +620,25 @@ exports.handler = async (event) => {
         if (!canCancel(session)) return json(403, { error: 'Your role may not move credit' });
         const reg = await store.getRegistration(body.participantId, body.activityId);
         if (!reg) return json(404, { error: 'No such registration.' });
-        const cents = Math.round(Number(body.amountCents));
-        if (!(cents > 0)) return json(400, { error: 'An amount is a positive number of cents.' });
-        const balance = await ledger.balanceFor(reg.accountId);
-        if (cents > balance) {
-          return json(409, { error: 'That is more than this account holds.', balanceCents: balance });
+        // ONE SPENDER, two callers. A family can spend their own credit now, and
+        // two implementations would be two that can cap differently or write the
+        // two halves in a different order — which surfaces when a family reads
+        // their balance to the admin reading theirs.
+        let done;
+        try {
+          done = await spend.spendCredit({
+            record: reg, kind: 'registration',
+            cents: body.amountCents, by: session.email, note: body.note || null
+          });
+        } catch (err) {
+          const code = err.reason === 'amount' ? 400 : 409;
+          return json(code, { error: err.message, reason: err.reason,
+                              balanceCents: err.balanceCents, owedCents: err.owedCents });
         }
-        // Ledger first, for the same reason the cancellation writes it first: a
-        // debit that lands without the payment is visible and reversible, and a
-        // payment that lands without the debit is credit spent twice.
-        const entry = await ledger.append({
-          accountId: reg.accountId, type: 'debit', amountCents: cents,
-          reason: 'credit-applied',
-          relatedRegistrationKey: R.key(reg.participantId, reg.activityId),
-          note: body.note || null, createdBy: session.email
-        });
-        const paid = (reg.payment.paidCents || 0) + cents;
-        const next = R.transition(reg, {
-          status: reg.status, by: session.email, note: 'credit applied ' + cents + 'c'
-        });
-        next.payment = Object.assign({}, next.payment, {
-          paidCents: paid,
-          paidAt: new Date().toISOString(),
-          status: next.payment.owedCents != null && paid >= next.payment.owedCents ? 'paid' : 'owed'
-        });
-        await store.saveRegistration(next);
         await recordAudit(session, 'registrations.applyCredit',
-          body.participantId + '__' + body.activityId, 'ok', { detail: cents + 'c' });
-        return json(200, { ok: true, registration: next, entry: entry,
-                           balanceCents: balance - cents });
+          body.participantId + '__' + body.activityId, 'ok', { detail: done.spentCents + 'c' });
+        return json(200, { ok: true, registration: done.record, entry: done.entry,
+                           balanceCents: done.balanceCents });
       }
 
       // A correction, and it is an ENTRY rather than an edit. The ledger is

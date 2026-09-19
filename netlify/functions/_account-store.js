@@ -106,6 +106,30 @@ async function getAccountByEmail(email) {
   return id ? getAccount(id) : null;
 }
 
+// ⚠ EVERY ACCOUNT, AND THE ONLY SCAN IN THIS FILE.
+//
+// Nothing in the signed-in area ever needs it: a family reads their own record
+// through a pointer, which is the whole reason the pointer store exists. This is
+// for ONE screen — the admin's list of family accounts — and it is a scan
+// because there is no other question being asked. "Show me everyone" has no
+// index that would make it cheaper.
+//
+// It is deliberately not filtered or searched here. The list is small (a
+// community centre, not a mailing list) and the alternative is a query language
+// on a Blobs store; the screen filters what it is given, and the day this stops
+// fitting in one response is the day it needs paging rather than a smarter scan.
+async function allAccounts() {
+  const store = await optionalStore(ACCOUNTS);
+  if (!store) return [];
+  const { blobs } = await store.list({ prefix: 'acct-' });
+  const out = [];
+  for (const b of blobs) {
+    const rec = await store.get(b.key, { type: 'json' });
+    if (rec) out.push(rec);
+  }
+  return out.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+}
+
 // --- creating --------------------------------------------------------------
 
 // Throws with a message meant for a person. The one case it deliberately does
@@ -317,6 +341,7 @@ async function verifyPassword(email, password) {
 }
 
 module.exports = {
+  allAccounts,
   ACCOUNTS, EMAILS, ROUNDS, MIN_PASSWORD, MAX_FAILED, LOCK_MS,
   mintAccountId, normaliseEmail, validEmail, publicAccount, preferredLanguage,
   getAccount, getAccountByEmail, accountIdForEmail,

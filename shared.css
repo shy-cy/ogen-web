@@ -1212,6 +1212,35 @@ html[lang="he"] .thankyou h1{ font-family: var(--font-he); font-weight:700; }
    says the reading stops and the doing starts. */
 .acc-pay{ margin-block-start:20px; }
 
+/* ---- asking before something is undone -------------------------------------
+   ⚠ REPLACING window.confirm, WHICH IS NOT OURS TO STYLE.
+   The browser's dialog is pinned to the top of the viewport, carries the site's
+   DOMAIN as its heading, and renders in the operating system's own colours — so
+   the most consequential question this site asks ("cancel this session?")
+   arrived looking like a security warning from somewhere else. It also cannot
+   say what the answer COSTS, which on a cancellation is the whole of what a
+   family needs to know.
+   Centred, on paper, with the site's radius and type. Direction comes from
+   #page like everything else, so the buttons read in the right order in all
+   three languages with nothing directional written here. */
+.acc-modal{
+  position:fixed; inset:0; z-index:200;
+  display:flex; align-items:center; justify-content:center; padding:24px;
+  background:rgba(31,42,56,.55);
+}
+.acc-modal-box{
+  background:var(--paper); border-radius:14px; padding:26px 28px;
+  max-width:420px; width:100%; box-shadow:0 18px 50px rgba(31,42,56,.3);
+}
+.acc-modal-box h2{ margin:0 0 10px; font-size:19px; }
+.acc-modal-box p{ margin:0 0 6px; font-size:15px; line-height:1.55; }
+.acc-modal-box .acc-note{ margin-bottom:0; }
+/* The actions run along the reading direction and wrap on a narrow screen. The
+   destructive one is NOT the primary button: it is the quiet one, and staying
+   is the terracotta. A cancellation cannot be undone, so the easy press is the
+   one that changes nothing. */
+.acc-modal-acts{ display:flex; gap:10px; flex-wrap:wrap; margin-block-start:20px; }
+
 /* ---- waiting ---------------------------------------------------------------
    ⚠ THE SHAPE OF WHAT IS COMING, not a spinner.
    The family area fetches on every screen, and the wait was the word "Loading…"

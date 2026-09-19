@@ -106,6 +106,11 @@
       profileTitle: 'הפרטים שלי', editDetails: 'עריכת הפרטים',
       changePassword: 'שינוי סיסמה',
       currentPassword: 'סיסמה נוכחית', saved: 'נשמר.',
+      confirmTitle: 'לאשר?', confirmYes: 'כן, לבטל', confirmNo: 'חזרה',
+      confirmCredit: 'הסכום ששולם יוחזר כזיכוי לחשבון:',
+      confirmNoCredit: 'לא יוחזר זיכוי על הביטול הזה.',
+      useCredit: 'שימוש בזיכוי',
+      creditUsed: 'הזיכוי נוצל.', creditHave: 'יש לכם זיכוי:',
       registerTitle: 'הרשמה לפעילות', registerWho: 'מי נרשם/ת?',
       registerGroup: 'קבוצה', registerGo: 'הרשמה',
       registerFull: 'הפעילות מלאה.',
@@ -134,8 +139,7 @@
       buyValid: 'תוקף', buyDays: 'ימים',
       paySession: 'תשלום על המפגש', payingSession: 'פותח תשלום…',
       registerDone: 'ההרשמה בוצעה. קישור לתשלום יישלח אליכם בקרוב.',
-      owes: 'לתשלום', paid: 'שולם', feeIncluded: 'כולל דמי הרשמה שנתיים',
-      feeAlready: 'דמי ההרשמה השנתיים כבר שולמו',
+      owes: 'לתשלום', paid: 'שולם', feeAlready: 'דמי ההרשמה השנתיים כבר שולמו',
       places: 'מקומות פנויים', unlimited: 'ללא הגבלה',
       payLink: { expired: 'קישור התשלום פג או כבר אינו בתוקף. אפשר להתחבר ולשלם כאן.',
                  'not-approved': 'לא ניתן לשלם על ההרשמה הזו כרגע.',
@@ -210,6 +214,11 @@
       profileTitle: 'My details', editDetails: 'Edit my details',
       changePassword: 'Change password',
       currentPassword: 'Current password', saved: 'Saved.',
+      confirmTitle: 'Are you sure?', confirmYes: 'Yes, cancel it', confirmNo: 'Go back',
+      confirmCredit: 'What you paid comes back as credit on your account:',
+      confirmNoCredit: 'This cancellation earns no credit back.',
+      useCredit: 'Use credit',
+      creditUsed: 'Your credit has been used.', creditHave: 'You have credit:',
       registerTitle: 'Register for an activity', registerWho: 'Who is registering?',
       registerGroup: 'Group', registerGo: 'Register',
       registerFull: 'This activity is full.',
@@ -238,8 +247,7 @@
       buyValid: 'valid', buyDays: 'days',
       paySession: 'Pay for this session', payingSession: 'Opening payment…',
       registerDone: 'Registered. We will send you a payment link shortly.',
-      owes: 'To pay', paid: 'Paid', feeIncluded: 'includes the yearly registration fee',
-      feeAlready: 'yearly registration fee already paid',
+      owes: 'To pay', paid: 'Paid', feeAlready: 'yearly registration fee already paid',
       places: 'places left', unlimited: 'no limit',
       payLink: { expired: 'That payment link has expired or is no longer valid. You can sign in and pay here.',
                  'not-approved': 'This registration cannot be paid for at the moment.',
@@ -314,6 +322,11 @@
       profileTitle: 'Мои данные', editDetails: 'Изменить данные',
       changePassword: 'Изменить пароль',
       currentPassword: 'Текущий пароль', saved: 'Сохранено.',
+      confirmTitle: 'Вы уверены?', confirmYes: 'Да, отменить', confirmNo: 'Назад',
+      confirmCredit: 'Оплаченная сумма вернётся на счёт как зачёт:',
+      confirmNoCredit: 'За эту отмену зачёт не начисляется.',
+      useCredit: 'Использовать зачёт',
+      creditUsed: 'Зачёт использован.', creditHave: 'На счету есть зачёт:',
       registerTitle: 'Запись на занятие', registerWho: 'Кто записывается?',
       registerGroup: 'Группа', registerGo: 'Записаться',
       registerFull: 'Свободных мест нет.',
@@ -342,8 +355,7 @@
       buyValid: 'срок', buyDays: 'дней',
       paySession: 'Оплатить это занятие', payingSession: 'Открываем оплату…',
       registerDone: 'Запись оформлена. Ссылку на оплату мы пришлём в ближайшее время.',
-      owes: 'К оплате', paid: 'Оплачено', feeIncluded: 'включая годовой регистрационный взнос',
-      feeAlready: 'годовой регистрационный взнос уже оплачен',
+      owes: 'К оплате', paid: 'Оплачено', feeAlready: 'годовой регистрационный взнос уже оплачен',
       places: 'свободных мест', unlimited: 'без ограничения',
       payLink: { expired: 'Ссылка на оплату истекла или больше не действует. Вы можете войти и оплатить здесь.',
                  'not-approved': 'Эту запись сейчас нельзя оплатить.',
@@ -462,6 +474,81 @@
   //
   // aria-live for the same reason in the other direction: a message that appears
   // outside the viewport is also a message a screen reader never announces.
+  // ⚠ THE BUTTON THAT TURNS A BALANCE BACK INTO A PAID PLACE.
+  //
+  // Cancelling in time has written a credit since Phase 5 and the dashboard has
+  // shown the number since Phase 6, and until now that was the whole of it: a
+  // family could see what they were owed and could not use it. An admin could,
+  // from the Roster. The money was theirs and the button was somebody else's.
+  //
+  // It carries the FIGURE, because "use credit" beside a debt of €7 with €20 on
+  // the account raises the one question the label should answer. The amount is
+  // decided server-side — the smaller of what is owed and what is held — and the
+  // client shows the same arithmetic rather than sending a number of its own.
+  function useCreditButton(owing, balance, body, onDone) {
+    if (!(owing > 0) || !(balance > 0)) return null;
+    var amount = Math.min(owing, balance);
+    var btn = el('button', { type: 'button', class: 'acc-link',
+      text: T.useCredit + ' · ' + money(amount),
+      onclick: function () {
+        var done = busy(btn);
+        post(REGS, Object.assign({ action: 'useCredit' }, body)).then(function (res) {
+          done();
+          if (!res.ok) return say('err', failure(res));
+          say('ok', T.creditUsed);
+          onDone();
+        });
+      } });
+    return btn;
+  }
+
+  // ⚠ ASKING BEFORE SOMETHING IS UNDONE, IN OUR OWN WORDS.
+  //
+  // This was `window.confirm`, and three things were wrong with it. It is pinned
+  // to the top of the viewport, it is headed with the site's DOMAIN, and it
+  // paints in the operating system's colours — so the most consequential
+  // question this site asks a family arrived looking like a security warning
+  // from somewhere else.
+  //
+  // The third is the one that matters: a browser dialog takes a single string
+  // and cannot show what the answer COSTS. On a cancellation that is the whole
+  // of what somebody needs to know, and the server has already computed it —
+  // creditForSession() decided it before the button was drawn. So the credit
+  // line goes in the question.
+  //
+  // STAYING IS THE TERRACOTTA. Rule 5 says every actionable CTA is terracotta,
+  // and the action here is the one that changes nothing: a cancellation cannot
+  // be undone, so the easy press must be the one that leaves things alone.
+  function confirmAction(opts, onYes) {
+    var box = el('div', { class: 'acc-modal-box', role: 'dialog', 'aria-modal': 'true' }, [
+      el('h2', { text: T.confirmTitle }),
+      el('p', { text: opts.question }),
+      opts.note ? el('p', { class: 'acc-note', text: opts.note }) : null
+    ]);
+    var modal = el('div', { class: 'acc-modal' }, [box]);
+    function close() { if (modal.parentNode) modal.parentNode.removeChild(modal); }
+    box.appendChild(el('div', { class: 'acc-modal-acts' }, [
+      el('button', { type: 'button', class: 'btn-primary', text: T.confirmNo, onclick: close }),
+      el('button', { type: 'button', class: 'acc-link is-danger', text: opts.yes || T.confirmYes,
+        onclick: function () { close(); onYes(); } })
+    ]));
+    // On the mount rather than on <body>: #page owns the direction, so the
+    // buttons read in the right order in all three languages with nothing
+    // directional written into the block.
+    mount.appendChild(modal);
+  }
+
+  // What a cancellation is about to be worth, in a sentence. Taken from the
+  // SAME figure the server will apply, so the question and the outcome cannot
+  // disagree — a family told "€7 comes back" and credited nothing would have
+  // been told a lie by the screen that asked them.
+  function creditNote(cancellation) {
+    if (!cancellation) return null;
+    return cancellation.credit > 0
+      ? T.confirmCredit + ' ' + money(cancellation.credit)
+      : T.confirmNoCredit;
+  }
+
   // ⚠ WHAT IS COMING, DRAWN AT ITS OWN SHAPE.
   //
   // Every screen here fetches, and the wait was the word "Loading…" on an
@@ -1304,12 +1391,13 @@
       if (!p.isSelf && (res.data.guardians || []).length > 1) {
         sub.appendChild(el('button', { type: 'button', class: 'acc-link is-danger', text: T.leave,
           onclick: function () {
-            if (!window.confirm(T.leaveConfirm)) return;
-            post(FAMILY, { action: 'leaveParticipant', participantId: p.participantId })
-              .then(function (r) {
-                if (!r.ok) return say('err', failure(r));
-                boot();
-              });
+            confirmAction({ question: T.leaveConfirm, yes: T.leave }, function () {
+              post(FAMILY, { action: 'leaveParticipant', participantId: p.participantId })
+                .then(function (r) {
+                  if (!r.ok) return say('err', failure(r));
+                  boot();
+                });
+            });
           } }));
       }
       box.appendChild(sub);
@@ -1429,7 +1517,7 @@
       if (!act) body.appendChild(el('p', { class: 'acc-notice is-warn', text: T.activityGone }));
       else body.appendChild(factsBlock(act));
 
-      body.appendChild(costBlock(r, act));
+      body.appendChild(costBlock(r, act, res.data.balanceCents, renderActivity));
 
       // The sessions. A course lists the dates it meets on, which is the same
       // table the published page carries. A drop-in lists the evenings with what
@@ -1446,7 +1534,7 @@
         // both payloads. The panels keep their own fetch for the REDRAW after a
         // booking or a move, which is one panel changing rather than the page.
         renderBundlePanel(body, r, act, res.data.perSession);
-        renderEvenings(body, r, act, res.data.perSession);
+        renderEvenings(body, r, act, res.data.perSession, res.data.balanceCents);
       }
       else if (act && act.sessionRows && act.sessionRows.length) {
         body.appendChild(section(T.sessionsTitle, [courseSessions(act.sessionRows)]));
@@ -1472,12 +1560,14 @@
         body.appendChild(actions([
           el('button', { type: 'button', class: 'acc-link is-danger', text: T.cancelReg,
             onclick: function () {
-              if (!window.confirm(T.cancelRegConfirm)) return;
-              post(REGS, { action: 'cancel', participantId: r.participantId, activityId: r.activityId })
-                .then(function (c) {
-                  if (!c.ok) return say('err', failure(c));
-                  window.location.href = url('/account');
-                });
+              confirmAction({ question: T.cancelRegConfirm, note: creditNote(r.cancellation),
+                              yes: T.cancelReg }, function () {
+                post(REGS, { action: 'cancel', participantId: r.participantId, activityId: r.activityId })
+                  .then(function (c) {
+                    if (!c.ok) return say('err', failure(c));
+                    window.location.href = url('/account');
+                  });
+              });
             } })
         ]));
       }
@@ -1505,7 +1595,7 @@
   // term price: the fee is charged once a year and the course once a semester,
   // so their sum is a figure nobody is ever billed. The figures come from
   // priceRows() on the server, the same builder the public page uses.
-  function costBlock(r, act) {
+  function costBlock(r, act, balance, onDone) {
     var rows = (act && act.priceRows) || [];
     var kids = rows.map(function (row) {
       return el('div', { class: 'acc-money' }, [
@@ -1516,10 +1606,21 @@
         el('b', { text: row.value })
       ]);
     });
-    // Why 300 and not 350. The waiver is per participant, per activity, per
-    // academic year, and a family looking at a second term should be able to see
-    // that rather than wonder.
-    kids.push(el('p', { class: 'acc-meta', text: r.feeCharged === false ? T.feeAlready : T.feeIncluded }));
+    // ⚠ ONLY THE WAIVER, AND ONLY WHEN THERE IS A FEE TO WAIVE.
+    //
+    // This line used to be unconditional, and both halves of it were wrong.
+    // "Includes the yearly registration fee" restated a row that is already on
+    // the card directly above it, labelled and priced — and on a drop-in with no
+    // registration fee at all it was simply untrue: €7 for an evening, followed
+    // by a sentence about an annual fee nobody is charging.
+    //
+    // The half worth keeping is the other one. "Already paid" is why this term
+    // is 300 and not 350, and it is the one thing about the fee a family cannot
+    // work out from the figures in front of them. With no fee on the activity
+    // there is nothing to have been waived, so it says nothing at all.
+    if (r.feeCharged === false && r.registrationFee) {
+      kids.push(el('p', { class: 'acc-meta', text: T.feeAlready }));
+    }
     kids.push(el('div', { class: 'acc-money is-sum' }, [
       el('span', { text: T.paid }), el('b', { text: money(r.paidCents) })
     ]));
@@ -1533,6 +1634,16 @@
     kids.push(el('div', { class: 'acc-money is-sum' }, [
       el('span', { text: T.stillToPay }), el('b', { text: money(left) })
     ]));
+
+    // The wallet, on the page where it can be spent rather than only on the
+    // dashboard — which is not where anybody is standing when they owe
+    // something.
+    var useIt = useCreditButton(left, balance, { participantId: r.participantId,
+                                                 activityId: r.activityId }, onDone);
+    if (useIt) {
+      kids.push(el('p', { class: 'acc-note', text: T.creditHave + ' ' + money(balance) }));
+      kids.push(useIt);
+    }
 
     // THE PAY BUTTON, and what decides whether it is drawn.
     //
@@ -1740,7 +1851,7 @@
   }
 
   // ---- the evenings of a drop-in ----
-  function renderEvenings(where, r, act, seed) {
+  function renderEvenings(where, r, act, seed, balance) {
     var panel = el('div', {});
     where.appendChild(panel);
     if (!act) return;
@@ -1780,7 +1891,7 @@
           el('td', { class: 'is-num', text: s.priceBasis === 'bundle'
             ? T.fromBundle : money(s.owedCents) }),
           el('td', { class: 'is-num', text: money(s.paidCents) }),
-          el('td', {}, [eveningAction(s, data, r, act, draw)])
+          el('td', {}, [eveningAction(s, data, r, act, draw, balance)])
         ]));
       });
       panel.appendChild(section(T.sessionsTitle, [el('div', { class: 'acc-scroll' }, [table])]));
@@ -1793,7 +1904,7 @@
   // the deadline too, because a family can always say they are not coming; what
   // changes past it is only what it earns, and creditForSession() on the server
   // decided that before this button was drawn.
-  function eveningAction(s, data, r, act, redraw) {
+  function eveningAction(s, data, r, act, redraw, balance) {
     if (s.status === 'booked') {
       // ⚠ AN EVENING THAT IS BOOKED AND UNPAID HAD NO WAY TO BE PAID.
       //
@@ -1821,13 +1932,22 @@
           } });
         acts.push(payBtn);
       }
+      // Credit first, because it is the cheaper of the two ways to settle the
+      // same evening and a family holding a balance should not be sent to a card
+      // to spend it.
+      var useIt = useCreditButton(owing, balance, {
+        participantId: r.participantId, activityId: r.activityId, sessionDate: s.date
+      }, redraw);
+      if (useIt) acts.unshift(useIt);
       acts.push(el('button', { type: 'button', class: 'acc-link is-danger', text: T.cancelSession,
         onclick: function () {
-          if (!window.confirm(T.cancelSessionConfirm)) return;
+          confirmAction({ question: T.cancelSessionConfirm, note: creditNote(s.cancellation),
+                          yes: T.cancelSession }, function () {
           post(REGS, { action: 'cancelSession', participantId: r.participantId,
                        activityId: r.activityId, sessionDate: s.date }).then(function (c) {
             if (!c.ok) return say('err', failure(c));
             redraw();
+          });
           });
         } }));
       return el('div', { class: 'acc-evening-acts' }, acts);

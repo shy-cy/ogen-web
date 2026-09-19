@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ogen admin · Families</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+
+<div class="admin-bar">
+  <h1>Ogen admin</h1>
+  <a href="/admin/activities.html" style="color:#fff;font-size:12.5px;font-weight:700;opacity:.8;">Activities</a>
+  <a href="/admin/registrations.html" style="color:#fff;font-size:12.5px;font-weight:700;opacity:.8;">Roster</a>
+  <!-- FAMILIES, not "Accounts". That word was taken by the admin logins page
+       until it was renamed to Admins, and the confusion it caused is exactly
+       why nobody noticed there was no screen for the people who sign up. -->
+  <a href="/admin/families.html" style="color:#fff;font-size:12.5px;font-weight:700;">Families</a>
+  <a href="/admin/users.html" style="color:#fff;font-size:12.5px;font-weight:700;opacity:.8;">Admins</a>
+  <span class="spacer"></span>
+  <span class="who" id="who"></span>
+  <button type="button" id="logout">Sign out</button>
+</div>
+
+<div class="wrap" id="app" hidden>
+  <div id="no-access" class="msg err" hidden></div>
+
+  <div class="layout" id="tool">
+    <div class="sidebar">
+      <div class="panel">
+        <h2>Accounts</h2>
+        <!-- Filtered in the browser. The list is a community centre's, not a
+             mailing list's, and the alternative is a query language on a store
+             that has none. -->
+        <input type="search" id="q" placeholder="Name or email" autocomplete="off">
+        <div class="picker" id="picker" style="margin-top:12px;"></div>
+      </div>
+    </div>
+
+    <div class="main">
+      <div id="messages"></div>
+      <div class="panel" id="account-panel" hidden>
+        <h2 id="account-title">Account</h2>
+        <div id="account-body"></div>
+      </div>
+      <div class="panel" id="empty-panel">
+        <h2>Families</h2>
+        <p class="hint">Every account somebody has opened on the site. Choose one to see who is on it, what they are registered to, and what they are holding in credit.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/admin-session.js"></script>
+<script src="/js/families-admin.js"></script>
+</body>
+</html>

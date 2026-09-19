@@ -46,6 +46,20 @@ a{color:var(--terracotta);}
 .picker button:hover{background:var(--stone);}
 .picker button.active{background:var(--navy);color:var(--paper);}
 .picker .slug{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* The families picker is three lines per row where the activities picker is
+   one: a name, an address and what the account holds. Stacked rather than
+   inline, because an email is long and truncating the thing somebody is
+   searching for defeats the search. */
+.picker button.is-stacked, .picker button b{ display:block; }
+.picker button{ flex-wrap:wrap; }
+.picker button b{ width:100%; font-size:13px; }
+.picker button span{ width:100%; font-size:11.5px; color:var(--muted); }
+.picker button.active span{ color:rgba(255,255,255,.75); }
+#q{
+  width:100%; font-family:inherit; font-size:13px; padding:8px 10px;
+  border:1px solid var(--stone); border-radius:6px; background:#fff;
+}
+
 .pill{
   font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;
   padding:2px 7px;border-radius:999px;background:var(--stone);color:#5a5646;flex-shrink:0;

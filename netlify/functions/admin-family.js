@@ -1,6 +1,7 @@
 // /api/admin-family — the admin's way into a family record.
 //
-// Actions: findAccount | participant | linkGuardian | unlinkGuardian | deleteParticipant
+// Actions: accounts | account | findAccount | participant | linkGuardian |
+//          unlinkGuardian | deleteParticipant
 //
 // IT AUTHENTICATES THROUGH THE ADMIN STORE, and that is the only reason it is a
 // separate function from account-family.js rather than a branch inside it. One
@@ -21,6 +22,7 @@ const accounts = require('./_account-store');
 const participants = require('./_participant-store');
 const guardians = require('./_guardian-store');
 const registrations = require('./_registration-store');
+const ledger = require('./_credit-ledger');
 const attendance = require('./_session-attendance');
 const { recordAudit } = require('./_audit');
 
@@ -102,6 +104,86 @@ exports.handler = async (event) => {
 
   try {
     switch (body.action) {
+      // ⚠ EVERY FAMILY ACCOUNT, WHICH THERE WAS NO WAY TO SEE.
+      //
+      // The admin had `findAccount`, which answers "is there an account at this
+      // address" — useful when somebody has just told you their address on the
+      // phone, and no use at all for "who has signed up". There was no screen
+      // that could list the people this system exists for.
+      //
+      // ⚠ AND `Admins` IS NOT THAT SCREEN, which is how it stayed missing. That
+      // page manages admin LOGINS and roles, and it was called "Accounts" until
+      // the roster started showing family addresses and the name stopped being
+      // vague and became wrong. Renaming it closed the ambiguity and left the
+      // gap it was hiding.
+      //
+      // A LIST, not a search: the counts come from key scans that open no blob,
+      // and the screen filters what it is given. The day this stops fitting in
+      // one response it needs paging, not a cleverer query.
+      case 'accounts': {
+        const all = await accounts.allAccounts();
+        const rows = [];
+        for (const a of all) {
+          const ids = await guardians.participantIdsFor(a.accountId);
+          rows.push(Object.assign(accounts.publicAccount(a), {
+            name: displayName(a),
+            participantCount: ids.length
+          }));
+        }
+        // Who is looking, on the same response. A separate `auth` action would be
+        // a second round trip to fill in one line of the bar — and the tool gate
+        // above has already answered the only question it would ask.
+        return json(200, { ok: true, accounts: rows,
+                           admin: { name: session.name, roleName: session.roleName } });
+      }
+
+      // One account in full: who they are, who they guard, what those people are
+      // registered to, and what the account is holding in credit.
+      //
+      // ⚠ NO DATES OF BIRTH. `participant` above returns one, because an admin
+      // opening a single child's record is doing the job the age flag exists
+      // for. A list of everybody on the site is a different thing, and it does
+      // not need one — so the shape here is the NAME and the link, and the DOB
+      // stays one deliberate click away on the record it belongs to.
+      case 'account': {
+        const account = await accounts.getAccount(body.accountId);
+        if (!account) return json(404, { error: 'No such account.' });
+        const ids = await guardians.participantIdsFor(account.accountId);
+        const people = [];
+        const regs = [];
+        for (const id of ids) {
+          const p = await participants.getParticipant(id);
+          if (!p) continue;
+          people.push({
+            participantId: p.participantId,
+            name: [p.firstName, p.lastName].filter(Boolean).join(' '),
+            isPrimary: p.primaryAccountId === account.accountId
+          });
+          for (const reg of await registrations.forParticipant(id)) {
+            regs.push({
+              participantId: reg.participantId,
+              participantName: [p.firstName, p.lastName].filter(Boolean).join(' '),
+              activityId: reg.activityId,
+              slug: reg.frozen.activitySlugAtSubmission,
+              title: reg.frozen.activityTitle,
+              status: reg.status,
+              owedCents: reg.payment.owedCents,
+              paidCents: reg.payment.paidCents,
+              creditedCents: reg.payment.creditedCents
+            });
+          }
+        }
+        const entries = await ledger.entriesFor(account.accountId);
+        return json(200, {
+          ok: true,
+          account: Object.assign(accounts.publicAccount(account), { name: displayName(account) }),
+          participants: people,
+          registrations: regs,
+          balanceCents: ledger.balanceOf(entries),
+          entries: entries
+        });
+      }
+
       // Look up a guardian by address, so an admin can link an account they
       // have just been told about over the phone.
       case 'findAccount': {

@@ -2497,6 +2497,121 @@ current screen owns, and signing up *replaces* that screen — so the one thing 
 new account needs to know ("we have emailed you to confirm the address") was
 being written into a node discarded in the same repaint.
 
+### ⚠ A family could see their credit and not spend it
+
+Cancelling in time has written a ledger entry since Phase 5 and the dashboard has
+shown the balance since Phase 6. There was no action anywhere that turned it back
+into a paid place: `applyCredit` is gated on `canCancel`, an **admin**
+permission, so the only person who could spend a family's credit was somebody
+else. *"It comes back as credit"* was true and useless.
+
+`_spend-credit.js` is the one spender, called by both sides. Two
+implementations would be two that can cap differently or write the two halves in
+a different order, and the difference surfaces when a family reads their balance
+to the admin reading theirs.
+
+- **The ledger is written first** — the opposite of the rule for a *credit* and
+  right for the same reason. A debit without the payment is a visible line in an
+  append-only record a person reads, and is reversible with an adjustment; a
+  payment without the debit is credit spent twice with nothing saying so.
+- **⚠ Capped at what is owed**, which the admin's version did not do. Credit paid
+  beyond a debt is not a payment, it is credit **deleted**: the record reads
+  "paid" by more than it cost and the balance is lower with nothing to show for
+  the difference. A genuine correction is `adjustCredit`, which writes a line
+  saying what it was for.
+- **The amount is decided server-side** — the smaller of what is owed and what is
+  held. A client that names its own figure is a client that can name somebody
+  else's balance, and there is no other useful number to choose.
+- **The account that owes is the one credited.** A second guardian can book an
+  evening on a participant somebody else registered; a guardian link does not
+  authorise spending another account's credit.
+
+One action for both kinds of debt, because it is one question and the two records
+carry the same payment vocabulary on purpose — `sessionDate` says which. The
+balance now rides on the `registration` payload too, so the page showing a debt
+also shows the thing that settles it; the dashboard is not where anybody is
+standing when they owe something.
+
+### ⚠ "Includes the yearly registration fee" was printed under everything
+
+It sat under **every** cost card. It restated a row already on the card, labelled
+and priced — and on a drop-in with no registration fee it described a charge
+nobody is making: €7 for an evening, followed by a sentence about an annual fee.
+
+The half worth keeping is the other one. *"Already paid"* is why a second term is
+300 and not 350, and it is the one thing about the fee a family cannot work out
+from the figures in front of them. It appears only when a fee was actually
+waived; with no fee on the activity there is nothing to have been waived, and it
+says nothing at all. `feeIncluded` is deleted rather than left as dead copy in
+three languages.
+
+### ⚠ `window.confirm` is not ours to style
+
+Three destructive actions in the family area asked through the browser's dialog.
+It is pinned to the top of the viewport, headed with the site's **domain**, and
+painted in the operating system's colours — so the most consequential question
+this site asks arrived looking like a security warning from somewhere else.
+
+The third problem is the one that mattered: a browser dialog takes a single
+string and **cannot say what the answer costs**. On a cancellation that is the
+whole of what somebody needs to know, and the server has already computed it —
+`creditForSession()` decided it before the button was drawn. The credit line is
+in the question now, from that same figure, so what is asked and what happens
+cannot disagree.
+
+**Staying is the terracotta.** Rule 5 says every actionable CTA is terracotta,
+and the action here is the one that changes nothing: a cancellation cannot be
+undone, so the easy press is the one that leaves things alone. The dialog mounts
+inside `#page`, so direction comes from there and there is not one physical inset
+in the block.
+
+### The Families screen
+
+`/admin/families.html` — every account somebody has opened on the site: who they
+are, who they guard, what those people are registered to, and what the account is
+holding in credit.
+
+⚠ **It did not exist, and the reason it stayed missing is a word.** The admin had
+`findAccount`, which answers *"is there an account at this address"* — useful
+when somebody has read you their address over the phone, and no use at all for
+*"who has signed up"*. The page called **Accounts** was admin **logins**, so the
+bar already appeared to have a screen for this and did not. Renaming it to
+**Admins** closed the ambiguity and left the gap behind it.
+
+Gated on the `family` tool, Super Admin only, for the reason that permission
+exists: opening a family record means reading who somebody's children are.
+
+**No dates of birth.** The `participant` action returns one, because an admin
+opening a single child's record is doing the job the age flag exists for. A list
+of everybody on the site is a different thing and does not need one, so this
+carries the name and the link and the DOB stays one deliberate click away.
+
+`allAccounts()` is the only scan in `_account-store.js` and says so: nothing in
+the signed-in area ever needs it, because a family reads their own record through
+a pointer, which is the whole reason the pointer store exists. Filtering happens
+in the browser — the list is a community centre's, and the day it stops fitting
+in one response it needs paging rather than a cleverer query.
+
+It is **see**, mostly. Unlinking a guardian and deleting a participant already
+live in the flows that own them, with the last-guardian refusal and the debt
+disposition attached; a second door to them from a list would be a second place
+those refusals have to be remembered.
+
+### ⚠ Six files claimed to arm the legal gate and none of them did
+
+Every phase after the first added a store naming a participant, wrote
+*"Arms the legal gate, correctly"* at the top, and never appeared in the gate's
+own list: the attendance register, the bundles, the check-in tokens, the pay
+links and the credit ledger were all invisible to it while each file said
+otherwise.
+
+It fired anyway, because the files that **do** match are enough to arm it — which
+is exactly why nobody noticed. **A gate that is already armed cannot tell you
+what it is failing to see.** The store list is the thing that has to be complete,
+not the count of signals. `_spend-credit.js` now says the opposite and means it:
+it opens no store, so it does not arm the gate, and the records it writes through
+do.
+
 ### ⚠ Fewer calls, and a cached read that must never reach money
 
 The family area was slow because every screen was several API calls and each one

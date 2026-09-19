@@ -26,6 +26,7 @@ const store = require('./_registration-store');
 const R = require('./_registration');
 const credit = require('./_credit');
 const ledger = require('./_credit-ledger');
+const spend = require('./_spend-credit');
 const { cancelAndCredit } = require('./_registration-cancel');
 const attendance = require('./_session-attendance');
 const B = require('./_bundle');
@@ -893,6 +894,63 @@ exports.handler = async (event) => {
         return json(200, { ok: true, session: moved, bundle: B.bundleView(bundle, byDate, now) });
       }
 
+      // ⚠ SPENDING CREDIT, WHICH A FAMILY COULD NOT DO.
+      //
+      // Cancelling in time has written a line in the ledger since Phase 5, the
+      // dashboard has shown a balance since Phase 6, and there was no action
+      // anywhere that turned it back into a paid place. "It comes back as
+      // credit" was true and useless: an admin could apply it from the Roster
+      // and the family whose money it was could not.
+      //
+      // One action for both kinds of debt, because it is one question — "put
+      // some of what I am holding against this" — and the two records carry the
+      // same payment vocabulary. `sessionDate` is what says which.
+      //
+      // ⚠ THE AMOUNT IS DECIDED HERE, never taken from the request. A client
+      // that names its own figure is a client that can name somebody else's
+      // balance, and there is nothing useful to choose anyway: what can be spent
+      // is the smaller of what is owed and what is held, and any other number is
+      // either a leftover debt or credit deleted.
+      case 'useCredit': {
+        const participant = await mustGuard(body.participantId);
+        if (!participant) return json(404, { error: NOT_YOURS });
+
+        const record = body.sessionDate
+          ? await attendance.getAttendance(participant.participantId, body.activityId, body.sessionDate)
+          : await store.getRegistration(participant.participantId, body.activityId);
+        if (!record) return json(404, { error: 'No such registration.' });
+        // The account that OWES is the one credited, and it need not be this
+        // one: a second guardian can book an evening on a participant somebody
+        // else registered. Spending another account's credit is not something a
+        // guardian link authorises.
+        if (record.accountId !== me.accountId) {
+          return json(403, { error: 'That was booked on another account, so its credit is not yours to spend.',
+                             reason: 'not-your-debt' });
+        }
+
+        const balance = await ledger.balanceFor(me.accountId);
+        const cents = spend.spendable(record, balance);
+        if (!(cents > 0)) {
+          return json(409, {
+            error: balance > 0 ? 'There is nothing outstanding on this.' : 'There is no credit on this account.',
+            reason: balance > 0 ? 'nothing-due' : 'no-credit', balanceCents: balance
+          });
+        }
+
+        let done;
+        try {
+          done = await spend.spendCredit({
+            record: record, kind: body.sessionDate ? 'session' : 'registration',
+            cents: cents, by: me.accountId, note: 'applied by the account holder'
+          });
+        } catch (err) {
+          const code = err.reason === 'amount' ? 400 : 409;
+          return json(code, { error: err.message, reason: err.reason });
+        }
+        return json(200, { ok: true, spentCents: done.spentCents,
+                           balanceCents: done.balanceCents, entry: done.entry });
+      }
+
       case 'cancelSession': {
         const participant = await mustGuard(body.participantId);
         if (!participant) return json(404, { error: NOT_YOURS });
@@ -1026,6 +1084,10 @@ exports.handler = async (event) => {
           // empty: the client draws those panels only for a drop-in, and an empty
           // object would be a claim that there are no evenings rather than that
           // the question does not arise.
+          // What this account is holding, so the page that shows a debt can also
+          // show the thing that settles it. It was on the dashboard only, which
+          // is not where anybody is standing when they owe something.
+          balanceCents: await ledger.balanceFor(me.accountId),
           perSession: activity && activity.type === 'dropin'
             ? Object.assign(
                 await sessionsPayload(activity, participant.participantId, Date.now()),
