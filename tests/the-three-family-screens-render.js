@@ -353,5 +353,36 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
   H.ok(has(dom, 'Registered. The payment is on the registration page.'),
     'the confirmation is still on screen — rebooting the dashboard used to throw it away');
 
+  console.log('\n[the family area answers "what else is there", not only "what am I in"]');
+  // ⚠ IT HAD NO ANSWER AT ALL. The dashboard listed what you are registered to
+  // and offered no route to anything new — the only way to the listing was the
+  // nav of some other page. The register PANEL is not that route and must not
+  // become it: it is drawn from ?register= alone, because registering belongs on
+  // an activity page, where the description, the price and the dates are. This
+  // is a link out.
+  dom = await screen({ view: 'account', lang: 'en' });
+  H.ok(!has(dom, 'Register for an activity'),
+    'arriving with no ?register= draws no registration form — this is the family area');
+  const browse = D.byTag(dom.mount, 'a').filter((a) => /See all activities/.test(a.textContent))[0];
+  H.ok(browse, 'and there is a link to the activities listing');
+  H.eq(browse.getAttribute('href'), '/en/activities', 'in the reader\'s own tree');
+
+  // With nothing registered it is the whole answer, so it has to be there too —
+  // that is the screen where "what else is there" is the ONLY question.
+  dom = await screen({ view: 'account', lang: 'en',
+                       api: { dashboard: () => ({ ok: true, registrations: [], participantCount: 1,
+                                                  balanceCents: 0, entries: [] }) } });
+  H.ok(has(dom, 'No registrations yet.'), 'an empty list says so');
+  H.ok(D.byTag(dom.mount, 'a').some((a) => /See all activities/.test(a.textContent)),
+    'and still offers the way to find one');
+
+  // Russian, because the link is built from the tree prefix rather than a
+  // hardcoded path, and that is exactly the kind of thing that works in Hebrew
+  // and sends a Russian reader into the default tree.
+  dom = await screen({ view: 'account', lang: 'ru' });
+  const ruBrowse = D.byTag(dom.mount, 'a').filter((a) => /Все занятия/.test(a.textContent))[0];
+  H.ok(ruBrowse, 'the Russian dashboard has it too');
+  H.eq(ruBrowse.getAttribute('href'), '/ru/activities', 'pointing inside the Russian tree');
+
   H.done();
 })();

@@ -1063,6 +1063,18 @@ html[lang="he"] .thankyou h1{ font-family: var(--font-he); font-weight:700; }
 }
 .acc-inline{ margin-block-start:16px; }
 
+/* The way out of the family area to something new. It sits at the foot of the
+   registrations card in both states — with rows and with none — so "what else is
+   there" is answered in the same place as "what am I in". A rule above it rather
+   than a button: this is a link out of the page, not an action on it, and rule 5
+   reserves the terracotta fill for things that DO something. .acc-row already
+   draws a line under every row but the last, so the border lands only where one
+   is missing. Nothing here is edge-aligned, so there is nothing directional. */
+.acc-browse{
+  margin:0; padding-block-start:14px; border-block-start:1px solid var(--stone);
+}
+.acc-card > .acc-intro + .acc-browse{ border-block-start:0; padding-block-start:0; }
+
 /* A row of buttons. Nothing in the family area is built from HTML source — it is
    all createElement — so two adjacent buttons have no whitespace text node
    between them and sit flush against each other. The gap has to be declared.

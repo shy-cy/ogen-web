@@ -87,6 +87,7 @@
       emailFixed: 'לשינוי כתובת הדוא״ל פנו אלינו.',
 
       activitiesTitle: 'הפעילויות שלי', noRegs: 'אין עדיין הרשמות.',
+      browseActivities: 'לכל הפעילויות',
       grpCurrent: 'פעילות כעת', grpPast: 'הסתיימו', viewDetails: 'לפרטים',
       cancelReg: 'ביטול הרשמה', cancelRegConfirm: 'לבטל את ההרשמה?',
       regNotFound: 'לא נמצאה הרשמה.',
@@ -194,6 +195,7 @@
       emailFixed: 'To change your email address, please contact us.',
 
       activitiesTitle: 'My activities', noRegs: 'No registrations yet.',
+      browseActivities: 'See all activities',
       grpCurrent: 'Current', grpPast: 'Finished', viewDetails: 'View details',
       cancelReg: 'Cancel registration', cancelRegConfirm: 'Cancel this registration?',
       regNotFound: 'That registration was not found.',
@@ -301,6 +303,7 @@
       emailFixed: 'Чтобы изменить адрес электронной почты, свяжитесь с нами.',
 
       activitiesTitle: 'Мои занятия', noRegs: 'Записей пока нет.',
+      browseActivities: 'Все занятия',
       grpCurrent: 'Текущие', grpPast: 'Завершённые', viewDetails: 'Подробнее',
       cancelReg: 'Отменить запись', cancelRegConfirm: 'Отменить эту запись?',
       regNotFound: 'Запись не найдена.',
@@ -451,6 +454,17 @@
   // '/ru', so one helper keeps a reader inside the language they are reading.
   function url(path, query) {
     return base + path + (query ? '?' + query : '');
+  }
+
+  // Drop ?register= once it has been acted on, without navigating — a redraw is
+  // already happening and a navigation would throw away the confirmation it just
+  // wrote. See the note at the call site.
+  function forgetRegisterQuery() {
+    try {
+      var h = window.history;
+      if (!h || !h.replaceState || !param('register')) return;
+      h.replaceState(null, '', window.location.pathname + window.location.hash);
+    } catch (err) {}
   }
 
   var notice = null;
@@ -653,10 +667,9 @@
   // The two are a real distinction on our side — approved is what opens
   // payment — but "waiting for an answer" is not the state a parent is in.
   // They have registered; if we cannot take the place we write to them and say
-  // so, which is the rejection message. The difference between the two is
-  // already expressed where it matters: a pay button on one, "a payment link
-  // is on its way" on the other. Do not put the word "pending" back in front
-  // of a family — the admin queue is where that word belongs.
+  // so, which is the rejection message. Both are payable, so the difference is
+  // not a button either. Do not put the word "pending" back in front of a
+  // family — the admin queue is where that word belongs.
   function pill(status, table) {
     return el('span', { class: 'acc-pill is-' + status, text: (table || T.status)[status] || status });
   }
@@ -990,6 +1003,16 @@
         // that had just been written into it, so the one thing a family needed
         // to see — that the child is registered and where the payment is —
         // was on screen for the length of one repaint.
+        //
+        // ⚠ AND THE QUERY GOES, so the form does not outlive the errand. This
+        // panel is drawn from ?register=<slug> and nothing else: the family area
+        // is where you see what you are registered TO, and registering is a
+        // thing you arrive here to do from an activity page. Left in the URL,
+        // a reload or a back button reopens a filled-in registration form on a
+        // page headed "My family", which is what makes it look like the place
+        // registration lives. Guarded because replaceState is a browser method
+        // and the DOM this script is tested in implements only what it uses.
+        forgetRegisterQuery();
         clear(where);
         where.appendChild(section(null, [
           el('p', { class: 'acc-notice is-ok', text: T.registerDone })
@@ -1119,12 +1142,29 @@
   // registers one participant to one activity, so two children in the same class
   // are two registrations with their own status, price and cancellation. A row
   // that named only the activity would be hiding which of them it was about.
+  // ⚠ THE WAY OUT TO SOMETHING NEW, and it was missing entirely.
+  //
+  // The family area answers "what am I registered to" and had no answer at all
+  // for "what else is there" — the only route to a new activity was the public
+  // listing, reachable from the nav of every page except the one a family is
+  // standing on when they think of it. Registering happens on an activity page,
+  // which is right: that is where the description, the price and the dates are,
+  // and the register panel here only exists because the Register button on that
+  // page has to land somewhere signed in. So this is a link out, not a second
+  // place to register.
+  //
+  // In the reader's own tree — /activities, /en/activities, /ru/activities.
+  function browseLink() {
+    return el('p', { class: 'acc-browse' },
+      [el('a', { class: 'acc-link', href: url('/activities'), text: T.browseActivities })]);
+  }
+
   function renderRegistrations(where, list) {
     if (!where) return;
     clear(where);
     if (!list.length) {
       return where.appendChild(section(T.activitiesTitle,
-        [el('p', { class: 'acc-intro', text: T.noRegs })]));
+        [el('p', { class: 'acc-intro', text: T.noRegs }), browseLink()]));
     }
     // LIVE OR FINISHED, which is what the data actually says. Not "upcoming and
     // past" — a row carries no end date, so grouping by time would be a claim
@@ -1140,6 +1180,7 @@
       kids.push(el('h3', { class: 'acc-group', text: g.label }));
       g.rows.forEach(function (r) { kids.push(regRow(r)); });
     });
+    kids.push(browseLink());
     where.appendChild(section(T.activitiesTitle, kids));
   }
 

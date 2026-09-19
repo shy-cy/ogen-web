@@ -2370,6 +2370,22 @@ family opens it for — *is Noa in?* — was the hardest thing on it to find. Th
 dashboard is now two summary tiles and the list, and the tiles are links rather
 than ornaments: "My family · 4" is how you reach the four people.
 
+**And it answers "what else is there", which it did not.** The dashboard listed
+what you are registered to and offered **no route to anything new** — the only
+way to the listing was the nav of some other page, which is not the page a family
+is standing on when the thought occurs. There is a `See all activities` /
+`לכל הפעילויות` / `Все занятия` link at the foot of the registrations card in
+both states, in the reader's own tree.
+
+⚠ **The register panel is NOT that route, and must not become it.** It is drawn
+from `?register=<slug>` and from nothing else, because registering belongs on an
+activity page — that is where the description, the price and the dates are — and
+this panel exists only because the Register button there has to land somewhere
+signed in, to ask *who*. The query is dropped with `replaceState` once it has
+been acted on, so a reload or a back button does not reopen a registration form
+on a page headed "My family". Left in the URL it does exactly that, which is what
+made the family area look like the place registration lives.
+
 **Every row is a person AND an activity**, never an activity alone. Ogen
 registers one participant to one activity, so two children in the same class are
 two registrations with their own status, price and cancellation; a row naming
