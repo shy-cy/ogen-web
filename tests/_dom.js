@@ -186,6 +186,15 @@ function makeDom(opts) {
   const document = {
     documentElement: { lang: opts.lang || 'he' },
     createElement: node,
+    // An SVG element made with createElement is an HTMLUnknownElement and draws
+    // nothing, so js/member-account.js reaches for the namespaced factory to put
+    // a Lucide tick in the waiting block. One method, recording the namespace —
+    // NOT an innerHTML parser, which is the line this shim exists not to cross.
+    createElementNS: (ns, tag) => {
+      const n = node(tag);
+      n.namespaceURI = ns;
+      return n;
+    },
     createTextNode: text,
     getElementById: (id) => (id === 'account-mount' ? root : null)
   };

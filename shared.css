@@ -1108,11 +1108,45 @@ html[lang="he"] .thankyou h1{ font-family: var(--font-he); font-weight:700; }
   display:inline-block; font-size:12.5px; font-weight:700; padding:3px 10px;
   border-radius:99px; background:var(--stone); color:var(--ink);
 }
-.acc-pill.is-pending{ background:var(--gold); color:#fff; }
+/* ⚠ WHITE ON --gold WAS 3.18:1, which is below AA for 12.5px bold text. The
+   token is a background colour chosen to sit under white at display sizes, and
+   this pill is neither. Darkened along the same hue until white clears 4.5 —
+   #96651F is 5.03:1 — rather than recolouring the state, so the gold reading
+   survives. Computed, not eyeballed: the sibling rule below is white on --olive
+   at 6.53:1 and needed nothing. */
+.acc-pill.is-pending{ background:#96651F; color:#fff; }
 .acc-pill.is-approved{ background:var(--olive); color:#fff; }
 .acc-pill.is-rejected, .acc-pill.is-expired, .acc-pill.is-cancelled{
   background:var(--stone); color:var(--camel);
 }
+
+/* ⚠ REGISTERED, PAYMENT NOT YET OPEN — and it must read as "nothing is wrong".
+   It sits where the pay button would be, so the first thing it has to do is not
+   look like one: this codebase learned the hard way that a SOLID FILL PLUS A
+   FULL PILL means pressable — a status tag that was property-for-property the
+   button beneath it, and readers pressed it. So a tinted ground, an 8px radius
+   and dark text, borrowing .acc-notice's leading-rule idiom so it reads as
+   family rather than as a new invention.
+
+   OLIVE, NOT GOLD. Gold is the advisory colour — the admin queue's age flag —
+   and reads as "look at this"; olive is this site's "nothing is wrong", which is
+   why the nav chip's signed-in initial is olive rather than terracotta.
+
+   The ground is olive at 10% over paper. Computed rather than eyeballed: olive
+   text on it is 5.45:1 and ink on it 9.45:1, both clear of AA. Nothing here is
+   pushed to an edge and the rule is logical, so it mirrors with the page and
+   there is no per-language override. */
+.acc-waiting{
+  margin-block-start:16px; padding:13px 16px; border-radius:8px;
+  background:#EBEBE5; border-inline-start:3px solid var(--olive);
+}
+.acc-waiting-lead{
+  display:flex; align-items:center; gap:8px;
+  margin:0 0 5px; font-size:15px; font-weight:700; color:var(--olive);
+}
+/* The glyph must not squash when the label wraps to a second line. */
+.acc-waiting-lead svg{ flex:none; }
+.acc-waiting-body{ margin:0; font-size:15px; color:var(--ink); }
 
 .acc-balance{ font-size:30px; font-weight:700; margin:0 0 10px; font-variant-numeric:tabular-nums; }
 

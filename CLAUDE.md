@@ -1699,34 +1699,80 @@ email both say the child is registered and point at the page the payment is on,
 and **`pending` and `approved` both read "registered" to a family**. `pending`
 survives in the admin queue, which is the only place that word belongs.
 
-⚠ **AND THE DIFFERENCE STOPPED BEING A PAY BUTTON.** For a while `approved` drew
-one and `pending` drew the sentence *"we will send you a payment link shortly"*
-in its place — under a figure reading **Still to pay €500.00**. That is a bill
-with the means to settle it withheld, and the link it promised exists only once
-an admin reaches the queue, so on a manually-approved activity it could be days.
-It also contradicted the line above it: if the two read "registered" alike, one
-of them cannot then be told to wait for permission to pay.
+⚠ **THE DIFFERENCE IS STILL A PAY BUTTON, AND THE ROUND TRIP IS WORTH KEEPING.**
+For one release `pending` was payable. The bug that prompted it was real: the
+cost card read **Still to pay €500.00** with no button under it and the sentence
+*"we will send you a payment link shortly"* in its place — a bill with the means
+to settle it withheld, naming a link that on a manually-approved activity exists
+only once an admin reaches the queue.
 
-`isPayable()` in `_checkout.js` is the single list — `pending` and `approved`,
-read by the signed-in `pay` action **and by the emailed `/pay` link**, which
-matters there too: a receipt for a part payment on a pending registration mints
-one of those links, and it would otherwise have been dead on arrival. The client
-reads the same two statuses, so it cannot hide a button the server would honour.
+**The fix for a bill with no button was never to make it payable.** `pending`
+arises *only* when a person has something to decide — `autoApprove` is off, or an
+age could not be confirmed — so there is no such thing as a pending registration
+nobody needs to look at, and "pending is payable" means *pay for a place we have
+not agreed to give you* in **every** case rather than in an edge one. The tell
+was what had to be built beside it: `paidRefusal()`, a guard stopping an admin
+rejecting a family who had already paid. Needing machinery to contain a
+consequence usually means the change created the problem.
 
-**The cost is a refusal after a payment, and it is guarded rather than ignored.**
-Rejecting a registration that is holding money would leave us with it and
-nothing in the record saying we owe it back — the family has no place, so nothing
-bills it and nothing ever asks. `paidRefusal()` in `admin-registrations.js`
-refuses, names the amount, and names the route that *does* account for it:
-**cancelling**, which writes the credit through the ledger and sends the message.
-Cancel rather than reject is a real loss of meaning — "we could not take your
-child" and "this registration ended" are different events — and it is the honest
-trade until there is a refund path. It is asked in two places, `decide()` and
-`rejectPreview`, so an admin learns before writing a paragraph rather than after;
-one builder, so the two cannot disagree about the figure or the wording. And
-`creditedCents` comes **off** the total held, which is the opposite of
-`dueCents()`, where it is deliberately not subtracted because there it is already
-inside `paidCents`.
+`isPayable()` in `_checkout.js` is `['approved']`, read by the signed-in `pay`
+action **and** by the emailed `/pay` link, so the two doors cannot disagree about
+what is chargeable. `paidRefusal()` **stays** — approved → paid → an admin
+rejects is still reachable and is exactly the case it was written for.
+
+**What a pending family sees is the waiting block**, `waitLead` / `waitBody` on
+the cost card. It is the branch that was missing, not a line of copy that was
+wrong: one grey sentence under a figure says as much about a screen that is
+working as about one that is broken. It leads with **what is true** — `Registered
+— payment opens soon` / `ההרשמה בוצעה — התשלום ייפתח בקרוב` / `Запись оформлена —
+оплата откроется скоро` — and then explains: the participant is registered, we
+are confirming the last few details, payment will open here, we will email. The
+participant's name is in it and the activity's is not, because the page is
+already headed with the activity.
+
+The wording is **lifted from `_registration-email.js` rather than invented** —
+`נרשם/ה` and `записан(а)` are that module's gender-neutral forms and
+`ההרשמה בוצעה` / `Запись оформлена` its headings — so the inbox and the screen
+cannot drift. None of it says *pending*, *awaiting*, *approval* or *request*; a
+test asserts all four are absent from the rendered screen.
+
+**The treatment had to not look pressable.** It sits where the pay button would
+be, and this codebase already learned that **a solid fill plus a full pill means
+press me** — so it is a tinted ground, an 8px radius and dark text, borrowing
+`.acc-notice`'s leading-rule idiom so it reads as family rather than as a new
+invention. **Olive, not gold**: gold is the advisory colour the admin queue uses
+for the age flag and reads as *look at this*, where olive is this site's
+*nothing is wrong* — the same reason the nav chip's signed-in initial is olive
+rather than terracotta. Computed rather than eyeballed: olive on the 10% tint is
+5.45:1 and ink on it 9.45:1.
+
+The glyph is a **check, not a clock**, and that is the whole job of it — the
+block exists to say *nothing is wrong* at a glance, and a clock says *wait*,
+which is the reading it exists to prevent. What is done is the registration; the
+payment opening is the follow-on, and the sentence carries that. It is 15px and
+inline rather than white in a 56px disc, because rule 6's shape is for section
+markers and a 56px circle beside one line is larger than the thing it labels —
+the same argument that took the fact-group icons to 34px. A test pins the path
+data, not the name of the constant holding it.
+
+⚠ **It is built with `createElementNS`.** An `<svg>` made with `createElement` is
+an `HTMLUnknownElement` and draws nothing. `js/nav.js` and `js/motifs.js` set
+`innerHTML` instead; this file has never used it, which is the reason
+`tests/_dom.js` can execute it at all, and adding an HTML parser to that shim to
+draw one tick would be the wrong trade. The shim gained the one namespaced
+factory and nothing else.
+
+⚠ **And a separate contrast bug was fixed in the same pass.**
+`.acc-pill.is-pending` painted white on `--gold`, which is **3.18:1** — below AA
+for 12.5px bold text. The token is a *background* chosen to sit under white at
+display sizes, and a pill is neither. It is `#96651F` now, darkened along the
+same hue so the gold reading survives, at 5.03:1. Its sibling `.is-approved` is
+white on olive at 6.53:1 and needed nothing.
+
+⚠ **There was no `pending` fixture anywhere in the tests**, which is why the
+screen a family sees while an admin has not answered yet had never once been
+drawn by anything. Every row in `the-three-family-screens-render.js` was approved
+or over. There is one now, and the branch is executed rather than read.
 
 **That moved `DEFAULT_EXPIRY_DAYS` from 14 to 45**, because the number and the
 sentence were one thing. The confirmation used to promise an answer within the

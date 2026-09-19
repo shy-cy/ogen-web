@@ -1229,13 +1229,13 @@ exports.handler = async (event) => {
         if (refusal) return refusal;
 
         // ONE LIST, BOTH DOORS — see isPayable() in _checkout.js, which the
-        // emailed pay link reads too. `pending` is payable: a family told they
-        // are registered and shown what they owe must be able to settle it.
-        // The reason keeps its name so the refusal page's ?pay=not-approved
-        // copy still reads correctly for the three statuses that mean it.
+        // emailed pay link reads too. Approved only: `pending` means a person
+        // still has something to decide, and money must not move against a place
+        // nobody has agreed to give. What a pending family sees on the card is
+        // the waiting block, not silence.
         if (!checkout.isPayable(reg)) {
           return json(409, {
-            error: 'This registration is ' + reg.status + '. Only a live registration can be paid for.',
+            error: 'This registration is ' + reg.status + '. Only an approved place can be paid for.',
             reason: 'not-approved', status: reg.status
           });
         }

@@ -75,12 +75,14 @@ const registrationHref = (reg, l) =>
 // they consider settled. If we cannot take the place we write and say so, and
 // that message already exists — REJECTED, below.
 //
-// ⚠ AND IT NO LONGER PROMISES A LINK. It used to say "we will send you a
-// payment link shortly", which was the truth about our queue again rather than
-// about the family: on a manually-approved activity that link exists only once
-// an admin gets to it. A pending registration is payable now — see isPayable()
-// in _checkout.js — so the message points at the page, where the button is, and
-// is equally true whether the activity auto-approves or not.
+// ⚠ AND IT STILL DOES NOT PROMISE A LINK. It used to say "we will send you a
+// payment link shortly", which was the shape of our queue again rather than of
+// the family: on a manually-approved activity that link exists only once an
+// admin gets to it, and "shortly" was a guess. It says what is actually
+// happening instead — we are finishing the details, payment opens on the page,
+// we will write — matching `waitBody` on the card word for word in intent, so
+// the inbox and the screen say one thing. An activity that auto-approves sends
+// APPROVED instead and the payment is live the moment they open the page.
 // --- we have your request --------------------------------------------------
 
 const RECEIVED = {
@@ -88,22 +90,22 @@ const RECEIVED = {
     subject: (child, act) => `${child} נרשם/ה ל${act}`,
     heading: 'ההרשמה בוצעה',
     body: (child, act) => `${child} נרשם/ה ל${act}.`,
-    next: 'התשלום נמצא בעמוד ההרשמה, ואפשר לשלם כבר עכשיו.',
-    button: 'לתשלום ולפרטים'
+    next: 'נשלים כמה פרטים אחרונים, והתשלום ייפתח בעמוד ההרשמה. נעדכן אתכם במייל.',
+    button: 'לעמוד ההרשמה'
   },
   en: {
     subject: (child, act) => `${child} is registered for ${act}`,
     heading: 'Registered',
     body: (child, act) => `${child} is registered for ${act}.`,
-    next: 'The payment is on your registration page, and you can pay now.',
-    button: 'Pay and see the details'
+    next: 'We are confirming the last few details, and payment will open on your registration page. We will email you.',
+    button: 'Go to the registration'
   },
   ru: {
     subject: (child, act) => `${child} записан(а) на ${act}`,
     heading: 'Запись оформлена',
     body: (child, act) => `${child} записан(а) на ${act}.`,
-    next: 'Оплата — на странице записи, оплатить можно уже сейчас.',
-    button: 'Оплата и подробности'
+    next: 'Мы уточняем последние детали, оплата откроется на странице записи. Мы напишем вам.',
+    button: 'Страница записи'
   }
 };
 

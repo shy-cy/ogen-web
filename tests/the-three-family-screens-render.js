@@ -59,7 +59,15 @@ const REGS = [
     title: { en: 'Autumn term', he: 'סמסטר סתיו', ru: 'Осенний семестр' },
     type: 'course', status: 'cancelled', holdsASpot: false,
     owedCents: 30000, paidCents: 0, creditedCents: 0, feeCharged: false,
-    cancellation: { guardianMayCancel: false } }
+    cancellation: { guardianMayCancel: false } },
+  // ⚠ THERE WAS NO PENDING FIXTURE, which is why the screen a family sees while
+  // an admin has not answered yet was never once drawn by anything. Every row
+  // here was approved or over.
+  { participantId: 'p-2', participantName: 'Noa Levi', activityId: 'act-4', slug: 'drama',
+    title: { en: 'Drama club', he: 'חוג דרמה', ru: 'Театральный кружок' },
+    type: 'course', groupId: null, groupName: null,
+    status: 'pending', holdsASpot: true, owedCents: 50000, paidCents: 0, creditedCents: 0,
+    feeCharged: true, cancellation: { guardianMayCancel: true, total: 0 } }
 ];
 
 const sent = [];
@@ -350,8 +358,36 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
   // queue, not of what the family just did. It no longer promises a LINK
   // either: a pending registration is payable, so the payment is already on the
   // page rather than waiting on an admin reaching the queue.
-  H.ok(has(dom, 'Registered. The payment is on the registration page.'),
+  H.ok(has(dom, 'Registered. The details and the payment are on the registration page.'),
     'the confirmation is still on screen — rebooting the dashboard used to throw it away');
+
+  console.log('\n[registered, and payment not yet open — the waiting state]');
+  // ⚠ EXECUTED, not read. The words are one half; the other half is that the
+  // branch runs at all, draws its glyph, and puts the participant's name in the
+  // sentence rather than the literal {name}.
+  dom = await screen({ view: 'activity', lang: 'en', search: '?p=p-2&a=act-4' });
+  H.ok(has(dom, 'Registered — payment opens soon'), 'the lead says registered FIRST, then what is next');
+  H.ok(has(dom, 'Noa Levi is registered.'), 'and the sentence names the participant');
+  H.ok(!has(dom, '{name}'), 'the placeholder was filled, not printed');
+  H.ok(!has(dom, 'Pay securely'), 'there is no pay button — nobody has agreed to the place yet');
+  // None of the words a family must not be handed about their own registration.
+  ['pending', 'awaiting', 'request', 'approval'].forEach((w) => {
+    H.ok(!new RegExp(w, 'i').test(dom.mount.textContent),
+      'and it never says "' + w + '" — that is the shape of our queue, not of what they did');
+  });
+  const tick = D.byTag(dom.mount, 'svg')[0];
+  H.ok(tick, 'the check is drawn');
+  H.eq(tick.namespaceURI, 'http://www.w3.org/2000/svg',
+    'in the SVG namespace — createElement would make an HTMLUnknownElement that renders nothing');
+  H.eq(tick.getAttribute('aria-hidden'), 'true', 'and hidden from a screen reader, which has the words');
+
+  // The same state in Hebrew, because the copy carries a gender-neutral form
+  // lifted from the email module and a placeholder that has to survive RTL.
+  dom = await screen({ view: 'activity', lang: 'he', search: '?p=p-2&a=act-4' });
+  H.ok(has(dom, 'ההרשמה בוצעה — התשלום ייפתח בקרוב'), 'the Hebrew lead');
+  // The NAME is not translated — it is whatever the family typed, in whatever
+  // script they typed it in, and it appears verbatim in all three trees.
+  H.ok(has(dom, 'Noa Levi נרשם/ה.'), 'and the gender-neutral form the emails already use');
 
   console.log('\n[the family area answers "what else is there", not only "what am I in"]');
   // ⚠ IT HAD NO ANSWER AT ALL. The dashboard listed what you are registered to

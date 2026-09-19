@@ -117,14 +117,18 @@ const client0 = fs.readFileSync(path.join(R, 'js/member-account.js'), 'utf8');
 H.ok(/resendVerification/.test(client0), 'and the dashboard still offers it');
 H.ok(/!account\.emailVerifiedAt/.test(client0), 'and still says so when the address is unconfirmed');
 
-console.log('\n[gate 2: the place must be a LIVE one — and pending counts]');
-// ⚠ IT WAS `approved` ONLY, AND THAT PRODUCED A BILL WITH NO BUTTON. A family's
-// cost card read "Still to pay  €500.00" with nothing under it but the sentence
-// "We will send you a payment link shortly" — a link that, on a manually
-// approved activity, exists only once an admin reaches the queue. It also
-// contradicted the copy above it: `pending` and `approved` both read
-// "registered" to a family on purpose, so one told they are registered and
-// shown what they owe must be able to settle it.
+console.log('\n[gate 2: the place must be APPROVED — pending is explained, not charged]');
+// ⚠ THE ROUND TRIP IS THE POINT, and this suite is where it is pinned.
+//
+// `pending` was briefly payable, to fix a real bug: a cost card reading "Still
+// to pay €500.00" with nothing under it but "We will send you a payment link
+// shortly" — a link that, on a manually approved activity, exists only once an
+// admin reaches the queue.
+//
+// The fix for a bill with no button was never to make it payable. `pending`
+// arises ONLY when a person has something to decide, so paying then buys a place
+// nobody has agreed to give — in every case, not an edge one. What the family
+// gets instead is the waiting block, asserted below.
 //
 // ONE LIST, BOTH DOORS. The signed-in action and the emailed link must never
 // disagree about what is chargeable, so neither compares a status itself.
@@ -136,9 +140,9 @@ H.ok(/if \(!isPayable\(reg\)\) return refuse\(lang, 'not-approved', reg\)/.test(
   + 'pending registration mints a link that would otherwise be dead on arrival');
 const payable = (/const PAYABLE_STATUSES = \[([^\]]*)\]/.exec(
   fs.readFileSync(path.join(R, 'netlify/functions/_checkout.js'), 'utf8')) || [, ''])[1];
-H.ok(/'pending'/.test(payable) && /'approved'/.test(payable), 'the list is pending and approved');
-['rejected', 'expired', 'cancelled'].forEach((st) => {
-  H.ok(payable.indexOf("'" + st + "'") === -1, st + ' is not payable — there is no place to pay for');
+H.eq(payable.trim(), "'approved'", 'the list is approved and nothing else');
+['pending', 'rejected', 'expired', 'cancelled'].forEach((st) => {
+  H.ok(payable.indexOf("'" + st + "'") === -1, st + ' is not payable');
 });
 // AUTO-APPROVED COUNTS. Nothing here may ask HOW it was approved.
 H.ok(!/autoApproved/.test(pay),
@@ -276,8 +280,38 @@ H.ok(/action: 'pay', participantId: r\.participantId, activityId: r\.activityId/
   'the client calls the pay action with the registration key');
 H.ok(/var needsVerify = r\.type !== 'dropin' && !\(S\.account && S\.account\.emailVerifiedAt\)/.test(ui),
   'the term card asks for a confirmed address, and only on a term');
-H.ok(/var payable = r\.status === 'approved' \|\| r\.status === 'pending';/.test(ui),
-  'the client reads the same two statuses the server does');
+H.ok(/var payable = r\.status === 'approved';/.test(ui),
+  'the client reads the same single status the server does');
+// ⚠ AND THE WAITING STATE IS ITS OWN BRANCH, not the absence of a button. A
+// family shown what they owe and given nothing to press learns nothing from
+// silence; this is where the words go.
+H.ok(/else if \(left > 0 && r\.status === 'pending'\)/.test(ui),
+  'a pending registration draws the waiting block');
+H.ok(/class: 'acc-waiting'/.test(ui), 'with its own treatment, not a bare grey line');
+H.ok(/lucide\(CHECK, '15'\)/.test(ui), 'a check — the registration IS done; the payment is the follow-on');
+// The glyph itself, not the name of the constant holding it. Lucide's `check` is
+// one polyline; anything else here would be a different icon wearing the name,
+// and a clock in particular would say WAIT — the reading this block exists to
+// prevent. Read off the source with comments stripped, or the prose explaining
+// that decision trips the assertion asserting it.
+H.eq((/var CHECK = '([^']*)'/.exec(ui) || [, ''])[1], 'M20 6 9 17l-5-5', 'and it is the check path');
+H.ok(!/clock/i.test(ui.replace(/\/\/[^\n]*\n/g, '')), 'no clock anywhere in the client');
+// It must not look pressable. Solid fill plus a full pill is what this codebase
+// learned means "press me", so the block is tinted with an 8px radius instead.
+const css = fs.readFileSync(path.join(R, 'shared.css'), 'utf8');
+const waiting = (/\.acc-waiting\{([^}]*)\}/.exec(css) || [, ''])[1];
+H.ok(/border-radius:8px/.test(waiting), 'the waiting block is not a pill');
+H.ok(!/var\(--terracotta\)/.test(waiting), 'and carries none of the actionable colour');
+H.ok(/var\(--olive\)/.test(waiting), 'olive, which is this site\'s "nothing is wrong"');
+H.ok(/border-inline-start/.test(waiting) && !/border-left|border-right/.test(waiting),
+  'and its rule is logical, so it mirrors with the page');
+// ⚠ THE SEPARATE CONTRAST BUG, fixed in the same pass. White on --gold is
+// 3.18:1, below AA for 12.5px bold text; the token is a background chosen to sit
+// under white at DISPLAY sizes, and a pill is neither.
+H.ok(!/\.acc-pill\.is-pending\{ background:var\(--gold\)/.test(css),
+  'the pending pill no longer paints white on the raw gold token');
+H.ok(/\.acc-pill\.is-pending\{ background:#96651F/.test(css),
+  'it is darkened along the same hue, so the gold reading survives');
 H.ok(/left > 0 && payable && !needsVerify/.test(ui),
   'and draws the button when both gates pass and something is owed');
 // ⚠ THE SAME FIELD AS THE SERVER. regRow() sends the FROZEN type, defaulting to

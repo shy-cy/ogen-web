@@ -95,6 +95,9 @@
 
       costTitle: 'מה זה עולה', stillToPay: 'נותר לתשלום', credited: 'זוכה',
       payNow: 'תשלום מאובטח', payOpening: 'פותח תשלום…',
+      waitLead: 'ההרשמה בוצעה — התשלום ייפתח בקרוב',
+      waitBody: '{name} נרשם/ה. אנחנו משלימים כמה פרטים אחרונים, והתשלום ייפתח כאן. '
+              + 'נעדכן אתכם במייל ברגע שאפשר.',
       payNeedsVerify: 'כדי לשלם, יש לאשר את כתובת האימייל. הקישור לאישור נמצא בעמוד החשבון.',
       sessionsTitle: 'המפגשים', dateCol: 'תאריך', statusCol: 'סטטוס',
       book: 'הרשמה למפגש', cancelSession: 'ביטול מפגש',
@@ -138,7 +141,7 @@
       buySessions: 'מפגשים', buyGo: 'רכישה', buyOpening: 'פותח תשלום…',
       buyValid: 'תוקף', buyDays: 'ימים',
       paySession: 'תשלום על המפגש', payingSession: 'פותח תשלום…',
-      registerDone: 'ההרשמה בוצעה. התשלום נמצא בעמוד ההרשמה.',
+      registerDone: 'ההרשמה בוצעה. הפרטים והתשלום נמצאים בעמוד ההרשמה.',
       owes: 'לתשלום', paid: 'שולם', feeAlready: 'דמי ההרשמה כבר שולמו',
       places: 'מקומות פנויים', unlimited: 'ללא הגבלה',
       payLink: { expired: 'קישור התשלום פג או כבר אינו בתוקף. אפשר להתחבר ולשלם כאן.',
@@ -203,6 +206,9 @@
 
       costTitle: 'What it costs', stillToPay: 'Still to pay', credited: 'Credited',
       payNow: 'Pay securely', payOpening: 'Opening payment…',
+      waitLead: 'Registered — payment opens soon',
+      waitBody: '{name} is registered. We\u2019re confirming the last few details, and payment '
+              + 'will open here. We\u2019ll email you the moment it does.',
       payNeedsVerify: 'To pay, please confirm your email address. The link to resend it is on your account page.',
       sessionsTitle: 'Sessions', dateCol: 'Date', statusCol: 'Status',
       book: 'Book', cancelSession: 'Cancel this session',
@@ -246,7 +252,7 @@
       buySessions: 'sessions', buyGo: 'Buy', buyOpening: 'Opening payment…',
       buyValid: 'valid', buyDays: 'days',
       paySession: 'Pay for this session', payingSession: 'Opening payment…',
-      registerDone: 'Registered. The payment is on the registration page.',
+      registerDone: 'Registered. The details and the payment are on the registration page.',
       owes: 'To pay', paid: 'Paid', feeAlready: 'registration fee already paid',
       places: 'places left', unlimited: 'no limit',
       payLink: { expired: 'That payment link has expired or is no longer valid. You can sign in and pay here.',
@@ -311,6 +317,9 @@
 
       costTitle: 'Сколько это стоит', stillToPay: 'Осталось оплатить', credited: 'Зачислено',
       payNow: 'Оплатить', payOpening: 'Открываем оплату…',
+      waitLead: 'Запись оформлена — оплата откроется скоро',
+      waitBody: '{name} записан(а). Мы уточняем последние детали, оплата откроется здесь. '
+              + 'Напишем вам, как только всё будет готово.',
       payNeedsVerify: 'Чтобы оплатить, подтвердите адрес электронной почты. Ссылка для повторной отправки — на странице аккаунта.',
       sessionsTitle: 'Занятия', dateCol: 'Дата', statusCol: 'Статус',
       book: 'Записаться', cancelSession: 'Отменить занятие',
@@ -354,7 +363,7 @@
       buySessions: 'занятий', buyGo: 'Купить', buyOpening: 'Открываем оплату…',
       buyValid: 'срок', buyDays: 'дней',
       paySession: 'Оплатить это занятие', payingSession: 'Открываем оплату…',
-      registerDone: 'Запись оформлена. Оплата — на странице записи.',
+      registerDone: 'Запись оформлена. Подробности и оплата — на странице записи.',
       owes: 'К оплате', paid: 'Оплачено', feeAlready: 'регистрационный взнос уже оплачен',
       places: 'свободных мест', unlimited: 'без ограничения',
       payLink: { expired: 'Ссылка на оплату истекла или больше не действует. Вы можете войти и оплатить здесь.',
@@ -1154,6 +1163,35 @@
   // place to register.
   //
   // In the reader's own tree — /activities, /en/activities, /ru/activities.
+  // A Lucide glyph, built with createElementNS because an SVG element made with
+  // createElement is an HTMLUnknownElement and renders nothing. js/nav.js and
+  // js/motifs.js set innerHTML instead; this file has never used it, which is
+  // why it can be executed by the DOM shim at all, and adding an HTML parser to
+  // that shim to draw one tick would be the wrong trade.
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+  function lucide(d, size) {
+    var svg = window.document.createElementNS(SVG_NS, 'svg');
+    [['viewBox', '0 0 24 24'], ['width', size], ['height', size], ['fill', 'none'],
+     ['stroke', 'currentColor'], ['stroke-width', '2.5'], ['stroke-linecap', 'round'],
+     ['stroke-linejoin', 'round'], ['aria-hidden', 'true'], ['focusable', 'false']
+    ].forEach(function (a) { svg.setAttribute(a[0], a[1]); });
+    var path = window.document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', d);
+    svg.appendChild(path);
+    return svg;
+  }
+  // ⚠ A CHECK, NOT A CLOCK, and the difference is the whole job of this icon.
+  // The block's purpose is "this is normal, nothing is wrong" at a glance; a
+  // clock says WAIT, which is the reading it exists to prevent. What is done is
+  // the registration — the payment opening is the follow-on, and the sentence
+  // carries that.
+  //
+  // It is 15px and inline rather than white in a 56px disc, which is rule 6's
+  // shape. That rule is about section markers: a 56px circle beside one line of
+  // text is larger than the thing it labels, the same argument that took the
+  // fact-group icons to 34px.
+  var CHECK = 'M20 6 9 17l-5-5';
+
   function browseLink() {
     return el('p', { class: 'acc-browse' },
       [el('a', { class: 'acc-link', href: url('/activities'), text: T.browseActivities })]);
@@ -1689,14 +1727,12 @@
     // both conditions, and the copy exists so a family is not offered an action
     // about to be refused.
     //
-    // ⚠ A PENDING REGISTRATION IS PAYABLE, and this card is where that shows.
-    // It used to draw no button at all and a line reading "We will send you a
-    // payment link shortly" — under a figure saying €500.00 still to pay. That
-    // is a bill with the means to settle it withheld, and the link it promised
-    // only exists once an admin gets to the queue. It also contradicted the copy
-    // one section up: `pending` and `approved` both read "registered" here on
-    // purpose, so a family told they are registered and shown what they owe
-    // should be able to pay it. isPayable() in _checkout.js is the server's half.
+    // ⚠ A PENDING REGISTRATION IS NOT PAYABLE — it is EXPLAINED. It was made
+    // payable for a release, to fix a card reading "Still to pay €500.00" with
+    // no button under it; the bug was real and making it payable was the wrong
+    // fix, because `pending` means a person still has something to decide, so
+    // paying then buys a place nobody has agreed to give. See isPayable() in
+    // _checkout.js for the full round trip. The branch below is the right fix.
     //
     // A settled balance draws nothing, since the figures above already say why.
     //
@@ -1710,7 +1746,7 @@
     // the two must not read different fields, or the client hides a button the
     // server would have honoured.
     var needsVerify = r.type !== 'dropin' && !(S.account && S.account.emailVerifiedAt);
-    var payable = r.status === 'approved' || r.status === 'pending';
+    var payable = r.status === 'approved';
     if (left > 0 && payable && !needsVerify) {
       var go = el('button', { type: 'submit', class: 'btn-primary', text: T.payNow });
       var payForm = el('form', { class: 'acc-pay', onsubmit: function (e) {
@@ -1733,6 +1769,24 @@
       // the resend button is on the dashboard, and a missing button teaches
       // nobody that their address needs confirming.
       kids.push(el('p', { class: 'acc-note', text: T.payNeedsVerify }));
+    } else if (left > 0 && r.status === 'pending') {
+      // ⚠ THE WAITING STATE, WHICH IS NOT AN ERROR AND MUST NOT LOOK LIKE ONE.
+      //
+      // This used to be one grey line reading "We will send you a payment link
+      // shortly", under a figure saying what was owed — which says as much
+      // about a screen that is working as about one that is broken, and names a
+      // link that only exists once an admin reaches the queue.
+      //
+      // It says what is TRUE at a glance and then explains: the registration
+      // stands, the payment opens here, and we will write. No "pending", no
+      // "awaiting approval", no "your request" — the family registered, and
+      // being told a decision is pending reads as a decision that might go
+      // either way over something they consider settled.
+      kids.push(el('div', { class: 'acc-waiting' }, [
+        el('p', { class: 'acc-waiting-lead' }, [lucide(CHECK, '15'), el('span', { text: T.waitLead })]),
+        el('p', { class: 'acc-waiting-body',
+                  text: T.waitBody.replace('{name}', r.participantName || '') })
+      ]));
     }
     // ADDRESSABLE, because every message about money links straight to it. The
     // page is the activity, the facts, the price and the sessions; a family
