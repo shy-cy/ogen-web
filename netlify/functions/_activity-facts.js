@@ -581,17 +581,28 @@ function priceRows(f, lang, duration) {
   const hasFull = full != null && full > 0;
 
   const L = {
-    he: { fee: 'דמי הרשמה לשנה', lesson: 'עלות לשיעור', term: 'עלות לסמסטר', perSession: 'עלות למפגש',
+    he: { fee: 'דמי הרשמה', lesson: 'עלות לשיעור', term: 'עלות לסמסטר', perSession: 'עלות למפגש',
           session: ['מפגש', 'מפגשים'], unit: ['שיעור', 'שיעורים'] },
-    en: { fee: 'Yearly registration fee', lesson: 'Cost per lesson', term: 'Cost per semester',
+    en: { fee: 'Registration fee', lesson: 'Cost per lesson', term: 'Cost per semester',
           perSession: 'Cost per session',
           session: ['session', 'sessions'], unit: ['lesson', 'lessons'] },
-    ru: { fee: 'Годовой регистрационный взнос', lesson: 'Стоимость урока', term: 'Стоимость семестра',
+    ru: { fee: 'Регистрационный взнос', lesson: 'Стоимость урока', term: 'Стоимость семестра',
           perSession: 'Стоимость занятия' }
   }[lang] || null;
   if (!L) return [];
   const row = (label, value, note) => ({ label, note: note || '', value });
 
+  // ⚠ "REGISTRATION FEE", NOT "YEARLY REGISTRATION FEE". The label carried the
+  // scope for a while, on the argument that annual-ness is the one thing about
+  // the fee a family cannot infer from the number. It is still the one thing
+  // they cannot infer — but a three-word label on a card of two-word labels was
+  // reading as clutter rather than as information, and the scope is now carried
+  // where it is actually needed: the waived line on the family's own cost card,
+  // which appears exactly when a returning child is NOT being charged it again.
+  // That is the moment the question "why is this 300 and not 350" is asked.
+  //
+  // The scope itself is unchanged and is enforced in feeApplies(): one
+  // participant, one activity, one ACADEMIC year.
   if (hasFee) rows.push(row(L.fee, money(fee)));
 
   // Cost per lesson is OFF unless the activity opts in. It was the one row that

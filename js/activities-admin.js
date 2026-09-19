@@ -944,7 +944,7 @@
     var fee = readNum('fact-price-registrationFee');
     var full = readNum('fact-price-fullPrice');
     var parts = [];
-    if (fee != null && fee > 0) parts.push('Yearly registration fee ' + fee + ' €');
+    if (fee != null && fee > 0) parts.push('Registration fee ' + fee + ' €');
     if (readBool('fact-price-showPerLesson')) {
       var per = perLessonValue();
       if (per != null) parts.push('Cost per lesson ' + per + ' €');
@@ -1137,7 +1137,7 @@
       var isDropin = currentType() === 'dropin';
       body = el('div', {}, [
         el('div', { class: 'fact-grid' }, [
-          numField('fact-price-registrationFee', 'Yearly registration fee (€)', fact.registrationFee),
+          numField('fact-price-registrationFee', 'Registration fee (€)', fact.registrationFee),
           isDropin
             ? numField('fact-price-perSessionPrice', 'Price per session (€)', fact.perSessionPrice)
             : numField('fact-price-fullPrice', 'Full course price (€)', fact.fullPrice),

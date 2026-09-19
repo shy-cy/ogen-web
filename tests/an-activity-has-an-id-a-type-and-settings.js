@@ -107,12 +107,12 @@ console.log('\n[the price card asks what data it has, never what type it is]');
 // one more conditional row, not a second builder.
 const D = { sessionCount: 10, sessionMinutes: 90 };
 const dropRows = facts.priceRows(F.dropin().facts.price, 'en', D);
-H.eq(dropRows.map((r) => r.label).join(' | '), 'Yearly registration fee | Cost per session',
+H.eq(dropRows.map((r) => r.label).join(' | '), 'Registration fee | Cost per session',
   'a drop-in quotes the session');
 H.ok(!dropRows.some((r) => r.note),
   'and carries no "(N sessions × M lessons)" qualifier, which hangs off a term price it does not have');
 const courseRows = facts.priceRows(F.course().facts.price, 'en', D);
-H.eq(courseRows.map((r) => r.label).join(' | '), 'Yearly registration fee | Cost per semester',
+H.eq(courseRows.map((r) => r.label).join(' | '), 'Registration fee | Cost per semester',
   'a course quotes the term, unchanged');
 ['he', 'en', 'ru'].forEach((l) => {
   const rows = facts.priceRows(F.dropin().facts.price, l, D);

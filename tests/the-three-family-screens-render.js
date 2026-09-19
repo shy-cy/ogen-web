@@ -89,7 +89,7 @@ const ANSWERS = {
       facts: [{ key: 'schedule', heading: 'When & where', facts: [
         { key: 'schedule', label: 'When', value: 'Wednesdays 16:00' },
         { key: 'location', label: 'Location', value: 'Limassol' }] }],
-      priceRows: [{ label: 'Yearly registration fee', note: null, value: '€50' },
+      priceRows: [{ label: 'Registration fee', note: null, value: '€50' },
                   { label: 'Cost per semester', note: '(10 sessions × 2 lessons)', value: '€300' }],
       sessionRows: [{ n: 1, label: 'Session 1', day: 'Wednesday', date: '14 October' }]
     }
@@ -346,9 +346,11 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
   D.byTag(dom.mount, 'form')[0].submit();
   await settle();
   // A REGISTRATION, NOT A REQUEST. The confirmation says the place is taken and
-  // the payment link is coming — being told a decision is pending is the shape
-  // of our queue, not of what the family just did.
-  H.ok(has(dom, 'Registered. We will send you a payment link shortly.'),
+  // where to pay for it — being told a decision is pending is the shape of our
+  // queue, not of what the family just did. It no longer promises a LINK
+  // either: a pending registration is payable, so the payment is already on the
+  // page rather than waiting on an admin reaching the queue.
+  H.ok(has(dom, 'Registered. The payment is on the registration page.'),
     'the confirmation is still on screen — rebooting the dashboard used to throw it away');
 
   H.done();

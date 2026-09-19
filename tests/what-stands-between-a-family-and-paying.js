@@ -83,7 +83,7 @@ H.ok(paySession.length > 300 && bookAndPay.length > 600, 'found the other two br
 // registered under — and this branch never opens the activity at all.
 H.ok(/verificationRefusal\(me, \(reg\.frozen && reg\.frozen\.type\) \|\| 'course'\)/.test(pay),
   'pay asks, from the frozen type on the registration');
-H.ok(pay.indexOf('verificationRefusal') < pay.indexOf("!== 'approved'"),
+H.ok(pay.indexOf('verificationRefusal') < pay.indexOf('isPayable'),
   'and the cheap check runs before the status one');
 // ⚠ A MISSING TYPE READS AS `course`. This inverts the usual rule in this
 // project, where every blank resolves towards the family — and deliberately: a
@@ -117,14 +117,62 @@ const client0 = fs.readFileSync(path.join(R, 'js/member-account.js'), 'utf8');
 H.ok(/resendVerification/.test(client0), 'and the dashboard still offers it');
 H.ok(/!account\.emailVerifiedAt/.test(client0), 'and still says so when the address is unconfirmed');
 
-console.log('\n[gate 2: the place must be approved]');
-H.ok(/if \(reg\.status !== 'approved'\)/.test(pay), 'only an approved registration is payable');
+console.log('\n[gate 2: the place must be a LIVE one — and pending counts]');
+// ⚠ IT WAS `approved` ONLY, AND THAT PRODUCED A BILL WITH NO BUTTON. A family's
+// cost card read "Still to pay  €500.00" with nothing under it but the sentence
+// "We will send you a payment link shortly" — a link that, on a manually
+// approved activity, exists only once an admin reaches the queue. It also
+// contradicted the copy above it: `pending` and `approved` both read
+// "registered" to a family on purpose, so one told they are registered and
+// shown what they owe must be able to settle it.
+//
+// ONE LIST, BOTH DOORS. The signed-in action and the emailed link must never
+// disagree about what is chargeable, so neither compares a status itself.
+H.ok(/if \(!checkout\.isPayable\(reg\)\)/.test(pay),
+  'the pay action asks isPayable() rather than comparing a status of its own');
 H.ok(/reason: 'not-approved'/.test(pay), 'with a reason and the actual status');
+H.ok(/if \(!isPayable\(reg\)\) return refuse\(lang, 'not-approved', reg\)/.test(payLink),
+  'and so does /pay — which matters there too: a receipt for a part payment on a '
+  + 'pending registration mints a link that would otherwise be dead on arrival');
+const payable = (/const PAYABLE_STATUSES = \[([^\]]*)\]/.exec(
+  fs.readFileSync(path.join(R, 'netlify/functions/_checkout.js'), 'utf8')) || [, ''])[1];
+H.ok(/'pending'/.test(payable) && /'approved'/.test(payable), 'the list is pending and approved');
+['rejected', 'expired', 'cancelled'].forEach((st) => {
+  H.ok(payable.indexOf("'" + st + "'") === -1, st + ' is not payable — there is no place to pay for');
+});
 // AUTO-APPROVED COUNTS. Nothing here may ask HOW it was approved.
 H.ok(!/autoApproved/.test(pay),
   'and nothing asks whether it was auto-approved — the status is the single source of truth');
-H.ok(pay.indexOf('mustGuard') < pay.indexOf("!== 'approved'"),
+H.ok(pay.indexOf('mustGuard') < pay.indexOf('isPayable'),
   'and the guardian link is checked before the status');
+
+console.log('\n[and the new state that opens is GUARDED, not ignored]');
+// A paid PENDING registration an admin then wants to refuse. Rejecting it would
+// leave us holding the money with nothing in the record saying we owe it back —
+// the family has no place, so nothing bills it and nothing ever asks. The
+// refusal names the route that does account for it.
+const adminRegs = fs.readFileSync(path.join(R, 'netlify/functions/admin-registrations.js'), 'utf8');
+H.ok(/if \(status === 'rejected'\) \{\s*\n\s*const refusal = paidRefusal\(reg\);/.test(adminRegs),
+  'rejecting a registration that is holding money is refused');
+H.ok(/reason: 'paid-not-refunded'/.test(adminRegs), 'with a reason a screen can act on');
+H.ok(/amountCents: held/.test(adminRegs), 'and the figure, so the refusal can name it');
+H.ok(/Cancel it instead/.test(adminRegs),
+  'and it names cancelling, which credits the family through the ledger');
+// creditedCents comes OFF, because credit already given back is money no longer
+// held — the opposite of dueCents(), where it is already inside paidCents.
+H.ok(/paidCents\) \|\| 0\)\s*\n\s*- \(\(reg\.payment && reg\.payment\.creditedCents\)/.test(adminRegs),
+  'and what is held is paid minus credited, not paid alone');
+// ⚠ ASKED AT THE DRAFT TOO. The send is refused either way; an admin told at the
+// top has not yet written a paragraph explaining a decision they cannot take.
+const preview = adminRegs.slice(adminRegs.indexOf("case 'rejectPreview'"),
+                                adminRegs.indexOf("case 'approve'"));
+H.ok(preview.length > 200 && /const paid = paidRefusal\(reg\);/.test(preview),
+  'and the rejection DRAFT asks the same question before it is written');
+H.eq((adminRegs.match(/paid-not-refunded/g) || []).length, 1,
+  'through one builder, so the two cannot disagree about the figure or the wording');
+// It must not block the decision that DOES handle money.
+H.ok(!/if \(status === 'cancelled' && held > 0\)/.test(adminRegs),
+  'cancelling is deliberately not blocked — it is the route the refusal points at');
 
 console.log('\n[the amount is ours, not the browser\'s]');
 // ⚠ AND IT IS BUILT IN ONE PLACE. There are two doors to this payment now — the
@@ -228,7 +276,9 @@ H.ok(/action: 'pay', participantId: r\.participantId, activityId: r\.activityId/
   'the client calls the pay action with the registration key');
 H.ok(/var needsVerify = r\.type !== 'dropin' && !\(S\.account && S\.account\.emailVerifiedAt\)/.test(ui),
   'the term card asks for a confirmed address, and only on a term');
-H.ok(/left > 0 && r\.status === 'approved' && !needsVerify/.test(ui),
+H.ok(/var payable = r\.status === 'approved' \|\| r\.status === 'pending';/.test(ui),
+  'the client reads the same two statuses the server does');
+H.ok(/left > 0 && payable && !needsVerify/.test(ui),
   'and draws the button when both gates pass and something is owed');
 // ⚠ THE SAME FIELD AS THE SERVER. regRow() sends the FROZEN type, defaulting to
 // course — if the client read anything else it would hide a button the server
@@ -237,7 +287,11 @@ const api = fs.readFileSync(path.join(R, 'netlify/functions/account-registration
 H.ok(/type: reg\.frozen\.type \|\| 'course'/.test(api),
   'and that field is the frozen type, with the same default on both sides');
 H.ok(/T\.payNeedsVerify/.test(ui), 'an unverified account is TOLD, not silently denied a button');
-H.ok(/T\.payNeedsApproval/.test(ui), 'and so is one still waiting on approval');
+// And there is no longer anything to say about waiting for approval, because
+// waiting no longer stops anyone paying. The key is DELETED rather than left
+// unreferenced in three languages — an orphan is dead copy indistinguishable
+// from a key whose only caller was renamed.
+H.ok(!/payNeedsApproval/.test(ui), 'the "a link is coming" line is gone from all three tables');
 // The per-session button is the drop-in half, and must NOT ask.
 const evening = ui.slice(ui.indexOf('function eveningAction'));
 H.ok(!/emailVerifiedAt/.test(evening.slice(0, evening.indexOf('cancelSession'))),

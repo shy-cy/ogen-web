@@ -30,6 +30,32 @@ function dueCents(reg) {
   return ((p.owedCents || 0) - (p.paidCents || 0));
 }
 
+// ⚠ WHICH REGISTRATIONS MAY BE PAID FOR — one list, both doors.
+//
+// `pending` is in it, and that is a change worth stating plainly. It used to be
+// `approved` only, on the reasoning that money must not move before a person has
+// agreed to the place. What that produced on screen was a card reading
+// "Still to pay  €500.00" with no button under it and the sentence "We will send
+// you a payment link shortly" in its place — a debt shown to somebody, with the
+// means to settle it withheld and a promise of a link that only exists once an
+// admin gets round to it.
+//
+// It also contradicted the copy directly above it. `pending` and `approved` both
+// read "registered" to a family by design — the queue's shape is ours, not
+// theirs — so a family told they are registered and shown what they owe should
+// be able to pay it.
+//
+// THE COST IS A REFUSAL AFTER A PAYMENT, and it is guarded rather than ignored:
+// `decide()` in admin-registrations.js refuses to reject a registration carrying
+// money that has not been given back, and names cancelling — which credits the
+// family through the ledger — as the route that accounts for it. Without that
+// guard this change would quietly convert "we cannot take your child" into money
+// we are holding with nothing recording it.
+//
+// Not `rejected`, `expired` or `cancelled`: those have no place to pay for.
+const PAYABLE_STATUSES = ['pending', 'approved'];
+const isPayable = (reg) => PAYABLE_STATUSES.indexOf(reg && reg.status) !== -1;
+
 // Where Stripe sends a family back: their own registration page, addressed by
 // the registration's key in the spelling THE PAGE READS, and anchored on the
 // cost card. This was `?participantId=…&activityId=…` once, which is the API's
@@ -244,5 +270,5 @@ const createSessionCheckout = (att, activityTitle, lang, email) =>
 
 module.exports = {
   createCheckout, createSessionCheckout, createSessionsCheckout, createBundleCheckout,
-  dueCents, returnUrl, MAX_SESSION_LINES
+  dueCents, returnUrl, isPayable, PAYABLE_STATUSES, MAX_SESSION_LINES
 };

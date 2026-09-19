@@ -120,6 +120,45 @@ const ACTABLE = {
   cancelled: ['pending', 'approved']
 };
 
+// ⚠ A REFUSAL MUST NOT WALK AWAY FROM MONEY.
+//
+// A family can pay while their registration is still `pending` — see isPayable()
+// in _checkout.js, and the cost card that showed a €500 balance with no button
+// under it, which is why. That makes one state reachable that was not before: a
+// PAID registration an admin then wants to say no to.
+//
+// Rejecting it would leave us holding the money with nothing in the record
+// saying we owe it back — the family has no place, so nothing bills it and
+// nothing ever asks. So it is refused, and the refusal names the route that does
+// account for it: CANCELLING writes the credit through the ledger and sends the
+// message, which is the same arithmetic in the same place.
+//
+// Cancel rather than reject is a real loss of meaning — "we could not take your
+// child" and "this registration ended" are different events — and it is the
+// honest trade until there is a refund path. `cancelSource` still records that
+// an admin did it, and the reason is typed in.
+//
+// creditedCents comes OFF, because credit already given back is money no longer
+// held. That is the opposite of dueCents(), where it is deliberately NOT
+// subtracted, because there it is already inside paidCents.
+//
+// Asked in TWO places: here, where it is the rule, and by `rejectPreview`, so an
+// admin learns before writing a paragraph rather than after.
+const heldCents = (reg) => ((reg.payment && reg.payment.paidCents) || 0)
+                         - ((reg.payment && reg.payment.creditedCents) || 0);
+
+function paidRefusal(reg) {
+  const held = heldCents(reg);
+  if (!(held > 0)) return null;
+  return {
+    error: 'This registration has been paid (' + (held / 100).toFixed(2)
+         + ' €) and rejecting it would leave that money unaccounted for. '
+         + 'Cancel it instead — that credits the family through the ledger — '
+         + 'or record a refund first.',
+    reason: 'paid-not-refunded', amountCents: held
+  };
+}
+
 // Read, act, write — with the two checks that are easy to leave out: the
 // registration must exist, and it must be in a state the action makes sense from.
 async function decide(body, session, status, source) {
@@ -129,6 +168,32 @@ async function decide(body, session, status, source) {
 
   if (ACTABLE[status].indexOf(reg.status) === -1) {
     return { code: 409, payload: { error: 'This registration is ' + reg.status + '.' } };
+  }
+
+  // ⚠ A REFUSAL MUST NOT WALK AWAY FROM MONEY.
+  //
+  // A family can pay while their registration is still `pending` — see
+  // isPayable() in _checkout.js, and the card that showed a €500 balance with no
+  // button under it, which is why. That makes one new state reachable that was
+  // not before: a paid registration an admin then wants to say no to.
+  //
+  // Rejecting it would leave us holding the money with nothing in the record
+  // saying we owe it back — the family has no place, so nothing bills it, and
+  // nothing ever asks. So it is refused, and the refusal names the route that
+  // does account for it: CANCELLING writes the credit through the ledger and
+  // sends the message, which is the same arithmetic in the same place.
+  //
+  // Cancel rather than reject is a real loss of meaning — "we could not take
+  // your child" and "this registration ended" are different events — and it is
+  // the honest trade until there is a refund path. `cancelSource` still says an
+  // admin did it, and the reason is typed in.
+  //
+  // creditedCents is subtracted because credit already given back is money no
+  // longer held. Same reason dueCents() does NOT subtract it: there it is
+  // already inside paidCents, here it is what came out.
+  if (status === 'rejected') {
+    const refusal = paidRefusal(reg);
+    if (refusal) return { code: 409, payload: refusal };
   }
   const next = R.transition(reg, {
     status: status, by: session.email, source: source,
@@ -229,6 +294,11 @@ exports.handler = async (event) => {
         }
         const reg = await store.getRegistration(body.participantId, body.activityId);
         if (!reg) return json(404, { error: 'No such registration.' });
+        // Before the draft, not after it. The send is refused either way, but an
+        // admin told at the top has not yet written a paragraph explaining a
+        // decision they are about to be prevented from taking.
+        const paid = paidRefusal(reg);
+        if (paid) return json(409, paid);
         const account = await accounts.getAccount(reg.accountId);
         if (!account) return json(404, { error: 'That registration has no account behind it.' });
         return json(200, Object.assign({ ok: true, to: account.email }, mail.rejectedDraft(reg, account)));

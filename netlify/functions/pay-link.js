@@ -9,8 +9,8 @@
 //
 // WHY THIS IS NOT A WEAKER DOOR THAN THE PASSWORD ONE. The signed-in `pay`
 // action checks two things: that the account's address is confirmed, and that
-// the registration is approved. The second is re-checked here, from the record,
-// every time. The first is satisfied by construction and by something stronger
+// the registration is one that can be paid for. The second is re-checked here,
+// from the record, every time, through the same isPayable() that door reads. The first is satisfied by construction and by something stronger
 // — the token was mailed to that address and nowhere else, so following it is
 // itself proof of reading that inbox, which is all `emailVerifiedAt` ever
 // attested. It is deliberately NOT treated as a verification: confirming an
@@ -25,7 +25,7 @@
 const links = require('./_pay-link');
 const store = require('./_registration-store');
 const accounts = require('./_account-store');
-const { createCheckout, dueCents } = require('./_checkout');
+const { createCheckout, dueCents, isPayable } = require('./_checkout');
 const { SITE } = require('./_email-shell');
 
 const LANGS = ['he', 'en', 'ru'];
@@ -73,7 +73,12 @@ exports.handler = async (event) => {
     // Re-read every time rather than trusting what was true when the link was
     // written. A registration cancelled, rejected or settled since the message
     // went out must not be chargeable by an old email.
-    if (reg.status !== 'approved') return refuse(lang, 'not-approved', reg);
+    // isPayable(), not a status compared here — the signed-in door and this one
+    // must never disagree about what is chargeable. See _checkout.js: `pending`
+    // is payable, which matters more here than there, because a receipt for a
+    // part payment on a pending registration mints one of these links and it
+    // would otherwise be dead on arrival.
+    if (!isPayable(reg)) return refuse(lang, 'not-approved', reg);
     if (!(dueCents(reg) > 0)) return refuse(lang, 'nothing-due', reg);
 
     // The address on the ACCOUNT, not on the link and not on the query — it is

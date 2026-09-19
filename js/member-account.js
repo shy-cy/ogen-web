@@ -95,7 +95,6 @@
       costTitle: 'מה זה עולה', stillToPay: 'נותר לתשלום', credited: 'זוכה',
       payNow: 'תשלום מאובטח', payOpening: 'פותח תשלום…',
       payNeedsVerify: 'כדי לשלם, יש לאשר את כתובת האימייל. הקישור לאישור נמצא בעמוד החשבון.',
-      payNeedsApproval: 'קישור לתשלום יישלח אליכם בקרוב.',
       sessionsTitle: 'המפגשים', dateCol: 'תאריך', statusCol: 'סטטוס',
       book: 'הרשמה למפגש', cancelSession: 'ביטול מפגש',
       cancelSessionConfirm: 'לבטל את המפגש הזה?',
@@ -138,8 +137,8 @@
       buySessions: 'מפגשים', buyGo: 'רכישה', buyOpening: 'פותח תשלום…',
       buyValid: 'תוקף', buyDays: 'ימים',
       paySession: 'תשלום על המפגש', payingSession: 'פותח תשלום…',
-      registerDone: 'ההרשמה בוצעה. קישור לתשלום יישלח אליכם בקרוב.',
-      owes: 'לתשלום', paid: 'שולם', feeAlready: 'דמי ההרשמה השנתיים כבר שולמו',
+      registerDone: 'ההרשמה בוצעה. התשלום נמצא בעמוד ההרשמה.',
+      owes: 'לתשלום', paid: 'שולם', feeAlready: 'דמי ההרשמה כבר שולמו',
       places: 'מקומות פנויים', unlimited: 'ללא הגבלה',
       payLink: { expired: 'קישור התשלום פג או כבר אינו בתוקף. אפשר להתחבר ולשלם כאן.',
                  'not-approved': 'לא ניתן לשלם על ההרשמה הזו כרגע.',
@@ -203,7 +202,6 @@
       costTitle: 'What it costs', stillToPay: 'Still to pay', credited: 'Credited',
       payNow: 'Pay securely', payOpening: 'Opening payment…',
       payNeedsVerify: 'To pay, please confirm your email address. The link to resend it is on your account page.',
-      payNeedsApproval: 'We will send you a payment link shortly.',
       sessionsTitle: 'Sessions', dateCol: 'Date', statusCol: 'Status',
       book: 'Book', cancelSession: 'Cancel this session',
       cancelSessionConfirm: 'Cancel this session?',
@@ -246,8 +244,8 @@
       buySessions: 'sessions', buyGo: 'Buy', buyOpening: 'Opening payment…',
       buyValid: 'valid', buyDays: 'days',
       paySession: 'Pay for this session', payingSession: 'Opening payment…',
-      registerDone: 'Registered. We will send you a payment link shortly.',
-      owes: 'To pay', paid: 'Paid', feeAlready: 'yearly registration fee already paid',
+      registerDone: 'Registered. The payment is on the registration page.',
+      owes: 'To pay', paid: 'Paid', feeAlready: 'registration fee already paid',
       places: 'places left', unlimited: 'no limit',
       payLink: { expired: 'That payment link has expired or is no longer valid. You can sign in and pay here.',
                  'not-approved': 'This registration cannot be paid for at the moment.',
@@ -311,7 +309,6 @@
       costTitle: 'Сколько это стоит', stillToPay: 'Осталось оплатить', credited: 'Зачислено',
       payNow: 'Оплатить', payOpening: 'Открываем оплату…',
       payNeedsVerify: 'Чтобы оплатить, подтвердите адрес электронной почты. Ссылка для повторной отправки — на странице аккаунта.',
-      payNeedsApproval: 'Ссылку на оплату мы пришлём в ближайшее время.',
       sessionsTitle: 'Занятия', dateCol: 'Дата', statusCol: 'Статус',
       book: 'Записаться', cancelSession: 'Отменить занятие',
       cancelSessionConfirm: 'Отменить это занятие?',
@@ -354,8 +351,8 @@
       buySessions: 'занятий', buyGo: 'Купить', buyOpening: 'Открываем оплату…',
       buyValid: 'срок', buyDays: 'дней',
       paySession: 'Оплатить это занятие', payingSession: 'Открываем оплату…',
-      registerDone: 'Запись оформлена. Ссылку на оплату мы пришлём в ближайшее время.',
-      owes: 'К оплате', paid: 'Оплачено', feeAlready: 'годовой регистрационный взнос уже оплачен',
+      registerDone: 'Запись оформлена. Оплата — на странице записи.',
+      owes: 'К оплате', paid: 'Оплачено', feeAlready: 'регистрационный взнос уже оплачен',
       places: 'свободных мест', unlimited: 'без ограничения',
       payLink: { expired: 'Ссылка на оплату истекла или больше не действует. Вы можете войти и оплатить здесь.',
                  'not-approved': 'Эту запись сейчас нельзя оплатить.',
@@ -991,7 +988,7 @@
         if (!res.ok) return say('err', failure(res));
         // IN PLACE, not a reboot. Rebooting the dashboard threw away the notice
         // that had just been written into it, so the one thing a family needed
-        // to see — that the child is registered and a payment link is coming —
+        // to see — that the child is registered and where the payment is —
         // was on screen for the length of one repaint.
         clear(where);
         where.appendChild(section(null, [
@@ -1651,10 +1648,16 @@
     // both conditions, and the copy exists so a family is not offered an action
     // about to be refused.
     //
-    // A refusal is SHOWN RATHER THAN HIDDEN when it is something the reader can
-    // act on: a registration still awaiting approval gets a line, because "wait"
-    // is the answer and silence is not. A settled balance draws nothing, since
-    // the figures above already say why.
+    // ⚠ A PENDING REGISTRATION IS PAYABLE, and this card is where that shows.
+    // It used to draw no button at all and a line reading "We will send you a
+    // payment link shortly" — under a figure saying €500.00 still to pay. That
+    // is a bill with the means to settle it withheld, and the link it promised
+    // only exists once an admin gets to the queue. It also contradicted the copy
+    // one section up: `pending` and `approved` both read "registered" here on
+    // purpose, so a family told they are registered and shown what they owe
+    // should be able to pay it. isPayable() in _checkout.js is the server's half.
+    //
+    // A settled balance draws nothing, since the figures above already say why.
     //
     // The third condition — a confirmed email address — is A COURSE RULE and
     // applies here only. See verificationRefusal() in account-registrations.js:
@@ -1666,7 +1669,8 @@
     // the two must not read different fields, or the client hides a button the
     // server would have honoured.
     var needsVerify = r.type !== 'dropin' && !(S.account && S.account.emailVerifiedAt);
-    if (left > 0 && r.status === 'approved' && !needsVerify) {
+    var payable = r.status === 'approved' || r.status === 'pending';
+    if (left > 0 && payable && !needsVerify) {
       var go = el('button', { type: 'submit', class: 'btn-primary', text: T.payNow });
       var payForm = el('form', { class: 'acc-pay', onsubmit: function (e) {
         e.preventDefault();
@@ -1683,13 +1687,11 @@
           });
       } }, [go]);
       kids.push(payForm);
-    } else if (left > 0 && r.status === 'approved') {
+    } else if (left > 0 && payable) {
       // SHOWN RATHER THAN HIDDEN, because it is something the reader can fix:
       // the resend button is on the dashboard, and a missing button teaches
       // nobody that their address needs confirming.
       kids.push(el('p', { class: 'acc-note', text: T.payNeedsVerify }));
-    } else if (left > 0) {
-      kids.push(el('p', { class: 'acc-note', text: T.payNeedsApproval }));
     }
     // ADDRESSABLE, because every message about money links straight to it. The
     // page is the activity, the facts, the price and the sessions; a family

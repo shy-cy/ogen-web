@@ -75,9 +75,12 @@ const registrationHref = (reg, l) =>
 // they consider settled. If we cannot take the place we write and say so, and
 // that message already exists — REJECTED, below.
 //
-// So this one confirms, and promises the one thing a family is now waiting
-// for: the payment link. An activity that auto-approves sends APPROVED instead
-// and the link is live the moment they open the page.
+// ⚠ AND IT NO LONGER PROMISES A LINK. It used to say "we will send you a
+// payment link shortly", which was the truth about our queue again rather than
+// about the family: on a manually-approved activity that link exists only once
+// an admin gets to it. A pending registration is payable now — see isPayable()
+// in _checkout.js — so the message points at the page, where the button is, and
+// is equally true whether the activity auto-approves or not.
 // --- we have your request --------------------------------------------------
 
 const RECEIVED = {
@@ -85,22 +88,22 @@ const RECEIVED = {
     subject: (child, act) => `${child} נרשם/ה ל${act}`,
     heading: 'ההרשמה בוצעה',
     body: (child, act) => `${child} נרשם/ה ל${act}.`,
-    next: 'קישור לתשלום יישלח אליכם בקרוב.',
-    button: 'לעמוד ההרשמה'
+    next: 'התשלום נמצא בעמוד ההרשמה, ואפשר לשלם כבר עכשיו.',
+    button: 'לתשלום ולפרטים'
   },
   en: {
     subject: (child, act) => `${child} is registered for ${act}`,
     heading: 'Registered',
     body: (child, act) => `${child} is registered for ${act}.`,
-    next: 'We will send you a payment link shortly.',
-    button: 'Go to the registration'
+    next: 'The payment is on your registration page, and you can pay now.',
+    button: 'Pay and see the details'
   },
   ru: {
     subject: (child, act) => `${child} записан(а) на ${act}`,
     heading: 'Запись оформлена',
     body: (child, act) => `${child} записан(а) на ${act}.`,
-    next: 'Ссылку на оплату мы пришлём в ближайшее время.',
-    button: 'Страница записи'
+    next: 'Оплата — на странице записи, оплатить можно уже сейчас.',
+    button: 'Оплата и подробности'
   }
 };
 

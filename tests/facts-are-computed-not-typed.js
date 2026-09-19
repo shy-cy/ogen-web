@@ -115,19 +115,19 @@ F.FACT_ORDER.forEach((key) => {
 const D12 = { sessionCount: 12, sessionMinutes: 90 };
 H.eq(JSON.stringify(F.priceRows(ACT.facts.price, 'he', D12)),
   JSON.stringify([
-    { label: 'דמי הרשמה לשנה', note: '', value: '50 €' },
+    { label: 'דמי הרשמה', note: '', value: '50 €' },
     { label: 'עלות לשיעור', note: '', value: '15 €' },
     { label: 'עלות לסמסטר', note: '(12 מפגשים × 2 שיעורים)', value: '360 €' }
   ]), 'price in Hebrew, three rows');
 H.eq(JSON.stringify(F.priceRows(ACT.facts.price, 'en', D12)),
   JSON.stringify([
-    { label: 'Yearly registration fee', note: '', value: '50 €' },
+    { label: 'Registration fee', note: '', value: '50 €' },
     { label: 'Cost per lesson', note: '', value: '15 €' },
     { label: 'Cost per semester', note: '(12 sessions × 2 lessons)', value: '360 €' }
   ]), 'price in English');
 H.eq(JSON.stringify(F.priceRows(ACT.facts.price, 'ru', D12)),
   JSON.stringify([
-    { label: 'Годовой регистрационный взнос', note: '', value: '50 €' },
+    { label: 'Регистрационный взнос', note: '', value: '50 €' },
     { label: 'Стоимость урока', note: '', value: '15 €' },
     { label: 'Стоимость семестра', note: '(12 занятий × 2 урока)', value: '360 €' }
   ]), 'price in Russian');
@@ -144,7 +144,7 @@ H.eq(JSON.stringify(F.priceRows(ACT.facts.price, 'ru', D12)),
 // The string form is DERIVED from the rows, so a page and a caller with no room
 // for rows cannot disagree about the price.
 H.eq(text('price', 'en'),
-  'Yearly registration fee - 50 €\nCost per lesson - 15 €\n' +
+  'Registration fee - 50 €\nCost per lesson - 15 €\n' +
   'Cost per semester (12 sessions × 2 lessons) - 360 €',
   'and the one-string form says the same thing');
 
@@ -194,7 +194,7 @@ const offRows = F.priceRows(OFF, 'en', D12);
 H.eq(offRows.length, 2, 'two rows by default, not three');
 H.ok(!offRows.some((r) => r.label === 'Cost per lesson'), 'and cost per lesson is not one of them');
 H.eq(offRows.map((r) => r.label).join(' | '),
-     'Yearly registration fee | Cost per semester',
+     'Registration fee | Cost per semester',
      'the other two are untouched, in order');
 H.eq(F.priceRows(Object.assign({ showPerLesson: true }, OFF), 'en', D12).length, 3, 'opting in restores it');
 H.eq(F.priceRows(Object.assign({ showPerLesson: 'yes' }, OFF), 'en', D12).length, 2,
@@ -216,10 +216,21 @@ H.eq(JSON.stringify(F.priceRows(OFF, 'en', D12, { feeWaived: true })),
   H.ok(rows[0].note === '' && rows[0].value === '50 €',
        lang + ': the yearly fee is shown plainly, with no note qualifying who pays it');
 });
-H.eq(F.priceRows(OFF, 'en', D12)[0].label, 'Yearly registration fee',
-     'and the label says the fee is annual, which is the part a family cannot infer');
-H.eq(F.priceRows(OFF, 'he', D12)[0].label, 'דמי הרשמה לשנה',
-     'Hebrew says "per year" rather than שנתיים, which reads first as "two years"');
+// ⚠ THE LABEL NO LONGER CARRIES THE SCOPE, and that was a deliberate reversal.
+// It said "Yearly registration fee" on the argument that annual-ness is the one
+// thing about the fee a family cannot infer from the number. It still is — but
+// a three-word label among two-word ones read as clutter rather than as
+// information, and the scope now lands where the question is actually asked:
+// the waived line on the family's own cost card, which appears exactly when a
+// returning child is NOT being charged it again. The SCOPE itself is unchanged
+// and lives in feeApplies() — one participant, one activity, one academic year.
+H.eq(F.priceRows(OFF, 'en', D12)[0].label, 'Registration fee', 'the label names the fee, plainly');
+H.eq(F.priceRows(OFF, 'he', D12)[0].label, 'דמי הרשמה', 'and the Hebrew does too');
+H.eq(F.priceRows(OFF, 'ru', D12)[0].label, 'Регистрационный взнос', 'and the Russian');
+['he', 'en', 'ru'].forEach((lang) => {
+  H.ok(!/לשנה|Yearly|Годов/.test(F.priceRows(OFF, lang, D12)[0].label),
+       lang + ': and none of the three still says "yearly"');
+});
 
 console.log('\n[group size takes a free-text override, like price already does]');
 // The override started life as ONE string, and that string was published on all

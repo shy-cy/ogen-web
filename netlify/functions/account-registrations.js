@@ -1228,9 +1228,14 @@ exports.handler = async (event) => {
         const refusal = verificationRefusal(me, (reg.frozen && reg.frozen.type) || 'course');
         if (refusal) return refusal;
 
-        if (reg.status !== 'approved') {
+        // ONE LIST, BOTH DOORS — see isPayable() in _checkout.js, which the
+        // emailed pay link reads too. `pending` is payable: a family told they
+        // are registered and shown what they owe must be able to settle it.
+        // The reason keeps its name so the refusal page's ?pay=not-approved
+        // copy still reads correctly for the three statuses that mean it.
+        if (!checkout.isPayable(reg)) {
           return json(409, {
-            error: 'This registration is ' + reg.status + '. Only an approved place can be paid for.',
+            error: 'This registration is ' + reg.status + '. Only a live registration can be paid for.',
             reason: 'not-approved', status: reg.status
           });
         }

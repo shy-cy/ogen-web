@@ -527,12 +527,22 @@ other rows are unaffected either way, and the admin's live preview mirrors
 `priceRows()` exactly — the same rows, and the same absent total — so the toggle
 is checked without publishing to find out.
 
-The registration fee is **annual, and the label says so** — "Yearly
-registration fee" / `דמי הרשמה לשנה` / `Годовой регистрационный взнос`. It is
-the one thing about the fee a family cannot infer from the number. What the
-label cannot carry is the scope: the fee is **per participant per activity per
-year**, so a sibling pays it again and so does the same child in a second
-activity. The public card therefore carries **no waiver logic at all** — whether
+The fee row is labelled plainly — "Registration fee" / `דמי הרשמה` /
+`Регистрационный взнос`. ⚠ **It used to carry the scope in the label itself**
+("Yearly registration fee" / `דמי הרשמה לשנה`), on the argument that annual-ness
+is the one thing about the fee a family cannot infer from the number. That is
+still true, and the label was still the wrong place to say it: three words among
+two-word labels read as clutter rather than as information, and it said "yearly"
+on every card whether or not anybody's yearly-ness was in question. The scope
+now lands where the question is actually asked — the **waived** line on the
+family's own cost card, which appears exactly when a returning child is *not*
+being charged it again, which is the moment somebody asks why this term is 300
+and not 350.
+
+The scope itself is unchanged and is enforced in `feeApplies()`: the fee is
+**per participant per activity per academic year**, so a sibling pays it again
+and so does the same child in a second activity. The public card therefore
+carries **no waiver logic at all** — whether
 a particular participant already paid it for this activity this year is a
 question about a person, and the page is static and has no idea who is reading
 it. That check belongs at the point of payment, behind a login, and lives in the
@@ -1685,12 +1695,38 @@ over something they consider settled. If we cannot take the place we write and
 say so, and that message already exists.
 
 So the button is `הרשמה` / Register / `Записаться`, the confirmation and the
-email both say the child is registered and a payment link is coming, and
-**`pending` and `approved` both read "registered" to a family**. The two are a
-real distinction on our side — approved is what opens payment — and the
-difference is already expressed where it matters: a pay button on one, "a
-payment link is on its way" on the other. `pending` survives in the admin queue,
-which is the only place that word belongs.
+email both say the child is registered and point at the page the payment is on,
+and **`pending` and `approved` both read "registered" to a family**. `pending`
+survives in the admin queue, which is the only place that word belongs.
+
+⚠ **AND THE DIFFERENCE STOPPED BEING A PAY BUTTON.** For a while `approved` drew
+one and `pending` drew the sentence *"we will send you a payment link shortly"*
+in its place — under a figure reading **Still to pay €500.00**. That is a bill
+with the means to settle it withheld, and the link it promised exists only once
+an admin reaches the queue, so on a manually-approved activity it could be days.
+It also contradicted the line above it: if the two read "registered" alike, one
+of them cannot then be told to wait for permission to pay.
+
+`isPayable()` in `_checkout.js` is the single list — `pending` and `approved`,
+read by the signed-in `pay` action **and by the emailed `/pay` link**, which
+matters there too: a receipt for a part payment on a pending registration mints
+one of those links, and it would otherwise have been dead on arrival. The client
+reads the same two statuses, so it cannot hide a button the server would honour.
+
+**The cost is a refusal after a payment, and it is guarded rather than ignored.**
+Rejecting a registration that is holding money would leave us with it and
+nothing in the record saying we owe it back — the family has no place, so nothing
+bills it and nothing ever asks. `paidRefusal()` in `admin-registrations.js`
+refuses, names the amount, and names the route that *does* account for it:
+**cancelling**, which writes the credit through the ledger and sends the message.
+Cancel rather than reject is a real loss of meaning — "we could not take your
+child" and "this registration ended" are different events — and it is the honest
+trade until there is a refund path. It is asked in two places, `decide()` and
+`rejectPreview`, so an admin learns before writing a paragraph rather than after;
+one builder, so the two cannot disagree about the figure or the wording. And
+`creditedCents` comes **off** the total held, which is the opposite of
+`dueCents()`, where it is deliberately not subtracted because there it is already
+inside `paidCents`.
 
 **That moved `DEFAULT_EXPIRY_DAYS` from 14 to 45**, because the number and the
 sentence were one thing. The confirmation used to promise an answer within the
