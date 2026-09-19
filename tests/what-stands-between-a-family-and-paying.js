@@ -42,7 +42,15 @@ const H = require('./_helpers');
 const R = path.join(__dirname, '..');
 const src = fs.readFileSync(path.join(R, 'netlify/functions/account-registrations.js'), 'utf8');
 const bare = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-const pay = bare.slice(bare.indexOf("case 'pay'"), bare.indexOf("case 'balance'"));
+// ⚠ BOUNDED BY `default:`, not by the action that used to follow. It was sliced
+// to "case 'balance'", and when that action was retired indexOf returned -1 —
+// so the slice silently became the whole rest of the file and every assertion
+// below started reading code it was not about. A test that cannot find its
+// subject must not quietly widen to everything.
+const payStart = bare.indexOf("case 'pay'");
+const payEnd = bare.indexOf('default:', payStart);
+H.ok(payStart !== -1 && payEnd > payStart, 'the pay branch and its end were both found');
+const pay = bare.slice(payStart, payEnd);
 H.ok(pay.length > 400, 'found the pay branch');
 
 console.log('[the guardian link is checked before anything else]');

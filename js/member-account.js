@@ -462,6 +462,30 @@
   //
   // aria-live for the same reason in the other direction: a message that appears
   // outside the viewport is also a message a screen reader never announces.
+  // ⚠ WHAT IS COMING, DRAWN AT ITS OWN SHAPE.
+  //
+  // Every screen here fetches, and the wait was the word "Loading…" on an
+  // otherwise empty page — which says exactly as much about a call that takes
+  // 200ms as about one that has already failed, and leaves the page to jump
+  // when the real content lands at a different height.
+  //
+  // A skeleton says the thing a spinner cannot: how much is coming, and how it
+  // is laid out. `T.loading` is still here and is what a screen reader is told,
+  // because a stack of grey blocks announces nothing at all.
+  //
+  // The shapes are named for the content rather than for their width, so a
+  // caller asks for a list of rows and does not have to know that a row is 66px.
+  function skeleton(shape) {
+    var plan = {
+      tiles: ['card', 'card'],
+      list: ['title', 'card', 'card', 'card'],
+      panel: ['title', 'wide', 'half', 'short'],
+      table: ['title', 'wide', 'wide', 'wide', 'wide']
+    }[shape] || ['title', 'wide', 'half'];
+    return el('div', { class: 'acc-skeleton', role: 'status', 'aria-label': T.loading },
+      plan.map(function (k) { return el('div', { class: 'acc-skel is-' + k }); }));
+  }
+
   // ⚠ A BUTTON THAT CANNOT BE PRESSED MUST LOOK LIKE ONE.
   //
   // Every form here already disabled its button for the length of the call, and
@@ -752,25 +776,44 @@
     };
     Object.keys(panels).forEach(function (k) { mount.appendChild(panels[k]); });
 
-    if (slug) renderRegister(panels.register, slug, function () {
-      renderRegistrations(panels.regs);
-      renderSummary(panels.summary, account);
-    });
-    renderSummary(panels.summary, account);
-    renderRegistrations(panels.regs);
-    renderCredit(panels.credit);
+    // ⚠ ONE CALL FOR THE WHOLE DASHBOARD. It was three — the participant count,
+    // the registrations and the credit balance — asked of two functions, each
+    // authenticating and each opening its own stores. They are one question
+    // about one account.
+    //
+    // The skeletons go in FIRST and synchronously, so the screen has its shape
+    // before the request leaves. A blank page that fills in later is
+    // indistinguishable from a page that is broken.
+    if (slug) renderRegister(panels.register, slug, load);
+    panels.summary.appendChild(skeleton('tiles'));
+    panels.regs.appendChild(skeleton('list'));
+    load();
+
+    function load() {
+      post(REGS, { action: 'dashboard' }).then(function (res) {
+        clear(panels.summary);
+        clear(panels.regs);
+        clear(panels.credit);
+        if (!res.ok) {
+          return panels.regs.appendChild(section(T.activitiesTitle,
+            [el('p', { class: 'acc-notice is-err', text: failure(res) })]));
+        }
+        renderSummary(panels.summary, account, res.data.participantCount);
+        renderRegistrations(panels.regs, res.data.registrations || []);
+        renderCredit(panels.credit, res.data);
+      });
+    }
   }
 
   // Two cards: who is on this account, and who you are. Both lead to the same
   // page on different tabs — the count is a link, not an ornament.
-  function renderSummary(where, account) {
+  function renderSummary(where, account, count) {
     clear(where);
     var familyCard = el('a', { class: 'acc-tile', href: url('/account/details', 'tab=family') }, [
       el('span', { class: 'acc-tile-label', text: T.familyTitle }),
-      el('span', { class: 'acc-stat', text: '—' }),
+      el('span', { class: 'acc-stat', text: count == null ? '—' : String(count) }),
       el('span', { class: 'acc-meta', text: T.people })
     ]);
-    var stat = familyCard.querySelector('.acc-stat');
 
     var meCard = el('a', { class: 'acc-tile', href: url('/account/details') }, [
       el('span', { class: 'acc-tile-label', text: T.profileTitle }),
@@ -779,10 +822,6 @@
     ]);
 
     where.appendChild(el('div', { class: 'acc-tiles' }, [familyCard, meCard]));
-    post(FAMILY, { action: 'listParticipants' }).then(function (res) {
-      if (!res.ok) return;
-      stat.textContent = String((res.data.participants || []).length);
-    });
   }
 
   // ---- registering for an activity ----
@@ -801,7 +840,7 @@
   // know that.
   function renderRegister(where, slug, onDone) {
     clear(where);
-    where.appendChild(section(T.registerTitle, [el('p', { class: 'acc-intro', text: T.loading })]));
+    where.appendChild(section(T.registerTitle, [skeleton('panel')]));
     Promise.all([
       post(REGS, { action: 'activity', slug: slug }),
       post(FAMILY, { action: 'listParticipants' })
@@ -958,7 +997,7 @@
     function load() {
       rows = [];
       clear(dates);
-      dates.appendChild(el('p', { class: 'acc-note', text: T.loading }));
+      dates.appendChild(skeleton('table'));
       post(REGS, { action: 'sessions', slug: slug, participantId: who.value }).then(function (res) {
         clear(dates);
         if (!res.ok) return dates.appendChild(el('p', { class: 'acc-notice is-err', text: failure(res) }));
@@ -996,34 +1035,28 @@
   // registers one participant to one activity, so two children in the same class
   // are two registrations with their own status, price and cancellation. A row
   // that named only the activity would be hiding which of them it was about.
-  function renderRegistrations(where) {
+  function renderRegistrations(where, list) {
     if (!where) return;
     clear(where);
-    post(REGS, { action: 'list' }).then(function (res) {
-      clear(where);
-      if (!res.ok) return where.appendChild(section(T.activitiesTitle,
-        [el('p', { class: 'acc-notice is-err', text: failure(res) })]));
-      var list = res.data.registrations || [];
-      if (!list.length) {
-        return where.appendChild(section(T.activitiesTitle,
-          [el('p', { class: 'acc-intro', text: T.noRegs })]));
-      }
-      // LIVE OR FINISHED, which is what the data actually says. Not "upcoming
-      // and past" — a row carries no end date, so grouping by time would be a
-      // claim this list cannot support.
-      var live = function (r) { return r.status === 'pending' || r.status === 'approved'; };
-      var groups = [
-        { label: T.grpCurrent, rows: list.filter(live) },
-        { label: T.grpPast, rows: list.filter(function (r) { return !live(r); }) }
-      ].filter(function (g) { return g.rows.length; });
+    if (!list.length) {
+      return where.appendChild(section(T.activitiesTitle,
+        [el('p', { class: 'acc-intro', text: T.noRegs })]));
+    }
+    // LIVE OR FINISHED, which is what the data actually says. Not "upcoming and
+    // past" — a row carries no end date, so grouping by time would be a claim
+    // this list cannot support.
+    var live = function (r) { return r.status === 'pending' || r.status === 'approved'; };
+    var groups = [
+      { label: T.grpCurrent, rows: list.filter(live) },
+      { label: T.grpPast, rows: list.filter(function (r) { return !live(r); }) }
+    ].filter(function (g) { return g.rows.length; });
 
-      var kids = [];
-      groups.forEach(function (g) {
-        kids.push(el('h3', { class: 'acc-group', text: g.label }));
-        g.rows.forEach(function (r) { kids.push(regRow(r)); });
-      });
-      where.appendChild(section(T.activitiesTitle, kids));
+    var kids = [];
+    groups.forEach(function (g) {
+      kids.push(el('h3', { class: 'acc-group', text: g.label }));
+      g.rows.forEach(function (r) { kids.push(regRow(r)); });
     });
+    where.appendChild(section(T.activitiesTitle, kids));
   }
 
   function regRow(r) {
@@ -1050,20 +1083,18 @@
   // a credit to the ledger, so removing the card would give a family credit they
   // cannot see. Today every balance is €0.00 because nothing collects money;
   // the day that changes, this is already here.
-  function renderCredit(where) {
+  function renderCredit(where, data) {
     clear(where);
-    post(REGS, { action: 'balance' }).then(function (res) {
-      clear(where);
-      if (!res.ok || !res.data.entries || !res.data.entries.length) return;
-      where.appendChild(section(T.creditTitle, [
-        el('p', { class: 'acc-balance', text: money(res.data.balanceCents) })
-      ].concat(res.data.entries.map(function (e) {
-        return el('div', { class: 'acc-row' }, [
-          el('span', { class: 'acc-meta', text: (e.createdAt || '').slice(0, 10) }),
-          el('span', { text: (e.type === 'debit' ? '−' : '+') + money(e.amountCents) })
-        ]);
-      }))));
-    });
+    var entries = (data && data.entries) || [];
+    if (!entries.length) return;
+    where.appendChild(section(T.creditTitle, [
+      el('p', { class: 'acc-balance', text: money(data.balanceCents) })
+    ].concat(entries.map(function (e) {
+      return el('div', { class: 'acc-row' }, [
+        el('span', { class: 'acc-meta', text: (e.createdAt || '').slice(0, 10) }),
+        el('span', { text: (e.type === 'debit' ? '−' : '+') + money(e.amountCents) })
+      ]);
+    }))));
   }
 
   // --------------------------------------------------------- /account/details
@@ -1379,7 +1410,7 @@
     if (!p || !a) return body.appendChild(section(null,
       [el('p', { class: 'acc-notice is-err', text: T.regNotFound })]));
 
-    body.appendChild(section(null, [el('p', { class: 'acc-intro', text: T.loading })]));
+    body.appendChild(section(null, [skeleton('panel')]));
     post(REGS, { action: 'registration', participantId: p, activityId: a }).then(function (res) {
       clear(body);
       if (!res.ok) return body.appendChild(section(null,
@@ -1409,8 +1440,13 @@
         // Bundles BEFORE the evenings. What a family holds decides how they read
         // the list under it — an evening costing nothing makes sense once the
         // bundle above it has been seen, and reads as a bug otherwise.
-        renderBundlePanel(body, r, act);
-        renderEvenings(body, r, act);
+        //
+        // ⚠ SEEDED, not re-fetched. This screen was three round trips for one
+        // page and each read the same activity file; the call above now carries
+        // both payloads. The panels keep their own fetch for the REDRAW after a
+        // booking or a move, which is one panel changing rather than the page.
+        renderBundlePanel(body, r, act, res.data.perSession);
+        renderEvenings(body, r, act, res.data.perSession);
       }
       else if (act && act.sessionRows && act.sessionRows.length) {
         body.appendChild(section(T.sessionsTitle, [courseSessions(act.sessionRows)]));
@@ -1577,29 +1613,35 @@
   // Every figure comes from the server's bundleView(), the same builder the
   // admin roster reads. An admin and a family reading different numbers off the
   // same purchase is the failure that shape exists to prevent.
-  function renderBundlePanel(where, r, act) {
+  function renderBundlePanel(where, r, act, seed) {
     var panel = el('div', {});
     where.appendChild(panel);
     if (!act) return;
-    draw();
+    if (seed) paint(seed); else draw();
     return panel;
 
     function draw() {
       clear(panel);
+      panel.appendChild(section(T.buyTitle, [skeleton('panel')]));
       post(REGS, { action: 'bundles', participantId: r.participantId, slug: act.slug })
         .then(function (res) {
           clear(panel);
           if (!res.ok) return;      // a bundle panel that cannot load is not an error a family can act on
-          var held = res.data.held || [];
-          var offers = res.data.offers || [];
-          if (held.length) panel.appendChild(section(T.bundleTitle, [
-            el('p', { class: 'acc-intro', text: T.bundleIntro })
-          ].concat(held.map(function (b) { return heldCard(b); }))));
-          panel.appendChild(section(T.buyTitle, offers.length
-            ? [el('p', { class: 'acc-intro', text: T.buyIntro })]
-                .concat(offers.map(function (o) { return offerRow(o); }))
-            : [el('p', { class: 'acc-intro', text: T.buyNone })]));
+          paint(res.data);
         });
+    }
+
+    function paint(data) {
+      clear(panel);
+      var held = data.held || [];
+      var offers = data.offers || [];
+      if (held.length) panel.appendChild(section(T.bundleTitle, [
+        el('p', { class: 'acc-intro', text: T.bundleIntro })
+      ].concat(held.map(function (b) { return heldCard(b); }))));
+      panel.appendChild(section(T.buyTitle, offers.length
+        ? [el('p', { class: 'acc-intro', text: T.buyIntro })]
+            .concat(offers.map(function (o) { return offerRow(o); }))
+        : [el('p', { class: 'acc-intro', text: T.buyNone })]));
     }
 
     function heldCard(b) {
@@ -1698,45 +1740,50 @@
   }
 
   // ---- the evenings of a drop-in ----
-  function renderEvenings(where, r, act) {
+  function renderEvenings(where, r, act, seed) {
     var panel = el('div', {});
     where.appendChild(panel);
     if (!act) return;
     // A move changes both panels, so the bundle card can ask this one to redraw.
     S.redrawEvenings = draw;
-    draw();
+    if (seed) paint(seed); else draw();
 
     function draw() {
       clear(panel);
-      panel.appendChild(section(T.sessionsTitle, [el('p', { class: 'acc-intro', text: T.loading })]));
+      panel.appendChild(section(T.sessionsTitle, [skeleton('table')]));
       post(REGS, { action: 'sessions', participantId: r.participantId, slug: act.slug })
         .then(function (res) {
           clear(panel);
           if (!res.ok) return panel.appendChild(section(T.sessionsTitle,
             [el('p', { class: 'acc-notice is-err', text: failure(res) })]));
-          var table = el('table', { class: 'acc-table' });
-          table.appendChild(el('tr', {}, [
-            el('th', { text: T.dateCol }), el('th', { text: T.statusCol }),
-            el('th', { class: 'is-num', text: T.owes }), el('th', { class: 'is-num', text: T.paid }),
-            el('th', {})
-          ]));
-          (res.data.sessions || []).forEach(function (s) {
-            table.appendChild(el('tr', {}, [
-              el('td', { text: dayMonth(s.date) }),
-              el('td', {}, [s.status
-                ? el('span', { class: 'acc-pill is-s-' + s.status,
-                               text: T.sessionStatus[s.status] || s.status })
-                : el('span', { class: 'acc-meta', text: '—' })]),
-              // €0.00 on an evening a family paid for in advance reads as a
-              // mistake. The reason it is nothing is the interesting part.
-              el('td', { class: 'is-num', text: s.priceBasis === 'bundle'
-                ? T.fromBundle : money(s.owedCents) }),
-              el('td', { class: 'is-num', text: money(s.paidCents) }),
-              el('td', {}, [eveningAction(s, res.data, r, act, draw)])
-            ]));
-          });
-          panel.appendChild(section(T.sessionsTitle, [el('div', { class: 'acc-scroll' }, [table])]));
+          paint(res.data);
         });
+    }
+
+    function paint(data) {
+      clear(panel);
+      var table = el('table', { class: 'acc-table' });
+      table.appendChild(el('tr', {}, [
+        el('th', { text: T.dateCol }), el('th', { text: T.statusCol }),
+        el('th', { class: 'is-num', text: T.owes }), el('th', { class: 'is-num', text: T.paid }),
+        el('th', {})
+      ]));
+      (data.sessions || []).forEach(function (s) {
+        table.appendChild(el('tr', {}, [
+          el('td', { text: dayMonth(s.date) }),
+          el('td', {}, [s.status
+            ? el('span', { class: 'acc-pill is-s-' + s.status,
+                           text: T.sessionStatus[s.status] || s.status })
+            : el('span', { class: 'acc-meta', text: '—' })]),
+          // €0.00 on an evening a family paid for in advance reads as a
+          // mistake. The reason it is nothing is the interesting part.
+          el('td', { class: 'is-num', text: s.priceBasis === 'bundle'
+            ? T.fromBundle : money(s.owedCents) }),
+          el('td', { class: 'is-num', text: money(s.paidCents) }),
+          el('td', {}, [eveningAction(s, data, r, act, draw)])
+        ]));
+      });
+      panel.appendChild(section(T.sessionsTitle, [el('div', { class: 'acc-scroll' }, [table])]));
     }
   }
 

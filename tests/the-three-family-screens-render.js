@@ -66,8 +66,14 @@ const sent = [];
 const ANSWERS = {
   me: () => ({ ok: true, account: ACCOUNT, expiresAt: Date.now() + 1e7 }),
   listParticipants: () => ({ ok: true, participants: PARTICIPANTS.map((p) => Object.assign({}, p)) }),
-  list: () => ({ ok: true, registrations: REGS }),
-  balance: () => ({ ok: true, balanceCents: 0, entries: [] }),
+  // ⚠ ONE CALL FOR THE WHOLE DASHBOARD. It was three — the participant count,
+  // the registrations and the credit balance — asked of two functions, each
+  // authenticating and each opening its own stores, for one question about one
+  // account. `list` and `balance` are gone rather than left beside it: an action
+  // nothing calls is dead copy indistinguishable from one whose caller was
+  // renamed.
+  dashboard: () => ({ ok: true, registrations: REGS, participantCount: PARTICIPANTS.length,
+                      balanceCents: 0, entries: [] }),
   listGuardians: () => ({ ok: true,
     guardians: [{ name: 'Michal Shinitzky', email: 'michal@example.com', isPrimary: true }],
     pendingInvites: [{ invitedEmail: 'dana@example.com', token: 'tok' }],
@@ -152,7 +158,44 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
   H.ok(/function say\(kind, text\)[\s\S]{0,420}aria-live/.test(src),
     'and announced, because off-screen and unannounced are the same failure twice');
 
-  console.log('[the dashboard]');
+  console.log('[the wait has a shape]');
+  // ⚠ DRAWN BEFORE THE REQUEST LEAVES. The wait used to be the word "Loading…"
+  // on an otherwise empty page, which says exactly as much about a call that
+  // takes 200ms as about one that has already failed — and leaves the page to
+  // jump when the real content arrives at a different height.
+  {
+    const held = D.makeDom({ view: 'account', lang: 'en', fetch: function (e, init) {
+      const body = JSON.parse(init.body);
+      // Authentication answers; everything after it hangs, which is the state
+      // being asserted.
+      if (body.action === 'me') {
+        return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve(ANSWERS.me()) });
+      }
+      return new Promise(function () {});
+    } });
+    held.window.localStorage.setItem('ogenMemberSession', JSON.stringify({
+      token: 't', firstName: 'Michal', email: ACCOUNT.email, expiresAt: Date.now() + 1e7 }));
+    const heldCtx = vm.createContext({
+      window: held.window, document: held.document, console: console,
+      location: held.window.location,
+      Intl: Intl, Date: Date, Math: Math, JSON: JSON, Object: Object, Array: Array,
+      String: String, Number: Number, RegExp: RegExp, Promise: Promise, setTimeout: setTimeout,
+      encodeURIComponent: encodeURIComponent, decodeURIComponent: decodeURIComponent
+    });
+    vm.runInContext(memberSession, heldCtx, { filename: 'js/member-session.js' });
+    vm.runInContext(memberAccount, heldCtx, { filename: 'js/member-account.js' });
+    await settle();
+    H.ok(D.byClass(held.mount, 'acc-skel').length >= 2,
+      'a screen waiting on data draws the SHAPE of what is coming, not a spinner');
+    const box = D.byClass(held.mount, 'acc-skeleton')[0];
+    H.eq(box.getAttribute('role'), 'status',
+      'announced, because a stack of grey blocks says nothing to a screen reader');
+    H.ok(box.getAttribute('aria-label'), 'with the word it replaced as its label');
+    H.ok(held.mount.textContent.indexOf('Loading') === -1,
+      'and the word itself is not on screen — the shape is the message');
+  }
+
+  console.log('\n[the dashboard]');
   let dom = await screen({ view: 'account', lang: 'en' });
   H.ok(has(dom, 'Hello, Michal'), 'it greets you by name');
   H.ok(has(dom, 'My family'), 'the family tile is there');
@@ -180,6 +223,13 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
   // screen reader announces this outline.
   H.eq(D.byTag(dom.mount, 'h1').length, 0,
     'the script adds no h1 of its own — the page-header in the shell carries it');
+
+  // ⚠ ONE CALL, NOT THREE. The dashboard asked two functions three questions
+  // about one account — the participant count, the registrations and the credit
+  // balance — each authenticating and each opening its own stores.
+  H.eq(sent.filter((b) => b.action === 'dashboard').length, 1, 'the dashboard is one request');
+  H.eq(sent.filter((b) => ['list', 'balance', 'listParticipants'].indexOf(b.action) !== -1).length, 0,
+    'and none of the three it replaced is still asked');
 
   console.log('\n[the same screen in Hebrew]');
   dom = await screen({ view: 'account', lang: 'he' });

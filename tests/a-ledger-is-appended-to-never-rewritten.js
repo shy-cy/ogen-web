@@ -183,7 +183,10 @@ process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
     'and the same euros land on the registration — one action, or the two disagree');
 
   console.log('\n[the family can see it all]');
-  const mine = await H.call(regs.handler, { action: 'balance', token: dana.token });
+  // The dashboard action, which is where a family's balance now comes from: it
+  // was its own call, and three requests for one screen is what that screen was
+  // waiting on.
+  const mine = await H.call(regs.handler, { action: 'dashboard', token: dana.token });
   H.eq(mine.body.balanceCents, 10000, 'the same number they were told');
   H.eq(mine.body.entries.length, 3, 'and every line behind it');
   H.ok(mine.body.entries.every((e) => e.amountCents > 0), 'all positive, with the sign in the type');

@@ -1212,6 +1212,41 @@ html[lang="he"] .thankyou h1{ font-family: var(--font-he); font-weight:700; }
    says the reading stops and the doing starts. */
 .acc-pay{ margin-block-start:20px; }
 
+/* ---- waiting ---------------------------------------------------------------
+   ⚠ THE SHAPE OF WHAT IS COMING, not a spinner.
+   The family area fetches on every screen, and the wait was the word "Loading…"
+   on an otherwise empty page — which says the same thing about a call that will
+   take 200ms and one that has already failed. A skeleton says something a
+   spinner cannot: how much is coming and how it is laid out, so the page does
+   not jump when it arrives.
+   Built from the site's own tokens — stone on paper, the same 10px radius the
+   cards use — rather than a grey box from somewhere else. The sheen is a slow
+   pass of --paper across --stone, which is the palette doing the work. */
+.acc-skeleton{ display:flex; flex-direction:column; gap:10px; }
+.acc-skel{
+  height:14px; border-radius:7px; background:var(--stone); position:relative; overflow:hidden;
+}
+.acc-skel.is-title{ height:20px; width:42%; }
+.acc-skel.is-wide{ width:100%; }
+.acc-skel.is-half{ width:64%; }
+.acc-skel.is-short{ width:35%; }
+.acc-skel.is-card{ height:66px; border-radius:10px; }
+.acc-skel::after{
+  content:""; position:absolute; inset:0;
+  /* Physical, and deliberately so: this is a sheen crossing a shape, not
+     anything positioned relative to a side. It reads the same in all three
+     languages because it is symmetric, so there is nothing to mirror. */
+  background:linear-gradient(90deg, transparent, rgba(253,251,247,.85), transparent);
+  transform:translateX(-100%);
+  animation:acc-sheen 1.25s ease-in-out infinite;
+}
+@keyframes acc-sheen{ to{ transform:translateX(100%); } }
+/* Motion is the decoration, never the message: with it switched off the blocks
+   are still there, still the right shape, still saying the page is not empty. */
+@media (prefers-reduced-motion: reduce){
+  .acc-skel::after{ animation:none; opacity:.35; }
+}
+
 /* A BUNDLE IS A CARD, not a row: one family can hold two, and what matters
    about one is a list of dates with what happened to each. The count is the
    number they opened the page for, so it is the largest thing on it.

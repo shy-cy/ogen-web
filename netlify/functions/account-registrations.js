@@ -1,6 +1,8 @@
 // /api/account-registrations — what a signed-in guardian may do about places.
 //
-// Actions: activity | list | submit | cancel
+// Actions: dashboard | activity | registration | submit | cancel | sessions |
+//          bookSession | bookAndPay | paySession | cancelSession | rescheduleSession |
+//          bundles | buyBundle | pay
 //
 // AUTHORISATION IS A LINK, CHECKED PER PARTICIPANT, exactly as in
 // account-family.js: every action that names a participant starts by asking
@@ -63,6 +65,54 @@ async function published(slug) {
   return raw ? migrate(raw) : null;
 }
 
+// ⚠ THE SAME READ, FOR SCREENS ONLY — AND THE SPLIT IS THE WHOLE POINT.
+//
+// The activity page was three API calls, each one a GitHub round trip for the
+// same file, and the register panel was three more. A short cache collapses
+// them. The argument for it was "this is only display data, and the money paths
+// verify everything fresh anyway" — which was NOT true when it was made: one
+// `published()` served the ten call sites in this file, and six of them write.
+//
+// So it is true by construction now rather than by assumption. TWO FUNCTIONS:
+//
+//   published()           booking, paying, buying, moving, submitting — every
+//                         path that freezes terms onto a record or opens a
+//                         Checkout. Never cached, ever.
+//   publishedForDisplay() the four read-only actions. Cached.
+//
+// A test pins which actions call which, because the failure mode of getting it
+// wrong is a family charged a price that was edited ten seconds ago, and
+// nothing about that looks wrong until somebody compares two receipts.
+//
+// TEN SECONDS. It covers the burst a single page load makes and an immediate
+// redraw after it, which is all it needs to; an admin who edits a price and
+// reloads the page they are looking at sees the change within one breath. The
+// number to compare it against is not zero — it is the ~60s the deployed bundle
+// already trails a save by, which is what the uncached read exists to beat.
+//
+// Cached as a STRING and parsed per call, so a caller that mutates what it got
+// back cannot poison the next reader. Per container, so it empties on its own
+// and there is nothing to invalidate.
+const DISPLAY_TTL_MS = 10000;
+const displayCache = new Map();
+
+async function publishedForDisplay(slug, now) {
+  if (!slug) return null;
+  const at = now == null ? Date.now() : now;
+  const hit = displayCache.get(slug);
+  if (hit && at - hit.at < DISPLAY_TTL_MS) {
+    return hit.json === null ? null : JSON.parse(hit.json);
+  }
+  const value = await (reader || published)(slug);
+  displayCache.set(slug, { at: at, json: value === null ? null : JSON.stringify(value) });
+  return value;
+}
+
+// The one seam this file has, and it exists for the same reason _email.js and
+// _stripe.js have theirs: "it caches" and "it expires" are two claims, and only
+// the first is visible in the source. A test drives the reader and counts.
+let reader = null;
+
 // What the registration form needs, and nothing it does not. It is deliberately
 // a COUNT and never a list: how many places are left is public-ish information,
 // who is in them is not.
@@ -96,6 +146,91 @@ function activityView(activity, report, lang) {
           full: g.left != null && g.left <= 0
         }))
       : null
+  };
+}
+
+// ⚠ THE TWO PAY-PER-SESSION PAYLOADS, BUILT ONCE EACH.
+//
+// The activity page used to make three calls for one screen — the registration,
+// then the evenings, then the bundles — and each was a GitHub round trip for the
+// same file. It makes one now, and these are what let it: the combined call and
+// the two narrow ones return the SAME shape because they run the same function.
+//
+// The narrow ones did not go away, and should not: booking, cancelling and
+// moving all redraw one panel, and re-fetching the whole page to repaint a table
+// is the trade in the other direction.
+async function sessionsPayload(activity, participantId, now) {
+  const reg = await store.getRegistration(participantId, activity.activityId);
+  const all = await attendance.forActivity(activity.activityId);
+  const mine = {};
+  all.filter((a) => a.participantId === participantId)
+     .forEach((a) => { mine[a.sessionDate] = a; });
+
+  return {
+    // Booking needs an approved registration behind it. The registration is the
+    // "may come" decision and an admin makes it once; this does not quietly
+    // become a second way in.
+    mayBook: !!reg && reg.status === 'approved',
+    registrationStatus: reg ? reg.status : null,
+    sessions: attendance.bookableDates(activity).map((date) => {
+      const cap = R.capacityForDate(activity, all, date);
+      const own = mine[date] || null;
+      const frozen = own ? own.frozen : credit.freezeSession(activity, date, null, { bookedAt: now });
+      return {
+        date: date,
+        // ⚠ THE PRICE AN EVENING WOULD COST, from the SAME function that freezes
+        // it at booking and with the same `bookedAt` — or a screen offering the
+        // standard price would take the late one, on an activity where those
+        // differ. A booked evening quotes what it actually froze, never a
+        // recomputed figure: an admin raising the price must not change what was
+        // already agreed.
+        priceCents: own
+          ? (own.payment.owedCents || 0)
+          : Math.max(0, Math.round(Number(frozen.perSessionPrice || 0) * 100)),
+        priceBasis: frozen.priceBasis || null,
+        startsAt: frozen.startsAt || null,
+        // Booking a date that has gone is not a thing to offer. It is a flag
+        // rather than a filter because the registration page lists the whole
+        // term, past evenings included, and only the register panel needs them
+        // gone.
+        past: credit.past(date, now),
+        left: cap.left, capacity: cap.capacity, full: cap.left != null && cap.left <= 0,
+        status: own ? own.status : null,
+        owedCents: own ? own.payment.owedCents : null,
+        paidCents: own ? own.payment.paidCents : null,
+        // What cancelling would do, from the SAME function the server will
+        // apply — so what is shown is what happens.
+        cancellation: own ? credit.creditForSession(own, now) : null
+      };
+    })
+  };
+}
+
+async function bundlesPayload(activity, participantId, now) {
+  const held = await bundleStore.forParticipant(participantId, activity.activityId);
+  const mine = {};
+  (await attendance.forParticipant(participantId, activity.activityId))
+    .forEach((a) => { mine[a.sessionDate] = a; });
+
+  // WHERE EACH MOVEABLE ENTRY MAY GO, computed from the same function the server
+  // will apply when the move is asked for — so a date offered is a date that
+  // will be accepted. A client guessing the list would offer a full evening, or
+  // one outside the window that was sold.
+  const taken = Object.keys(mine).filter((d) => R.holdsASeat(mine[d]));
+  return {
+    offers: B.bundlesAvailable(activity, now).map((b) => ({
+      bundleId: b.bundleId, entries: b.entries, pricePerEntry: b.pricePerEntry,
+      validityDays: b.validityDays,
+      totalCents: Math.round(Number(b.pricePerEntry) * 100) * b.entries,
+      coveredDates: B.coverageFor(activity, b, now)
+    })),
+    held: held.map((b) => {
+      const view = B.bundleView(b, mine, now);
+      view.rows.forEach((row) => {
+        if (row.mayReschedule) row.targets = B.rescheduleTargets(b, activity, row.date, now, taken);
+      });
+      return view;
+    })
   };
 }
 
@@ -272,6 +407,12 @@ function regRow(reg, participant) {
   };
 }
 
+exports._internal = {
+  publishedForDisplay,
+  DISPLAY_TTL_MS,
+  _setReader: (fn) => { reader = fn; displayCache.clear(); }
+};
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return json(405, { error: 'Use POST' });
 
@@ -315,7 +456,7 @@ exports.handler = async (event) => {
     switch (body.action) {
       // --- what is on offer ------------------------------------------------
       case 'activity': {
-        const activity = await published(body.slug);
+        const activity = await publishedForDisplay(body.slug);
         if (!activity) return json(404, { error: 'No such activity.' });
         const regs = await store.forActivity(activity.activityId);
         return json(200, { ok: true, activity: activityView(activity, R.capacityReport(activity, regs), lang) });
@@ -331,57 +472,13 @@ exports.handler = async (event) => {
       case 'sessions': {
         const participant = await mustGuard(body.participantId);
         if (!participant) return json(404, { error: NOT_YOURS });
-        const activity = await published(body.slug);
+        const activity = await publishedForDisplay(body.slug);
         if (!activity) return json(404, { error: 'No such activity.' });
         if (activity.type !== 'dropin') {
           return json(400, { error: 'This activity is booked for the whole term, not by the session.' });
         }
-        const reg = await store.getRegistration(participant.participantId, activity.activityId);
-        const all = await attendance.forActivity(activity.activityId);
-        const mine = {};
-        all.filter((a) => a.participantId === participant.participantId)
-           .forEach((a) => { mine[a.sessionDate] = a; });
-
-        const now = Date.now();
-        return json(200, {
-          ok: true,
-          // Booking needs an approved registration behind it. The registration
-          // is the "may come" decision and an admin makes it once; this endpoint
-          // does not quietly become a second way in.
-          mayBook: !!reg && reg.status === 'approved',
-          registrationStatus: reg ? reg.status : null,
-          sessions: attendance.bookableDates(activity).map((date) => {
-            const cap = R.capacityForDate(activity, all, date);
-            const own = mine[date] || null;
-            const frozen = own ? own.frozen : credit.freezeSession(activity, date, null, { bookedAt: now });
-            return {
-              date: date,
-              // ⚠ THE PRICE AN EVENING WOULD COST, from the SAME function that
-              // freezes it at booking and with the same `bookedAt` — or a screen
-              // offering the standard price would take the late one, on an
-              // activity where those differ. A booked evening quotes what it
-              // actually froze, never a recomputed figure: an admin raising the
-              // price must not change what was already agreed.
-              priceCents: own
-                ? (own.payment.owedCents || 0)
-                : Math.max(0, Math.round(Number(frozen.perSessionPrice || 0) * 100)),
-              priceBasis: frozen.priceBasis || null,
-              startsAt: frozen.startsAt || null,
-              // Booking a date that has gone is not a thing to offer. It is a
-              // flag rather than a filter because the registration page lists
-              // the whole term, past evenings included, and only the register
-              // panel needs them gone.
-              past: credit.past(date, now),
-              left: cap.left, capacity: cap.capacity, full: cap.left != null && cap.left <= 0,
-              status: own ? own.status : null,
-              owedCents: own ? own.payment.owedCents : null,
-              paidCents: own ? own.payment.paidCents : null,
-              // What cancelling would do, from the SAME function the server will
-              // apply — so what is shown is what happens.
-              cancellation: own ? credit.creditForSession(own, now) : null
-            };
-          })
-        });
+        return json(200, Object.assign({ ok: true },
+          await sessionsPayload(activity, participant.participantId, Date.now())));
       }
 
       case 'bookSession': {
@@ -640,42 +737,13 @@ exports.handler = async (event) => {
       case 'bundles': {
         const participant = await mustGuard(body.participantId);
         if (!participant) return json(404, { error: NOT_YOURS });
-        const activity = await published(body.slug);
+        const activity = await publishedForDisplay(body.slug);
         if (!activity) return json(404, { error: 'No such activity.' });
         if (activity.type !== 'dropin') {
           return json(400, { error: 'Bundles are for pay-per-session activities.' });
         }
-        const now = Date.now();
-        const held = await bundleStore.forParticipant(participant.participantId, activity.activityId);
-        const mine = {};
-        (await attendance.forParticipant(participant.participantId, activity.activityId))
-          .forEach((a) => { mine[a.sessionDate] = a; });
-
-        // WHERE EACH MOVEABLE ENTRY MAY GO, computed from the same function the
-        // server will apply when the move is asked for — so a date offered is a
-        // date that will be accepted. A client guessing the list would offer a
-        // full evening, or one outside the window that was sold.
-        const taken = Object.keys(mine).filter((d) => R.holdsASeat(mine[d]));
-        const views = held.map((b) => {
-          const view = B.bundleView(b, mine, now);
-          view.rows.forEach((row) => {
-            if (row.mayReschedule) {
-              row.targets = B.rescheduleTargets(b, activity, row.date, now, taken);
-            }
-          });
-          return view;
-        });
-
-        return json(200, {
-          ok: true,
-          offers: B.bundlesAvailable(activity, now).map((b) => ({
-            bundleId: b.bundleId, entries: b.entries, pricePerEntry: b.pricePerEntry,
-            validityDays: b.validityDays,
-            totalCents: Math.round(Number(b.pricePerEntry) * 100) * b.entries,
-            coveredDates: B.coverageFor(activity, b, now)
-          })),
-          held: views
-        });
+        return json(200, Object.assign({ ok: true },
+          await bundlesPayload(activity, participant.participantId, Date.now())));
       }
 
       case 'buyBundle': {
@@ -867,16 +935,6 @@ exports.handler = async (event) => {
       }
 
       // --- this account's registrations ------------------------------------
-      case 'list': {
-        const ids = await guardians.participantIdsFor(me.accountId);
-        const out = [];
-        for (const id of ids) {
-          const p = await participants.getParticipant(id);
-          for (const reg of await store.forParticipant(id)) out.push(regRow(reg, p));
-        }
-        return json(200, { ok: true, registrations: out });
-      }
-
       // --- one registration, in full ----------------------------------------
       //
       // What the family area's activity page shows: the registration, the
@@ -888,6 +946,41 @@ exports.handler = async (event) => {
       // `frozen.activitySlugAtSubmission` is audit only — if it disagrees with
       // the activity's slug today, that is a rename working, and following it
       // would open the wrong record or none at all.
+      // ⚠ THE WHOLE DASHBOARD, IN ONE CALL.
+      //
+      // It was four: `me` to authenticate, then the participant count, then the
+      // registrations, then the credit balance — three of which are the same
+      // question asked of three functions. Two of them already lived here, and
+      // the third is one prefix scan that does not need a function of its own.
+      //
+      // `me` stays separate on purpose: boot() has to know WHO this is before it
+      // can decide which screen to draw, so it is the one call that cannot be
+      // folded into the others without inverting the order the page renders in.
+      case 'dashboard': {
+        // The same walk `list` does, and it is the only one available: a
+        // registration is keyed by participant, so "this account's" means "every
+        // participant it guards". The ids come back from a key scan without a
+        // blob being opened.
+        const ids = await guardians.participantIdsFor(me.accountId);
+        const rows = [];
+        for (const id of ids) {
+          const p = await participants.getParticipant(id);
+          for (const reg of await store.forParticipant(id)) rows.push(regRow(reg, p));
+        }
+        const entries = await ledger.entriesFor(me.accountId);
+        return json(200, {
+          ok: true,
+          // A COUNT, not the people. The dashboard tile shows a number and links
+          // to the page that lists them; sending names here would be sending a
+          // child's name to a screen that does not display it.
+          participantCount: ids.length,
+          registrations: rows,
+          balanceCents: ledger.balanceOf(entries),
+          currency: ledger.CURRENCY,
+          entries: entries
+        });
+      }
+
       case 'registration': {
         const participant = await mustGuard(body.participantId);
         if (!participant) return json(404, { error: NOT_YOURS });
@@ -896,7 +989,7 @@ exports.handler = async (event) => {
 
         const index = (await readJson('activities/activities-index.json')) || [];
         const entry = index.filter((a) => a.activityId === reg.activityId)[0] || null;
-        const activity = entry ? await published(entry.slug) : null;
+        const activity = entry ? await publishedForDisplay(entry.slug) : null;
 
         // An activity can be unpublished after somebody registered for it. The
         // registration is still real and still shows its frozen terms; there is
@@ -922,7 +1015,22 @@ exports.handler = async (event) => {
             // nobody is ever billed.
             priceRows: facts.factPriceRows(activity, lang),
             sessionRows: facts.sessionRows((activity.facts || {}).duration, lang)
-          }) : null
+          }) : null,
+          // ⚠ EVERYTHING THIS SCREEN NEEDS, IN ONE CALL.
+          //
+          // A drop-in page was three round trips — this, then the evenings, then
+          // the bundles — and each read the same activity file from GitHub. They
+          // are built here from the copy already in hand.
+          //
+          // Absent on a course and absent when the activity is gone, rather than
+          // empty: the client draws those panels only for a drop-in, and an empty
+          // object would be a claim that there are no evenings rather than that
+          // the question does not arise.
+          perSession: activity && activity.type === 'dropin'
+            ? Object.assign(
+                await sessionsPayload(activity, participant.participantId, Date.now()),
+                await bundlesPayload(activity, participant.participantId, Date.now()))
+            : null
         });
       }
 
@@ -1085,16 +1193,6 @@ exports.handler = async (event) => {
         }
 
         return json(200, { ok: true, url: session.url, amountCents: due });
-      }
-
-      case 'balance': {
-        const entries = await ledger.entriesFor(me.accountId);
-        return json(200, {
-          ok: true,
-          balanceCents: ledger.balanceOf(entries),
-          currency: ledger.CURRENCY,
-          entries: entries
-        });
       }
 
       default:

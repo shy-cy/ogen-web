@@ -2497,6 +2497,77 @@ current screen owns, and signing up *replaces* that screen — so the one thing 
 new account needs to know ("we have emailed you to confirm the address") was
 being written into a node discarded in the same repaint.
 
+### ⚠ Fewer calls, and a cached read that must never reach money
+
+The family area was slow because every screen was several API calls and each one
+read the same activity file from the GitHub API.
+
+**One call per screen.** The dashboard was four requests — `me`, the participant
+count, the registrations, the balance — which is two functions asked three
+questions about one account, each authenticating and each opening its own
+stores. It is `me` plus `dashboard` now. The activity page was three — the
+registration, then the evenings, then the bundles — each a GitHub round trip for
+the same file; `registration` carries a `perSession` block built from the copy
+already in hand. `sessionsPayload()` and `bundlesPayload()` are the one builder
+each, so the combined call and the narrow ones cannot return different shapes.
+
+The narrow actions stay, and should: booking, cancelling and moving redraw **one
+panel**, and re-fetching a whole page to repaint a table is the trade in the
+other direction. `list` and `balance` are **gone** rather than left beside
+`dashboard` — an action nothing calls is dead copy indistinguishable from one
+whose caller was renamed.
+
+**⚠ And the cache is the part with teeth.** The argument for it was *"this is
+only display data, and the money paths verify everything fresh anyway"* — which
+was **not true when it was made**. One `published()` served ten call sites in
+`account-registrations.js` and **six of them write**: `submit`, `bookSession`,
+`bookAndPay`, `paySession`, `buyBundle`, `rescheduleSession`. Caching that would
+mean a family charged a price edited ten seconds earlier, and nothing about it
+looks wrong until two receipts are compared.
+
+So the premise is true **by construction**:
+
+| | |
+|---|---|
+| `published()` | every path that freezes terms onto a record or opens a Checkout. Never cached. |
+| `publishedForDisplay()` | the four read-only actions — `activity`, `sessions`, `bundles`, `registration`. Cached for **10 seconds**. |
+
+Ten seconds covers the burst one page load makes and a redraw straight after it,
+which is all it has to do. The number to compare it against is not zero: **the
+deployed bundle already trails a save by about a minute**, which is the
+staleness the uncached read exists to beat, and this is a sixth of it.
+
+The cache holds a **string** and parses per call, so an action that mutates what
+it got back cannot poison the next reader. It is per container, so it empties on
+its own and there is nothing to invalidate.
+
+`tests/a-cached-read-never-reaches-money.js` reads the classification **off the
+source** rather than listing it, so an action added tomorrow is covered without
+anyone editing the test — and it fails on an action that reads an activity and
+appears on neither list, because picking the wrong reader is invisible. It also
+checks the property behind the list: nothing on the cached side saves a record or
+opens a Checkout.
+
+### The wait has a shape
+
+Every screen here fetches, and the wait was the word "Loading…" on an otherwise
+empty page — which says exactly as much about a call that takes 200ms as about
+one that has already failed, and leaves the page to jump when the content arrives
+at a different height.
+
+`skeleton(shape)` draws blocks at the size of what is coming, built from the
+site's own tokens: `--stone` on `--paper`, the cards' own 10px radius, and a
+sheen that is a slow pass of `--paper` across `--stone`. Not a stock spinner, and
+not a grey box from somewhere else. The shapes are named for the content —
+`tiles`, `list`, `panel`, `table` — so a caller asks for a list of rows and does
+not have to know that a row is 66px.
+
+Three things it has to get right: it is appended **synchronously**, before the
+request leaves, or it is not a loading state; it carries `role="status"` and the
+`T.loading` string as its label, because a stack of grey blocks announces nothing
+to a screen reader; and under `prefers-reduced-motion` the sheen stops while the
+blocks stay, because motion is the decoration and never the message.
+
 ### ⚠ The language on screen is the PAGE's, not the account's
 
 A family reading the **Hebrew** page was offered group names in **English**.
