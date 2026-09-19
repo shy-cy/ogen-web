@@ -153,7 +153,7 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
 (async () => {
   console.log('[the panel asks the whole question at once]');
   sent.length = 0;
-  let dom = await screen({ view: 'account', lang: 'en', search: '?register=folk' });
+  let dom = await screen({ view: 'activity', lang: 'en', search: '?register=folk' });
   H.ok(has(dom, 'Folk dancing'), 'it names the activity');
   H.ok(has(dom, 'Choose who is coming and which sessions'),
     'and says what registering here actually does');
@@ -224,7 +224,7 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
       says: 'could not open the payment page', why: 'the dates are booked and the family is told to pay from their own page' }
   ];
   for (const e of endings) {
-    const d = await screen({ view: 'account', lang: 'en', search: '?register=folk', api: e.api });
+    const d = await screen({ view: 'activity', lang: 'en', search: '?register=folk', api: e.api });
     D.byTag(d.mount, 'form')[0].submit();
     await settle();
     H.ok(d.mount.textContent.indexOf(e.says) !== -1, e.why);
@@ -233,7 +233,7 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
 
   console.log('\n[a refusal that names dates reloads the list]');
   let asked = 0;
-  const d2 = await screen({ view: 'account', lang: 'en', search: '?register=folk', api: {
+  const d2 = await screen({ view: 'activity', lang: 'en', search: '?register=folk', api: {
     sessions: () => { asked++; return { ok: true, mayBook: true, sessions: SESSIONS }; },
     bookAndPay: () => ({ _status: 409, error: 'gone', reason: 'unavailable',
                          refused: [{ date: '2026-10-27', reason: 'full' }] })
@@ -246,7 +246,7 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
 
   console.log('\n[a course is untouched by any of this]');
   sent.length = 0;
-  const d3 = await screen({ view: 'account', lang: 'en', search: '?register=hebrew' });
+  const d3 = await screen({ view: 'activity', lang: 'en', search: '?register=hebrew' });
   H.eq(D.byClass(d3.mount, 'acc-date').length, 0, 'no date picker on a term');
   H.ok(has(d3, '4 places left'), 'and the places-left line is still there, where it means something');
   D.byTag(d3.mount, 'form')[0].submit();
@@ -256,7 +256,7 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
 
   console.log('\n[the same screen in Hebrew and Russian]');
   for (const [l, word] of [['he', 'הרשמה ותשלום'], ['ru', 'Записаться и оплатить']]) {
-    const d = await screen({ view: 'account', lang: l, search: '?register=folk' });
+    const d = await screen({ view: 'activity', lang: l, search: '?register=folk' });
     H.ok(d.mount.textContent.indexOf(word) !== -1, l + ': the button is in the reader\'s language');
     H.eq(D.byClass(d.mount, 'acc-date').length, 5, l + ': and the picker renders');
   }

@@ -345,14 +345,30 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
     H.ok(!has(dom, 'Noa'), v + ': and nothing about anybody\'s family');
   }
 
-  console.log('\n[registering says so, and the message survives]');
+  console.log('\n[registering happens on the activity page, and the page becomes the registration]');
+  // ⚠ NOT ON THE DASHBOARD. The panel sat at the top of a page headed "My
+  // family", which is what made the family area look like the place
+  // registration lives. The dashboard answers "what am I in" and "what else is
+  // there"; a form for joining one particular activity is neither.
   dom = await screen({ view: 'account', lang: 'en', search: '?register=hebrew' });
+  H.ok(!has(dom, 'Register for an activity'),
+    'the dashboard draws no register panel, even when the query asks for one');
+  H.ok(has(dom, 'My activities'), 'it is the list and the way out, and nothing else');
+
+  dom = await screen({ view: 'activity', lang: 'en', search: '?register=hebrew' });
   H.ok(has(dom, 'Register for an activity'), 'the panel is drawn from ?register=');
   H.ok(has(dom, '4 places left'), 'with a count, never a list of who');
   H.ok(has(dom, 'Michal Shinitzky (me)'),
     'and you are in the who-is-registering list — folk dancing is not only for the kids');
   D.byTag(dom.mount, 'form')[0].submit();
   await settle();
+  // ⚠ THE URL BECAME THE REGISTRATION'S OWN KEY, and the page was drawn again
+  // from it. Not a notice sitting where a form was: the question a family has
+  // the instant they press Register is "what happens now", and that is answered
+  // by the registration page, not by the form they just used.
+  H.ok(/[?&]p=p-2/.test(dom.window.location.search), 'the query carries the participant');
+  H.ok(/[?&]a=act-1/.test(dom.window.location.search), 'and the activity');
+  H.ok(!has(dom, 'Who is registering?'), 'and the form is gone — it cannot outlive the errand');
   // A REGISTRATION, NOT A REQUEST. The confirmation says the place is taken and
   // where to pay for it — being told a decision is pending is the shape of our
   // queue, not of what the family just did. It no longer promises a LINK

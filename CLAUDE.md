@@ -625,7 +625,7 @@ Driven by three markup contracts:
    ⚠ **`ctaUrl` is gone, and why is worth keeping.**
 
    **The registration button's target is built from the slug** —
-   `/account?register=<slug>` in the reader's own language tree — and there is
+   `/account/activity?register=<slug>` in the reader's own language tree — and there is
    no field to override it. There used to be: `ctaUrl`, per language, because
    registration did not exist and the button needed somewhere to point. Phase 6
    built the real target and the escape hatch stayed open behind it.
@@ -2423,14 +2423,47 @@ is standing on when the thought occurs. There is a `See all activities` /
 `לכל הפעילויות` / `Все занятия` link at the foot of the registrations card in
 both states, in the reader's own tree.
 
-⚠ **The register panel is NOT that route, and must not become it.** It is drawn
-from `?register=<slug>` and from nothing else, because registering belongs on an
-activity page — that is where the description, the price and the dates are — and
-this panel exists only because the Register button there has to land somewhere
-signed in, to ask *who*. The query is dropped with `replaceState` once it has
-been acted on, so a reload or a back button does not reopen a registration form
-on a page headed "My family". Left in the URL it does exactly that, which is what
-made the family area look like the place registration lives.
+⚠ **AND THE REGISTER PANEL IS NOT ON THE DASHBOARD AT ALL.** It was, drawn from
+`?register=<slug>`, and sitting at the top of a page headed "My family" it read
+as the place registration lives — which is the thing the link above exists to
+deny. Dropping the query after use was not enough: the panel was still the first
+thing on the screen every time somebody arrived from an activity page.
+
+It lives on **`/account/activity?register=<slug>`** now — the family area's page
+*about* one activity, in the state it is in before there is a registration to
+show. It has to be behind a sign-in, because the public activity page is static
+and cannot ask *who*; this is the signed-in page that was already about an
+activity. One view with two entry points rather than two views.
+
+**And the same URL becomes the registration page the moment the form succeeds.**
+`submit` hands back the record, so the query is rewritten from `?register=` to
+that registration's own `?p=&a=` key and the view is drawn again — so a family
+lands on the page answering the question they have the instant they press
+Register (the waiting block, or the pay button), rather than on a notice sitting
+where a form was. Rewriting also stops the form outliving the errand: left in the
+URL, a reload reopens a filled-in form for something already joined.
+
+⚠ The message is said **after** the redraw, not before — `renderActivity()`
+replaces the notice node on its way in, so saying it first writes into something
+discarded inside one repaint. That is the bug this file already warns about, one
+screen over. The `flash()` drain in `boot()` had the same shape of fault and is
+fixed in passing: it sat past two early `return`s, so a message carried towards
+`/account/details` or `/account/activity` was dropped in silence.
+
+⚠ **`pending` and `approved` share a pill, because they share a word.** Both
+render "Registered" / `רשום/ה` / `Записан(а)` on purpose, and they were painted
+gold and olive — so a family read two rows saying one thing in two colours, with
+nothing on the page explaining the difference. **A colour with no legend is not
+information**; it is our queue leaking onto their screen and asking them to
+decode it. The distinction is real and surfaces where it is *actionable*: the
+cost card draws a pay button on one and the waiting block on the other. The word
+"pending" stays in the admin queue, which has its own styles and is untouched.
+
+⚠ **White on `--gold` is 3.18:1**, below AA for 12.5px bold text — the token is a
+*background* chosen to sit under white at display sizes, and a pill is neither.
+`.acc-pill.is-s-booked` is `#96651F` now, darkened along the same hue at 5.03:1.
+There the colour earns its keep, unlike the pair above: "booked" and "attended"
+are different words, so the hue supports a distinction the text already makes.
 
 **Every row is a person AND an activity**, never an activity alone. Ogen
 registers one participant to one activity, so two children in the same class are
@@ -2825,7 +2858,7 @@ refused" are different things and a person should not be told the wrong one.
 
 `js/activity.js` fell back to `#register`, the contact section, because
 registration did not exist and a dead end was worse than a form. It now defaults
-to `/account?register=<slug>` **in the reader's own tree**, so a Russian-speaking
+to `/account/activity?register=<slug>` **in the reader's own tree**, so a Russian-speaking
 parent lands on the Russian page rather than in the Hebrew default with a
 language switch to find. There is **no override** — see the `ctaUrl` note under
 the status contract for why the field was removed.
@@ -3676,7 +3709,7 @@ share image, Formspree wiring, domain) is done. Open items:
   Activities group** — and so are the account chip and the hamburger's
   `/account` entry.
 - **Registration is wired end to end.** The `open` CTA defaults to
-  `/account?register=<slug>` in the reader's own tree, and the family area is
+  `/account/activity?register=<slug>` in the reader's own tree, and the family area is
   the public surface behind it, with no override field. **A drop-in registers
   and pays in one step** — who, which dates, Checkout — rather than walking a
   term's machinery; see **Registering for a drop-in is ONE step**. What is still

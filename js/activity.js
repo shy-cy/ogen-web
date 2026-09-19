@@ -135,7 +135,7 @@
         .replace(/\.html$/, '');
       const base = lang === 'he' ? '' : '/' + lang;
       const href = slug
-        ? base + '/account?register=' + encodeURIComponent(slug)
+        ? base + '/account/activity?register=' + encodeURIComponent(slug)
         : base + '/account';
       const note = cfg.note ? `<p class="sidebar-note">${esc(pick(cfg.note))}</p>` : '';
       ctaSlot.innerHTML =

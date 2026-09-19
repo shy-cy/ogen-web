@@ -82,8 +82,13 @@ console.log('\n[a new account is TOLD it exists, across the redraw that hides it
 // into a node discarded in the same repaint.
 H.ok(/flash\(T\.signUpDone\);/.test(ui), 'sign-up flashes a message');
 H.ok(/function flash\(text\) \{ S\.flash = text; \}/.test(ui), 'which is held on the state');
-H.ok(/renderAccount\(S\.account\);[\s\S]{0,260}if \(S\.flash\)/.test(ui),
+H.ok(/else renderAccount\(S\.account\);[\s\S]{0,400}if \(S\.flash\)/.test(ui),
   'and said AFTER the screen is drawn, which is the whole point of it');
+// ⚠ AND AFTER WHICHEVER SCREEN. The drain sat past two early returns, so it ran
+// for the dashboard alone — a message carried towards /account/details or
+// /account/activity was dropped with nothing saying so.
+H.ok(!/if \(view === '(details|activity)'\) return render/.test(ui),
+  'no view returns before the drain');
 ['he', 'en', 'ru'].forEach((l) => {
   const t = tableFor(l);
   H.ok(t.working && t.signUpDone, l + ': both strings exist');

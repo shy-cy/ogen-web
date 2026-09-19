@@ -160,7 +160,19 @@ function makeDom(opts) {
   const store = {};
   const window = {
     location: { search: opts.search || '', href: opts.href || '/', hash: '' },
-    history: { replaceState(a, b, u) { window.location.href = u; } },
+    // ⚠ IT UPDATES location.search, NOT ONLY href. js/member-account.js rewrites
+    // the query and then redraws, reading param() back out — so a replaceState
+    // that moved href alone would leave the redraw looking at the OLD query and
+    // the test would pass while the browser showed a different screen.
+    history: {
+      replaceState(a, b, u) {
+        window.location.href = u;
+        const q = String(u).indexOf('?');
+        const hash = String(u).indexOf('#');
+        window.location.search = q === -1 ? ''
+          : String(u).slice(q, hash === -1 || hash < q ? undefined : hash);
+      }
+    },
     localStorage: {
       getItem: (k) => (k in store ? store[k] : null),
       setItem: (k, v) => { store[k] = String(v); },

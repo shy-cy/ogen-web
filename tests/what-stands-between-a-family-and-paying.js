@@ -308,10 +308,21 @@ H.ok(/border-inline-start/.test(waiting) && !/border-left|border-right/.test(wai
 // ⚠ THE SEPARATE CONTRAST BUG, fixed in the same pass. White on --gold is
 // 3.18:1, below AA for 12.5px bold text; the token is a background chosen to sit
 // under white at DISPLAY sizes, and a pill is neither.
-H.ok(!/\.acc-pill\.is-pending\{ background:var\(--gold\)/.test(css),
-  'the pending pill no longer paints white on the raw gold token');
-H.ok(/\.acc-pill\.is-pending\{ background:#96651F/.test(css),
-  'it is darkened along the same hue, so the gold reading survives');
+H.ok(!/background:var\(--gold\); color:#fff/.test(css),
+  'no pill paints white on the raw gold token — 3.18:1, below AA for 12.5px bold');
+H.ok(/\.acc-pill\.is-s-booked\{ background:#96651F/.test(css),
+  'the booked pill is darkened along the same hue, so the gold reading survives');
+// ⚠ AND THE TWO THAT SHARE A WORD NOW SHARE A COLOUR. `pending` and `approved`
+// both render "Registered" on purpose; painted differently, a family saw one
+// word in two colours with no legend anywhere — a colour nobody can decode is
+// not information, it is our queue leaking onto their screen. The distinction
+// surfaces where it is actionable, on the cost card.
+H.ok(/\.acc-pill\.is-pending, \.acc-pill\.is-approved\{ background:var\(--olive\)/.test(css),
+  'pending and approved are one rule, because they are one word');
+const ui2 = ui.replace(/\/\/[^\n]*\n/g, '');
+H.eq(/status: \{ pending: '([^']*)', approved: '([^']*)'/.exec(ui2)[1],
+     /status: \{ pending: '([^']*)', approved: '([^']*)'/.exec(ui2)[2],
+     'and the words really are identical, which is what makes one colour correct');
 H.ok(/left > 0 && payable && !needsVerify/.test(ui),
   'and draws the button when both gates pass and something is owed');
 // ⚠ THE SAME FIELD AS THE SERVER. regRow() sends the FROZEN type, defaulting to

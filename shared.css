@@ -1108,14 +1108,21 @@ html[lang="he"] .thankyou h1{ font-family: var(--font-he); font-weight:700; }
   display:inline-block; font-size:12.5px; font-weight:700; padding:3px 10px;
   border-radius:99px; background:var(--stone); color:var(--ink);
 }
-/* ⚠ WHITE ON --gold WAS 3.18:1, which is below AA for 12.5px bold text. The
-   token is a background colour chosen to sit under white at display sizes, and
-   this pill is neither. Darkened along the same hue until white clears 4.5 —
-   #96651F is 5.03:1 — rather than recolouring the state, so the gold reading
-   survives. Computed, not eyeballed: the sibling rule below is white on --olive
-   at 6.53:1 and needed nothing. */
-.acc-pill.is-pending{ background:#96651F; color:#fff; }
-.acc-pill.is-approved{ background:var(--olive); color:#fff; }
+/* ⚠ PENDING AND APPROVED ARE THE SAME PILL, because they are the same WORD.
+   Both render "Registered" / `רשום/ה` / `Записан(а)` — deliberately, since the
+   queue's shape is ours and not the family's — and they were painted gold and
+   olive, so a family looked at two rows saying one thing in two colours with
+   nothing on the page explaining the difference. A colour with no legend is not
+   information; it leaks our internal state and asks the reader to decode it.
+
+   The distinction is real and it surfaces where it is ACTIONABLE — the cost card
+   on the registration page, which draws a pay button on one and the waiting
+   block on the other. The word "pending" belongs in the admin queue, which has
+   its own styles and is untouched by this.
+
+   Both classes are kept rather than collapsed to one: they are honest about what
+   the row is, and painting them alike is the statement. */
+.acc-pill.is-pending, .acc-pill.is-approved{ background:var(--olive); color:#fff; }
 .acc-pill.is-rejected, .acc-pill.is-expired, .acc-pill.is-cancelled{
   background:var(--stone); color:var(--camel);
 }
@@ -1208,7 +1215,15 @@ html[lang="he"] .thankyou h1{ font-family: var(--font-he); font-weight:700; }
   background:var(--olive); color:#fff; margin-inline-start:8px;
   font-size:11px; vertical-align:middle;
 }
-.acc-pill.is-s-booked{ background:var(--gold); color:#fff; }
+/* ⚠ WHITE ON --gold IS 3.18:1, below AA for 12.5px bold text — the token is a
+   background chosen to sit under white at DISPLAY sizes, and a pill is neither.
+   Darkened along the same hue until white clears 4.5: #96651F is 5.03:1, so the
+   gold reading survives. Here the colour earns its keep, unlike on the pair
+   above — "booked" and "attended" are different WORDS, so the hue supports a
+   distinction the text already makes rather than inventing one. Computed, not
+   eyeballed; the sibling below is white on --olive at 6.53:1 and needed
+   nothing. */
+.acc-pill.is-s-booked{ background:#96651F; color:#fff; }
 .acc-pill.is-s-attended{ background:var(--olive); color:#fff; }
 
 /* Who this page is about, under the activity's name. */

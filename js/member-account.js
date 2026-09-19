@@ -465,14 +465,18 @@
     return base + path + (query ? '?' + query : '');
   }
 
-  // Drop ?register= once it has been acted on, without navigating — a redraw is
-  // already happening and a navigation would throw away the confirmation it just
-  // wrote. See the note at the call site.
-  function forgetRegisterQuery() {
+  // Change the query without navigating — a redraw is already happening, and a
+  // navigation would throw away the message it just wrote and cost a round trip
+  // for a page we are about to draw anyway. Guarded because replaceState is a
+  // browser method and the DOM this script is tested in implements only what it
+  // uses; when it is absent the redraw still happens, reading the old query,
+  // which is the same screen one state behind rather than a broken one.
+  function rewriteQuery(query) {
     try {
       var h = window.history;
-      if (!h || !h.replaceState || !param('register')) return;
-      h.replaceState(null, '', window.location.pathname + window.location.hash);
+      if (!h || !h.replaceState) return;
+      h.replaceState(null, '', window.location.pathname + (query ? '?' + query : '') +
+                                window.location.hash);
     } catch (err) {}
   }
 
@@ -875,10 +879,14 @@
       ]));
     }
 
-    var slug = param('register');
+    // ⚠ THERE IS NO REGISTER PANEL HERE, and that is the point of the screen.
+    // The dashboard answers "what am I in" and "what else is there" — a form for
+    // joining one particular activity is neither, and sitting at the top of a
+    // page headed "My family" it read as the place registration lives. It moved
+    // to /account/activity?register=<slug>, which is a page ABOUT an activity,
+    // and which the same URL then becomes the registration page for.
     var panels = {
-      register: el('div', {}), summary: el('div', {}),
-      regs: el('div', {}), credit: el('div', {})
+      summary: el('div', {}), regs: el('div', {}), credit: el('div', {})
     };
     Object.keys(panels).forEach(function (k) { mount.appendChild(panels[k]); });
 
@@ -890,7 +898,6 @@
     // The skeletons go in FIRST and synchronously, so the screen has its shape
     // before the request leaves. A blank page that fills in later is
     // indistinguishable from a page that is broken.
-    if (slug) renderRegister(panels.register, slug, load);
     panels.summary.appendChild(skeleton('tiles'));
     panels.regs.appendChild(skeleton('list'));
     load();
@@ -944,7 +951,7 @@
   // The registration still exists underneath — it carries the guardian link, the
   // frozen terms and an admin's ability to say no — and a family never has to
   // know that.
-  function renderRegister(where, slug, onDone) {
+  function renderRegister(where, slug) {
     clear(where);
     where.appendChild(section(T.registerTitle, [skeleton('panel')]));
     Promise.all([
@@ -970,7 +977,7 @@
       }
 
       if (a.perSession) registerPerSession(where, a, people, slug, title);
-      else registerTerm(where, a, people, slug, title, onDone);
+      else registerTerm(where, a, people, slug, title);
     });
   }
 
@@ -986,7 +993,7 @@
     return who;
   }
 
-  function registerTerm(where, a, people, slug, title, onDone) {
+  function registerTerm(where, a, people, slug, title) {
     var who = peopleSelect(people);
 
     var groupSel = null;
@@ -1008,25 +1015,31 @@
                    groupId: groupSel ? groupSel.value : null }).then(function (res) {
         done();
         if (!res.ok) return say('err', failure(res));
-        // IN PLACE, not a reboot. Rebooting the dashboard threw away the notice
-        // that had just been written into it, so the one thing a family needed
-        // to see — that the child is registered and where the payment is —
-        // was on screen for the length of one repaint.
+
+        // ⚠ THE PAGE BECOMES THE REGISTRATION IT JUST CREATED. Not a redirect
+        // and not a notice sitting where a form was: `submit` hands back the
+        // record, so the URL is rewritten from ?register=<slug> to the
+        // registration's own ?p=&a= key and the view is drawn again. A family
+        // lands on the page that tells them what happens next — the waiting
+        // block, or the pay button — which is the question they have the instant
+        // they press Register.
         //
-        // ⚠ AND THE QUERY GOES, so the form does not outlive the errand. This
-        // panel is drawn from ?register=<slug> and nothing else: the family area
-        // is where you see what you are registered TO, and registering is a
-        // thing you arrive here to do from an activity page. Left in the URL,
-        // a reload or a back button reopens a filled-in registration form on a
-        // page headed "My family", which is what makes it look like the place
-        // registration lives. Guarded because replaceState is a browser method
-        // and the DOM this script is tested in implements only what it uses.
-        forgetRegisterQuery();
-        clear(where);
-        where.appendChild(section(null, [
-          el('p', { class: 'acc-notice is-ok', text: T.registerDone })
-        ]));
-        if (onDone) onDone();
+        // Rewriting the query also stops the form outliving the errand: left in
+        // the URL, a reload or a back button reopens a filled-in registration
+        // form for something they have already joined.
+        //
+        // ⚠ THE MESSAGE IS WRITTEN AFTER THE REDRAW, not before it. renderActivity
+        // replaces the notice node on its way in, so saying it first writes into
+        // something discarded inside one repaint — the exact bug this file
+        // already carries a warning about, one screen over. It builds its notice
+        // synchronously, before the fetch leaves, so there is one to write to by
+        // the time this line runs.
+        var r = res.data && res.data.registration;
+        if (!r) return say('err', failure(res));
+        rewriteQuery('p=' + encodeURIComponent(r.participantId) +
+                     '&a=' + encodeURIComponent(r.activityId));
+        renderActivity();
+        say('ok', T.registerDone);
       });
     } }, [
       el('div', { class: 'acc-field' }, [el('label', { text: T.registerWho }), who]),
@@ -1571,6 +1584,18 @@
     mount.appendChild(notice);
     mount.appendChild(body);
     payLinkNotice();
+
+    // ⚠ REGISTERING HAPPENS HERE, not on the dashboard. This URL is the family
+    // area's page ABOUT one activity, and ?register=<slug> is the state it is in
+    // before there is a registration to show. The panel has to live behind a
+    // sign-in — the public activity page is static and cannot ask WHO — and this
+    // is the signed-in page that is already about an activity.
+    //
+    // The same URL becomes the registration page the moment the form succeeds,
+    // which is why this is one view with two entry points rather than two views.
+    var reg = param('register');
+    if (!p && !a && reg) return renderRegister(body, reg);
+
     if (!p || !a) return body.appendChild(section(null,
       [el('p', { class: 'acc-notice is-err', text: T.regNotFound })]));
 
@@ -2192,11 +2217,13 @@
         expiresAt: res.data.expiresAt,
         account: res.data.account
       }));
-      if (view === 'details') return renderDetails(S.account);
-      if (view === 'activity') return renderActivity();
-      renderAccount(S.account);
+      if (view === 'details') renderDetails(S.account);
+      else if (view === 'activity') renderActivity();
+      else renderAccount(S.account);
       // AFTER the screen is drawn, or it is written into a node about to be
-      // replaced — which is exactly the bug it exists to fix.
+      // replaced — which is exactly the bug it exists to fix. And after WHICHEVER
+      // screen: this used to sit past two early returns, so a message carried
+      // towards /account/details or /account/activity was dropped in silence.
       if (S.flash) { var m = S.flash; S.flash = null; say('ok', m); }
     });
   }

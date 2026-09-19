@@ -115,8 +115,14 @@ VIEWS.forEach((v) => {
     H.ok(read(file).indexOf('data-view="' + v + '"') !== -1, file + ' declares data-view="' + v + '"');
   });
 });
-H.ok(/if \(view === 'details'\) return renderDetails/.test(src), 'the router branches on details');
-H.ok(/if \(view === 'activity'\) return renderActivity/.test(src), 'and on activity');
+H.ok(/if \(view === 'details'\) renderDetails/.test(src), 'the router branches on details');
+H.ok(/else if \(view === 'activity'\) renderActivity/.test(src), 'and on activity');
+// ⚠ AND NONE OF THE THREE RETURNS EARLY. The flash — one message carried across
+// a page load — was drained on the line after the branches, so it only ever ran
+// for the dashboard: anything carried towards /account/details or
+// /account/activity was dropped in silence.
+H.ok(/else renderAccount\(S\.account\);\n[\s\S]{0,400}?if \(S\.flash\)/.test(src),
+  'and the flash is drained after WHICHEVER screen was drawn');
 
 console.log('\n[a registration page is addressed by ids, never by the frozen slug]');
 // `activitySlugAtSubmission` is audit only. Following it after an admin renames

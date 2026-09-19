@@ -122,11 +122,11 @@ STATUSES.forEach((status) => {
 // registration did not exist. The field is gone — every value it ever held on
 // this site was a mistake — so the link is built from the slug and there is
 // nothing left for a status to disagree with.
-H.ok(render('open', 'he').cta.indexOf('href="/account?register=hebrew4kids"') !== -1,
+H.ok(render('open', 'he').cta.indexOf('href="/account/activity?register=hebrew4kids"') !== -1,
   'open leads to the family area carrying the slug');
-H.ok(render('waitlist', 'ru').cta.indexOf('href="/ru/account?register=hebrew4kids"') !== -1,
+H.ok(render('waitlist', 'ru').cta.indexOf('href="/ru/account/activity?register=hebrew4kids"') !== -1,
   'in the READER\'S OWN TREE — a Russian-speaking parent must not land in the Hebrew default');
-H.ok(render('open', 'en').cta.indexOf('href="/en/account?register=hebrew4kids"') !== -1,
+H.ok(render('open', 'en').cta.indexOf('href="/en/account/activity?register=hebrew4kids"') !== -1,
   'and in English too');
 
 console.log('\n[the stylesheet describes only what is drawn]');

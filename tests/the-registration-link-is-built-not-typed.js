@@ -6,7 +6,7 @@
 //
 // `ctaUrl` was an escape hatch from before registration existed: the button
 // needed somewhere to point, so an admin typed it. Phase 6 built the real
-// target — /account?register=<slug>, in the reader's own language tree — and
+// target — /account/activity?register=<slug>, in the reader's own language tree — and
 // the hatch stayed open behind it.
 //
 // EVERY VALUE IT EVER CARRIED ON THIS SITE WAS A MISTAKE. First the button's
@@ -81,7 +81,7 @@ console.log('\n[the derived link is per-language, and a path on this site]');
 const js = read('js/activity.js');
 H.ok(/const base = lang === 'he' \? '' : '\/' \+ lang/.test(js),
   "the tree prefix is '' for Hebrew — '/' + '/account' would be a host called \"account\"");
-H.ok(/base \+ '\/account\?register=' \+ encodeURIComponent\(slug\)/.test(js),
+H.ok(/base \+ '\/account\/activity\?register=' \+ encodeURIComponent\(slug\)/.test(js),
   'the slug is encoded into the query, not concatenated raw');
 H.ok(/: base \+ '\/account'/.test(js),
   'and a page with no readable slug still reaches the family area');
