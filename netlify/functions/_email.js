@@ -120,12 +120,52 @@ async function logSend(recipient, result, message, logAs) {
   }
 }
 
+// ⚠ AND IT IS BOUNDED, WHICH IS THE HALF THAT WAS MISSING.
+//
+// "An email failure never blocks the action" was true of a send that FAILS and
+// false of one that hangs. settle() swallowed the exception and waited forever
+// for it to arrive — so a slow mail provider held the whole function until
+// Netlify killed it at ten seconds, and the caller got a 502 for work that had
+// already succeeded.
+//
+// That is exactly what it looked like from outside: press Create account, wait,
+// and eventually be told something went wrong — on an account that exists. The
+// person then tries a different address, because the message they were shown
+// said the first one had failed.
+//
+// Six seconds leaves room inside Netlify's ten for the work that ran before it
+// — hashing a password and writing several records — and is far longer than a
+// healthy send, which is well under one.
+//
+// The timeout does NOT cancel the request; it stops us waiting on it. The send
+// may well land afterwards, and the log entry may not be written, which is the
+// honest cost of the rule this file opens with: an email that was not logged is
+// a gap in a record, and a person left staring at a dead button is worse.
+const SEND_TIMEOUT_MS = 6000;
+
+function timeout(ms, what) {
+  let timer;
+  const promise = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(what + ' timed out after ' + ms + 'ms')), ms);
+  });
+  return { promise: promise, clear: () => clearTimeout(timer) };
+}
+
 // Run a thunk that sends email and swallow whatever it throws, having said so.
 // Returns whether it worked, for a caller that wants to tell the admin "sent"
 // or "not sent" without the answer changing anything else.
 async function settle(what, who, thunk) {
-  try { await thunk(); return true; }
-  catch (e) { console.error('[email] ' + what + ' failed for ' + who + ': ' + (e && e.message || e)); return false; }
+  const t = timeout(SEND_TIMEOUT_MS, what);
+  try {
+    await Promise.race([Promise.resolve().then(thunk), t.promise]);
+    return true;
+  } catch (e) {
+    console.error('[email] ' + what + ' failed for ' + who + ': ' + (e && e.message || e));
+    return false;
+  } finally {
+    // Or the pending timer keeps the function alive after it has answered.
+    t.clear();
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -244,6 +284,6 @@ function icsAttachment(events, opts) {
 module.exports = {
   send, settle, configured, adminRecipients,
   buildIcs, icsAttachment,
-  FROM, REPLY_TO,
+  FROM, REPLY_TO, SEND_TIMEOUT_MS,
   _internal: { setTransport, resetTransport, escapeIcs, formatIcsDate, foldLine, logSend }
 };

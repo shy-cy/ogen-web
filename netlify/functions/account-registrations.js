@@ -50,6 +50,7 @@ const json = (statusCode, payload) => ({
   body: JSON.stringify(payload)
 });
 
+const READER_LANGS = ['he', 'en', 'ru'];
 const NOT_YOURS = 'No such participant.';
 
 // READ FROM GITHUB, NEVER FROM THE DEPLOYED BUNDLE. The bundle trails a save by
@@ -284,7 +285,25 @@ exports.handler = async (event) => {
   const found = await sessions.authenticate(body);
   if (!found) return json(401, { error: 'Not signed in' });
   const me = found.account;
-  const lang = (me.profile && me.profile.preferredLanguage) || 'he';
+  // ⚠ THE LANGUAGE ON SCREEN, NOT THE ONE ON THE ACCOUNT.
+  //
+  // Everything this file renders for a person to read right now — the named
+  // groups, the facts card, the price rows, the session table, the language
+  // Stripe Checkout opens in and the tree it returns to — is about the page they
+  // are looking at. The account's `preferredLanguage` is about messages that
+  // arrive LATER and out of context, which is a different question with a
+  // different right answer, and it stays where it belongs: the mail module reads
+  // it off the account and nothing here passes it one.
+  //
+  // A family reading the Hebrew page was being offered English group names to
+  // choose between, because somebody had once picked English as a preference.
+  //
+  // The client sends it on every request; an absent or unknown value falls back
+  // to the preference, so an older tab and a direct API call still answer in
+  // something rather than in nothing.
+  const lang = READER_LANGS.indexOf(body.lang) !== -1
+    ? body.lang
+    : ((me.profile && me.profile.preferredLanguage) || 'he');
 
   const mustGuard = async (participantId) => {
     if (!participantId) return null;

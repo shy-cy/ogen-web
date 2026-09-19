@@ -2459,6 +2459,68 @@ invitation being broken. `inviteDetails` returns `hasAccount`, so the page opens
 the door that person actually needs — sign in, or sign up — with no second round
 trip and revealing nothing they do not already know about their own address.
 
+### ⚠ A press with nothing happening reads as a broken button
+
+Reported as *"clicking Create account — nothing happened; after a long time, an
+error"*, and it was two bugs wearing one symptom.
+
+**`.btn-primary` had no states at all** — no `:hover`, no `:active`, no
+`:disabled`, no `:focus-visible`. Every form here already disabled its button for
+the length of the call, and that was the *whole* of the feedback: a disabled
+button with no style is pixel-for-pixel a button sitting there doing nothing.
+Sign-up is also the slowest action on the site — a password hashed at cost 12 and
+several records written — so the gap is seconds long on the one form where it is
+least affordable, and the tallest, so the notice renders off screen.
+
+The button now moves when pressed, which is the only feedback that arrives before
+the network does, and `busy()` relabels it. One helper rather than a line in each
+handler, because the failure *was* every handler doing the same half-measure and
+the next form added would have done it too. The handlers that still disable by
+hand are the ones writing their own label ("Opening payment…", "Register and pay
+· €27.00"); a test checks each rather than counting them.
+
+**And "after a long time, an error" was a second bug underneath.** `settle()`
+promised that an email failure never blocks the action it accompanies — true of a
+send that *fails* and false of one that *hangs*. It waited forever, Netlify killed
+the function at ten seconds, and the caller was told something went wrong about an
+account that had already been created. The person then tries a different address,
+because that is what the message told them to do.
+
+`SEND_TIMEOUT_MS` is 6000: inside Netlify's ten with room for the work that ran
+first, and far longer than a healthy send. The timeout does **not** cancel the
+request, it stops us waiting on it — so the mail may well land afterwards and its
+log entry may not be written, which is the honest cost of this file's opening
+rule. A gap in a record beats a person staring at a dead button.
+
+`flash()` carries one message across a redraw. `say()` writes into the notice the
+current screen owns, and signing up *replaces* that screen — so the one thing a
+new account needs to know ("we have emailed you to confirm the address") was
+being written into a node discarded in the same repaint.
+
+### ⚠ The language on screen is the PAGE's, not the account's
+
+A family reading the **Hebrew** page was offered group names in **English**.
+
+Every display string `account-registrations.js` renders — the named groups, the
+facts card, the price rows, the session table, the language Stripe Checkout opens
+in and the tree it returns to — was built from `profile.preferredLanguage`. That
+is the right language for an **email**, which arrives later and out of context,
+and the wrong one for a screen somebody is looking at right now. Somebody had
+once picked English as a preference, and every Hebrew page they opened afterwards
+was half in English.
+
+`post()` in `js/member-session.js` now sends `lang` from
+`document.documentElement.lang` on **every** request — from the one place rather
+than per action, because the next action added would forget — and the server
+prefers it, falling back to the preference so an older tab still answers in
+something. **The emails are untouched**: they read the account, and a test asserts
+no `mail.send*` call in that file is ever handed a page language.
+
+Note the client was already right about half of it: the activity title on that
+same screen comes through `pick()` in the browser and was in Hebrew. Only the
+server-rendered strings were wrong, which is why it looked like a translation gap
+rather than a plumbing one.
+
 ### The session is localStorage, and the admin's is not
 
 A guardian session is seven days on a sliding window, sized for a parent who

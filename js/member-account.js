@@ -51,6 +51,8 @@
       termsPre: 'קראתי ואני מסכים/ה ל', termsLink: 'תנאי השימוש', termsMid: ' ול',
       privacyLink: 'מדיניות הפרטיות',
       signUp: 'פתיחת חשבון',
+      working: 'רגע…',
+      signUpDone: 'החשבון נוצר. שלחנו לכם אימייל לאישור הכתובת.',
       forgotTitle: 'איפוס סיסמה',
       forgotIntro: 'הזינו את כתובת הדוא״ל שלכם ונשלח קישור לאיפוס.',
       forgotSend: 'שליחת קישור',
@@ -153,6 +155,8 @@
       termsPre: 'I have read and accept the ', termsLink: 'Terms of Use', termsMid: ' and the ',
       privacyLink: 'Privacy Policy',
       signUp: 'Create account',
+      working: 'One moment…',
+      signUpDone: 'Your account is ready. We have sent you an email to confirm your address.',
       forgotTitle: 'Reset your password',
       forgotIntro: 'Enter your email address and we will send you a link.',
       forgotSend: 'Send the link',
@@ -255,6 +259,8 @@
       termsPre: 'Я прочитал(а) и принимаю ', termsLink: 'Условия использования', termsMid: ' и ',
       privacyLink: 'Политику конфиденциальности',
       signUp: 'Создать',
+      working: 'Минуту…',
+      signUpDone: 'Учётная запись создана. Мы отправили письмо для подтверждения адреса.',
       forgotTitle: 'Сброс пароля',
       forgotIntro: 'Укажите адрес электронной почты, и мы пришлём ссылку.',
       forgotSend: 'Отправить ссылку',
@@ -456,6 +462,32 @@
   //
   // aria-live for the same reason in the other direction: a message that appears
   // outside the viewport is also a message a screen reader never announces.
+  // ⚠ A BUTTON THAT CANNOT BE PRESSED MUST LOOK LIKE ONE.
+  //
+  // Every form here already disabled its button for the length of the call, and
+  // that was the whole of the feedback: `disabled` had no style, so on sign-up —
+  // the tallest form, and the slowest, because a password is hashed and several
+  // records are written — what a person saw was nothing at all. They pressed
+  // Create account and the screen did not change for several seconds.
+  //
+  // So the label says what is happening as well. One helper rather than a line
+  // in each handler, because the failure was every handler doing the same
+  // half-measure, and the next form added would have done it too. It hands back
+  // the undo, so a caller cannot restore the wrong text.
+  function busy(btn) {
+    if (!btn) return function () {};
+    var was = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = T.working;
+    return function () { btn.disabled = false; btn.textContent = was; };
+  }
+
+  // A message that has to survive a redraw. say() writes into the notice the
+  // current screen owns, and signing up REPLACES that screen — so the one thing
+  // a new account needs to be told ("we have emailed you") was being written
+  // into a node that was discarded in the same repaint. This carries it across.
+  function flash(text) { S.flash = text; }
+
   function say(kind, text) {
     if (!notice) return;
     clear(notice);
@@ -569,9 +601,9 @@
       var btn = el('button', { type: 'submit', class: 'btn-primary', text: T.forgotSend });
       var form = el('form', { onsubmit: function (e) {
         e.preventDefault();
-        btn.disabled = true;
+        var done = busy(btn);
         post(AUTH, { action: 'requestReset', email: fe.input.value }).then(function (res) {
-          btn.disabled = false;
+          done();
           // The SAME answer whether or not an account exists. An attacker who
           // learns dana@example.com has an Ogen account has learned she has
           // children attending and roughly where they are on a Wednesday.
@@ -597,10 +629,10 @@
     var go = el('button', { type: 'submit', class: 'btn-primary', text: T.signIn });
     var form = el('form', { onsubmit: function (e) {
       e.preventDefault();
-      go.disabled = true;
+      var done = busy(go);
       post(AUTH, { action: 'signin', email: e1.input.value, password: p1.input.value })
         .then(function (res) {
-          go.disabled = false;
+          done();
           if (!res.ok) return say('err', failure(res));
           window.MemberSession.set(sessionFor(res.data));
           if (opts.onSignedIn) return opts.onSignedIn(res.data.account);
@@ -651,15 +683,20 @@
     var go = el('button', { type: 'submit', class: 'btn-primary', text: T.signUp });
     var form = el('form', { onsubmit: function (e) {
       e.preventDefault();
-      go.disabled = true;
+      var done = busy(go);
       post(AUTH, {
         action: 'signup', email: e1.input.value, password: p1.input.value,
         termsAccepted: agree.checked,
         profile: { firstName: f.input.value, lastName: l.input.value,
                    phone: ph.input.value, preferredLanguage: langSel.value }
       }).then(function (res) {
-        go.disabled = false;
+        done();
         if (!res.ok) return say('err', failure(res));
+        // SAID, rather than left to be inferred from the screen changing. The
+        // dashboard appearing is a real signal and it is not the whole story:
+        // an address still has to be confirmed, and the mail saying so has just
+        // been sent.
+        flash(T.signUpDone);
         // A session immediately. Making somebody sign in again with the password
         // they typed ten seconds ago is a step that exists only because it was
         // easier to build.
@@ -821,10 +858,10 @@
     var go = el('button', { type: 'submit', class: 'btn-primary', text: T.registerGo });
     var form = el('form', { onsubmit: function (e) {
       e.preventDefault();
-      go.disabled = true;
+      var done = busy(go);
       post(REGS, { action: 'submit', slug: slug, participantId: who.value,
                    groupId: groupSel ? groupSel.value : null }).then(function (res) {
-        go.disabled = false;
+        done();
         if (!res.ok) return say('err', failure(res));
         // IN PLACE, not a reboot. Rebooting the dashboard threw away the notice
         // that had just been written into it, so the one thing a family needed
@@ -1150,7 +1187,7 @@
     var go = el('button', { type: 'submit', class: 'btn-primary', text: T.save });
     var form = el('form', { class: 'acc-inline', onsubmit: function (e) {
       e.preventDefault();
-      go.disabled = true;
+      var done = busy(go);
       post(FAMILY, {
         action: existing ? 'updateParticipant' : 'createParticipant',
         participantId: existing ? existing.participantId : undefined,
@@ -1161,7 +1198,7 @@
         participant: { firstName: f.input.value, lastName: l.input.value,
                        dateOfBirth: d.input.value, notes: n.input.value }
       }).then(function (res) {
-        go.disabled = false;
+        done();
         if (!res.ok) return say('err', failure(res));
         renderFamily(where);
       });
@@ -1216,10 +1253,10 @@
         var ib = el('button', { type: 'submit', class: 'btn-primary', text: T.inviteSend });
         sub.appendChild(el('form', { class: 'acc-inline', onsubmit: function (e) {
           e.preventDefault();
-          ib.disabled = true;
+          var done = busy(ib);
           post(FAMILY, { action: 'invite', participantId: p.participantId, email: ie.input.value })
             .then(function (r) {
-              ib.disabled = false;
+              done();
               if (!r.ok) return say('err', failure(r));
               say('ok', T.saved);
               box.removeChild(sub);
@@ -1278,12 +1315,12 @@
     where.appendChild(section(T.profileTitle, [
       el('form', { onsubmit: function (e) {
         e.preventDefault();
-        go.disabled = true;
+        var done = busy(go);
         post(AUTH, { action: 'updateProfile', profile: {
           firstName: f.input.value, lastName: l.input.value,
           phone: ph.input.value, preferredLanguage: langSel.value
         } }).then(function (res) {
-          go.disabled = false;
+          done();
           if (!res.ok) return say('err', failure(res));
           // The cached name feeds the nav chip's initial, so a change of name
           // has to reach it or the letter in the bar keeps saying who somebody
@@ -1301,10 +1338,10 @@
             el('div', { class: 'acc-field' }, [el('label', { text: T.prefLang }), langSel]), go]),
       el('form', { class: 'acc-inline', onsubmit: function (e) {
         e.preventDefault();
-        pgo.disabled = true;
+        var done = busy(pgo);
         post(AUTH, { action: 'changePassword', currentPassword: cur.input.value,
                      newPassword: nw.input.value }).then(function (res) {
-          pgo.disabled = false;
+          done();
           if (!res.ok) return say('err', failure(res));
           // A password change ends every OTHER session and deliberately keeps
           // this one — the person is standing here and should not be signed out
@@ -1606,11 +1643,11 @@
           });
           var go = el('button', { type: 'button', class: 'acc-link', text: T.rescheduleGo,
             onclick: function () {
-              go.disabled = true;
+              var done = busy(go);
               post(REGS, { action: 'rescheduleSession', participantId: r.participantId,
                            slug: act.slug, fromDate: row.date, toDate: pickDate.value })
                 .then(function (res) {
-                  if (!res.ok) { go.disabled = false; return say('err', failure(res)); }
+                  if (!res.ok) { done(); return say('err', failure(res)); }
                   say('ok', T.rescheduleDone);
                   // Both panels move: the entry left one date and landed on
                   // another, and the evenings table below is the other half of
@@ -1787,13 +1824,13 @@
     mount.appendChild(section(T.resetTitle, [
       el('form', { onsubmit: function (e) {
         e.preventDefault();
-        go.disabled = true;
+        var done = busy(go);
         // A reset ENDS EVERY OTHER SESSION: a reset exists because somebody may
         // have lost control of the account, and leaving the others alive would
         // lock out the owner while whoever took it stayed signed in.
         post(AUTH, { action: 'resetPassword', token: token, password: p1.input.value })
           .then(function (res) {
-            go.disabled = false;
+            done();
             if (!res.ok) return say('err', failure(res));
             clear(mount);
             mount.appendChild(section(null, [
@@ -1894,6 +1931,9 @@
       if (view === 'details') return renderDetails(S.account);
       if (view === 'activity') return renderActivity();
       renderAccount(S.account);
+      // AFTER the screen is drawn, or it is written into a node about to be
+      // replaced — which is exactly the bug it exists to fix.
+      if (S.flash) { var m = S.flash; S.flash = null; say('ok', m); }
     });
   }
 

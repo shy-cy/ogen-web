@@ -61,6 +61,20 @@
     }
     var t = token();
     if (t && payload.token === undefined) payload.token = t;
+    // ⚠ WHICH LANGUAGE THE READER IS READING IN, on every request.
+    //
+    // The server used to render every display string — group names, the facts
+    // card, the price rows, the session table — in the language stored on the
+    // ACCOUNT. That is the right language for an email, which arrives later and
+    // out of context, and the wrong one for a screen: a family on the Hebrew
+    // page was being handed English group names to choose between, because
+    // somebody had once picked English as their preference.
+    //
+    // The page knows, so the page says. Sent from every call rather than added
+    // per action, because the next action added would forget.
+    if (payload.lang === undefined) {
+      payload.lang = (window.document.documentElement.lang || 'he');
+    }
 
     return window.fetch(endpoint, {
       method: 'POST',

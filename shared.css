@@ -293,7 +293,21 @@ html[lang="he"] .hero-text p{ margin-inline-start:0; margin-inline-end:0; }
   display:inline-block; background: var(--terracotta); color: var(--paper);
   font-family: var(--font-latin); font-weight:700; font-size:15px;
   padding:14px 30px; border-radius:999px; border:none; cursor:pointer;
+  transition: background-color .15s ease, transform .06s ease, opacity .15s ease;
 }
+/* ⚠ THE BUTTON HAD NO STATES AT ALL — no hover, no press, no disabled — and on
+   the tallest form in the family area that made it look broken. Sign-up takes a
+   couple of seconds (a password is hashed and several records are written), the
+   handler disabled the button for the whole of it, and `disabled` with no style
+   is INDISTINGUISHABLE from the button sitting there doing nothing. What a
+   person saw was: pressed Create account, nothing happened.
+   Three states, and the press is the one that matters most: it is the only
+   feedback that arrives before the network does. */
+.btn-primary:hover{ background:#9d4a2c; }
+.btn-primary:active{ transform: translateY(1px); }
+.btn-primary:focus-visible{ outline:2px solid var(--navy); outline-offset:2px; }
+.btn-primary:disabled{ opacity:.6; cursor:progress; transform:none; }
+.btn-primary:disabled:hover{ background: var(--terracotta); }
 html[lang="he"] .btn-primary{ font-family: var(--font-he); }
 .link-arrow{ font-family: var(--font-latin); font-weight:700; font-size:15px; color: var(--navy); }
 html[lang="he"] .link-arrow{ font-family: var(--font-he); }
@@ -1069,6 +1083,10 @@ html[lang="he"] .thankyou h1{ font-family: var(--font-he); font-weight:700; }
 }
 .acc-link:hover{ color:var(--olive); }
 .acc-link.is-danger{ color:#8a3220; }
+/* The secondary controls need the same treatment for the same reason: several
+   of them start a network call, and one that cannot be pressed twice has to look
+   like one that cannot be pressed twice. */
+.acc-link:disabled{ opacity:.55; cursor:progress; }
 .acc-alt{ font-size:14.5px; margin-top:14px; }
 
 /* The status of a registration, in the same five words the guardian's list and
