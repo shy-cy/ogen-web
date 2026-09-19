@@ -103,14 +103,20 @@
       }
     },
     "instructionLanguage": {
-      "he": "",
-      "en": "",
-      "ru": ""
+      "codes": [],
+      "text": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      }
     },
     "prerequisites": {
-      "he": "",
-      "en": "",
-      "ru": ""
+      "level": null,
+      "text": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      }
     },
     "location": {
       "text": {
@@ -137,7 +143,14 @@
         "hoursBefore": null,
         "price": null
       },
-      "bundles": []
+      "bundles": [
+        {
+          "bundleId": "b-mu8kaf7nkjz4",
+          "entries": 4,
+          "pricePerEntry": 5,
+          "validityDays": 60
+        }
+      ]
     }
   },
   "factVisibility": {
@@ -164,10 +177,10 @@
     }
   ],
   "sponsors": [],
-  "isoUpdated": "2026-09-18T15:36:40.995Z",
+  "isoUpdated": "2026-09-19T15:48:42.234Z",
   "isoCreated": "2026-09-18T15:36:40.995Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
   "activityId": "act-a17993ff6a2b4f4f",
-  "lastPublishedAt": "2026-09-18T15:36:40.995Z"
+  "lastPublishedAt": "2026-09-19T15:48:42.234Z"
 }
