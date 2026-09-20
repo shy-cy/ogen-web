@@ -869,6 +869,51 @@
     ]);
   }
 
+  // ⚠ A TEXT BOX, NOT `type="time"`, AND THAT IS THE ONLY WAY TO GET 24 HOURS.
+  //
+  // A native time input renders AM/PM or 24h from the BROWSER'S locale, and
+  // there is no attribute that changes it — the admin is used in Cyprus and
+  // Israel where 16:00 is how anybody writes an afternoon class, and it was
+  // showing "04:00 PM". The stored value was always 24h `HH:MM`, so this was
+  // never a data question; it was a display the page could not control.
+  //
+  // What is lost is the native picker, which on a desktop admin is a small
+  // price: four digits is faster to type than a spinner is to click. What is
+  // gained is one format in every browser and every locale.
+  var TIME_PATTERN = '([01][0-9]|2[0-3]):[0-5][0-9]';
+
+  // 1600, 930, 16, 9 and 16:00 all mean something obvious. Typed shorthand is
+  // normalised on the way out of the field rather than refused, and anything
+  // genuinely unreadable is handed back UNCHANGED so the pattern can mark it
+  // rather than the box silently eating what somebody typed.
+  function normaliseTime(raw) {
+    var v = String(raw == null ? '' : raw).trim();
+    if (!v) return '';
+    var m = /^(\d{1,2})[:.\s]?(\d{2})?$/.exec(v);
+    if (!m) return v;
+    var h = Number(m[1]);
+    var mi = m[2] == null ? 0 : Number(m[2]);
+    if (h > 23 || mi > 59) return v;
+    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    return pad(h) + ':' + pad(mi);
+  }
+
+  function timeField(id, value) {
+    var input = el('input', {
+      type: 'text', class: 'time24', id: id, inputmode: 'numeric', maxlength: '5',
+      placeholder: '16:00', pattern: TIME_PATTERN, autocomplete: 'off',
+      'aria-label': 'Time, 24 hour'
+    });
+    input.value = value || '';
+    input.addEventListener('input', function () { S.dirty = true; refreshLegacyNotes(); });
+    input.addEventListener('blur', function () {
+      var t = normaliseTime(input.value);
+      if (t !== input.value) { input.value = t; S.dirty = true; }
+      refreshLegacyNotes();
+    });
+    return input;
+  }
+
   function scheduleRows(fact) {
     var box = el('div', { class: 'session-rows', id: 'schedule-rows' });
     var freq = ($('fact-schedule-frequency') || {}).value || fact.frequency || 'weekly';
@@ -889,11 +934,49 @@
         daySel.appendChild(el('option', { value: String(d), text: name, selected: sess.day === d || null }));
       });
       daySel.addEventListener('change', function () { S.dirty = true; refreshLegacyNotes(); });
-      var time = el('input', { type: 'time', id: 'fact-schedule-' + i + '-time' });
-      time.value = sess.time || '';
-      time.addEventListener('input', function () { S.dirty = true; refreshLegacyNotes(); });
+      var time = timeField('fact-schedule-' + i + '-time', sess.time);
 
-      var row = el('div', { class: 'session-row' }, [daySel, time]);
+      // ⚠ A CUSTOM SCHEDULE CAN NAME ITS DATES, and that is the difference
+      // between "Wednesday, 16:00" and "Wednesday, 14 October, 16:00". An
+      // activity that meets on a handful of particular days could not say which
+      // ones: a weekday and a time is the right shape for something repeating
+      // and says almost nothing about something that is not.
+      //
+      // Only for `custom`. Every other frequency IS a rule for repeating, and a
+      // date on one of those rows would be a second, contradictory answer to
+      // the question the frequency already settles.
+      var dateInput = null;
+      if (freq === 'custom') {
+        dateInput = el('input', { type: 'date', id: 'fact-schedule-' + i + '-date' });
+        dateInput.value = sess.date || '';
+        dateInput.addEventListener('input', function () {
+          S.dirty = true;
+          syncDay();
+          refreshLegacyNotes();
+        });
+      }
+
+      // THE WEEKDAY IS DERIVED, NEVER TYPED TWICE. With a date in the row the
+      // select shows that date's day and is disabled — a row claiming "Tuesday"
+      // and "14 October 2026", which is a Wednesday, is two claims that can
+      // disagree with nothing to say which one a reader should believe. The
+      // server derives it too, on every save, so this is the screen agreeing
+      // with a rule rather than the screen being the rule.
+      function syncDay() {
+        var d = dateInput && weekdayOf(dateInput.value);
+        if (d == null) {
+          daySel.disabled = false;
+          daySel.removeAttribute('title');
+          return;
+        }
+        daySel.value = String(d);
+        daySel.disabled = true;
+        daySel.title = 'Taken from the date';
+      }
+      if (dateInput) syncDay();
+
+      var row = el('div', { class: 'session-row' },
+        dateInput ? [dateInput, daySel, time] : [daySel, time]);
       if (!wanted) {
         row.appendChild(el('button', {
           type: 'button', class: 'del', text: 'Remove',
@@ -905,11 +988,26 @@
 
     if (!wanted) {
       box.appendChild(el('button', {
-        type: 'button', class: 'add-btn', text: '+ Add another day',
+        type: 'button', class: 'add-btn',
+        text: freq === 'custom' ? '+ Add another date' : '+ Add another day',
         onclick: function () { syncSchedule(); S.scheduleSessions.push({ day: null, time: '' }); S.dirty = true; redrawSchedule(); }
       }));
     }
     return box;
+  }
+
+  // The weekday of an ISO date, or null. Built through Date.UTC rather than
+  // `new Date('2026-10-14')` parsed locally, for the same reason the server
+  // enumerates in UTC: a local parse puts a DST boundary between the string and
+  // the day it names, and the symptom is one row of a schedule off by a day.
+  function weekdayOf(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '').trim());
+    if (!m) return null;
+    var t = Date.UTC(+m[1], +m[2] - 1, +m[3]);
+    var back = new Date(t);
+    if (back.getUTCFullYear() !== +m[1] || back.getUTCMonth() !== +m[2] - 1 ||
+        back.getUTCDate() !== +m[3]) return null;
+    return back.getUTCDay();
   }
 
   // Same rule the repeatable lists live by: read the inputs into the model
@@ -918,8 +1016,18 @@
     S.scheduleSessions = S.scheduleSessions.map(function (sess, i) {
       var d = $('fact-schedule-' + i + '-day');
       var t = $('fact-schedule-' + i + '-time');
-      if (!d && !t) return sess;
-      return { day: d && d.value !== '' ? Number(d.value) : null, time: t ? t.value : '' };
+      var dt = $('fact-schedule-' + i + '-date');
+      if (!d && !t && !dt) return sess;
+      var date = dt && dt.value ? dt.value : null;
+      var out = {
+        // Derived where there is a date, so the two cannot disagree. This is
+        // also what the server does on save; doing it here as well means the
+        // form never shows one answer and stores another.
+        day: date ? weekdayOf(date) : (d && d.value !== '' ? Number(d.value) : null),
+        time: t ? t.value : ''
+      };
+      if (date) out.date = date;
+      return out;
     });
     return S.scheduleSessions;
   }
@@ -1547,7 +1655,13 @@
       else if (d.kind === 'schedule') {
         out = {
           frequency: ($('fact-schedule-frequency') || {}).value || 'weekly',
-          sessions: syncSchedule().filter(function (x) { return x.day != null || x.time; })
+          // The SAME test the server's shape applies — see SHAPES.schedule in
+          // _activity-migrate.js. Two filters that differ is one of them
+          // dropping a row the other keeps, and the symptom is a schedule that
+          // loses a line on save with nothing erroring.
+          sessions: syncSchedule().filter(function (x) {
+            return x.day != null || x.time || x.date;
+          })
         };
         var wom = $('fact-schedule-weekOfMonth');
         if (out.frequency === 'monthly' && wom) {

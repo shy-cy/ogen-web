@@ -68,9 +68,28 @@ const SHAPES = {
   schedule: (f) => {
     const out = {
       frequency: sessionsModule.FREQUENCIES.indexOf(f.frequency) !== -1 ? f.frequency : 'weekly',
+      // ⚠ `date` HAS TO BE LISTED HERE OR IT IS DELETED ON EVERY READ. This
+      // shape runs on every load and every save, so a key it does not name is
+      // gone by the next write — the same silent loss sessionDates suffered
+      // before it was added, where a calendar could be generated, stored,
+      // rendered, and wiped by the next save with nothing erroring.
+      //
+      // THE WEEKDAY IS DERIVED FROM THE DATE, never stored beside it as a
+      // second answer. A row saying "Tuesday" and "14 October 2026" — a
+      // Wednesday — is two claims that can disagree, and the one thing that
+      // could not then be decided is which of them the reader should believe.
+      // With a date present the weekday is computed, so they cannot.
       sessions: (Array.isArray(f.sessions) ? f.sessions : [])
-        .map((s) => ({ day: num(s && s.day), time: String((s && s.time) || '').trim() }))
-        .filter((s) => s.day != null || s.time)
+        .map((s) => {
+          const time = String((s && s.time) || '').trim();
+          const date = sessionsModule.parseISO(s && s.date) == null
+            ? null : String(s.date).trim();
+          const day = date ? sessionsModule.isoWeekday(date) : num(s && s.day);
+          const out = { day: day, time: time };
+          if (date) out.date = date;
+          return out;
+        })
+        .filter((s) => s.day != null || s.time || s.date)
     };
     // Which week of the month a monthly activity meets in. 'last' is a real
     // option rather than an error state: a month with only four of a weekday

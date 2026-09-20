@@ -22,10 +22,21 @@
 
 const FREQUENCIES = ['one-time', 'weekly', 'biweekly', 'twice-weekly', 'monthly', 'custom'];
 
-// A frequency that names a repeating weekday can be enumerated. `custom` cannot:
-// it is whatever the admin typed, which is why it has no generator and why
-// prorated cancellation has to refuse it.
-const GENERATED = ['one-time', 'weekly', 'biweekly', 'twice-weekly', 'monthly'];
+// A frequency that names a repeating weekday can be enumerated by walking the
+// calendar. `custom` is enumerated a different way and for a different reason:
+// its rows carry the DATES THEMSELVES, so there is nothing to walk — the admin
+// has already written the answer down and the generator's job is to read it.
+//
+// ⚠ IT USED TO BE UNENUMERABLE, and that cost more than a button. `custom` meant
+// a list of weekday-and-time pairs with no dates at all, so an activity that met
+// on a handful of specific dates could not have a session calendar generated,
+// could not show a session table, and — because prorated cancellation divides by
+// the session list — could not use prorated cancellation either. All three came
+// back the moment a row could say which day it means.
+//
+// A custom schedule with no dates on its rows still enumerates to nothing, which
+// is exactly what it did before. Nothing regresses; a capability was added.
+const GENERATED = ['one-time', 'weekly', 'biweekly', 'twice-weekly', 'monthly', 'custom'];
 
 const ISO_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -96,6 +107,27 @@ function enumerate(spec) {
   spec = spec || {};
   const freq = String(spec.frequency || '').trim();
   if (GENERATED.indexOf(freq) === -1) return [];
+
+  // ⚠ CUSTOM IS READ, NOT WALKED, and it answers before the start date is asked
+  // for. Every other frequency needs a start to count from; these dates need
+  // nothing, because they ARE the answer. Bounding them by a typed start or end
+  // would silently drop a date an admin wrote on purpose, which is the one thing
+  // a list of exact dates must never do — so `limit` is honoured (it is a cap on
+  // how many to take) and the two dates are not.
+  if (freq === 'custom') {
+    const seen = {};
+    const dates = [];
+    (Array.isArray(spec.sessions) ? spec.sessions : []).forEach((sess) => {
+      const t = parseISO(sess && sess.date);
+      if (t == null || seen[t]) return;
+      seen[t] = true;
+      dates.push(t);
+    });
+    dates.sort((a, b) => a - b);
+    const cap = Number(spec.limit);
+    const take = isFinite(cap) && cap > 0 ? dates.slice(0, Math.floor(cap)) : dates;
+    return take.map(toISO);
+  }
 
   const start = parseISO(spec.startDate);
   if (start == null) return [];

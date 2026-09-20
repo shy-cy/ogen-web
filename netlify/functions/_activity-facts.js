@@ -245,6 +245,23 @@ function weekOrdinal(nth, lang, day) {
   return last ? (WEEK_LAST[lang] || WEEK_LAST.en) : (table[idx] || table[0]);
 }
 
+// "14 October" / "14 \u05D1\u05D0\u05D5\u05E7\u05D8\u05D5\u05D1\u05E8" / "14 \u043E\u043A\u0442\u044F\u0431\u0440\u044F", from an ISO date. Lifted out of
+// sessionRows() when a custom schedule started naming its dates, because two
+// copies of this are two places Hebrew's \u05D1 prefix or Russian's genitive can be
+// forgotten. Returns '' for anything that is not a date, so a caller can test it.
+function dayAndMonth(iso, lang) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '').trim());
+  if (!m) return '';
+  const months = MONTHS[lang] || MONTHS.en;
+  const mi = +m[2] - 1;
+  if (mi < 0 || mi > 11) return '';
+  const dayNum = String(+m[3]);
+  // Hebrew prefixes the month with \u05D1; Russian needs the genitive.
+  return lang === 'he' ? `${dayNum} \u05D1${months[mi]}`
+       : lang === 'ru' ? `${dayNum} ${MONTHS_RU_GEN[mi]}`
+       : `${dayNum} ${months[mi]}`;
+}
+
 function formatSchedule(f, lang) {
   const sessions = Array.isArray(f.sessions) ? f.sessions : [];
   const freq = String(f.frequency || '').trim();
@@ -255,6 +272,21 @@ function formatSchedule(f, lang) {
     .map((s) => {
       const day = num(s && s.day);
       const time = String((s && s.time) || '').trim();
+
+      // ⚠ A DATED ROW NAMES ITS DATE. A custom schedule can say "Wednesday, 14
+      // October, 16:00" rather than only "Wednesday, 16:00" — which on an
+      // activity meeting a handful of times was the whole question a reader
+      // had. The weekday still leads, because it is how somebody checks the
+      // date against their own week; it is DERIVED from the date on save, so
+      // the two cannot disagree. Never plural here whatever the frequency: one
+      // date is one meeting, and "Wednesdays, 14 October" is not a sentence.
+      const dated = dayAndMonth(s && s.date, lang);
+      if (dated) {
+        const head = day == null || day < 0 || day > 6
+          ? dated : `${names.one[day]}, ${dated}`;
+        return time ? `${head}, ${time}` : head;
+      }
+
       if (day == null || day < 0 || day > 6) return time;
       const name = plural ? names.many[day] : names.one[day];
 
@@ -296,14 +328,8 @@ function sessionRows(f, lang) {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(r.date);
     if (!m) return;
     const day = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay();
-    const mi = +m[2] - 1;
-    const dayNum = String(+m[3]);
-    // Hebrew prefixes the month with ב; Russian needs the genitive.
-    const date = lang === 'he' ? `${dayNum} ב${months[mi]}`
-               : lang === 'ru' ? `${dayNum} ${MONTHS_RU_GEN[mi]}`
-               : `${dayNum} ${months[mi]}`;
     out.push({ n: out.length + 1, label: `${label} ${out.length + 1}`, day: names[day],
-               date: date, year: m[1] });
+               date: dayAndMonth(r.date, lang), year: m[1] });
   });
   // No year in the rows, because the date range is already on the page two
   // blocks up as the duration fact, and a second place to print the same two

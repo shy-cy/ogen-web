@@ -774,6 +774,39 @@ truth: `sessionCount` is derived from it, not read beside it. `_activity-session
 enumerates it from the frequency; the admin then edits it by hand. **Generate
 once, then edit.**
 
+⚠ **A `custom` schedule names its dates.** Its rows were a weekday and a time —
+"Wednesday, 16:00" — which is the right shape for something that repeats and says
+almost nothing about something that does not. An activity meeting on four
+particular days could not name them, and three things followed: the card said
+"Wednesday, 16:00" for meetings scattered across two months, no calendar could be
+generated because `custom` was the one frequency with nothing to enumerate, and
+**prorated cancellation had to be refused** because it divides by a session list
+that did not exist. All three came back at once. `enumerate()` reads a custom
+schedule rather than walking it — the admin has already written the answer down —
+and it is deliberately **not** bounded by the term's start and end dates, because
+filtering would drop a date somebody typed on purpose. `limit` still caps.
+
+⚠ **The weekday is DERIVED from the date, never stored beside it.** A row saying
+"Tuesday" and "14 October 2026" — a Wednesday — is two claims that can disagree,
+with nothing to say which a reader should believe. `SHAPES.schedule` computes it
+on every save and the form computes it in the browser, where the select shows the
+answer and is **disabled** rather than hidden: the day a date landed on is
+exactly what an admin is checking after typing it. The form and the server also
+apply the **same filter** for what counts as a row (`day`, `time` or `date`) —
+two filters that differ is one of them dropping a line on save with nothing
+erroring. And `date` had to be added to `SHAPES.schedule` or it would have been
+deleted on the next write, which is precisely what happened to `sessionDates`.
+
+⚠ **Times are a text box, not `<input type="time">`.** A native time input renders
+AM/PM or 24h from the **browser's locale** and there is no attribute that changes
+it — so an admin in Cyprus, where 16:00 is how anybody writes an afternoon class,
+was shown "04:00 PM". The stored value was always 24h `HH:MM`, so this was never
+a data question; it was a display the page could not control. `1600`, `930`, `16`
+and `9` all normalise on blur; anything genuinely unreadable is handed **back
+unchanged** so the pattern marks it rather than the box silently eating it. What
+is lost is the native picker, which on a desktop admin is worth less than four
+digits typed.
+
 It was already half-built and **silently lossy**: `SHAPES.duration` is applied to
 every record on every read and every save and did not list `sessionDates`, so the
 calendar could be generated, stored and rendered, and the next save deleted it.
