@@ -26,6 +26,7 @@
 const accounts = require('./_account-store');
 const sessions = require('./_member-session');
 const mail = require('./_account-email');
+const E = require('./_family-errors');
 
 const json = (statusCode, payload) => ({
   statusCode,
@@ -33,11 +34,23 @@ const json = (statusCode, payload) => ({
   body: JSON.stringify(payload)
 });
 
-// One sentence, one shape, for every way signing in can fail. See rule 1.
-const SIGNIN_FAILED = 'That email address and password do not match an account.';
-
 // The answer a reset request always gives, whether or not anything was sent.
+// The client says its own words on success; this is for a direct caller.
 const RESET_SENT = 'If that address has an account, a reset link is on its way.';
+
+// ⚠ EVERY REFUSAL IS IN THE READER'S LANGUAGE. A family on the Hebrew page,
+// filling in a Hebrew form under a Hebrew heading, was told "An account with
+// that email already exists". _family-errors.js holds all three languages; the
+// only strings still hard-coded in English here are the wire-level ones — a
+// non-POST, a body that is not JSON, an action that does not exist — which mean
+// the client is broken and are unreachable from the site.
+const refuse = (lang) => (status, key, extra, params) =>
+  json(status, E.body(key, lang, extra, params));
+
+// A store throws with a code on it, never with a sentence for a person. An
+// unrecognised one falls through to the generic apology rather than leaking an
+// internal message onto a family's screen.
+const codeOf = (err) => (err && err.code) || 'server-error';
 
 async function requireSession(body) {
   const found = await sessions.authenticate(body);
@@ -55,6 +68,14 @@ exports.handler = async (event) => {
   }
 
   const agent = (event.headers && (event.headers['user-agent'] || event.headers['User-Agent'])) || '';
+
+  // The language the PAGE is in, which js/member-session.js sends on every
+  // request. Most actions here happen before there is an account to read a
+  // preference off — signing up, signing in, following a reset link — so this
+  // is the only thing that can answer, and it is also the right thing: a
+  // sentence appearing under a form somebody is looking at belongs in the
+  // language of that form.
+  const no = refuse(E.readerLang(body));
 
   try {
     switch (body.action) {
@@ -75,8 +96,8 @@ exports.handler = async (event) => {
           // account is ready. The mitigation is that sign-up is the loudest,
           // slowest, most rate-limitable action here, not that the leak is
           // pretended away.
-          if (err.code === 'email-taken') return json(409, { error: err.message });
-          return json(400, { error: err.message });
+          if (err.code === 'email-taken') return no(409, 'email-taken');
+          return no(400, codeOf(err), null, { min: accounts.MIN_PASSWORD });
         }
 
         // A fresh session immediately: making somebody sign in again with the
@@ -99,7 +120,7 @@ exports.handler = async (event) => {
         // verifyPassword returns null for every kind of failure — no account,
         // wrong password, suspended, locked — so there is nothing here to
         // accidentally distinguish between them.
-        if (!account) return json(401, { error: SIGNIN_FAILED });
+        if (!account) return no(401, 'signin-failed');
         const session = await sessions.createSession(account, { userAgent: agent });
         return json(200, {
           ok: true, token: session.token, expiresAt: session.expiresAt,
@@ -117,7 +138,7 @@ exports.handler = async (event) => {
 
       case 'me': {
         const found = await requireSession(body);
-        if (!found) return json(401, { error: 'Not signed in' });
+        if (!found) return no(401, 'not-signed-in');
         return json(200, {
           ok: true,
           account: accounts.publicAccount(found.account),
@@ -139,7 +160,7 @@ exports.handler = async (event) => {
       case 'resetPassword': {
         const record = await sessions.consumeToken(body.token, 'reset');
         if (!record) {
-          return json(400, { error: 'That reset link has expired or has already been used. Ask for a new one.' });
+          return no(400, 'reset-link-dead');
         }
         try {
           await accounts.setPassword(record.accountId, body.password);
@@ -148,7 +169,8 @@ exports.handler = async (event) => {
           // see consumeToken. A weak password means asking for a new link, and
           // that is the safe direction: the alternative is a token that survives
           // repeated attempts.
-          return json(400, { error: err.message + '. Ask for a new reset link and try again.' });
+          return no(400, err.code === 'password-short' ? 'reset-password-short' : codeOf(err),
+                    null, { min: accounts.MIN_PASSWORD });
         }
 
         // EVERY OTHER SESSION GOES. A reset exists because somebody may have
@@ -169,17 +191,17 @@ exports.handler = async (event) => {
 
       case 'changePassword': {
         const found = await requireSession(body);
-        if (!found) return json(401, { error: 'Not signed in' });
+        if (!found) return no(401, 'not-signed-in');
         // The current password is required even though the session proves who
         // they are. A session on a shared laptop is not the same evidence as
         // knowing the password, and this is the action that would lock the
         // owner out.
         const ok = await accounts.verifyPassword(found.account.email, body.currentPassword);
-        if (!ok) return json(403, { error: 'That is not your current password.' });
+        if (!ok) return no(403, 'wrong-current-password');
         try {
           await accounts.setPassword(found.account.accountId, body.newPassword);
         } catch (err) {
-          return json(400, { error: err.message });
+          return no(400, codeOf(err), null, { min: accounts.MIN_PASSWORD });
         }
         // Every session except this one: the person is standing here and should
         // not be signed out of the device they are using.
@@ -193,7 +215,7 @@ exports.handler = async (event) => {
       case 'verifyEmail': {
         const record = await sessions.consumeToken(body.token, 'verify');
         if (!record) {
-          return json(400, { error: 'That link has expired or has already been used.' });
+          return no(400, 'verify-link-dead');
         }
         const account = await accounts.markEmailVerified(record.accountId);
         return json(200, { ok: true, account: account });
@@ -201,7 +223,7 @@ exports.handler = async (event) => {
 
       case 'resendVerification': {
         const found = await requireSession(body);
-        if (!found) return json(401, { error: 'Not signed in' });
+        if (!found) return no(401, 'not-signed-in');
         if (found.account.emailVerifiedAt) {
           return json(200, { ok: true, message: 'That address is already confirmed.' });
         }
@@ -212,7 +234,7 @@ exports.handler = async (event) => {
 
       case 'updateProfile': {
         const found = await requireSession(body);
-        if (!found) return json(401, { error: 'Not signed in' });
+        if (!found) return no(401, 'not-signed-in');
         const account = await accounts.updateProfile(found.account.accountId, body.profile || {});
         return json(200, { ok: true, account: account });
       }
@@ -222,6 +244,6 @@ exports.handler = async (event) => {
     }
   } catch (err) {
     console.error('[account-auth] ' + (err && err.stack || err));
-    return json(500, { error: 'Something went wrong. Please try again.' });
+    return no(500, 'server-error');
   }
 };

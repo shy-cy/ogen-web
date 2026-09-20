@@ -57,7 +57,9 @@ process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
   console.log('[an account cannot exist without the terms being accepted]');
   const noTerms = await call(Object.assign({ action: 'signup' }, GOOD, { termsAccepted: false }));
   H.eq(noTerms.status, 400, 'signing up without accepting is refused');
-  H.ok(/terms/i.test(noTerms.body.error), 'and says why');
+  // The CODE, not the words. The words are trilingual now and this call names
+  // no language, so asserting on English would be asserting on the default.
+  H.eq(noTerms.body.code, 'terms-required', 'and says why');
   // /privacy and /terms are published, linked from the footer and final, so
   // there is a document to point at. The moment a person's name is stored, WHEN
   // they agreed has to be a fact on the record rather than an assumption about
@@ -146,7 +148,7 @@ process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
 
   const reused = await call({ action: 'resetPassword', token: resetToken, password: 'again' });
   H.eq(reused.status, 400, 'the link cannot be used twice');
-  H.ok(/expired|already/i.test(reused.body.error), 'and says so plainly');
+  H.eq(reused.body.code, 'reset-link-dead', 'and says so plainly');
 
   const oldPassword = await call({ action: 'signin', email: GOOD.email, password: GOOD.password });
   H.eq(oldPassword.status, 401, 'the old password no longer works');

@@ -68,8 +68,13 @@ const helper = bare2.slice(bare2.indexOf('function verificationRefusal'),
 H.ok(helper.length > 80, 'there is one verificationRefusal()');
 H.ok(/if \(type === 'dropin'\) return null;/.test(helper), 'a drop-in is never asked');
 H.ok(/if \(me\.emailVerifiedAt\) return null;/.test(helper), 'and a confirmed address passes');
-H.ok(/reason: 'email-unverified'/.test(helper), 'the refusal carries a reason the client can act on');
-H.ok(/json\(403/.test(helper), 'as a 403 — it is a permission, not a missing thing');
+// ⚠ IT ANSWERS WITH A KEY, NOT A RESPONSE. It is called from two actions and
+// has no language of its own, so the caller renders it — in the language of the
+// page, like every other string this file puts on a screen.
+H.ok(/return 'email-unverified';/.test(helper), 'the refusal names itself');
+H.eq((bare2.match(/no\(403, refusal, \{ reason: 'email-unverified' \}\)/g) || []).length, 2,
+  'and both call sites answer 403 with the reason the client acts on — ' +
+  'a permission, not a missing thing');
 // ONE function, or the condition is written at three call sites and the third
 // one is added later without it.
 H.eq((bare2.match(/emailVerifiedAt/g) || []).length, 1,
@@ -227,7 +232,8 @@ H.eq(builders.join(','), '_checkout.js',
   'one, and it is the shared builder — a second would be a second amount to keep in step');
 
 console.log('\n[a Stripe failure is a 502, not a crash]');
-H.ok(/catch \(err\)[\s\S]{0,200}json\(502/.test(pay), 'a failed session creation answers 502');
+H.ok(/catch \(err\)[\s\S]{0,260}no\(502, 'checkout-failed'\)/.test(pay),
+  'a failed session creation answers 502');
 H.ok(!/json\(200[\s\S]*catch/.test(pay.slice(pay.indexOf('try {'))),
   'and nothing claims success on the way out of the catch');
 

@@ -343,7 +343,7 @@ html[lang="he"] .offer-head h3{ font-family: var(--font-he); font-weight:700; }
 .card h3{ font-family: var(--font-latin); font-weight:700; font-size:17px; color: var(--navy); margin-top:0; margin-bottom:10px; }
 html[lang="he"] .card h3{ font-family: var(--font-he); }
 .card p{ font-size:14.5px; color:#5a5a54; line-height:1.6; }
-.coming-soon{ text-align:center; max-width:560px; margin:34px auto 0; font-size:15px; font-weight:800; color: var(--paper); background: var(--terracotta); padding:14px 22px; border-radius:999px; }
+.offer-cta{ text-align:center; margin:34px 0 0; }
 
 /* ============================== WHY OGEN ============================== */
 .why-ogen{ padding: 70px 24px; text-align:center; position:relative; overflow:hidden; }
@@ -948,6 +948,26 @@ html[lang="he"] .fact-card-head h2{ text-transform:none; letter-spacing:0; font-
 }
 .activity-card h2{ font-size:19px; font-weight:700; color: var(--navy); margin:18px 22px 8px; }
 .activity-card p{ font-size:14.5px; color:#5a5a54; line-height:1.6; margin:0 22px 16px; flex:1; }
+/* The four facts a card answers at a glance. Stacked rows rather than pills:
+   each one is a label AND a value, and a pill holding both is either too wide
+   for a 320px card or has to drop the label, which is what makes "7-10" or
+   "€300" ambiguous in the first place.
+
+   NOTHING IS PUSHED TO AN EDGE — no space-between, no text-align — so there is
+   not one directional override here and the row reads correctly in all three
+   languages with no per-language rule. That is the same shape the price card
+   was rebuilt into after its label-at-one-edge/value-at-the-other version kept
+   breaking in Hebrew and kept being fixed.
+
+   The label is --navy (10.8:1 on paper) and not --camel, which is 2.3:1: the
+   warm tokens were chosen as BACKGROUNDS behind white text and fail as
+   foregrounds. */
+.activity-card-tags{
+  list-style:none; margin:0 22px 16px; padding:0;
+  display:flex; flex-direction:column; gap:4px;
+}
+.activity-card-tags li{ font-size:13px; line-height:1.45; color:#5a5a54; }
+.activity-card-tags li span{ font-weight:700; color: var(--navy); }
 .activity-card-more{
   margin:0 22px; font-size:13.5px; font-weight:800; color: var(--terracotta);
 }

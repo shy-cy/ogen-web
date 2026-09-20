@@ -48,6 +48,7 @@
       createAccount: 'פתיחת חשבון', haveAccount: 'כבר יש לכם חשבון?',
       signUpTitle: 'פתיחת חשבון', firstName: 'שם פרטי', lastName: 'שם משפחה',
       phone: 'טלפון', prefLang: 'שפה מועדפת',
+      termsRequired: 'צריך לאשר את תנאי השימוש ואת מדיניות הפרטיות.',
       termsPre: 'קראתי ואני מסכים/ה ל', termsLink: 'תנאי השימוש', termsMid: ' ול',
       privacyLink: 'מדיניות הפרטיות',
       signUp: 'פתיחת חשבון',
@@ -163,6 +164,7 @@
       createAccount: 'Create an account', haveAccount: 'Already have an account?',
       signUpTitle: 'Create an account', firstName: 'First name', lastName: 'Last name',
       phone: 'Phone', prefLang: 'Preferred language',
+      termsRequired: 'The terms and the privacy policy have to be accepted.',
       termsPre: 'I have read and accept the ', termsLink: 'Terms of Use', termsMid: ' and the ',
       privacyLink: 'Privacy Policy',
       signUp: 'Create account',
@@ -280,6 +282,7 @@
       createAccount: 'Создать учётную запись', haveAccount: 'Уже есть учётная запись?',
       signUpTitle: 'Создание учётной записи', firstName: 'Имя', lastName: 'Фамилия',
       phone: 'Телефон', prefLang: 'Предпочитаемый язык',
+      termsRequired: 'Нужно принять условия использования и политику конфиденциальности.',
       termsPre: 'Я прочитал(а) и принимаю ', termsLink: 'Условия использования', termsMid: ' и ',
       privacyLink: 'Политику конфиденциальности',
       signUp: 'Создать',
@@ -937,7 +940,21 @@
     // AN ACCOUNT CANNOT EXIST WITHOUT ACCEPTING THE TERMS, and termsAcceptedAt
     // is stored. The links are per-language and point at the reader's own tree;
     // the pages themselves say which version is legally binding.
-    var agree = el('input', { type: 'checkbox', id: 'acc-terms', required: 'required' });
+    // ⚠ NOT `required`, AND THAT IS THE ONLY FIELD ON THIS FORM WHERE IT IS
+    // WORTH THE TRADE. A native validation bubble is drawn by the BROWSER, in
+    // the browser's language, with no attribute that changes it — so a family
+    // on the Hebrew page was shown "Please tick this box if you want to
+    // proceed." in English, over a Hebrew form. Same class of problem as a
+    // native <input type="time"> printing AM/PM at an admin in Cyprus: the
+    // stored value was never in question, the display was one the page could
+    // not control.
+    //
+    // The other nine `required` fields here keep it, deliberately. On a text or
+    // email box the attribute also buys format checking, focus and scroll, and
+    // the message is the browser's own UI in the language its owner set it to.
+    // A checkbox has no format to check, so `required` buys the bubble and
+    // nothing else — which makes this the one place the trade is free.
+    var agree = el('input', { type: 'checkbox', id: 'acc-terms' });
     var terms = el('div', { class: 'acc-check' }, [agree, el('label', { for: 'acc-terms' }, [
       el('span', { text: T.termsPre }),
       el('a', { href: base + '/terms', target: '_blank', rel: 'noopener', text: T.termsLink }),
@@ -948,6 +965,12 @@
     var go = el('button', { type: 'submit', class: 'btn-primary', text: T.signUp });
     var form = el('form', { onsubmit: function (e) {
       e.preventDefault();
+      // Checked here rather than on the way back, so the answer arrives with no
+      // round trip — and it is the SAME sentence the server would have sent, out
+      // of the one table, so the two doors cannot word it differently. say()
+      // scrolls its notice into view, which the bubble did for free and is the
+      // half worth keeping: this is the tallest form in the family area.
+      if (!agree.checked) return say('err', T.termsRequired);
       var done = busy(go);
       post(AUTH, {
         action: 'signup', email: e1.input.value, password: p1.input.value,

@@ -130,21 +130,31 @@ async function allAccounts() {
   return out.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
 }
 
+// A refusal a caller can render. ⚠ THE CODE IS WHAT TRAVELS, not the sentence:
+// a store has no business knowing which language a browser is set to, and the
+// message here is a fallback for a log rather than something a family reads.
+// _family-errors.js turns the code into a sentence in the reader's own language.
+const fail = (code, message) => {
+  const err = new Error(message);
+  err.code = code;
+  return err;
+};
+
 // --- creating --------------------------------------------------------------
 
 // Throws with a message meant for a person. The one case it deliberately does
 // NOT distinguish is handled by the caller: see createAccount's note on
 // enumeration.
 function validateNew({ email, password, termsAccepted }) {
-  if (!validEmail(email)) throw new Error('A valid email address is required');
+  if (!validEmail(email)) throw fail('email-invalid', 'A valid email address is required');
   if (!password || String(password).length < MIN_PASSWORD) {
-    throw new Error(`Password must be at least ${MIN_PASSWORD} characters`);
+    throw fail('password-short', `Password must be at least ${MIN_PASSWORD} characters`);
   }
   // The account cannot exist without this. /privacy and /terms are published,
   // linked from the footer and final, so there is a document to point at — and
   // the moment somebody's name is stored, when they agreed has to be a fact on
   // the record rather than an assumption about the flow that created it.
-  if (termsAccepted !== true) throw new Error('The terms and the privacy policy have to be accepted');
+  if (termsAccepted !== true) throw fail('terms-required', 'The terms and the privacy policy have to be accepted');
 }
 
 async function createAccount(input) {
@@ -157,9 +167,7 @@ async function createAccount(input) {
   // pointer to an account that does not exist. The first is invisible and
   // harmless; the second is a sign-in that reads null and has to guess why.
   if (await accountIdForEmail(email)) {
-    const err = new Error('An account with that email already exists');
-    err.code = 'email-taken';
-    throw err;
+    throw fail('email-taken', 'An account with that email already exists');
   }
 
   const now = new Date().toISOString();
@@ -212,7 +220,7 @@ async function saveAccount(record) {
 
 async function updateProfile(accountId, patch) {
   const account = await getAccount(accountId);
-  if (!account) throw new Error('No such account');
+  if (!account) throw fail('no-such-account', 'No such account');
   const p = account.profile || {};
   const next = patch || {};
   account.profile = {
@@ -231,16 +239,14 @@ async function updateProfile(accountId, patch) {
 // both sides rather than from neither.
 async function changeEmail(accountId, newEmail) {
   const email = normaliseEmail(newEmail);
-  if (!validEmail(email)) throw new Error('A valid email address is required');
+  if (!validEmail(email)) throw fail('email-invalid', 'A valid email address is required');
   const account = await getAccount(accountId);
-  if (!account) throw new Error('No such account');
+  if (!account) throw fail('no-such-account', 'No such account');
   if (account.email === email) return publicAccount(account);
 
   const taken = await accountIdForEmail(email);
   if (taken && taken !== accountId) {
-    const err = new Error('An account with that email already exists');
-    err.code = 'email-taken';
-    throw err;
+    throw fail('email-taken', 'An account with that email already exists');
   }
 
   const emails = await requireStore(EMAILS);
@@ -257,10 +263,10 @@ async function changeEmail(accountId, newEmail) {
 
 async function setPassword(accountId, password) {
   if (!password || String(password).length < MIN_PASSWORD) {
-    throw new Error(`Password must be at least ${MIN_PASSWORD} characters`);
+    throw fail('password-short', `Password must be at least ${MIN_PASSWORD} characters`);
   }
   const account = await getAccount(accountId);
-  if (!account) throw new Error('No such account');
+  if (!account) throw fail('no-such-account', 'No such account');
   account.passwordHash = bcrypt.hashSync(String(password), ROUNDS);
   // Changing a password clears a lockout: the person has proved, by another
   // route, that the account is theirs.

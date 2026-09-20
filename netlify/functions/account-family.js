@@ -22,6 +22,7 @@ const sessions = require('./_member-session');
 const participants = require('./_participant-store');
 const guardians = require('./_guardian-store');
 const mail = require('./_account-email');
+const E = require('./_family-errors');
 
 const json = (statusCode, payload) => ({
   statusCode,
@@ -32,7 +33,20 @@ const json = (statusCode, payload) => ({
 // One sentence for "no such participant" and "not yours", deliberately. Telling
 // the two apart confirms that a participant id exists, which is a fact about
 // another family.
-const NOT_YOURS = 'No such participant.';
+// ⚠ EVERY REFUSAL IS IN THE READER'S LANGUAGE — _family-errors.js holds all
+// three. Only the wire-level strings below stay English: a non-POST, a body
+// that is not JSON, an action that does not exist. Those mean the client is
+// broken and no family can reach them.
+//
+// `no-such-participant` is deliberately the same answer for "there is no such
+// record" and "that record is not yours", exactly as NOT_YOURS was: telling
+// them apart would let anybody holding an id find out whether a participant
+// exists.
+const refuse = (lang) => (status, key, extra, params) =>
+  json(status, E.body(key, lang, extra, params));
+
+// A store throws with a code, never with a sentence for a person.
+const codeOf = (err) => (err && err.code) || 'server-error';
 
 // THE SESSION TOKEN IS `token`, AND AN INVITE TOKEN IS NEVER CALLED THAT.
 //
@@ -73,8 +87,11 @@ exports.handler = async (event) => {
   // before asking anybody to sign in or sign up.
   const open = body.action === 'inviteDetails';
   const found = await sessions.authenticate(body);
-  if (!found && !open) return json(401, { error: 'Not signed in' });
   const me = found ? found.account : null;
+  // The page's language, falling back to the account's for a caller that does
+  // not send one. js/member-session.js sends it on every request.
+  const no = refuse(E.readerLang(body, me));
+  if (!found && !open) return no(401, 'not-signed-in');
 
   try {
     switch (body.action) {
@@ -107,7 +124,7 @@ exports.handler = async (event) => {
         try {
           created = await participants.createParticipant(body.participant || {}, me.accountId);
         } catch (err) {
-          return json(400, { error: err.message });
+          return no(400, codeOf(err));
         }
         // The creator's link is written immediately, and if that write fails the
         // participant is deleted rather than left behind. A participant with no
@@ -128,28 +145,28 @@ exports.handler = async (event) => {
           });
         } catch (err) {
           await participants.deleteParticipant(created.participantId);
-          return json(500, { error: 'Could not create that record. Please try again.' });
+          return no(500, 'participant-not-created');
         }
         return json(201, { ok: true, participant: created });
       }
 
       case 'updateParticipant': {
         const p = await mustGuard(body.participantId, me.accountId);
-        if (!p) return json(404, { error: NOT_YOURS });
+        if (!p) return no(404, 'no-such-participant');
         try {
           // Either guardian may edit. The primary/secondary distinction governs
           // who may bring somebody else in, not who may correct a spelling.
           const updated = await participants.updateParticipant(p.participantId, body.participant || {});
           return json(200, { ok: true, participant: updated });
         } catch (err) {
-          return json(400, { error: err.message });
+          return no(400, codeOf(err));
         }
       }
 
       // --- who else can see this child ---------------------------------------
       case 'listGuardians': {
         const p = await mustGuard(body.participantId, me.accountId);
-        if (!p) return json(404, { error: NOT_YOURS });
+        if (!p) return no(404, 'no-such-participant');
         const links = await guardians.guardiansOf(p.participantId);
         const out = [];
         for (const l of links) {
@@ -176,30 +193,30 @@ exports.handler = async (event) => {
       // --- inviting the second guardian --------------------------------------
       case 'invite': {
         const p = await mustGuard(body.participantId, me.accountId);
-        if (!p) return json(404, { error: NOT_YOURS });
+        if (!p) return no(404, 'no-such-participant');
         if (p.primaryAccountId !== me.accountId) {
-          return json(403, { error: 'Only the guardian who created this record can invite someone else.' });
+          return no(403, 'invite-not-primary');
         }
         const email = accounts.normaliseEmail(body.email);
-        if (!accounts.validEmail(email)) return json(400, { error: 'A valid email address is required' });
+        if (!accounts.validEmail(email)) return no(400, 'email-invalid');
         if (email === accounts.normaliseEmail(me.email)) {
-          return json(400, { error: 'That is your own address — you are already a guardian here.' });
+          return no(400, 'invite-own-address');
         }
 
         const existing = await guardians.guardiansOf(p.participantId);
         if (existing.length >= guardians.MAX_GUARDIANS) {
-          return json(409, { error: `This record already has ${guardians.MAX_GUARDIANS} guardians.` });
+          return no(409, 'max-guardians', null, { max: guardians.MAX_GUARDIANS });
         }
         // An account already linked under that address does not need inviting,
         // and saying so beats sending a link that would fail on acceptance.
         const theirId = await accounts.accountIdForEmail(email);
         if (theirId && await guardians.isGuardian(p.participantId, theirId)) {
-          return json(409, { error: 'That person is already a guardian here.' });
+          return no(409, 'already-guardian');
         }
         const live = (await guardians.invitesFor(p.participantId))
           .filter((i) => i.status === 'pending' && i.invitedEmail === email);
         if (live.length) {
-          return json(409, { error: 'An invitation is already waiting at that address. Resend or withdraw it first.' });
+          return no(409, 'invite-already-waiting');
         }
 
         const invite = await guardians.createInvite({
@@ -216,13 +233,13 @@ exports.handler = async (event) => {
 
       case 'resendInvite': {
         const p = await mustGuard(body.participantId, me.accountId);
-        if (!p) return json(404, { error: NOT_YOURS });
+        if (!p) return no(404, 'no-such-participant');
         if (p.primaryAccountId !== me.accountId) {
-          return json(403, { error: 'Only the guardian who created this record can manage invitations.' });
+          return no(403, 'invites-not-primary');
         }
         const old = await guardians.getInvite(inviteTokenOf(body));
         if (!old || old.participantId !== p.participantId) {
-          return json(404, { error: 'No such invitation.' });
+          return no(404, 'no-such-invitation');
         }
         // A NEW token, and the old one revoked. Re-sending the same link would
         // leave a forwarded copy of it working; this kills it.
@@ -241,13 +258,13 @@ exports.handler = async (event) => {
 
       case 'revokeInvite': {
         const p = await mustGuard(body.participantId, me.accountId);
-        if (!p) return json(404, { error: NOT_YOURS });
+        if (!p) return no(404, 'no-such-participant');
         if (p.primaryAccountId !== me.accountId) {
-          return json(403, { error: 'Only the guardian who created this record can manage invitations.' });
+          return no(403, 'invites-not-primary');
         }
         const inv = await guardians.getInvite(inviteTokenOf(body));
         if (!inv || inv.participantId !== p.participantId) {
-          return json(404, { error: 'No such invitation.' });
+          return no(404, 'no-such-invitation');
         }
         await guardians.revokeInvite(inv.token, me.accountId);
         return json(200, { ok: true });
@@ -260,7 +277,7 @@ exports.handler = async (event) => {
         // answer must be worth no more than the link itself already is.
         const inv = await guardians.getInvite(inviteTokenOf(body));
         if (!inv || inv.status !== 'pending') {
-          return json(404, { error: 'That invitation link is not valid or has expired.' });
+          return no(404, 'invite-link-dead');
         }
         const p = await participants.getParticipant(inv.participantId);
         const from = await accounts.getAccount(inv.invitedByAccountId);
@@ -280,7 +297,7 @@ exports.handler = async (event) => {
       }
 
       case 'acceptInvite': {
-        if (!me) return json(401, { error: 'Sign in first, with the address the invitation was sent to.' });
+        if (!me) return no(401, 'invite-sign-in-first');
         try {
           const link = await guardians.acceptInvite(inviteTokenOf(body), me);
           const p = await participants.getParticipant(link.participantId);
@@ -290,24 +307,21 @@ exports.handler = async (event) => {
                        : err.code === 'max-guardians' ? 409
                        : err.code === 'already-linked' ? 409
                        : 400;
-          return json(status, { error: err.message });
+          return no(status, codeOf(err));
         }
       }
 
       // --- leaving ------------------------------------------------------------
       case 'leaveParticipant': {
         const p = await mustGuard(body.participantId, me.accountId);
-        if (!p) return json(404, { error: NOT_YOURS });
+        if (!p) return no(404, 'no-such-participant');
         const links = await guardians.guardiansOf(p.participantId);
         // THE LAST GUARDIAN CANNOT LEAVE. It would leave a record no account can
         // see or edit — reachable only by an admin, invisible to the family it
         // is about. Refused here as it is refused on the admin path, and for the
         // same reason.
         if (links.length <= 1) {
-          return json(409, {
-            error: 'You are the only guardian on this record, so you cannot remove yourself. ' +
-                   'Invite someone else first, or ask Ogen to remove the record.'
-          });
+          return no(409, 'last-guardian');
         }
         // Primacy moves with the same write. There is only one possible answer,
         // so it is not a prompt — but it must not be forgotten, because primacy
@@ -326,6 +340,6 @@ exports.handler = async (event) => {
     }
   } catch (err) {
     console.error('[account-family] ' + (err && err.stack || err));
-    return json(500, { error: 'Something went wrong. Please try again.' });
+    return no(500, 'server-error');
   }
 };

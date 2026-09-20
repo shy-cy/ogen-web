@@ -33,6 +33,7 @@ const B = require('./_bundle');
 const groups = require('./_activity-groups');
 const bundleStore = require('./_bundle-store');
 const checkout = require('./_checkout');
+const E = require('./_family-errors');
 const facts = require('./_activity-facts');
 const { LABELS } = require('./_activity-template');
 
@@ -54,8 +55,17 @@ const json = (statusCode, payload) => ({
   body: JSON.stringify(payload)
 });
 
-const READER_LANGS = ['he', 'en', 'ru'];
-const NOT_YOURS = 'No such participant.';
+// ⚠ EVERY REFUSAL IS IN THE READER'S LANGUAGE — _family-errors.js holds all
+// three, and js/member-session.js already sends which one on every request.
+// Only the wire-level strings stay English: a non-POST, a body that is not
+// JSON, an action that does not exist. A family cannot reach any of them.
+//
+// This file renders the price rows, the facts card and the session table in the
+// page's language already; a refusal is a display string like the rest of them,
+// and it was the one class that stayed English — which is the class somebody
+// most needs to be able to read.
+const refuse = (lang) => (status, key, extra, params) =>
+  json(status, E.body(key, lang, extra, params));
 
 // READ FROM GITHUB, NEVER FROM THE DEPLOYED BUNDLE. The bundle trails a save by
 // about a minute, and an activity whose capacity or age range changed a moment
@@ -263,8 +273,12 @@ async function bundlesPayload(activity, participantId, now) {
 // that already holds a place is a refusal to `submit` and is simply the
 // registration to book against for `bookAndPay`.
 async function openRegistration({ activity, participant, accountId, groupId }) {
+  // ⚠ KEYS, NOT SENTENCES. This function has no language — it is called from
+  // two actions and knows nothing about who is reading — so it names the
+  // refusal and the handler renders it. `errors` still travels whole, because
+  // a form showing every problem at once beats one showing them one at a time.
   const errors = R.submissionErrors(activity, participant, groupId);
-  if (errors.length) return { status: 400, payload: { error: errors[0], errors: errors } };
+  if (errors.length) return { status: 400, key: errors[0], extra: { errors: errors } };
 
   const existing = await store.getRegistration(participant.participantId, activity.activityId);
   if (existing && R.holdsASpot(existing)) return { reg: existing, already: true };
@@ -288,7 +302,7 @@ async function openRegistration({ activity, participant, accountId, groupId }) {
     // has to choose who gets a freed place, tell them, and give them a deadline
     // before it moves on again, and none of that is decided. Today the place is
     // simply gone and the next submission takes it, first come.
-    return { status: 409, payload: { error: 'This activity is full.', full: true, capacity: report.capacity } };
+    return { status: 409, key: 'activity-full', extra: { full: true, capacity: report.capacity } };
   }
 
   const reg = R.newRegistration({
@@ -339,10 +353,11 @@ async function openRegistration({ activity, participant, accountId, groupId }) {
 function verificationRefusal(me, type) {
   if (type === 'dropin') return null;
   if (me.emailVerifiedAt) return null;
-  return json(403, {
-    error: 'Please confirm your email address before paying.',
-    reason: 'email-unverified'
-  });
+  // A KEY, for the same reason openRegistration() returns one: this is called
+  // from two actions and has no language of its own. The caller renders it and
+  // keeps `reason: 'email-unverified'`, which the client already branches on to
+  // put the resend button in front of the person.
+  return 'email-unverified';
 }
 
 // ⚠ WHICH BUNDLE PAYS FOR EACH DATE, ALLOCATED ACROSS THE WHOLE SELECTION.
@@ -444,7 +459,7 @@ exports.handler = async (event) => {
   }
 
   const found = await sessions.authenticate(body);
-  if (!found) return json(401, { error: 'Not signed in' });
+  if (!found) return json(401, E.body('not-signed-in', E.readerLang(body)));
   const me = found.account;
   // ⚠ THE LANGUAGE ON SCREEN, NOT THE ONE ON THE ACCOUNT.
   //
@@ -462,9 +477,10 @@ exports.handler = async (event) => {
   // The client sends it on every request; an absent or unknown value falls back
   // to the preference, so an older tab and a direct API call still answer in
   // something rather than in nothing.
-  const lang = READER_LANGS.indexOf(body.lang) !== -1
-    ? body.lang
-    : ((me.profile && me.profile.preferredLanguage) || 'he');
+  // One resolver, shared with the other two family endpoints so the three
+  // cannot answer the same request in different languages.
+  const lang = E.readerLang(body, me);
+  const no = refuse(lang);
 
   const mustGuard = async (participantId) => {
     if (!participantId) return null;
@@ -477,7 +493,7 @@ exports.handler = async (event) => {
       // --- what is on offer ------------------------------------------------
       case 'activity': {
         const activity = await publishedForDisplay(body.slug);
-        if (!activity) return json(404, { error: 'No such activity.' });
+        if (!activity) return no(404, 'no-such-activity');
         const regs = await store.forActivity(activity.activityId);
         return json(200, { ok: true, activity: activityView(activity, R.capacityReport(activity, regs), lang) });
       }
@@ -491,11 +507,11 @@ exports.handler = async (event) => {
       // already booked. A COUNT per date, never a list of who.
       case 'sessions': {
         const participant = await mustGuard(body.participantId);
-        if (!participant) return json(404, { error: NOT_YOURS });
+        if (!participant) return no(404, 'no-such-participant');
         const activity = await publishedForDisplay(body.slug);
-        if (!activity) return json(404, { error: 'No such activity.' });
+        if (!activity) return no(404, 'no-such-activity');
         if (activity.type !== 'dropin') {
-          return json(400, { error: 'This activity is booked for the whole term, not by the session.' });
+          return no(400, 'term-not-by-session');
         }
         return json(200, Object.assign({ ok: true },
           await sessionsPayload(activity, participant.participantId, Date.now())));
@@ -503,20 +519,20 @@ exports.handler = async (event) => {
 
       case 'bookSession': {
         const participant = await mustGuard(body.participantId);
-        if (!participant) return json(404, { error: NOT_YOURS });
+        if (!participant) return no(404, 'no-such-participant');
         const activity = await published(body.slug);
-        if (!activity) return json(404, { error: 'No such activity.' });
+        if (!activity) return no(404, 'no-such-activity');
         const bad = attendance.validate(activity, body.sessionDate);
-        if (bad) return json(400, { error: bad });
+        if (bad) return no(400, bad);
 
         const reg = await store.getRegistration(participant.participantId, activity.activityId);
         if (!reg || reg.status !== 'approved') {
-          return json(409, { error: 'You need an approved registration for this activity first.' });
+          return no(409, 'need-approved-registration');
         }
         const existing = await attendance.getAttendance(
           participant.participantId, activity.activityId, body.sessionDate);
         if (existing && R.holdsASeat(existing)) {
-          return json(409, { error: 'That evening is already booked.', status: existing.status });
+          return no(409, 'evening-already-booked', { status: existing.status });
         }
 
         // The room on THAT evening, not the term. Counted, never decremented —
@@ -524,7 +540,7 @@ exports.handler = async (event) => {
         const all = await attendance.forActivity(activity.activityId, body.sessionDate);
         const cap = R.capacityForDate(activity, all, body.sessionDate);
         if (cap.left != null && cap.left <= 0) {
-          return json(409, { error: 'That evening is full.', full: true });
+          return no(409, 'evening-full', { full: true });
         }
 
         // ⚠ AN ENTRY IS SPENT BEFORE A PRICE IS CHARGED. A bundle covering this
@@ -578,11 +594,11 @@ exports.handler = async (event) => {
       // atomic increment to stop them. That is the rule everywhere here.
       case 'bookAndPay': {
         const participant = await mustGuard(body.participantId);
-        if (!participant) return json(404, { error: NOT_YOURS });
+        if (!participant) return no(404, 'no-such-participant');
         const activity = await published(body.slug);
-        if (!activity) return json(404, { error: 'No such activity.' });
+        if (!activity) return no(404, 'no-such-activity');
         if (activity.type !== 'dropin') {
-          return json(400, { error: 'This activity is booked for the whole term, not by the session.' });
+          return no(400, 'term-not-by-session');
         }
         // No verificationRefusal() call, and not because it was forgotten: the
         // line above has already refused everything that is not a drop-in, so
@@ -591,23 +607,21 @@ exports.handler = async (event) => {
 
         const wanted = Array.isArray(body.sessionDates) ? body.sessionDates.map(String) : [];
         const dates = wanted.filter((d, i) => wanted.indexOf(d) === i).sort();
-        if (!dates.length) return json(400, { error: 'Choose at least one date.', reason: 'no-dates' });
+        if (!dates.length) return no(400, 'choose-a-date', { reason: 'no-dates' });
         if (dates.length > checkout.MAX_SESSION_LINES) {
-          return json(400, {
-            error: 'Up to ' + checkout.MAX_SESSION_LINES + ' dates can be paid for at once.',
-            reason: 'too-many'
-          });
+          return no(400, 'too-many-dates', { reason: 'too-many' },
+                    { max: checkout.MAX_SESSION_LINES });
         }
         for (const d of dates) {
           const bad = attendance.validate(activity, d);
-          if (bad) return json(400, { error: bad });
+          if (bad) return no(400, bad);
         }
 
         const opened = await openRegistration({
           activity: activity, participant: participant,
           accountId: me.accountId, groupId: body.groupId || null
         });
-        if (opened.status) return json(opened.status, opened.payload);
+        if (opened.status) return no(opened.status, opened.key, opened.extra);
         const reg = opened.reg;
 
         // ⚠ AN ACTIVITY THAT DOES NOT AUTO-APPROVE STOPS HERE, and stops before
@@ -639,10 +653,7 @@ exports.handler = async (event) => {
           if (cap.left != null && cap.left <= 0) refused.push({ date: d, reason: 'full' });
         });
         if (refused.length) {
-          return json(409, {
-            error: 'Some of those evenings are no longer available.',
-            reason: 'unavailable', refused: refused
-          });
+          return no(409, 'dates-gone', { reason: 'unavailable', refused: refused });
         }
 
         // Entries are allocated across the WHOLE selection in one pass — see
@@ -713,17 +724,16 @@ exports.handler = async (event) => {
       // once; this must not quietly become a second way in.
       case 'paySession': {
         const participant = await mustGuard(body.participantId);
-        if (!participant) return json(404, { error: NOT_YOURS });
+        if (!participant) return no(404, 'no-such-participant');
         const activity = await published(body.slug);
-        if (!activity) return json(404, { error: 'No such activity.' });
+        if (!activity) return no(404, 'no-such-activity');
         const reg = await store.getRegistration(participant.participantId, activity.activityId);
         if (!reg || reg.status !== 'approved') {
-          return json(409, { error: 'You need an approved registration for this activity first.',
-                             reason: 'not-approved' });
+          return no(409, 'need-approved-registration', { reason: 'not-approved' });
         }
         const att = await attendance.getAttendance(
           participant.participantId, activity.activityId, body.sessionDate);
-        if (!att) return json(404, { error: 'That evening is not booked.' });
+        if (!att) return no(404, 'evening-not-booked');
 
         // Today this always passes: an attendance record exists only for a
         // drop-in, because both booking paths refuse anything else. The call is
@@ -731,18 +741,17 @@ exports.handler = async (event) => {
         // payable by the session, the rule follows it instead of being a thing
         // somebody has to remember.
         const refusal = verificationRefusal(me, activity.type);
-        if (refusal) return refusal;
+        if (refusal) return no(403, refusal, { reason: 'email-unverified' });
 
         let session;
         try {
           session = await checkout.createSessionCheckout(att, activity.title, lang, me.email);
         } catch (err) {
           if (err && err.reason === 'nothing-due') {
-            return json(409, { error: 'There is nothing outstanding on that evening.',
-                               reason: 'nothing-due' });
+            return no(409, 'nothing-due-session', { reason: 'nothing-due' });
           }
           console.error('account-registrations: Stripe session failed:', err && err.message);
-          return json(502, { error: 'Could not start the payment. Please try again.' });
+          return no(502, 'checkout-failed');
         }
         return json(200, { ok: true, url: session.url });
       }
@@ -756,11 +765,11 @@ exports.handler = async (event) => {
       // being charged for something with a different name.
       case 'bundles': {
         const participant = await mustGuard(body.participantId);
-        if (!participant) return json(404, { error: NOT_YOURS });
+        if (!participant) return no(404, 'no-such-participant');
         const activity = await publishedForDisplay(body.slug);
-        if (!activity) return json(404, { error: 'No such activity.' });
+        if (!activity) return no(404, 'no-such-activity');
         if (activity.type !== 'dropin') {
-          return json(400, { error: 'Bundles are for pay-per-session activities.' });
+          return no(400, 'bundles-dropin-only');
         }
         return json(200, Object.assign({ ok: true },
           await bundlesPayload(activity, participant.participantId, Date.now())));
@@ -768,11 +777,11 @@ exports.handler = async (event) => {
 
       case 'buyBundle': {
         const participant = await mustGuard(body.participantId);
-        if (!participant) return json(404, { error: NOT_YOURS });
+        if (!participant) return no(404, 'no-such-participant');
         const activity = await published(body.slug);
-        if (!activity) return json(404, { error: 'No such activity.' });
+        if (!activity) return no(404, 'no-such-activity');
         if (activity.type !== 'dropin') {
-          return json(400, { error: 'Bundles are for pay-per-session activities.' });
+          return no(400, 'bundles-dropin-only');
         }
 
         const now = Date.now();
@@ -784,7 +793,7 @@ exports.handler = async (event) => {
           activity: activity, participant: participant,
           accountId: me.accountId, groupId: body.groupId || null
         });
-        if (opened.status) return json(opened.status, opened.payload);
+        if (opened.status) return no(opened.status, opened.key, opened.extra);
         const reg = opened.reg;
         if (reg.status !== 'approved') {
           if (opened.created) await mail.sendReceived(reg, me);
@@ -809,7 +818,7 @@ exports.handler = async (event) => {
         const offer = B.bundlesAvailable(activity, now, gid)
           .filter((b) => b.bundleId === String(body.bundleId || ''))[0];
         if (!offer) {
-          return json(409, { error: 'That bundle is not available at the moment.', reason: 'unavailable' });
+          return no(409, 'bundle-unavailable', { reason: 'unavailable' });
         }
 
         const coveredDates = B.coverageFor(activity, offer, now, gid);
@@ -823,7 +832,7 @@ exports.handler = async (event) => {
           });
         } catch (err) {
           console.error('account-registrations: bundle checkout failed:', err && err.message);
-          return json(502, { error: 'Could not start the payment. Please try again.' });
+          return no(502, 'checkout-failed');
         }
         // NOTHING IS WRITTEN. The bundle does not exist until Stripe says it was
         // paid for — see settleBundle in stripe-webhook.js.
@@ -843,46 +852,43 @@ exports.handler = async (event) => {
       // us too late for the place to be offered to anybody else.
       case 'rescheduleSession': {
         const participant = await mustGuard(body.participantId);
-        if (!participant) return json(404, { error: NOT_YOURS });
+        if (!participant) return no(404, 'no-such-participant');
         const activity = await published(body.slug);
-        if (!activity) return json(404, { error: 'No such activity.' });
+        if (!activity) return no(404, 'no-such-activity');
         const bad = attendance.validate(activity, body.toDate);
-        if (bad) return json(400, { error: bad });
+        if (bad) return no(400, bad);
 
         const att = await attendance.getAttendance(
           participant.participantId, activity.activityId, body.fromDate);
-        if (!att) return json(404, { error: 'No such booking.' });
+        if (!att) return no(404, 'no-such-booking');
 
         const now = Date.now();
         const may = B.mayReschedule(att, now);
         if (!may.may) {
-          return json(409, {
-            error: may.reason === 'too-late'
-              ? 'That session is too close to its start to be moved.'
-              : may.reason === 'not-a-bundle-entry'
-                ? 'Only a session paid for from a bundle can be moved.'
-                : 'That session cannot be moved.',
-            reason: may.reason, deadline: may.deadline || null
-          });
+          // The three reasons are three keys. mayReschedule() already named
+          // which one it is; this only turns that name into a sentence.
+          const why = may.reason === 'too-late' ? 'session-too-late-to-move'
+                    : may.reason === 'not-a-bundle-entry' ? 'not-a-bundle-entry'
+                    : 'session-cannot-move';
+          return no(409, why, { reason: may.reason, deadline: may.deadline || null });
         }
 
         const held = await bundleStore.forParticipant(participant.participantId, activity.activityId);
         const bundle = held.filter((b) => b.bundleId === att.frozen.bundleId &&
                                           (b.usedDates || []).indexOf(body.fromDate) !== -1)[0];
-        if (!bundle) return json(409, { error: 'That session is not on a bundle we can find.' });
+        if (!bundle) return no(409, 'bundle-not-found');
 
         const mine = await attendance.forParticipant(participant.participantId, activity.activityId);
         const taken = mine.filter((a) => R.holdsASeat(a)).map((a) => a.sessionDate);
         const targets = B.rescheduleTargets(bundle, activity, body.fromDate, now, taken);
         if (targets.indexOf(body.toDate) === -1) {
-          return json(409, { error: 'That date is not one this bundle can move to.',
-                             reason: 'not-a-target', targets: targets });
+          return no(409, 'not-a-move-target', { reason: 'not-a-target', targets: targets });
         }
 
         const all = await attendance.forActivity(activity.activityId, body.toDate);
         const cap = R.capacityForDate(activity, all, body.toDate);
         if (cap.left != null && cap.left <= 0) {
-          return json(409, { error: 'That session is full.', full: true });
+          return no(409, 'session-full', { full: true });
         }
 
         // ORDER: the new booking, then the old one, then the bundle.
@@ -944,28 +950,25 @@ exports.handler = async (event) => {
       // either a leftover debt or credit deleted.
       case 'useCredit': {
         const participant = await mustGuard(body.participantId);
-        if (!participant) return json(404, { error: NOT_YOURS });
+        if (!participant) return no(404, 'no-such-participant');
 
         const record = body.sessionDate
           ? await attendance.getAttendance(participant.participantId, body.activityId, body.sessionDate)
           : await store.getRegistration(participant.participantId, body.activityId);
-        if (!record) return json(404, { error: 'No such registration.' });
+        if (!record) return no(404, 'no-such-registration');
         // The account that OWES is the one credited, and it need not be this
         // one: a second guardian can book an evening on a participant somebody
         // else registered. Spending another account's credit is not something a
         // guardian link authorises.
         if (record.accountId !== me.accountId) {
-          return json(403, { error: 'That was booked on another account, so its credit is not yours to spend.',
-                             reason: 'not-your-debt' });
+          return no(403, 'credit-not-yours', { reason: 'not-your-debt' });
         }
 
         const balance = await ledger.balanceFor(me.accountId);
         const cents = spend.spendable(record, balance);
         if (!(cents > 0)) {
-          return json(409, {
-            error: balance > 0 ? 'There is nothing outstanding on this.' : 'There is no credit on this account.',
-            reason: balance > 0 ? 'nothing-due' : 'no-credit', balanceCents: balance
-          });
+          return no(409, balance > 0 ? 'nothing-outstanding' : 'no-credit',
+                    { reason: balance > 0 ? 'nothing-due' : 'no-credit', balanceCents: balance });
         }
 
         let done;
@@ -984,13 +987,13 @@ exports.handler = async (event) => {
 
       case 'cancelSession': {
         const participant = await mustGuard(body.participantId);
-        if (!participant) return json(404, { error: NOT_YOURS });
+        if (!participant) return no(404, 'no-such-participant');
         const att = await attendance.getAttendance(
           body.participantId, body.activityId, body.sessionDate);
-        if (!att) return json(404, { error: 'No such booking.' });
+        if (!att) return no(404, 'no-such-booking');
         if (att.status === 'cancelled') return json(200, { ok: true, session: att });
         if (att.status !== 'booked') {
-          return json(409, { error: 'That evening has already happened.' });
+          return no(409, 'evening-already-happened');
         }
 
         // ALL OR NOTHING. In time, the payment becomes credit; after the
@@ -1072,9 +1075,9 @@ exports.handler = async (event) => {
 
       case 'registration': {
         const participant = await mustGuard(body.participantId);
-        if (!participant) return json(404, { error: NOT_YOURS });
+        if (!participant) return no(404, 'no-such-participant');
         const reg = await store.getRegistration(body.participantId, body.activityId);
-        if (!reg) return json(404, { error: 'No such registration.' });
+        if (!reg) return no(404, 'no-such-registration');
 
         const index = (await readJson('activities/activities-index.json')) || [];
         const entry = index.filter((a) => a.activityId === reg.activityId)[0] || null;
@@ -1130,22 +1133,19 @@ exports.handler = async (event) => {
       // --- ask for a place --------------------------------------------------
       case 'submit': {
         const participant = await mustGuard(body.participantId);
-        if (!participant) return json(404, { error: NOT_YOURS });
+        if (!participant) return no(404, 'no-such-participant');
         const activity = await published(body.slug);
-        if (!activity) return json(404, { error: 'No such activity.' });
+        if (!activity) return no(404, 'no-such-activity');
 
         const opened = await openRegistration({
           activity: activity, participant: participant,
           accountId: me.accountId, groupId: body.groupId || null
         });
-        if (opened.status) return json(opened.status, opened.payload);
+        if (opened.status) return no(opened.status, opened.key, opened.extra);
         if (opened.already) {
-          return json(409, {
-            error: opened.reg.status === 'approved'
-              ? 'This participant already has a place in this activity.'
-              : 'There is already a request for this participant, waiting for an answer.',
-            status: opened.reg.status
-          });
+          return no(409, opened.reg.status === 'approved'
+                      ? 'already-has-a-place' : 'already-registered-waiting',
+                    { status: opened.reg.status });
         }
 
         const reg = opened.reg;
@@ -1159,12 +1159,12 @@ exports.handler = async (event) => {
       // --- give a place back ------------------------------------------------
       case 'cancel': {
         const participant = await mustGuard(body.participantId);
-        if (!participant) return json(404, { error: NOT_YOURS });
+        if (!participant) return no(404, 'no-such-participant');
         const reg = await store.getRegistration(body.participantId, body.activityId);
-        if (!reg) return json(404, { error: 'No such registration.' });
+        if (!reg) return no(404, 'no-such-registration');
         if (reg.status === 'cancelled') return json(200, { ok: true, registration: reg });
         if (reg.status !== 'pending' && reg.status !== 'approved') {
-          return json(409, { error: 'This registration is already ' + reg.status + '.' });
+          return no(409, 'already-in-status', null, { status: reg.status });
         }
 
         const owed = credit.creditFor(reg);
@@ -1175,10 +1175,9 @@ exports.handler = async (event) => {
         // nothing: a child has to be removable in week nine for a reason that is
         // not about money.
         if (owed.guardianMayCancel === false) {
-          return json(409, {
-            error: 'Cancellation for this activity closed on ' + owed.closedOn + '. Please contact us.',
-            reason: owed.reason, closedOn: owed.closedOn
-          });
+          return no(409, 'cancellation-closed',
+                    { reason: owed.reason, closedOn: owed.closedOn },
+                    { closedOn: owed.closedOn });
         }
 
         // Nothing to release. The place is free the moment the cancellation is
@@ -1248,16 +1247,16 @@ exports.handler = async (event) => {
       // see stripe-webhook.js.
       case 'pay': {
         const participant = await mustGuard(body.participantId);
-        if (!participant) return json(404, { error: NOT_YOURS });
+        if (!participant) return no(404, 'no-such-participant');
 
         const reg = await store.getRegistration(body.participantId, body.activityId);
-        if (!reg) return json(404, { error: 'No such registration.' });
+        if (!reg) return no(404, 'no-such-registration');
 
         // THE FROZEN TYPE, not the activity's current one. It is what the family
         // registered under, and it is read from the record already in hand —
         // this branch never opens the activity at all.
         const refusal = verificationRefusal(me, (reg.frozen && reg.frozen.type) || 'course');
-        if (refusal) return refusal;
+        if (refusal) return no(403, refusal, { reason: 'email-unverified' });
 
         // ONE LIST, BOTH DOORS — see isPayable() in _checkout.js, which the
         // emailed pay link reads too. Approved only: `pending` means a person
@@ -1265,10 +1264,8 @@ exports.handler = async (event) => {
         // nobody has agreed to give. What a pending family sees on the card is
         // the waiting block, not silence.
         if (!checkout.isPayable(reg)) {
-          return json(409, {
-            error: 'This registration is ' + reg.status + '. Only an approved place can be paid for.',
-            reason: 'not-approved', status: reg.status
-          });
+          return no(409, 'not-approved-for-payment',
+                    { reason: 'not-approved', status: reg.status }, { status: reg.status });
         }
 
         // ONE BUILDER, TWO DOORS. The emailed pay link charges the same
@@ -1279,7 +1276,7 @@ exports.handler = async (event) => {
         // charged a figure nobody on this side can explain.
         const due = checkout.dueCents(reg);
         if (!(due > 0)) {
-          return json(409, { error: 'There is nothing outstanding on this registration.', reason: 'nothing-due' });
+          return no(409, 'nothing-due-registration', { reason: 'nothing-due' });
         }
 
         let session;
@@ -1287,7 +1284,7 @@ exports.handler = async (event) => {
           session = await checkout.createCheckout(reg, lang, me.email);
         } catch (err) {
           console.error('account-registrations: Stripe session failed:', err && err.message);
-          return json(502, { error: 'Could not start the payment. Please try again.' });
+          return no(502, 'checkout-failed');
         }
 
         return json(200, { ok: true, url: session.url, amountCents: due });
@@ -1298,6 +1295,6 @@ exports.handler = async (event) => {
     }
   } catch (err) {
     console.error('[account-registrations] ' + (err && err.stack || err));
-    return json(500, { error: 'Something went wrong. Please try again.' });
+    return no(500, 'server-error');
   }
 };

@@ -14,7 +14,7 @@
 // bare string. Section headings and sidebar labels are NOT admin-editable —
 // they are fixed per language and live in LABELS below.
 
-const { sidebarGroups, factPriceRows, sessionTables, SESSION_TABLE } = require('./_activity-facts');
+const { sidebarGroups, sidebarRows, factPriceRows, sessionTables, SESSION_TABLE } = require('./_activity-facts');
 
 // Sidebar group icons. Lucide, drawn white inside a solid circle, which is the
 // site's icon rule. The circle is 34px rather than the 56px used for section
@@ -562,6 +562,70 @@ ${sessionsBand}  </div>
 // Deliberately minimal: cards that link out. It exists so activities are
 // reachable without someone already holding the direct link.
 
+// --- what a card can answer at a glance ------------------------------------
+//
+// A card was a picture, a title and a blurb, which answers "what is this" and
+// none of the questions a parent actually filters on. Standing in front of a
+// grid, they are deciding whether to open a page at all, and they decide on
+// four things: is it for my child, what language is it taught in, when does it
+// meet, what does it cost. That is the same order — and the same four leading
+// facts — as the activity page's own cards, which is deliberate: the card is a
+// preview of that page, not a second description of the activity.
+//
+// Everything here is read through sidebarRows(), the SAME builder the page
+// uses, so a card cannot start describing an activity differently from the
+// page it links to. Reading through it also filters members-only facts for
+// free: the exact address is not on a card for exactly the reason it is not on
+// the page, and that is a property of the code rather than a rule this
+// function has to remember.
+//
+// And it adds no copy. All four labels are already in LABELS in three
+// languages, because the page's own fact rows use them.
+const CARD_TAGS = ['ages', 'instructionLanguage', 'schedule', 'price'];
+
+function cardTags(activity, lang) {
+  const L = LABELS[lang];
+  const byKey = {};
+  sidebarRows(activity, lang).forEach((r) => { byKey[r.key] = r.value; });
+
+  return CARD_TAGS.map((key) => {
+    // ONE figure, and it is the one activities are compared by — the term
+    // price, or the per-session price on a drop-in. Never the registration fee,
+    // which is charged once a year and would read as the cost of the course,
+    // and never the per-lesson rate, which is a division of two numbers that
+    // are both already on the page. The row brings its own label, so a drop-in
+    // chip says "per session" and a course chip says "per semester" without
+    // this having to know which it is looking at.
+    if (key === 'price') {
+      const head = factPriceRows(activity, lang)
+        .filter((r) => r.key === 'term' || r.key === 'perSession')[0];
+      // esc() here and nowhere else in this function: a price label is plain
+      // text out of _activity-facts.js, where every LABELS value in this file
+      // is authored as HTML and interpolated raw.
+      return head ? { key, label: esc(head.label), value: head.value } : null;
+    }
+
+    const value = byKey[key];
+    if (!value) return null;
+
+    // ⚠ A SCHEDULE OF MORE THAN ONE LINE IS MORE THAN ONE GROUP, and then no
+    // single line is true of the reader. scheduleText() renders "Beginners:
+    // Monday, 16:00" and "Advanced: Wednesday, 16:00"; a chip showing the first
+    // tells half of them a day they do not attend, and does it in the one place
+    // on the site meant to be scanned rather than read. The chip is dropped and
+    // the page, which prints every group's line, is one click away. A card that
+    // says nothing beats a card that is confidently wrong, and this is the
+    // cheapest place to be wrong about the most consequential fact.
+    if (key === 'schedule' && value.indexOf('\n') !== -1) return null;
+
+    // The remaining multi-line case is the opposite and is not a hazard: a
+    // language list and a level each carry an OPTIONAL note on a second line,
+    // and the first line is a complete answer on its own. So it is truncated
+    // rather than dropped.
+    return { key, label: L[key], value: value.split('\n')[0] };
+  }).filter(Boolean);
+}
+
 function renderActivitiesIndexPage(activities, lang) {
   const L = LABELS[lang];
   const list = (activities || []).filter((a) => langsPresent(a).indexOf(lang) !== -1);
@@ -583,10 +647,19 @@ function renderActivitiesIndexPage(activities, lang) {
     const thumb = a.cardImage
       ? `      <img class="activity-card-thumb" src="${esc(a.cardImage)}" alt="" width="800" height="800" loading="lazy">`
       : `      <span class="activity-card-thumb" aria-hidden="true"></span>`;
+    // The tags sit between the blurb and "Details" rather than under the title,
+    // because they are what a reader checks AFTER the name has interested them
+    // — and because the blurb carries `flex:1`, so putting them below it keeps
+    // every card's tag row and link aligned across a row of unequal blurbs.
+    const tags = cardTags(a, lang);
+    const tagList = !tags.length ? '' : `
+      <ul class="activity-card-tags">
+${tags.map((t) => `        <li><span>${t.label}</span> ${esc(t.value)}</li>`).join('\n')}
+      </ul>`;
     return `    <a class="activity-card" href="${pathFor(a.slug, lang)}">
 ${thumb}
       <${level}>${esc(title)}</${level}>
-      <p>${esc(blurb)}</p>
+      <p>${esc(blurb)}</p>${tagList}
       <span class="activity-card-more">${L.more}</span>
     </a>`;
   };

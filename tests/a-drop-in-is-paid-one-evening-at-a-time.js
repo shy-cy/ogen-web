@@ -123,10 +123,16 @@ const HOUR = 3600 * 1000;
     registration: Object.assign({}, dropin.registration, { cancellationPolicy: { mode: 'prorated' } })
   })).some((e) => /prorate/i.test(e)), 'a drop-in has no course to prorate, and says so rather than ignoring it');
   H.eq(REG.validateRegistration(dropin).length, 0, 'and is otherwise valid as configured');
-  H.eq(att.validate(course, '2026-10-14'), 'Sessions are booked one at a time only on a pay-per-session activity.',
+  // ⚠ KEYS, NOT SENTENCES. validate() used to answer in English prose, which
+  // put one language's copy inside a pure rule module that both a family and an
+  // admin call. It names the refusal now and the handler renders it — see
+  // _family-errors.js, which holds all three languages.
+  H.eq(att.validate(course, '2026-10-14'), 'dropin-only',
     'a course cannot be booked by the evening');
-  H.ok(/does not meet on that date/.test(att.validate(dropin, '2026-10-07') || ''),
+  H.eq(att.validate(dropin, '2026-10-07'), 'not-a-meeting-date',
     'and a date the calendar does not contain is not a session');
+  H.ok(!/ /.test(att.validate(course, '2026-10-14')),
+    'and what comes back is a key, not a sentence somebody could print');
 
   console.log('\n[5. FIELD_SCHEMA draws each type its own fields, and keeps the rest]');
   const drawn = (t) => REG.FIELDS.filter((f) => !f.types || f.types.indexOf(t) !== -1).map((f) => f.key);

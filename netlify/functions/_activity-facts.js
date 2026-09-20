@@ -668,7 +668,12 @@ function priceRows(f, lang, duration) {
           perSession: 'Стоимость занятия' }
   }[lang] || null;
   if (!L) return [];
-  const row = (label, value, note) => ({ label, note: note || '', value });
+  // ⚠ THE KEY IS WHAT THE ROW IS, and it is here so that a caller wanting ONE of
+  // these rows can say which one. The listing card wants the headline figure —
+  // the term price, or the per-session price on a drop-in — and picking it by
+  // matching the label would mean matching three translations of it, and would
+  // break silently the next time one is reworded.
+  const row = (key, label, value, note) => ({ key, label, note: note || '', value });
 
   // ⚠ "REGISTRATION FEE", NOT "YEARLY REGISTRATION FEE". The label carried the
   // scope for a while, on the argument that annual-ness is the one thing about
@@ -681,13 +686,13 @@ function priceRows(f, lang, duration) {
   //
   // The scope itself is unchanged and is enforced in feeApplies(): one
   // participant, one activity, one ACADEMIC year.
-  if (hasFee) rows.push(row(L.fee, money(fee)));
+  if (hasFee) rows.push(row('fee', L.fee, money(fee)));
 
   // Cost per lesson is OFF unless the activity opts in. It was the one row that
   // invited arithmetic rather than answering a question, and a teacher reading
   // the card does not price a course by the academic hour.
   const per = showPerLesson(f) ? pricePerHour(f, duration) : null;
-  if (per) rows.push(row(L.lesson, money(per.value)));
+  if (per) rows.push(row('lesson', L.lesson, money(per.value)));
 
   // A pay-per-session activity quotes the meeting. It is the drop-in
   // counterpart of the term price rather than an extra line beside one, so it
@@ -700,7 +705,7 @@ function priceRows(f, lang, duration) {
   // whichever prices it actually carries. That is why a second content type was
   // not needed: the price card was already built this way.
   const perSession = num(f.perSessionPrice);
-  if (perSession != null && perSession > 0) rows.push(row(L.perSession, money(perSession)));
+  if (perSession != null && perSession > 0) rows.push(row('perSession', L.perSession, money(perSession)));
 
   if (hasFull) {
     const sessions = sessionTotal(duration);
@@ -716,7 +721,7 @@ function priceRows(f, lang, duration) {
         ? `(${sessions} ${ruPlural(sessions, 'занятие', 'занятия', 'занятий')} × ${lessons} ${ruPlural(lessons, 'урок', 'урока', 'уроков')})`
         : `(${sessions} ${sessions === 1 ? L.session[0] : L.session[1]} × ${lessons} ${lessons === 1 ? L.unit[0] : L.unit[1]})`;
     }
-    rows.push(row(L.term, money(full), note));
+    rows.push(row('term', L.term, money(full), note));
   }
 
   // There is deliberately NO total. The two numbers are on different cycles --

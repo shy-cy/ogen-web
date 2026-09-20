@@ -103,7 +103,13 @@ async function isGuardian(participantId, accountId) {
 // second entity, no different validation. A guardian registering themselves has
 // always worked; this is only what lets the screen stop calling them a child.
 async function addLink({ participantId, accountId, addedVia, addedBy, inviteId, isSelf }) {
-  if (!participantId || !accountId) throw new Error('A link needs a participant and an account');
+  if (!participantId || !accountId) {
+    // Coded like every other refusal here, so account-family.js can render it
+    // in the reader's own language rather than passing err.message through.
+    const err = new Error('A link needs a participant and an account');
+    err.code = 'link-needs-both';
+    throw err;
+  }
   const via = ADDED_VIA.indexOf(addedVia) !== -1 ? addedVia : 'admin';
 
   if (await isGuardian(participantId, accountId)) {
@@ -231,11 +237,21 @@ async function acceptInvite(token, account) {
     throw err;
   }
   if (invite.status !== LIVE) {
+    // ⚠ WRITTEN OUT, NOT BUILT WITH `'invite-' + invite.status`. A computed
+    // code can name a message that does not exist — add a fourth status and
+    // the family gets the generic apology with nothing saying why — and it is
+    // invisible to the check that reads the keys off the source, which is what
+    // stops a message becoming dead copy in three languages. The default is the
+    // expiry, which is the only one of the three worth asking for a new link
+    // about.
+    const code = invite.status === 'accepted' ? 'invite-accepted'
+               : invite.status === 'revoked' ? 'invite-revoked'
+               : 'invite-expired';
     const err = new Error(
-      invite.status === 'accepted' ? 'That invitation has already been accepted.'
-      : invite.status === 'revoked' ? 'That invitation was withdrawn.'
+      code === 'invite-accepted' ? 'That invitation has already been accepted.'
+      : code === 'invite-revoked' ? 'That invitation was withdrawn.'
       : 'That invitation has expired. Ask for a new one.');
-    err.code = 'invite-' + invite.status;
+    err.code = code;
     throw err;
   }
   // THE BINDING. Without it a forwarded link hands a stranger access to a

@@ -80,6 +80,23 @@ to a section. The `#offer` section itself is untouched in all three languages; i
 simply is not what the button is for. Each tree's button points inside its own
 tree, and a test pins all three.
 
+⚠ **And the `#offer` section's closing banner is now that same button.** It was
+a `<p class="coming-soon">` reading "Coming soon: we'll be publishing next
+year's full program and opening registration" — written before there was a
+programme to link to, and still sitting there after four activities were
+published. It was also, property for property, **a solid terracotta full pill
+with white bold text**, which is exactly the shape this file reserves for things
+you can press. The site's own badge rule was learned from the same mistake one
+page over: *solid fill plus a full pill means pressable*, and a reader who
+presses it gets nothing.
+
+So it is the hero's button, repeated, at the foot of the section that has just
+listed what is on offer — the same href and the same words, per tree. A reader
+who has scrolled the four teaser cards is at the point of asking "so what is
+there", and that is the one place a second copy of the primary CTA earns its
+place rather than diluting it. `.coming-soon` is deleted rather than left
+unused.
+
 ## Shared chrome is JS-injected
 
 Page files contain **only their own body copy**. The nav, footer, and contact
@@ -696,6 +713,59 @@ anyone who asks for it. Until an admin backend exists, a genuinely
 unpublished activity should not be committed or deployed at all, and must
 stay out of `sitemap.xml`.
 
+### What a listing card answers at a glance
+
+A card was a picture, a title and a blurb. That answers *what is this* and none
+of the questions somebody standing in front of a grid is actually deciding on,
+so every card had to be opened to find out whether it was even possible.
+
+Four tags now, and they are the same four facts the activity page's own cards
+lead with, in the order it already establishes — **is it for my child, what
+language is it taught in, when does it meet, what does it cost**. The card is a
+preview of that page rather than a second description of the activity, so it
+answers in the page's order.
+
+| Tag | Where it comes from |
+|---|---|
+| Ages | `formatAges` |
+| Language of instruction | the code list; an optional free-text note is dropped |
+| When | `scheduleFor`, **only when one line covers everybody** |
+| Price | the `term` or `perSession` row — never the fee, never per-lesson |
+
+**Everything is read through `sidebarRows()`, the same builder the page uses**,
+so a card cannot start describing an activity differently from the page it
+links to. That also filters members-only facts for free: the exact address is
+off a card for the same reason it is off the page, as a property of the code
+rather than a rule this function remembers.
+
+**It added no copy.** All four labels were already in `LABELS` in three
+languages, because the page's own fact rows use them — so a row of tags in
+Hebrew, English and Russian cost one list of four keys.
+
+⚠ **A SCHEDULE OF MORE THAN ONE LINE IS MORE THAN ONE GROUP, and the tag is
+dropped.** `scheduleText()` renders "Beginners: Monday, 16:00" and "Advanced:
+Wednesday, 16:00"; a card showing the first tells half its readers a day they do
+not attend, in the one place on the site meant to be scanned rather than read. A
+card that says nothing beats a card that is confidently wrong, and the page
+under it prints every group's line. The other multi-line case is the opposite
+and is truncated rather than dropped: a language list carries an optional note
+on a second line, and the list alone is a complete answer.
+
+**The price tag brings its own label**, which is why `priceRows()` gained a
+`key` per row. Picking the headline figure by matching a label would mean
+matching three translations of it and would break silently the next time one is
+reworded; with a key, a drop-in's tag says "Cost per session" and a course's
+says "Cost per semester" without the card knowing which it got.
+
+**Stacked rows, not pills.** Each tag is a label *and* a value, and a pill
+holding both is either too wide for a 320px card or drops the label — which is
+what makes a bare "7-10" or "€300" ambiguous in the first place. Nothing is
+pushed to an edge, so there is not one directional override and the row reads
+correctly in all three languages: the same shape the price card was rebuilt into
+after its label-at-one-edge version kept breaking in Hebrew. The label is
+`--navy` (10.8:1 on paper) and **not `--camel`**, which is 2.3:1 — the warm
+tokens are backgrounds chosen to sit under white text and fail as foregrounds.
+
 ### An activity has an id, a kind, and registration settings
 
 Three root-level fields, all **structure** — one answer for all three languages,
@@ -1141,6 +1211,8 @@ netlify/functions/
                          store, no gate. See the naming warning at its top; PURE
   _credit.js             what a cancellation credits; reads one registration and
                          one timestamp, and nothing else; PURE
+  _family-errors.js      every refusal a family can be shown, in three
+                         languages; no store, no clock; PURE
   _activity-autocomplete.js  when a closed activity has finished, and nothing
                          else; no store, no clock, no GitHub; PURE
   _blobs.js              the only place a Blobs store is opened; ALL store names
@@ -2304,6 +2376,24 @@ by typing the parameter.
 Signing in re-runs `boot()`, which draws whichever account view the reader is on.
 That is the right answer every time.
 
+### ⚠ The chip says Sign in / Register, because the page behind it is both
+
+It said **Sign in**. `/account` draws the sign-in card with *"No account yet?
+Create an account"* under it, so somebody with no account could always start
+there — the chip simply did not say so, and "Sign in" tells a first-time visitor
+that this control is for other people. It is the only way into the family area
+from the nav, on every page of the site, so a reader who reads it as *not for
+me* has nowhere else to be sent from.
+
+`כניסה / הרשמה` · `Sign in / Register` · `Вход / Регистрация`. The label is also
+the `title` and the hamburger entry, so all three follow.
+
+The Hebrew shares a word with the activity page's Register button, and that is
+judged acceptable rather than overlooked: `כניסה / הרשמה` is the standard
+pairing on an Israeli site header, and there is no activity in view from the nav
+bar for `הרשמה` to be read as registering *for*. Below 760px the chip sheds its
+label as before, so the longer string costs nothing on a phone.
+
 ### The initial comes from a cached name
 
 `js/nav.js` cannot ask the server who this is — it has no session helper and runs
@@ -2977,6 +3067,115 @@ that did not happen.
 outlast the wait it describes, and saying it again on a timer would also scroll
 the page under the reader every few seconds. Every other `ok` notice still clears
 itself after five seconds, and a test pins that default.
+
+### ⚠ A refusal was the one string that stayed English
+
+A family on the **Hebrew** page, filling in a **Hebrew** form, under a **Hebrew**
+heading, typed an address that already had an account and was answered:
+
+> An account with that email already exists
+
+Every refusal in the family area was like that. Eighteen shells, one `{he,en,ru}`
+table, RTL, a language toggle — all of it translated, and then the moment
+anything went wrong the page switched to English, which is the moment somebody
+most needs to be able to read it. A parent who cannot tell *that password is too
+short* from *we could not reach the server* tries the same thing again, or gives
+up, or opens an account under a second address, which is the one outcome that
+leaves real mess behind.
+
+It was not a missing translation. It was a whole **class** of string that had
+never been treated as copy, because it lived on the server — and the server's
+other display strings had only just been fixed, when the group names and price
+rows turned out to be rendering in the language on the **account** rather than
+the language on the **screen**.
+
+**`_family-errors.js` is the one table**, pure, opening no store. ~76 messages ×
+three languages, each either a string or a function of the same parameters.
+
+**The words are on the server rather than in the client's string table**, which
+is the one real design choice:
+
+- the refusal is authored beside the condition that produces it; a code
+  travelling to a client that holds the words is two files to edit and a code
+  with no key rendering as nothing;
+- several carry a number or a date — how many guardians, when cancellation
+  closed, how many characters a password needs — and interpolating in the client
+  means shipping the parameters and reassembling a sentence in three grammars;
+- **the server already knows.** `js/member-session.js` sends `lang` from
+  `document.documentElement.lang` on every request, built for exactly this class
+  of problem. An error message is a display string like any other.
+
+`code` travels beside the sentence anyway, so a client can branch on a reason
+without matching prose. The `reason` and `full` fields two screens already read
+are untouched.
+
+**The stores say what went wrong; the endpoint says it in a language.** A store
+has no business knowing which language a browser is set to, so
+`_account-store.js`, `_participant-store.js` and `_guardian-store.js` throw with
+a `code` and an English message that is a **log line, not something a family
+reads**. The same for the pure rule modules: `submissionErrors()` and
+`validate()` returned English prose, which is how a module that is handed an
+activity and asked what is wrong with it ends up holding one language's copy.
+They return keys.
+
+⚠ **`'invite-' + invite.status` is written out.** A computed code can name a
+message that does not exist — add a fourth invite status and the family gets the
+generic apology with nothing saying why — and it is invisible to the check that
+reads keys off the source, which is what stops a message becoming dead copy in
+three languages. That check **found these three** the moment it was made honest.
+
+**What stays English, on purpose:** `Use POST`, `Body must be JSON`,
+`Unknown action "x"`. They mean the client is broken or somebody is calling the
+API by hand; nobody using the site can reach them, and translating a message for
+a reader who does not exist is three languages of maintenance behind a screen
+nobody sees.
+
+**The default is Hebrew**, not English — the language of the tree at `/`, which
+is the direction every other blank on this site falls.
+
+`tests/a-refusal-is-in-the-language-it-is-read-in.js` asks four things, and the
+fourth is the one that matters in a year:
+
+1. every message is complete in all three, and **Hebrew contains Hebrew letters
+   and Russian contains Cyrillic** — a key quietly left holding the English is
+   invisible to a reviewer who does not read the language;
+2. every key the code uses exists, and every key that exists is **used** — an
+   orphan is dead copy three languages carry, indistinguishable from a key whose
+   only caller was renamed. ⚠ This check was **self-satisfying** at first: it
+   scanned the whole functions directory, so every key matched the quoted string
+   that *declares* it and an orphan looked used. Excluding the table's own file
+   is what made it bite;
+3. the handlers are **executed** in all three languages, with no session, and
+   the refusal that comes back is read;
+4. ⚠ **no family endpoint emits an English sentence any more**, which is what
+   stops the next refusal somebody adds from being English, silently, in the one
+   place nobody looks until a family writes in.
+
+All four failure modes are verified to fail.
+
+**The check-in page is the fourth endpoint and the odd one.** It has no session
+and no language in its URL, because a code on a wall cannot be three posters —
+so the page chooses with its own toggle and sends that, read live so switching
+language and tapping again switches both.
+
+### ⚠ And one refusal was never ours to translate
+
+The terms checkbox carried `required`, and a native validation bubble is drawn
+by the **browser**, in the browser's language, with no attribute that changes
+it: a Hebrew form refusing in English. Same shape as a native
+`<input type="time">` printing AM/PM at an admin in Cyprus — the value was never
+in question, the display was one the page could not control.
+
+It is checked in the submit handler now, with the **same sentence the server
+would have sent**, so the two doors cannot word it differently, and through
+`say()`, which scrolls its notice into view — the half of the bubble worth
+keeping on the tallest form in the family area.
+
+**The other nine `required` fields keep it, deliberately.** On a text or email
+box the attribute also buys format checking, focus and scroll, and the message
+is the browser's own UI in the language its owner set. A checkbox has no format
+to check, so `required` buys the bubble and nothing else — which makes it the
+one place the trade is free.
 
 ### The wait has a shape
 
@@ -3908,9 +4107,11 @@ Site is live and launched. Everything that was once a pre-launch blocker (OG
 share image, Formspree wiring, domain) is done. Open items:
 
 - **Russian copy has never been reviewed by a native speaker** — the homepage,
-  the About and activity pages, and every string in `_account-email.js` and
-  `_registration-email.js`. Flagged inline at the top of each `/ru/` file and at
-  the top of both mail modules.
+  the About and activity pages, every string in `_account-email.js` and
+  `_registration-email.js`, and now the ~76 refusals in `_family-errors.js`.
+  Flagged inline at the top of each `/ru/` file and at the top of both mail
+  modules. The refusals are the newest and largest addition to that pile and
+  the Hebrew in them wants a read too.
 - **English activity copy** is a first-pass translation of the approved Hebrew
   and has not been proofread, including the status strings in `js/activity.js`.
 - **`/about` is placeholder copy** (`[content needed]`), hence `noindex` and no

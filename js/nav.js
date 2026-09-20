@@ -39,15 +39,15 @@
   // wrong link. A test asserts they agree, character for character.
   const L = {
     he: { about:'אודות', activities:'פעילויות', contact:'צור קשר', menu:'תפריט', alt:'עוגן',
-          account:'אזור המשפחה', signIn:'כניסה', signOut:'יציאה',
+          account:'אזור המשפחה', signIn:'כניסה / הרשמה', signOut:'יציאה',
           seeAll:'לכל הפעילויות', running:'פעיל', archived:'ארכיון',
           soon:'בקרוב', waitlist:'רשימת המתנה' },
     en: { about:'About', activities:'Activities', contact:'Contact', menu:'Menu', alt:'Ogen',
-          account:'My family', signIn:'Sign in', signOut:'Sign out',
+          account:'My family', signIn:'Sign in / Register', signOut:'Sign out',
           seeAll:'See all activities', running:'Currently Running', archived:'Archived',
           soon:'Coming soon', waitlist:'Waiting list' },
     ru: { about:'О нас', activities:'Занятия', contact:'Контакты', menu:'Меню', alt:'Оген',
-          account:'Моя семья', signIn:'Войти', signOut:'Выйти',
+          account:'Моя семья', signIn:'Вход / Регистрация', signOut:'Выйти',
           seeAll:'Все занятия', running:'Активные', archived:'Архив',
           soon:'Скоро', waitlist:'Лист ожидания' }
   }[lang];
@@ -138,6 +138,20 @@
     // could write and was followed immediately after a password was typed, so
     // it needed a guard. A parameter nobody sets and nobody reads needs none.
     const signInHref = base + '/account';
+
+    // ⚠ THE SIGNED-OUT LABEL NAMES BOTH DOORS, because the page behind it is
+    // both. /account renders the sign-in card with "No account yet? Create an
+    // account" under it, so somebody with no account has always been able to
+    // start here — the chip simply did not say so, and "Sign in" tells a first
+    // time visitor that this control is for other people. It is the only way
+    // into the family area from the nav on every page of the site, so a reader
+    // who reads it as "not for me" has nowhere else to be sent from.
+    //
+    // The Hebrew is `כניסה / הרשמה`, which is the standard pairing on an
+    // Israeli site header. It does share a word with the activity page's
+    // Register button, and that is judged acceptable: there is no activity in
+    // view from the nav bar, so there is nothing for `הרשמה` to be read as
+    // registering FOR.
 
     const esc = (v) => String(v).replace(/[&<>"]/g, (c) =>
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));

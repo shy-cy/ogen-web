@@ -133,16 +133,26 @@ async function saveParticipant(record) {
   return record;
 }
 
+// A refusal a caller can render. ⚠ THE CODE IS WHAT TRAVELS, not the sentence:
+// a store has no business knowing which language a browser is set to, and the
+// message is a fallback for a log. _family-errors.js turns the code into a
+// sentence in the reader's own language.
+const fail = (code, message) => {
+  const err = new Error(message);
+  err.code = code;
+  return err;
+};
+
 function validate(input) {
   const first = String((input && input.firstName) || '').trim();
-  if (!first) throw new Error('A first name is required');
+  if (!first) throw fail('first-name-required', 'A first name is required');
   if (!validDateOfBirth(input && input.dateOfBirth)) {
-    throw new Error('A date of birth is required, as YYYY-MM-DD, and it cannot be in the future');
+    throw fail('dob-required', 'A date of birth is required, as YYYY-MM-DD, and it cannot be in the future');
   }
 }
 
 async function createParticipant(input, creatorAccountId) {
-  if (!creatorAccountId) throw new Error('A participant needs an account to belong to');
+  if (!creatorAccountId) throw fail('participant-needs-account', 'A participant needs an account to belong to');
   validate(input);
   const now = new Date().toISOString();
   const record = {
@@ -166,17 +176,17 @@ async function createParticipant(input, creatorAccountId) {
 
 async function updateParticipant(participantId, patch) {
   const record = await getParticipant(participantId);
-  if (!record) throw new Error('No such participant');
+  if (!record) throw fail('no-such-participant', 'No such participant');
   const next = patch || {};
   if (next.firstName != null) {
     const v = String(next.firstName).trim();
-    if (!v) throw new Error('A first name is required');
+    if (!v) throw fail('first-name-required', 'A first name is required');
     record.firstName = v.slice(0, 80);
   }
   if (next.lastName != null) record.lastName = String(next.lastName).trim().slice(0, 80);
   if (next.dateOfBirth != null) {
     if (!validDateOfBirth(next.dateOfBirth)) {
-      throw new Error('A date of birth is required, as YYYY-MM-DD, and it cannot be in the future');
+      throw fail('dob-required', 'A date of birth is required, as YYYY-MM-DD, and it cannot be in the future');
     }
     record.dateOfBirth = String(next.dateOfBirth).trim();
   }

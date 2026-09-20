@@ -43,6 +43,7 @@
 const attendance = require('./_session-attendance');
 const participants = require('./_participant-store');
 const codes = require('./_checkin-token');
+const E = require('./_family-errors');
 const credit = require('./_credit');
 
 const json = (code, payload) => ({
@@ -75,12 +76,18 @@ exports.handler = async (event) => {
   let body = {};
   try { body = JSON.parse(event.body || '{}'); } catch (err) { return json(400, { error: 'Bad request' }); }
 
+  // The language the toggle is currently showing. Nobody arrives here from a
+  // link that knows which language they read — they arrive from a code on a
+  // wall — so the page chooses and says so on every call.
+  const lang = E.readerLang(body);
+  const no = (status, key, extra) => json(status, E.body(key, lang, extra));
+
   try {
     const code = await codes.readCode(body.token);
     // One answer for an invented token and an expired one. Telling them apart
     // says whether a code ever existed, which is the only thing guessing could
     // learn here.
-    if (!code) return json(404, { error: 'This code is not valid any more.', reason: 'expired' });
+    if (!code) return no(404, 'checkin-code-dead', { reason: 'expired' });
 
     const opens = dayOpens(code.sessionDate);
     if (opens != null && Date.now() < opens) {
@@ -120,7 +127,7 @@ exports.handler = async (event) => {
         // Not found covers three cases on purpose — no such booking, a
         // cancelled one, and a participant on another evening — because telling
         // them apart would let the list be probed for names it does not show.
-        if (!att) return json(404, { error: 'That name is not on this evening\'s list.' });
+        if (!att) return no(404, 'checkin-not-listed');
         // Already present is a SUCCESS, not an error. Two people scanning one
         // poster in the same minute, or one person tapping twice because the
         // first tap was not obviously received, must not produce a failure on a
@@ -139,6 +146,6 @@ exports.handler = async (event) => {
     }
   } catch (err) {
     console.error('[checkin] ' + (err && err.stack || err));
-    return json(500, { error: 'Something went wrong. Please try again.' });
+    return no(500, 'server-error');
   }
 };

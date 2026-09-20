@@ -102,10 +102,20 @@ H.ok(/payload\.lang = \(window\.document\.documentElement\.lang \|\| 'he'\)/.tes
 H.ok(/if \(payload\.lang === undefined\)/.test(sess),
   'and a caller that names one explicitly still wins');
 const api = read('netlify/functions/account-registrations.js');
-H.ok(/const lang = READER_LANGS\.indexOf\(body\.lang\) !== -1/.test(api),
+// The resolver is shared by all three family endpoints now, so the three cannot
+// answer the same request in different languages.
+H.ok(/const lang = E\.readerLang\(body, me\);/.test(api),
   'the server prefers it');
-H.ok(/\(\(me\.profile && me\.profile\.preferredLanguage\) \|\| 'he'\)/.test(api),
+// The fallback lives with the resolver, and is EXECUTED rather than matched —
+// which is the stronger check, and the reason moving it out of this file was
+// safe to do at all.
+const FE = require('../netlify/functions/_family-errors');
+H.eq(FE.readerLang({ lang: 'ru' }, { profile: { preferredLanguage: 'en' } }), 'ru',
+  'the page wins over the account');
+H.eq(FE.readerLang({}, { profile: { preferredLanguage: 'en' } }), 'en',
   'and falls back to the preference, so an older tab still answers in something');
+H.eq(FE.readerLang({ lang: 'fr' }, {}), 'he',
+  'and to Hebrew, which is the language of the tree at /');
 // ⚠ AND THE EMAILS ARE UNTOUCHED. A message arrives later and out of context,
 // which is a different question with a different right answer.
 const mailCalls = (api.match(/mail\.send\w+\([^)\n]*/g) || []);
@@ -198,6 +208,25 @@ async function screens() {
   await settle();
   let go = D.byTag(dom.mount, 'button').filter((b) => b.textContent === 'פתיחת חשבון')[0];
   H.ok(go, 'the sign-up button is drawn in Hebrew');
+
+  // ⚠ THE TERMS BOX IS CHECKED BY US, NOT BY THE BROWSER. It carried
+  // `required`, and a native validation bubble is drawn by the browser in the
+  // BROWSER's language — so a Hebrew form was refusing in English, with no
+  // attribute that could change it. Submitting without ticking now says so in
+  // the language of the page, and says it through the same notice every other
+  // refusal uses, which scrolls itself into view.
+  D.byTag(dom.mount, 'form')[0].submit();
+  await settle();
+  H.eq(sent.filter((b) => b.action === 'signup').length, 0,
+    'an unticked box does not even reach the network');
+  H.ok(dom.mount.textContent.indexOf('תנאי השימוש') !== -1,
+    'and the reason is on screen, in Hebrew');
+
+  const box = D.byTag(dom.mount, 'input').filter((i) => i.type === 'checkbox')[0];
+  H.ok(box, 'the terms box is there');
+  H.ok(!box.getAttribute('required'),
+    'and it does not hand its refusal to the browser');
+  box.checked = true;
   D.byTag(dom.mount, 'form')[0].submit();
   await settle();
 

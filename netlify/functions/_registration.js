@@ -418,19 +418,25 @@ function freeze(activity, participant, groupId, flag, fee) {
 
 // --- building one -----------------------------------------------------------
 
+// ⚠ KEYS, NOT SENTENCES. This returned English prose, which put one language's
+// copy inside a pure rule module. This module has no reader — it is given an
+// activity and a participant and asked what is wrong — so there is nothing here
+// that could know which language to answer in, and the prose was English
+// because whoever wrote it was. It names the refusal; whoever asked renders it,
+// out of _family-errors.js, in the language of the page that asked.
 function submissionErrors(activity, participant, groupId) {
   const errors = [];
-  if (!activity) { errors.push('No such activity.'); return errors; }
-  if (!participant) { errors.push('No such participant.'); return errors; }
+  if (!activity) { errors.push('no-such-activity'); return errors; }
+  if (!participant) { errors.push('no-such-participant'); return errors; }
   if (activity.status !== 'open') {
-    errors.push('Registration for this activity is not open.');
+    errors.push('registration-not-open');
   }
   const named = facts.namedGroups((((activity.facts) || {}).groupSize) || {});
   if (named.length) {
-    if (!groupId) errors.push('This activity runs several groups, so one has to be chosen.');
-    else if (!named.some((g) => g.groupId === groupId)) errors.push('No such group on this activity.');
+    if (!groupId) errors.push('group-required');
+    else if (!named.some((g) => g.groupId === groupId)) errors.push('no-such-group');
   } else if (groupId) {
-    errors.push('This activity runs one pool, so there is no group to choose.');
+    errors.push('no-groups-to-choose');
   }
   return errors;
 }

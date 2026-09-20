@@ -111,14 +111,13 @@ function bookableDates(activity, groupId) {
     .map((r) => r.date);
 }
 
+// ⚠ A KEY, NOT A SENTENCE — see submissionErrors() in _registration.js, for
+// the same reason: a pure rule module has no reader and so has no language.
+// The three refusals live in _family-errors.js and are rendered by the caller.
 function validate(activity, sessionDate) {
-  if ((activity && activity.type) !== 'dropin') {
-    return 'Sessions are booked one at a time only on a pay-per-session activity.';
-  }
-  if (!ISO_DATE.test(String(sessionDate || ''))) return 'A session is identified by its date.';
-  if (bookableDates(activity).indexOf(sessionDate) === -1) {
-    return 'This activity does not meet on that date.';
-  }
+  if ((activity && activity.type) !== 'dropin') return 'dropin-only';
+  if (!ISO_DATE.test(String(sessionDate || ''))) return 'session-needs-a-date';
+  if (bookableDates(activity).indexOf(sessionDate) === -1) return 'not-a-meeting-date';
   return null;
 }
 

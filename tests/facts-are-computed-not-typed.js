@@ -115,21 +115,21 @@ F.FACT_ORDER.forEach((key) => {
 const D12 = { sessionCount: 12, sessionMinutes: 90 };
 H.eq(JSON.stringify(F.priceRows(ACT.facts.price, 'he', D12)),
   JSON.stringify([
-    { label: 'דמי הרשמה', note: '', value: '50 €' },
-    { label: 'עלות לשיעור', note: '', value: '15 €' },
-    { label: 'עלות לסמסטר', note: '(12 מפגשים × 2 שיעורים)', value: '360 €' }
+    { key: 'fee', label: 'דמי הרשמה', note: '', value: '50 €' },
+    { key: 'lesson', label: 'עלות לשיעור', note: '', value: '15 €' },
+    { key: 'term', label: 'עלות לסמסטר', note: '(12 מפגשים × 2 שיעורים)', value: '360 €' }
   ]), 'price in Hebrew, three rows');
 H.eq(JSON.stringify(F.priceRows(ACT.facts.price, 'en', D12)),
   JSON.stringify([
-    { label: 'Registration fee', note: '', value: '50 €' },
-    { label: 'Cost per lesson', note: '', value: '15 €' },
-    { label: 'Cost per semester', note: '(12 sessions × 2 lessons)', value: '360 €' }
+    { key: 'fee', label: 'Registration fee', note: '', value: '50 €' },
+    { key: 'lesson', label: 'Cost per lesson', note: '', value: '15 €' },
+    { key: 'term', label: 'Cost per semester', note: '(12 sessions × 2 lessons)', value: '360 €' }
   ]), 'price in English');
 H.eq(JSON.stringify(F.priceRows(ACT.facts.price, 'ru', D12)),
   JSON.stringify([
-    { label: 'Регистрационный взнос', note: '', value: '50 €' },
-    { label: 'Стоимость урока', note: '', value: '15 €' },
-    { label: 'Стоимость семестра', note: '(12 занятий × 2 урока)', value: '360 €' }
+    { key: 'fee', label: 'Регистрационный взнос', note: '', value: '50 €' },
+    { key: 'lesson', label: 'Стоимость урока', note: '', value: '15 €' },
+    { key: 'term', label: 'Стоимость семестра', note: '(12 занятий × 2 урока)', value: '360 €' }
   ]), 'price in Russian');
 
 // The qualifier is its OWN field, not glued onto the label. It renders as a
@@ -170,7 +170,7 @@ H.ok(F.formatPrice({ registrationFee: 50, fullPrice: 360 }, 'en', D12).indexOf('
      'nor in the one-string form, which is derived from the same rows');
 // Every row is conditional, so this is the shape for every activity.
 H.eq(JSON.stringify(F.priceRows({ fullPrice: 360 }, 'en', {})),
-     JSON.stringify([{ label: 'Cost per semester', note: '', value: '360 €' }]),
+     JSON.stringify([{ key: 'term', label: 'Cost per semester', note: '', value: '360 €' }]),
      'an activity with only a full price renders one row');
 H.eq(JSON.stringify(F.priceRows({}, 'en', {})), '[]', 'and one with no price says nothing');
 // The qualifier appears only when a session divides into whole lessons.

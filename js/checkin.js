@@ -122,7 +122,13 @@
   function post(payload) {
     return fetch(API, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(Object.assign({ token: token }, payload))
+      // ⚠ `lang` IS THE ONE ON SCREEN, and here that is the one the reader just
+      // chose with the toggle rather than the one in the URL — this page has no
+      // language in its URL, because a code on a wall cannot be three posters.
+      // Sent on every call, from this one place, so the refusals come back in
+      // the language the rest of the screen is in. It is read live rather than
+      // captured, so switching language and tapping again switches both.
+      body: JSON.stringify(Object.assign({ token: token, lang: lang }, payload))
     }).then(function (res) {
       return res.json().catch(function () { return {}; })
         .then(function (d) { return { ok: res.ok && d.ok !== false, status: res.status, data: d }; });
