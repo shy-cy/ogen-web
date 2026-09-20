@@ -71,6 +71,15 @@ sitemap.xml, robots.txt
 Homepage sections, in order: `hero` → `about` → `offer` (4 cards + "coming soon"
 banner) → `why-ogen` → `vision` → `contact`.
 
+⚠ **The hero button goes to `/activities`, not to `#offer`.** It pointed at the
+four themed teaser cards further down the same page — which is not the list, and
+is what the reader is about to scroll past anyway. That is word for word the
+reason **"What We Offer" left the menu**, and the button was left behind: the
+most pressed control on the site promising "our programs" and delivering a jump
+to a section. The `#offer` section itself is untouched in all three languages; it
+simply is not what the button is for. Each tree's button points inside its own
+tree, and a test pins all three.
+
 ## Shared chrome is JS-injected
 
 Page files contain **only their own body copy**. The nav, footer, and contact
@@ -2152,16 +2161,33 @@ itself: the avatar or icon stays, still a reachable target and still saying whic
 state you are in. The hamburger entry carries the words, and now says "Sign in"
 when signed out rather than always offering the same phrase.
 
-### `?next=` is an open redirect waiting to happen
+### ⚠ The chip goes to the family area, and `?next=` is gone
 
-The chip carries the current page into the sign-in link, so signing in from an
-activity page returns you to it. `nextTarget()` in `js/member-account.js`
-therefore follows **only a path on this site**: it must start with a single slash
-and not a second slash or a backslash. An absolute or protocol-relative value
-would make a link that looks like ogen.cy, asks for a password, and lands
-somewhere else — and it is followed immediately after somebody types one. The
-guard is one line, which is exactly the kind of line that gets "simplified"
-later, so the test exercises it rather than reading it.
+It carried `?next=<the page you were on>`, so signing in from the homepage
+signed you in and **put you back on the homepage**. That was built as a courtesy
+and is the wrong one: the chip is labelled **My family**, and pressing it is a
+request to go there, not a request to stay where you are. Somebody who has just
+typed a password is looking for the thing they pressed, and being returned to
+the page they left reads as a sign-in that did not take.
+
+The one case "come back to where you were" genuinely serves — pressing Register
+on an activity page — **never used it**: that goes to
+`/account/activity?register=<slug>`, which is already the right page, and
+`boot()` simply draws it once signed in. So the parameter was solving a problem
+solved better elsewhere while being wrong for the only path that used it.
+
+**Removing it removed an open redirect with it.** `next` arrived in a URL anyone
+could write and was followed the instant a password was typed, so an absolute or
+protocol-relative value would have made a link that looks like ogen.cy, asks for
+a password and lands somewhere else. It needed a one-line guard, and a one-line
+guard is exactly what gets simplified away later. Nothing sets it and nothing
+reads it now, so there is nothing to guard — and the test checks **both halves**,
+because either one alone is worse than neither: a generator with no consumer is
+dead copy, and a consumer with no generator is a redirect anyone can still reach
+by typing the parameter.
+
+Signing in re-runs `boot()`, which draws whichever account view the reader is on.
+That is the right answer every time.
 
 ### The initial comes from a cached name
 

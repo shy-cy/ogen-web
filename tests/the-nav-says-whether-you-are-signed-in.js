@@ -23,10 +23,22 @@
 //      What DOES mirror is the inside of the chip: the avatar sits at the
 //      reading start, and the exit arrow points the way the language reads.
 //
-//   3. `next` IS AN OPEN REDIRECT WAITING TO HAPPEN. It arrives in a URL anyone
-//      can write, and it is followed straight after somebody types a password.
-//      An absolute or protocol-relative value would make a link that looks like
-//      ogen.cy, asks for a password, and lands somewhere else.
+//   3. THE CHIP GOES TO THE FAMILY AREA, AND NOWHERE ELSE. It used to carry
+//      `?next=<the page you were on>`, so signing in from the homepage signed
+//      you in and put you back on the homepage — a control labelled MY FAMILY
+//      that does not take you to your family reads as a sign-in that did not
+//      take. The one case "come back to where you were" genuinely serves,
+//      pressing Register on an activity page, never used it: that goes to
+//      /account/activity?register=<slug>, which is already the right page.
+//
+//      Removing it removed an open redirect with it. `next` arrived in a URL
+//      anyone could write and was followed the instant a password was typed, so
+//      an absolute or protocol-relative value would have made a link that looks
+//      like ogen.cy, asks for a password and lands somewhere else. It needed a
+//      one-line guard; a one-line guard is what gets simplified away later. A
+//      parameter nobody sets and nobody reads needs none, and THAT is what this
+//      now checks — the absence, in both halves, because removing only one end
+//      would leave the surface with none of the benefit.
 //
 //   4. THREE LANGUAGES OR NONE. A missing key renders `undefined` into the nav
 //      of every page in that language.
@@ -124,25 +136,22 @@ H.eq(he.account, 'אזור המשפחה', 'and the signed-in label is "My family
 H.eq(tableFor('en').account, 'My family', 'in English');
 H.eq(tableFor('ru').account, 'Моя семья', 'and in Russian');
 
-console.log('\n[`next` cannot leave this site]');
-// Exercised rather than read: the guard is one line and one line is exactly what
-// gets "simplified" later.
-const ctx = { location: { search: '' }, out: null };
-const fn = new Function('param', `
-  ${strip(account).match(/function nextTarget\(\)\s*\{[\s\S]*?\n  \}/)[0]}
-  return nextTarget;`);
-const cases = [
-  ['/activities/hebrew4kids', '/activities/hebrew4kids', 'a path on this site is followed'],
-  ['/en/account?register=x', '/en/account?register=x', 'with its query intact'],
-  ['//evil.example/login', null, 'a PROTOCOL-RELATIVE url is refused — it is another host'],
-  ['https://evil.example', null, 'and so is an absolute one'],
-  ['/\\evil.example', null, 'and a backslash, which some browsers read as a slash'],
-  ['', null, 'nothing is nothing']
-];
-cases.forEach(([raw, want, why]) => {
-  const nextTarget = fn(() => (raw === '' ? null : raw));
-  H.eq(nextTarget(), want, why);
-});
+console.log('\n[`next` is gone from both halves, so there is nothing to redirect]');
+// Both ends, because either one alone is worse than neither: a generator with no
+// consumer is dead copy, and a consumer with no generator is an open redirect
+// anyone can still reach by typing the parameter.
+H.ok(!/next=/.test(navCode), 'the chip does not build a next parameter');
+H.ok(/const signInHref = base \+ '\/account';/.test(navCode),
+  'it goes to the family area, which is what it is labelled');
+const bare = strip(account);
+H.ok(!/nextTarget|goNext/.test(bare), 'and the family area no longer has anything that follows one');
+H.ok(!/param\('next'\)/.test(bare), 'nor reads it at all');
+// The property that replaces the guard: signing in redraws whichever account
+// view the reader is on, so the register flow still lands where it should.
+H.ok(/if \(opts\.onSignedIn\) return opts\.onSignedIn\(res\.data\.account\);\s*\n\s*boot\(\);/.test(bare),
+  'signing in re-boots the view the reader is already on');
+H.eq((bare.match(/boot\(\);/g) || []).length >= 3, true,
+  'from sign-in, from sign-up, and on load');
 
 console.log('\n[signing out drops the token before it tells anyone]');
 const signOut = navCode.slice(navCode.indexOf('window.ogenSignOut'));

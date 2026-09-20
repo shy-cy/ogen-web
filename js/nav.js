@@ -117,12 +117,27 @@
       }
     } catch (err) { /* corrupt or unavailable storage reads as signed out */ }
 
-    // Where to come back to. An account page is excluded, or signing in would
-    // send you back to the sign-in form you just used.
-    const onAccount = /^(?:\/(?:en|ru))?\/account(?:\/|$|\.html)/.test(location.pathname);
-    const here = location.pathname + location.search + location.hash;
-    const signInHref = base + '/account' +
-      (onAccount ? '' : '?next=' + encodeURIComponent(here));
+    // ⚠ IT GOES TO THE FAMILY AREA, AND NOWHERE ELSE.
+    //
+    // This carried `?next=<the page you were on>`, so signing in from the
+    // homepage signed you in and put you back on the homepage. That was built
+    // as a courtesy and is the wrong one: this chip is labelled MY FAMILY, and
+    // pressing it is a request to go there — not a request to stay where you
+    // are. Somebody who has just typed a password is looking for the thing they
+    // pressed, and being returned to the page they left reads as a sign-in that
+    // did not take.
+    //
+    // The one case "come back to where you were" genuinely serves — pressing
+    // Register on an activity page — never used this: it goes to
+    // /account/activity?register=<slug>, which is already the right page, and
+    // signing in there simply draws it. So the parameter was solving a problem
+    // that was solved better elsewhere, while being wrong for the only path
+    // that used it.
+    //
+    // Removing it also removes an open redirect: `next` arrived in a URL anyone
+    // could write and was followed immediately after a password was typed, so
+    // it needed a guard. A parameter nobody sets and nobody reads needs none.
+    const signInHref = base + '/account';
 
     const esc = (v) => String(v).replace(/[&<>"]/g, (c) =>
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));

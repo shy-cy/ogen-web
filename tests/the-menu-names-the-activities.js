@@ -98,6 +98,22 @@ H.ok(/id="offer"/.test(read('index.html')), 'the #offer section is still on the 
 H.ok(/id="offer"/.test(read('en/index.html')) && /id="offer"/.test(read('ru/index.html')),
   'and on the other two');
 
+console.log('\n[and the hero button makes the same promise the menu entry did]');
+// ⚠ THE SAME BUG, ONE FLOOR DOWN. "Discover our programs" / התוכניות שלנו /
+// Наши программы pointed at #offer — four themed teaser cards on the page the
+// reader is already on, which is not the list and is what they are about to
+// scroll past anyway. That is word for word the reason "What We Offer" left the
+// menu, and the button was left behind. It is the most pressed control on the
+// site and it led to a section rather than to the activities.
+[['index.html', '/activities'],
+ ['en/index.html', '/en/activities'],
+ ['ru/index.html', '/ru/activities']].forEach(([file, href]) => {
+  const hero = read(file);
+  const cta = /<a href="([^"]+)" class="btn-primary">/.exec(hero);
+  H.ok(!!cta, file + ' has a hero button');
+  H.eq(cta[1], href, file + ': it goes to the activities listing, in its own tree');
+});
+
 console.log('\n[the CSS mirrors on its own]');
 const css = read('shared.css');
 // Sliced from the first DECLARATION, not from the comment above it — starting

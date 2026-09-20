@@ -462,18 +462,21 @@
   // make this an open redirect: a link that looks like ogen.cy, asks for a
   // password, and lands somewhere else. It must start with a single slash and
   // nothing more.
-  function nextTarget() {
-    var raw = param('next');
-    if (!raw) return null;
-    if (raw.charAt(0) !== '/' || raw.charAt(1) === '/' || raw.charAt(1) === '\\') return null;
-    return raw;
-  }
-  function goNext() {
-    var target = nextTarget();
-    if (!target) return false;
-    window.location.href = target;
-    return true;
-  }
+  // ⚠ THERE IS NO `next` PARAMETER, and its absence is the feature.
+  //
+  // Signing in used to follow `?next=<path>`, set by the nav chip, so somebody
+  // who pressed a control labelled MY FAMILY on the homepage signed in and
+  // landed back on the homepage. boot() re-renders whichever account view the
+  // reader is actually on, which is the right answer every time: the chip goes
+  // to /account and draws the dashboard, and the register flow goes to
+  // /account/activity?register=<slug> and draws that.
+  //
+  // It also carried an open redirect. `next` arrived in a URL anyone could
+  // write and was followed the instant a password was typed, so an absolute or
+  // protocol-relative value would have made a link that looks like ogen.cy,
+  // asks for a password and lands elsewhere. That needed a one-line guard, and
+  // a one-line guard is exactly what gets simplified away later. Nothing sets
+  // the parameter and nothing reads it now, so there is nothing to guard.
   // Every internal link is built from the tree prefix, never from a hardcoded
   // '/account' — in Hebrew the prefix is '' and in the other two it is '/en' or
   // '/ru', so one helper keeps a reader inside the language they are reading.
@@ -899,7 +902,6 @@
           if (!res.ok) return say('err', failure(res));
           window.MemberSession.set(sessionFor(res.data));
           if (opts.onSignedIn) return opts.onSignedIn(res.data.account);
-          if (goNext()) return;
           boot();
         });
     } }, [e1.row, p1.row, go]);
@@ -965,7 +967,6 @@
         // easier to build.
         window.MemberSession.set(sessionFor(res.data));
         if (opts.onSignedIn) return opts.onSignedIn(res.data.account);
-        if (goNext()) return;
         boot();
       });
     } }, [f.row, l.row, ph.row, e1.row, p1.row,
