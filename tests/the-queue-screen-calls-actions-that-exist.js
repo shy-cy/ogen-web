@@ -7,9 +7,25 @@
 // the same shape as the read-back bug the field groups already have a test for —
 // the form draws, the admin types, the save succeeds, and the value is gone.
 //
-// So the two halves are checked against each other mechanically. The screen may
-// use fewer actions than the server offers; it may never use one the server does
-// not have.
+// So the two halves are checked against each other mechanically.
+//
+// ⚠ AND IT IS CHECKED IN BOTH DIRECTIONS NOW, because the other one is how a
+// feature goes missing. This file used to say, in a comment, "the reverse is NOT
+// required: an endpoint may offer more than one screen uses, and moveGroup has
+// no control yet" — and that sentence sat there while FOUR actions accumulated
+// behind it with nothing calling them. A missing button is silent in a way a
+// missing endpoint is not: nobody presses it, nothing 400s, and the capability
+// is simply absent from the product while the code for it is in the repository
+// and passing its tests.
+//
+// moveGroup was the expensive one. Correcting a child's group had no control at
+// all, so the only route was to cancel and re-register — which writes a credit,
+// sends a cancellation email and re-freezes the price, all to fix a dropdown.
+//
+// An action with no caller is allowed, and it has to be NAMED here. That is the
+// whole mechanism: writing the endpoint is no longer enough to consider the
+// thing built, and the next one added either gets a control or gets a line in
+// UNREACHED saying why not.
 //
 // The second half is the LEGAL GATE, and it is the more important one. The
 // family-facing area is held behind ogen-legal-review until the Russian legal
@@ -55,9 +71,72 @@ H.ok(sent.size >= 6, 'the screen sends a real set of actions (' + Array.from(sen
 Array.from(sent).sort().forEach((a) => {
   H.ok(handled.has(a), 'the server handles "' + a + '"');
 });
-// The reverse is NOT required: an endpoint may offer more than one screen uses,
-// and moveGroup has no control yet.
-H.ok(handled.size >= sent.size, 'and may offer more than the screen uses');
+console.log('\n[and every action the server handles, something can reach]');
+// Deliberately unreachable, each with the reason. Shrinking this list is the
+// point; growing it is a decision somebody has to write down.
+const UNREACHED = {
+  // Not a queue action at all — the shape of the reply to an unknown one.
+  auth: 'the session handshake, called on load rather than from a control',
+  // The drop-in register and its money. There IS no admin screen for an evening
+  // yet: attendance is written by the QR check-in page and nothing else, so a
+  // teacher with no signal cannot take the register. A real gap, not a decision.
+  register: 'NO SCREEN YET — the evening register an admin would open on the night',
+  markAttendance: 'NO SCREEN YET — today only the QR check-in page marks anybody present',
+  recordSessionPayment: 'NO SCREEN YET — cash for one evening cannot be recorded'
+};
+// ⚠ NAMED, not only sent as `action: '…'`. Three of them travel differently:
+// approve goes through act('approve', …) as a bare argument, and the two
+// previews sit in a config object beside the action they preview. An extractor
+// that only knew the one spelling would have reported all three as unreachable
+// and taught whoever read it to widen the allowlist rather than the regex.
+const named = (a) => sent.has(a) || screen.indexOf("'" + a + "'") !== -1;
+const orphans = Array.from(handled).filter((a) => !named(a) && !UNREACHED[a]).sort();
+H.eq(orphans.join(', '), '',
+  'no action is handled by the server with nothing able to reach it' +
+  (orphans.length ? ' — found: ' + orphans.join(', ') : ''));
+// And the list cannot rot in the other direction: an entry that has since been
+// wired up must come off it, or it hides the next one.
+Object.keys(UNREACHED).sort().forEach((a) => {
+  H.ok(handled.has(a), 'the unreachable list names a real action: ' + a);
+});
+H.eq(Object.keys(UNREACHED).filter((a) => named(a) && a !== 'auth').join(', '), '',
+  'and nothing on it is actually reachable — a stale entry hides the next gap');
+console.log('  ..   ' + Object.keys(UNREACHED).filter((a) => a !== 'auth').length +
+            ' server actions have no control anywhere:');
+Object.keys(UNREACHED).forEach((a) => {
+  if (a !== 'auth') console.log('       ' + a + ' — ' + UNREACHED[a]);
+});
+
+console.log('\n[moving a group is a correction, not a cancellation]');
+// ⚠ THE ONLY ROUTE WAS TO CANCEL AND RE-REGISTER, which writes a credit, sends
+// a cancellation email and re-freezes the price at today's figure — all real,
+// none of it wanted, to fix a dropdown somebody picked wrong. The endpoint was
+// there the whole time; nothing called it.
+H.ok(/action: 'moveGroup', slug: S\.slug/.test(screen), 'the screen calls moveGroup');
+H.ok(/function groupCell\(r\)/.test(screen), 'from the Group cell, which is the control');
+H.ok(/el\('td', \{\}, \[groupCell\(r\)\]\)/.test(screen), 'and the cell is drawn from it');
+const cell = screen.slice(screen.indexOf('function groupCell'), screen.indexOf('function actions'));
+// Cosmetic, like every permission check on this side — the server re-decides.
+H.ok(/!S\.canApprove/.test(cell), 'a role that may not decide gets the name, not a select');
+H.ok(/status === 'pending' \|\| r\.status === 'approved'/.test(cell),
+  'and so does a registration that is over — moving one rewrites a record about a place that has gone');
+H.ok(/!named\.length/.test(cell), 'a pooled activity has no groups to choose between');
+H.ok(/disabled: full \|\| null/.test(cell), 'a full group is offered and disabled, never hidden');
+H.ok(/loadQueue\(S\.slug\)/.test(cell),
+  'a move redraws the whole queue — the capacity line counts both groups and would otherwise disagree');
+H.ok(/sel\.value = r\.groupId \|\| ''/.test(cell),
+  'and a refusal puts the select back, or the screen claims a move the server declined');
+// The server half: the room check must exclude the registration being moved, or
+// a group is full of the very person trying to leave it.
+const move = server.slice(server.indexOf("case 'moveGroup'"), server.indexOf("case 'register'"));
+H.ok(/!\(r\.participantId === reg\.participantId && r\.activityId === reg\.activityId\)/.test(move),
+  'the room check excludes the registration being moved');
+H.ok(/canApprove\(session\)/.test(move), 'and the action is refused without the approve axis');
+// A history entry nobody can read is not a record. It said "moved to grp-1f3a9c".
+H.ok(/note: 'moved group: ' \+ moved/.test(move), 'the history names the move');
+H.ok(/const moved = \(name\(from\) \|\| '\\u2014'\)/.test(move),
+  'naming BOTH groups — "moved to Advanced" with no "from" is half a record');
+H.ok(!/'moved to ' \+ body\.groupId/.test(move), 'and never an id, which is the one spelling nobody can resolve');
 
 console.log('\n[the money controls are behind the cancel axis, on both sides]');
 // Reading a ledger is `access`; moving money is `cancel`. The client greys the

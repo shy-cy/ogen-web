@@ -311,6 +311,21 @@ input:disabled,textarea:disabled,select:disabled{background:#f2f0ea;color:#8b8b8
 .queue .num{font-variant-numeric:tabular-nums;white-space:nowrap;}
 .queue .who b{display:block;}
 .queue .who span{color:var(--muted);font-size:12px;}
+/* Moving a child between named groups. It is a select rather than a button,
+   because the whole action is choosing one of two or three things — a button
+   here would open a dialog whose only content is this control. It carries no
+   colour: recolouring it would put a third kind of emphasis in a row that
+   already has an approve button and an age flag, and correcting a group is
+   ordinary work rather than a decision. */
+.queue select.group-move{
+  font:inherit;font-size:13px;max-width:170px;
+  padding:5px 8px;border:1px solid var(--stone);border-radius:6px;
+  background:#fff;color:var(--ink);cursor:pointer;
+}
+.queue select.group-move:hover:not(:disabled){border-color:var(--camel);}
+.queue select.group-move:focus-visible{outline:2px solid var(--terracotta);outline-offset:1px;}
+.queue select.group-move:disabled{opacity:.5;cursor:progress;}
+
 .queue .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
 .queue .acts button{
   font-family:inherit;font-size:12px;font-weight:700;padding:5px 10px;border-radius:6px;

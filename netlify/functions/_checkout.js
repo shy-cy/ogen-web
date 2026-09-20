@@ -97,7 +97,21 @@ async function build({ lang, email, lines, back, meta }) {
         product_data: { name: l.name, description: l.description || undefined }
       }
     })),
-    success_url: back + (back.indexOf('?') === -1 ? '?' : '&') + 'paid=1',
+    // ⚠ IT NAMES WHAT WAS PAID FOR, and that is not decoration.
+    //
+    // This was `paid=1`, and for a while nothing read it at all: a family came
+    // back from a completed Checkout to a page that said nothing and, if the
+    // webhook had not landed yet, still showed the old figures. The page has to
+    // acknowledge the payment AND wait for the record to catch up — and to wait
+    // it has to know what to watch, because the three kinds settle into three
+    // different places. A registration debt falls, an evening's debt falls, and
+    // a bundle simply appears with nothing outstanding either side of it.
+    //
+    // The kind is already decided — it is the discriminator the webhook
+    // dispatches on — so it travels rather than being guessed at the other end.
+    // See paidWatch() in js/member-account.js.
+    success_url: back + (back.indexOf('?') === -1 ? '?' : '&')
+               + 'paid=' + encodeURIComponent((meta && meta.ogen_kind) || '1'),
     cancel_url: back,
     // Tagged on the SESSION and mirrored onto the PaymentIntent. The account is
     // shared with another organisation, so an untagged object is

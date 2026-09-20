@@ -131,6 +131,79 @@
     return el('div', {}, out);
   }
 
+  // ⚠ CORRECTING A GROUP MUST NOT MOVE MONEY, and until now it did.
+  //
+  // A child put in Beginners who belongs in Advanced is an ordinary thing to
+  // happen at a community centre, and there was no control for it anywhere — so
+  // the only route was to cancel the registration and register again. That
+  // writes a credit, sends a cancellation email, re-freezes the terms at today's
+  // price and re-decides the yearly fee. All of it real, none of it wanted, to
+  // fix a dropdown somebody picked wrong.
+  //
+  // The server action existed the whole time with nothing calling it. The
+  // select IS the control — a button opening a dialog to choose from two
+  // options is a dialog for a select.
+  //
+  // Everything here is cosmetic and the server re-decides all of it: the same
+  // `canApprove` gate, and a room check that EXCLUDES the registration being
+  // moved, so moving within a full group is not refused by its own occupant.
+  function groupCell(r) {
+    var named = (S.queue && S.queue.capacity && S.queue.capacity.named) || [];
+    var live = r.status === 'pending' || r.status === 'approved';
+
+    // Pooled activity, a role that may not decide, or a registration that is
+    // over: the frozen name, as before. Moving somebody whose place no longer
+    // exists would rewrite a record about a group they are not in.
+    if (!named.length || !S.canApprove || !live) {
+      return el('span', { text: r.groupName ? titleOf(r.groupName, r.groupId) : '—' });
+    }
+
+    var sel = el('select', { class: 'group-move' });
+
+    // A place taken while the activity was still pooled carries no group. It is
+    // shown and cannot be chosen BACK — moveGroup requires a real group, and
+    // there is deliberately no way to un-assign one.
+    if (!r.groupId) {
+      sel.appendChild(el('option', { value: '', selected: true, disabled: true, text: '— not in a group' }));
+    }
+
+    named.forEach(function (g) {
+      var mine = g.groupId === r.groupId;
+      // `left` already excludes nothing, so the group this row is IN reads one
+      // lower than it will after a move out of it. That only matters for a
+      // group somebody is leaving, which is never the one being disabled.
+      var full = !mine && g.left != null && g.left <= 0;
+      sel.appendChild(el('option', {
+        value: g.groupId, selected: mine || null, disabled: full || null,
+        text: titleOf(g.name, g.groupId) +
+              (g.capacity == null ? '' : ' · ' + Math.max(0, g.left) + ' left') +
+              (full ? ' · full' : '')
+      }));
+    });
+
+    sel.addEventListener('change', function () {
+      var to = sel.value;
+      if (!to || to === r.groupId) return;
+      sel.disabled = true;
+      send({ action: 'moveGroup', slug: S.slug,
+             participantId: r.participantId, groupId: to })
+        .then(function (res) {
+          if (!res.ok) {
+            sel.disabled = false;
+            // Put it back, or the screen claims a move the server refused.
+            sel.value = r.groupId || '';
+            return message('err', (res.data && res.data.error) || 'That did not work');
+          }
+          message('ok', 'Moved · ' + r.name);
+          // The whole queue, not the one row: the capacity line above the table
+          // counts both groups and would otherwise disagree with the select
+          // that just changed.
+          loadQueue(S.slug);
+        });
+    });
+    return sel;
+  }
+
   function actions(r) {
     var live = r.status === 'pending' || r.status === 'approved';
     var decidable = ['pending', 'approved', 'rejected', 'expired'].indexOf(r.status) !== -1;
@@ -186,7 +259,7 @@
           r.stillExists ? null : el('span', { class: 'flag', text: 'participant deleted' })
         ]),
         el('td', {}, [ageCell(r)]),
-        el('td', { text: r.groupName ? titleOf(r.groupName, r.groupId) : '—' }),
+        el('td', {}, [groupCell(r)]),
         el('td', {}, [
           el('span', { class: 'pill ' + r.status, text: r.status }),
           r.autoApproved ? el('div', {}, [el('span', { class: 'why', text: 'automatic' })]) : null

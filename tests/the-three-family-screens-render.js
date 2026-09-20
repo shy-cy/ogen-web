@@ -161,10 +161,16 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
   // was: pressed Create account, nothing happened. It is scrolled into view now,
   // and announced.
   const src = fs.readFileSync(path.join(R, 'js/member-account.js'), 'utf8');
-  H.ok(/function say\(kind, text\)[\s\S]{0,420}scrollIntoView/.test(src),
+  H.ok(/function say\(kind, text, sticky\)[\s\S]{0,420}scrollIntoView/.test(src),
     'every notice is brought into view — the button and the message are a screen apart');
-  H.ok(/function say\(kind, text\)[\s\S]{0,420}aria-live/.test(src),
+  H.ok(/function say\(kind, text, sticky\)[\s\S]{0,420}aria-live/.test(src),
     'and announced, because off-screen and unannounced are the same failure twice');
+  // ⚠ AND IT STILL CLEARS ITSELF BY DEFAULT. `sticky` is an opt-in for the one
+  // message that has to outlast the wait it describes; every other 'ok' notice
+  // goes away on its own, and a flag that reversed that default would leave
+  // stale confirmations on screen across a dozen forms.
+  H.ok(/if \(kind === 'ok' && !sticky\)/.test(src),
+    'and an ok notice still clears itself unless a caller asks otherwise');
 
   console.log('[the wait has a shape]');
   // ⚠ DRAWN BEFORE THE REQUEST LEAVES. The wait used to be the word "Loading…"
@@ -404,6 +410,44 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
   // The NAME is not translated — it is whatever the family typed, in whatever
   // script they typed it in, and it appears verbatim in all three trees.
   H.ok(has(dom, 'Noa Levi נרשם/ה.'), 'and the gender-neutral form the emails already use');
+
+  console.log('\n[coming back from a completed Checkout]');
+  // ⚠ THE PAGE SAID NOTHING. Stripe redirects to ?paid=<kind> and nothing read
+  // it, so a family who had just paid €350 landed on a card reading "Still to
+  // pay €350.00" with no acknowledgement — which is indistinguishable from a
+  // payment that failed. And the redirect fires the moment the card clears,
+  // routinely BEFORE the webhook that settles the record, so simply printing
+  // "paid" would have been the other half of the same lie.
+  dom = await screen({ view: 'activity', lang: 'en', search: '?p=p-2&a=act-1&paid=registration' });
+  H.ok(has(dom, 'Payment received. Thank you!'),
+    'a payment already settled when the reader arrives is acknowledged at once');
+  H.ok(!/paid=/.test(dom.window.location.search),
+    'and the parameter is dropped, so a reload does not announce the same payment again');
+
+  // Nothing owed on the record yet: the webhook has not landed. The page must
+  // say so rather than show the old figure in silence.
+  dom = await screen({ view: 'activity', lang: 'en', search: '?p=p-2&a=act-4&paid=registration' });
+  H.ok(has(dom, 'Payment received'), 'an unsettled one is acknowledged too');
+  H.ok(has(dom, 'we are recording it'), 'and says the figures are about to move');
+  H.ok(!has(dom, 'Thank you!'), 'without claiming it is done');
+  H.ok(/paid=/.test(dom.window.location.search),
+    'and keeps the parameter while it waits, so a redraw re-enters the wait');
+
+  // The ordinary visit, which is every visit but one.
+  dom = await screen({ view: 'activity', lang: 'en', search: '?p=p-2&a=act-1' });
+  H.ok(!has(dom, 'Payment received'), 'a page opened without the parameter says nothing about payment');
+
+  // The kind travels because the three settle in three different places, and a
+  // page that guessed would watch the wrong one.
+  const checkout = read('netlify/functions/_checkout.js');
+  H.ok(/'paid=' \+ encodeURIComponent\(\(meta && meta\.ogen_kind\) \|\| '1'\)/.test(checkout),
+    'the success URL names what was paid for, from the webhook\'s own discriminator');
+  H.ok(/registration: \{ read: owedOnReg, falls: true \}/.test(memberAccount),
+    'a registration debt is watched by the figure falling');
+  H.ok(/bundle: \{ read: bundleCount, falls: false \}/.test(memberAccount),
+    'and a bundle by the list changing — it has no figure to fall');
+  H.ok(/if \(paidTries >= PAID_TRIES\)/.test(memberAccount),
+    'the wait is bounded rather than polling for ever');
 
   console.log('\n[the family area answers "what else is there", not only "what am I in"]');
   // ⚠ IT HAD NO ANSWER AT ALL. The dashboard listed what you are registered to

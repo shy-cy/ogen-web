@@ -2794,6 +2794,49 @@ appears on neither list, because picking the wrong reader is invisible. It also
 checks the property behind the list: nothing on the cached side saves a record or
 opens a Checkout.
 
+### ⚠ Coming back from a completed Checkout
+
+`?paid=<kind>` is set on Stripe's `success_url`, and it means one thing and not
+the other: **somebody has just come back from Checkout**. It is not proof of
+payment &mdash; a person can type it &mdash; and Stripe redirects the moment the
+card clears, which is routinely **before** the webhook that settles the record.
+The webhook is the only thing here that moves money.
+
+For a release **nothing read the parameter at all**. A family who had just paid
+&euro;350 was returned to a card reading *"Still to pay &euro;350.00"* with no
+acknowledgement and no explanation, which is indistinguishable from a payment
+that failed. Printing "paid" on arrival would have been the other half of the
+same lie, because the figure underneath can still be the old one.
+
+So the URL opens the question and **the payload answers it**. Three kinds settle
+into three different places, which is why the kind travels rather than being
+guessed &mdash; it is the same discriminator the webhook dispatches on:
+
+| `paid=` | what moves |
+|---|---|
+| `registration` | a debt on the registration falls |
+| `session` | a debt on one or more evenings falls |
+| `bundle` | a bundle **appears**, with nothing outstanding either side of it |
+
+The first two are watched by the figure falling or reaching zero; the third has
+no figure, so it watches the bundle list change. Settled on arrival is
+acknowledged at once and the parameter is dropped from the URL, so a reload does
+not announce the same payment twice. Otherwise the page says it is being
+recorded, re-asks six times at 1.5s, and redraws the moment the figures move; the
+redraw re-enters the wait and `paidTries` survives it, so the wait is bounded
+whether the figures move once, partly, or not at all.
+
+⚠ **The bundle branch cannot read perfectly and says so.** If the webhook won the
+race the bundle is already listed on arrival and nothing will change, so the wait
+ends on the slow message &mdash; which is worded *"if the figures here have not
+caught up"* precisely so it is true in both cases rather than reporting a failure
+that did not happen.
+
+`say()` gained a `sticky` flag for this one caller: the recording message has to
+outlast the wait it describes, and saying it again on a timer would also scroll
+the page under the reader every few seconds. Every other `ok` notice still clears
+itself after five seconds, and a test pins that default.
+
 ### The wait has a shape
 
 Every screen here fetches, and the wait was the word "Loading…" on an otherwise
@@ -3401,6 +3444,42 @@ Four things it shows that are easy to get wrong:
 - **Whether the yearly fee was billed on this term**, beside the amount. An
   admin looking at a €300 next to a €350 should not have to open the other term
   to find out why.
+
+⚠ **The Group cell is a control, because correcting one must not move money.**
+A child put in Beginners who belongs in Advanced is ordinary, and there was no
+control for it anywhere &mdash; so the only route was to **cancel and register
+again**, which writes a credit, sends a cancellation email, re-freezes the terms
+at today's price and re-decides the yearly fee. All of it real, none of it
+wanted, to fix a dropdown. `moveGroup` had existed server-side the whole time
+with nothing calling it.
+
+It is a **select rather than a button**: the entire action is choosing one of two
+or three things, and a button here opens a dialog whose only content is this
+control. Cosmetic like every check on this side &mdash; a pooled activity, a role
+without `approve`, or a registration that is over gets the frozen name instead,
+and the server re-decides all three. A **full group is offered and disabled**
+rather than hidden, and the room check server-side **excludes the registration
+being moved**, or a group is full of the very person trying to leave it. A move
+redraws the whole queue, because the capacity line counts both groups.
+
+The history entry said `moved to grp-1f3a9c` &mdash; an id is the one spelling
+nobody reading a record months later can resolve, which is why `groupName` is
+frozen at all. It names **both** groups now: the frozen one on the way out and
+the activity's current one on the way in, which is correct rather than
+inconsistent.
+
+⚠ **And the parity test now runs in BOTH directions.** It checked that every
+action the screen sends exists on the server, and carried a comment saying the
+reverse was not required &mdash; while **four** actions accumulated behind that
+sentence with nothing calling them. A missing button is silent in a way a missing
+endpoint is not: nobody presses it, nothing 400s, and the capability is simply
+absent from the product while its code sits in the repository passing its tests.
+An unreachable action is allowed and has to be **named** in `UNREACHED` with its
+reason, so writing an endpoint is no longer enough to consider a thing built. It
+prints the remaining three on every run: `register`, `markAttendance` and
+`recordSessionPayment` &mdash; **there is no admin screen for an evening**, so
+attendance is written by the QR check-in page and nothing else, and a teacher
+with no signal cannot take the register.
 
 **Every money control lives in one panel, not on the row.** Money is its own
 permission axis, and the ledger is the context all three controls need: what a

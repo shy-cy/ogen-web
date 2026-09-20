@@ -95,6 +95,10 @@
 
       costTitle: 'מה זה עולה', stillToPay: 'נותר לתשלום', credited: 'זוכה',
       payNow: 'תשלום מאובטח', payOpening: 'פותח תשלום…',
+      paidThanks: 'התשלום התקבל. תודה!',
+      paidSettling: 'התשלום התקבל — אנחנו רושמים אותו. הסכומים כאן יתעדכנו עוד רגע.',
+      paidSlow: 'התשלום התקבל. הרישום לוקח עוד קצת זמן — אם הסכומים כאן עדיין לא '
+              + 'מתעדכנים, אפשר לרענן בעוד דקה, ואם גם אז לא, כתבו לנו.',
       waitLead: 'ההרשמה בוצעה — התשלום ייפתח בקרוב',
       waitBody: '{name} נרשם/ה. אנחנו משלימים כמה פרטים אחרונים, והתשלום ייפתח כאן. '
               + 'נעדכן אתכם במייל ברגע שאפשר.',
@@ -206,6 +210,12 @@
 
       costTitle: 'What it costs', stillToPay: 'Still to pay', credited: 'Credited',
       payNow: 'Pay securely', payOpening: 'Opening payment…',
+      paidThanks: 'Payment received. Thank you!',
+      paidSettling: 'Payment received \u2014 we are recording it. The figures here will '
+                  + 'update in a moment.',
+      paidSlow: 'Payment received. It is taking a little longer to record \u2014 if the '
+              + 'figures here have not caught up, reload in a minute, and write to us if '
+              + 'they still have not.',
       waitLead: 'Registered — payment opens soon',
       waitBody: '{name} is registered. We\u2019re confirming the last few details, and payment '
               + 'will open here. We\u2019ll email you the moment it does.',
@@ -317,6 +327,12 @@
 
       costTitle: 'Сколько это стоит', stillToPay: 'Осталось оплатить', credited: 'Зачислено',
       payNow: 'Оплатить', payOpening: 'Открываем оплату…',
+      paidThanks: 'Платёж получен. Спасибо!',
+      paidSettling: 'Платёж получен — мы его записываем. Суммы на этой странице обновятся '
+                  + 'через мгновение.',
+      paidSlow: 'Платёж получен. Запись занимает немного больше времени — если суммы здесь '
+              + 'не обновились, обновите страницу через минуту, а если и тогда нет, '
+              + 'напишите нам.',
       waitLead: 'Запись оформлена — оплата откроется скоро',
       waitBody: '{name} записан(а). Мы уточняем последние детали, оплата откроется здесь. '
               + 'Напишем вам, как только всё будет готово.',
@@ -623,14 +639,127 @@
   // into a node that was discarded in the same repaint. This carries it across.
   function flash(text) { S.flash = text; }
 
-  function say(kind, text) {
+  // `sticky` keeps an 'ok' notice up instead of clearing it after five seconds.
+  // One caller: the message shown while a payment is being recorded, which has
+  // to outlast the wait it is describing. Saying it again on a timer would work
+  // and would also scroll the page under the reader every few seconds.
+  function say(kind, text, sticky) {
     if (!notice) return;
     clear(notice);
     notice.setAttribute('aria-live', kind === 'err' ? 'assertive' : 'polite');
     notice.appendChild(el('p', { class: 'acc-notice is-' + kind, text: text }));
     if (notice.scrollIntoView) notice.scrollIntoView({ block: 'center' });
-    if (kind === 'ok') window.setTimeout(function () { if (notice) clear(notice); }, 5000);
+    if (kind === 'ok' && !sticky) {
+      window.setTimeout(function () { if (notice) clear(notice); }, 5000);
+    }
   }
+  // ⚠ COMING BACK FROM A COMPLETED CHECKOUT.
+  //
+  // `?paid=<kind>` is set on Stripe's success_url, so it means one thing and
+  // not the other: SOMEBODY HAS JUST COME BACK FROM CHECKOUT. It is not proof
+  // of payment — a person can type it — and, more to the point, Stripe
+  // redirects the moment the card clears, which is routinely BEFORE the webhook
+  // that settles the record has landed. The webhook is the only thing here that
+  // moves money.
+  //
+  // So the URL opens the question and the PAYLOAD answers it. Before this,
+  // nothing read the parameter at all: a family who had just paid €350 was
+  // returned to a page reading "Still to pay €350.00" with no acknowledgement
+  // and no explanation, which is indistinguishable from a payment that failed.
+  //
+  // Three kinds settle into three different places, which is why the kind
+  // travels rather than being guessed:
+  //
+  //   registration  a debt on the registration falls
+  //   session       a debt on one or more evenings falls
+  //   bundle        a bundle APPEARS, with nothing outstanding either side of it
+  //
+  // The first two are watched by the figure going down or reaching zero. The
+  // third has no figure to watch, so it watches the bundle list change — and
+  // that is the one case this cannot read perfectly: if the webhook won the race
+  // the bundle is already listed on arrival and nothing will change, so the
+  // wait ends on the slow message. Its wording is true either way, which is why
+  // it is phrased as "if it is not listed below" rather than as a failure.
+  var PAID_TRIES = 6;
+  var PAID_GAP_MS = 1500;
+
+  // What to watch, per kind. A number that is expected to FALL, or a count
+  // expected to CHANGE. Null means there is nothing sensible to watch and the
+  // acknowledgement is all a family gets.
+  function owedOnReg(d) {
+    var r = (d && d.registration) || {};
+    if (r.owedCents == null) return 0;
+    return Math.max(0, r.owedCents - (r.paidCents || 0) - (r.creditedCents || 0));
+  }
+  function owedOnSessions(d) {
+    var rows = (d && d.perSession && d.perSession.sessions) || [];
+    var total = 0;
+    rows.forEach(function (row) {
+      if (row.owedCents) total += Math.max(0, row.owedCents - (row.paidCents || 0));
+    });
+    return total;
+  }
+  function bundleCount(d) {
+    // `held`, which is what bundlesPayload() calls the list of bundles this
+    // participant owns — `offers` beside it is what they could buy, and that
+    // one changes for reasons nothing to do with a purchase.
+    var list = (d && d.perSession && d.perSession.held) || [];
+    // The LENGTH and the entries together: buying a second five-entry bundle
+    // when one is already held changes the count, and buying the first changes
+    // both. Either way this string moves when a purchase lands.
+    return list.length + ':' + list.reduce(function (n, b) { return n + (b.entries || 0); }, 0);
+  }
+  var PAID_WATCH = {
+    registration: { read: owedOnReg, falls: true },
+    session: { read: owedOnSessions, falls: true },
+    bundle: { read: bundleCount, falls: false }
+  };
+
+  var paidTries = 0;
+
+  // Called after each registration payload lands on the activity view. `again`
+  // redraws the page from scratch, which is what runs when the figures move.
+  function paidWatch(data, again) {
+    var kind = param('paid');
+    if (!kind) return;
+    var watch = PAID_WATCH[kind];
+
+    // An older Checkout, opened before the kind travelled, comes back as
+    // `paid=1`. It still deserves the acknowledgement; there is just nothing
+    // named to wait for.
+    if (!watch) { paidSettled(); return; }
+
+    var now = watch.read(data);
+    if (watch.falls && !(now > 0)) { paidSettled(); return; }
+
+    if (paidTries === 0) say('ok', T.paidSettling, true);
+    if (paidTries >= PAID_TRIES) { say('ok', T.paidSlow, true); return; }
+    paidTries++;
+
+    window.setTimeout(function () {
+      post(REGS, { action: 'registration',
+                   participantId: param('p'), activityId: param('a') })
+        .then(function (res) {
+          if (!res.ok || !res.data) { say('ok', T.paidSlow, true); return; }
+          var then = watch.read(res.data);
+          var moved = watch.falls ? (then < now) : (then !== now);
+          // A redraw re-enters this function with the new payload, and
+          // paidTries is kept across it, so the wait is bounded whether the
+          // figures move once, partly, or not at all.
+          if (moved) return again();
+          paidWatch(res.data, again);
+        });
+    }, PAID_GAP_MS);
+  }
+
+  // Thank them, and take the parameter out of the URL so a reload does not
+  // announce the same payment again.
+  function paidSettled() {
+    say('ok', T.paidThanks);
+    rewriteQuery('p=' + encodeURIComponent(param('p') || '') +
+                 '&a=' + encodeURIComponent(param('a') || ''));
+  }
+
   // WHY A PAYMENT LINK DID NOT OPEN STRIPE.
   //
   // /pay answers a 302 and never a body, so a refusal has nowhere to put its
@@ -1653,6 +1782,12 @@
         var card = document.getElementById('pay');
         if (card && card.scrollIntoView) card.scrollIntoView();
       }
+
+      // AFTER the cards are drawn, so the acknowledgement is written into the
+      // notice this render owns rather than one about to be replaced — the same
+      // ordering rule the flash already follows. It does nothing at all unless
+      // the reader has just come back from Checkout.
+      paidWatch(res.data, renderActivity);
 
       // Offered only when the frozen terms allow it. The same creditFor() the
       // server will apply decided this, so what is shown is what happens.

@@ -476,20 +476,37 @@ exports.handler = async (event) => {
         if (!R.hasRoom(report, body.groupId)) {
           return json(409, { error: 'That group is full.', full: true });
         }
-        const target = require('./_activity-facts')
+        const facts = require('./_activity-facts');
+        const target = facts
           .namedGroups(((activity.facts || {}).groupSize) || {})
           .filter((g) => g.groupId === body.groupId)[0];
         if (!target) return json(400, { error: 'No such group on this activity.' });
 
+        // ⚠ THE HISTORY NAMES THE GROUPS, NOT THEIR IDS, and it names BOTH.
+        // This read `moved to grp-1f3a9c`, which is the one spelling nobody
+        // reading a history months later can resolve — the frozen groupName
+        // exists precisely because an id is not for people. And "moved to
+        // Advanced" with no "from" is half a record: the question asked about a
+        // move is almost always which way it went.
+        //
+        // The name is taken from the FROZEN one on the way out and the
+        // activity's current one on the way in, which is correct rather than
+        // inconsistent: what they were in is what they agreed to, and what they
+        // are moving into is what it is called today.
+        const from = (reg.frozen && reg.frozen.groupName) || null;
+        const name = (v) => facts.pick(v, 'en');
+        const moved = (name(from) || '\u2014') + ' \u2192 ' + (name(target.name) || body.groupId);
+
         const next = R.transition(reg, {
           status: reg.status, by: session.email,
-          note: 'moved to ' + body.groupId
+          note: 'moved group: ' + moved
         });
         next.groupId = body.groupId;
         next.frozen = Object.assign({}, next.frozen, { groupName: target.name || null });
         await store.saveRegistration(next);
         await recordAudit(session, 'registrations.moveGroup',
-          body.participantId + '__' + activity.activityId, 'ok', { detail: body.groupId });
+          body.participantId + '__' + activity.activityId, 'ok',
+          { detail: reg.frozen.participantName + ' \u00B7 ' + moved });
         return json(200, { ok: true, registration: next });
       }
 
