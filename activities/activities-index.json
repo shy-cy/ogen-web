@@ -1,5 +1,29 @@
 [
   {
+    "slug": "beit-midrash",
+    "activityId": "act-32b1222460c4f004",
+    "seriesId": "act-32b1222460c4f004",
+    "type": "dropin",
+    "status": "open",
+    "langs": [
+      "he",
+      "en",
+      "ru"
+    ],
+    "title": {
+      "he": "בית מדרש קהילתי",
+      "en": "Community Beit Midrash",
+      "ru": "Общинный Бейт-Мидраш"
+    },
+    "summary": {
+      "he": "פותחים את התנ״ך, שואלים שאלות ומגלים סיפורים מוכרים מזוויות חדשות ומסקרנות, בהנחיית יפעת חלד. בית מדרש פתוח ללימוד, שיחה וגילוי, עם קבוצת נוער וצעירים בגילאי 15 עד 25 וקבוצת מבוגרים.",
+      "en": "Explore the Bible from fresh and intriguing perspectives with Yifat Hald. A welcoming Beit Midrash for learning, discussion and discovery, with separate groups for young people aged 15 to 25 and adults.",
+      "ru": "Изучаем Библию вместе с Ифат Халад, открывая знакомые истории с новых и неожиданных сторон. Открытый Бейт-Мидраш для учёбы, обсуждения и поиска новых смыслов, с отдельными группами для молодых людей 15–25 лет и взрослых."
+    },
+    "cardImage": "/images/activities/beit-midrash-card-04cf96e7.jpg",
+    "isoUpdated": "2026-09-20T07:57:58.547Z"
+  },
+  {
     "slug": "bnei-mitzvah-2027",
     "activityId": "act-b6728af43e70352b",
     "seriesId": "act-b6728af43e70352b",

@@ -1,0 +1,180 @@
+{
+  "slug": "beit-midrash",
+  "status": "open",
+  "motif": "book",
+  "corner": "br",
+  "cardImage": "/images/activities/beit-midrash-card-04cf96e7.jpg",
+  "shareImage": "/images/activities/beit-midrash-share-7708e929.png",
+  "robots": "index",
+  "type": "dropin",
+  "registration": {
+    "autoApprove": true,
+    "pendingExpiryDays": null,
+    "registrationFeeCutoffDate": null,
+    "cancellationPolicy": {
+      "mode": "flat",
+      "cancellationCutoffDate": null
+    },
+    "defaultBasis": null,
+    "sessionCancelHours": 1
+  },
+  "seriesId": "act-32b1222460c4f004",
+  "title": {
+    "he": "בית מדרש קהילתי",
+    "en": "Community Beit Midrash",
+    "ru": "Общинный Бейт-Мидраш"
+  },
+  "summary": {
+    "he": "פותחים את התנ״ך, שואלים שאלות ומגלים סיפורים מוכרים מזוויות חדשות ומסקרנות, בהנחיית יפעת חלד. בית מדרש פתוח ללימוד, שיחה וגילוי, עם קבוצת נוער וצעירים בגילאי 15 עד 25 וקבוצת מבוגרים.",
+    "en": "Explore the Bible from fresh and intriguing perspectives with Yifat Hald. A welcoming Beit Midrash for learning, discussion and discovery, with separate groups for young people aged 15 to 25 and adults.",
+    "ru": "Изучаем Библию вместе с Ифат Халад, открывая знакомые истории с новых и неожиданных сторон. Открытый Бейт-Мидраш для учёбы, обсуждения и поиска новых смыслов, с отдельными группами для молодых людей 15–25 лет и взрослых."
+  },
+  "about": {
+    "he": "<h3>תנ״ך, שאלות גדולות ומבט קצת אחר</h3><p>אנחנו גאים להזמין את <strong>יפעת חלד</strong> להוביל את בית המדרש הקהילתי של מרכז עוגן.</p><p>יפעת היא דמות מוכרת בקהילה, וזוכה להערכה רבה בזכות הדרך שבה היא מלמדת תנ״ך, מתוך סקרנות, עומק ויכולת להסתכל על הסיפורים המוכרים מזוויות חדשות ומפתיעות.</p><p>בית המדרש הקהילתי של מרכז עוגן יתקיים בשתי קבוצות: <strong>קבוצת נוער וצעירים בגילאי 15 עד 25 וקבוצת מבוגרים.</strong> התוכן והדיון בכל קבוצה יותאמו לגיל ולמאפייני המשתתפים.</p><p>בבית המדרש נפתח יחד את התנ״ך, נחזור לסיפורים שכולנו מכירים ונגלה שהם הרבה יותר מורכבים ומרתקים ממה שנדמה לנו. נבחן גרסאות שונות של אותם סיפורים, נשווה בין מקורות, נשאל שאלות על זהות, אמונה, חברה ומגדר, וננסה להבין מה הסיפורים העתיקים האלה יכולים לומר לנו על העולם שלנו היום.</p><p>זהו בית מדרש <strong>קהילתי, פתוח ומעורר מחשבה</strong>, מקום שבו אפשר ללמוד, לשאול, לחלוק רעיונות וגם לא להסכים.</p><p>לא צריך להגיע עם ידע מוקדם בתנ״ך. מספיק לבוא עם סקרנות ורצון להסתכל על הסיפורים המוכרים בעיניים חדשות.</p><p><strong>שישה מפגשים. סיפורים עתיקים. שאלות שרלוונטיות גם היום.</strong></p><h3>במהלך ששת המפגשים נעסוק, בין היתר, ב:</h3><p><strong>שני סיפורים, בורא אחד</strong></p><p> המבט הכפול על בריאת העולם והאדם, ומה אפשר ללמוד מההבדלים בין שני סיפורי הבריאה.</p><p><strong>הסערה שחוברה לה יחדיו</strong></p><p> שני סיפורי המבול ששינו את העולם, והמפגש המרתק בין ספר בראשית לעלילות גלגמש.</p><p><strong>DNA יהודי</strong></p><p> הגנים שקיבלנו מאבות ואימהות האומה, ומה הסיפורים המקראיים מספרים לנו על הזהות שלנו.</p><p><strong>נפשו של מלך</strong></p><p> האורות והצללים בחייו של דוד המלך, אחד הגיבורים המורכבים והמרתקים בתנ״ך.</p><p><strong>הפרדוקס של קהלת</strong></p><p> בין ייאוש עמוק לאופטימיות מעשית, ומה יש לספר קהלת לומר לנו על החיים.</p><p><strong>נבראה בצלם או מצלע?</strong></p><p> מה באמת עומד מאחורי סיפור בריאת האישה, ומה זה משנה כשמגיעים לשאלה מי הוא \"הגבר\" בבית?&nbsp;</p>",
+    "en": "The Bible, Big Questions and a Different Perspective<p>We are proud to invite <strong>Yifat Hald</strong> to lead OGEN Centre’s Community Beit Midrash.</p><p>Yifat is a well-known member of the community and is highly regarded for her approach to teaching the Bible, bringing curiosity, depth and the ability to look at familiar stories from new and intriguing perspectives.</p><p>The Community Beit Midrash will take place in two groups: <strong>a youth and young adults group for ages 15 to 25, and an adult group.</strong> The content and discussions in each group will be adapted to the age and characteristics of its participants.</p><p>Together, we will open the Bible, return to stories we think we know and discover that they are far more complex and fascinating than they may first appear. We will explore different versions of familiar stories, compare sources, ask questions about identity, faith, society and gender, and consider what these ancient stories can tell us about the world we live in today.</p><p>This is a <strong>community-based, open and thought-provoking Beit Midrash</strong>, a space where we can learn, ask questions, share ideas and even disagree.</p><p>No previous knowledge of the Bible is required. All you need is curiosity and a willingness to look at familiar stories with fresh eyes.</p><p><strong>Six sessions. Ancient stories. Questions that are still relevant today.</strong></p><h3>During the six sessions, we will explore:</h3><p><strong>Two Stories, One Creator</strong></p><p> A closer look at the two creation stories and what we can learn from the differences between them.</p><p><strong>The Storm That Came Together</strong></p><p> Two flood stories that changed the world, and the fascinating connection between Genesis and the Epic of Gilgamesh.</p><p><strong>Jewish DNA</strong></p><p> The genes we inherited from the fathers and mothers of our people, and what biblical stories tell us about our identity.</p><p><strong>The Soul of a King</strong></p><p> The light and shadows in the life of King David, one of the most complex and fascinating figures in the Bible.</p><p><strong>The Paradox of Ecclesiastes</strong></p><p> Between deep despair and practical optimism, and what Ecclesiastes has to say about life.</p><p><strong>Created in God's Image or From His Rib?</strong></p><p> What really lies behind the story of the creation of woman, and what does it have to do with the question of who is \"the man\" in the home?</p><p>The six session topics are based on the programme provided.</p>",
+    "ru": "Библия, большие вопросы и новый взгляд<p>Мы рады пригласить <strong>Ифат Халад</strong> вести Бейт-Мидраш в центре OGEN.</p><p>Ифат хорошо известна в нашей общине и пользуется большим уважением благодаря своему особому подходу к изучению Библии. Она умеет интересно и глубоко рассказывать о знакомых историях, открывая в них неожиданные смыслы и предлагая взглянуть на них с новой стороны.</p><p>Бейт-Мидраш в центре OGEN будет проходить в двух группах: <strong>для подростков и молодых людей от 15 до 25 лет и для взрослых</strong>. Содержание встреч и формат обсуждений будут адаптированы к возрасту и особенностям каждой группы.</p><p>Вместе мы откроем Библию, обратимся к знакомым историям и увидим, что они гораздо сложнее и интереснее, чем может показаться на первый взгляд. Мы рассмотрим разные версии знакомых сюжетов, сравним различные источники, поговорим об идентичности, вере, обществе и гендерных ролях и попробуем понять, что древние истории могут рассказать нам о мире, в котором мы живём сегодня.</p><p>Это <strong>открытый и живой Бейт-Мидраш для всей общины</strong>, где можно учиться, задавать вопросы, делиться своими мыслями и даже не соглашаться друг с другом.</p><p>Не нужно заранее хорошо знать Библию или иметь специальную подготовку. Достаточно любопытства и желания взглянуть на знакомые истории по-новому.</p><p><strong>Шесть встреч. Древние истории. Вопросы, которые остаются актуальными и сегодня.</strong></p><h3>В течение шести встреч мы поговорим о:</h3><p><strong>Две истории, один Творец</strong></p><p> Два рассказа о сотворении мира и человека. Почему они отличаются друг от друга и что эти различия могут рассказать нам о библейском тексте?</p><p><strong>Буря, которая изменила мир</strong></p><p> Два рассказа о потопе, изменившие представление человечества о мире, и удивительная связь между Книгой Бытия и «Эпосом о Гильгамеше».</p><p><strong>Еврейская ДНК</strong></p><p> Что мы унаследовали от отцов и матерей нашего народа и что библейские истории могут рассказать о нашей идентичности.</p><p><strong>Душа царя</strong></p><p> Светлые и тёмные стороны жизни царя Давида, одного из самых сложных и интересных персонажей Библии.</p><p><strong>Парадокс Экклезиаста</strong></p><p> Между глубоким отчаянием и практичным оптимизмом. Что книга Экклезиаста может рассказать нам о жизни?</p><p><strong>Создана по образу Божьему или из ребра?</strong></p><p> Что на самом деле стоит за историей сотворения женщины и какое отношение это имеет к вопросу о том, кто такой «мужчина» в доме?</p>"
+  },
+  "metaTitle": {
+    "he": "בית מדרש קהילתי בלימסול | מרכז עוגן",
+    "en": "Community Beit Midrash in Limassol | OGEN Centre",
+    "ru": "Бейт-Мидраш в Лимассоле | Центр OGEN"
+  },
+  "metaDescription": {
+    "he": "בית מדרש קהילתי במרכז עוגן בלימסול בהנחיית יפעת חלד. לומדים תנ״ך מזוויות חדשות, שואלים שאלות ומגלים משמעויות חדשות בסיפורים המוכרים.",
+    "en": "Join OGEN Centre’s Community Beit Midrash in Limassol with Yifat Hald. Explore the Bible through fresh perspectives, questions and lively discussion.",
+    "ru": "Бейт-Мидраш в Лимассоле с Ифат Халад. Изучаем Библию по-новому, обсуждаем знакомые истории и ищем неожиданные смыслы. Центр OGEN."
+  },
+  "facts": {
+    "ages": {
+      "min": 14,
+      "max": 120
+    },
+    "schedule": {
+      "frequency": "custom",
+      "sessions": [
+        {
+          "day": 0,
+          "time": "18:00"
+        }
+      ]
+    },
+    "duration": {
+      "startDate": "",
+      "endDate": "",
+      "sessionCount": 6,
+      "sessionMinutes": 90,
+      "sessionDates": []
+    },
+    "groupSize": {
+      "groups": 2,
+      "maxPerGroup": null,
+      "overrideText": {
+        "he": "תאריכים יפורסמו בהמשך",
+        "en": "Dates will be announced soon",
+        "ru": "Даты будут объявлены позже"
+      },
+      "named": [
+        {
+          "groupId": "g-mu9hqxm1klzk",
+          "name": {
+            "he": "קבוצת נוער",
+            "en": "Youth Group",
+            "ru": "Молодёжная группа"
+          },
+          "capacity": 20
+        },
+        {
+          "groupId": "g-mu9hrcjt42rt",
+          "name": {
+            "he": "קבוצת בוגרים",
+            "en": "Adult Group",
+            "ru": "Группа для взрослых"
+          },
+          "capacity": 30
+        }
+      ]
+    },
+    "instructionLanguage": {
+      "codes": [
+        "he"
+      ],
+      "text": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      }
+    },
+    "prerequisites": {
+      "level": "beginner",
+      "text": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      }
+    },
+    "location": {
+      "text": {
+        "he": "לימסול",
+        "en": "Limassol",
+        "ru": "Лимассол"
+      }
+    },
+    "address": {
+      "text": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      }
+    },
+    "price": {
+      "registrationFee": null,
+      "fullPrice": null,
+      "perHourOverride": null,
+      "perSessionPrice": 25,
+      "showPerLesson": false,
+      "lateDropIn": {
+        "enabled": false,
+        "hoursBefore": 1,
+        "price": 30
+      },
+      "bundles": [
+        {
+          "bundleId": "b-mu9iei9vwn55",
+          "entries": 6,
+          "pricePerEntry": 20,
+          "validityDays": 220
+        }
+      ]
+    }
+  },
+  "factVisibility": {
+    "ages": "public",
+    "schedule": "public",
+    "duration": "public",
+    "groupSize": "public",
+    "instructionLanguage": "public",
+    "prerequisites": "public",
+    "location": "public",
+    "address": "members",
+    "price": "public"
+  },
+  "faq": [],
+  "teachers": [
+    {
+      "id": "tea-mu9hpenq-1",
+      "name": {
+        "he": "יפעת חלד",
+        "en": "Yifaat Heled",
+        "ru": "Yifaat Heled"
+      },
+      "photo": "/images/activities/beit-midrash-teachers-tea-mu9hpenq-1-c79ea665.jpg"
+    }
+  ],
+  "sponsors": [],
+  "isoUpdated": "2026-09-20T07:57:58.547Z",
+  "isoCreated": "2026-09-20T07:57:58.547Z",
+  "lastEditedBy": "michal@ogen.cy",
+  "lastEditedByName": "Michal",
+  "activityId": "act-32b1222460c4f004",
+  "lastPublishedAt": "2026-09-20T07:57:58.547Z"
+}
