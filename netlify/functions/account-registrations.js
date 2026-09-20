@@ -30,6 +30,7 @@ const spend = require('./_spend-credit');
 const { cancelAndCredit } = require('./_registration-cancel');
 const attendance = require('./_session-attendance');
 const B = require('./_bundle');
+const groups = require('./_activity-groups');
 const bundleStore = require('./_bundle-store');
 const checkout = require('./_checkout');
 const facts = require('./_activity-facts');
@@ -173,10 +174,23 @@ async function sessionsPayload(activity, participantId, now) {
     // become a second way in.
     mayBook: !!reg && reg.status === 'approved',
     registrationStatus: reg ? reg.status : null,
-    sessions: attendance.bookableDates(activity).map((date) => {
+    // ⚠ THIS PARTICIPANT'S OWN EVENINGS. Where the groups keep their own
+    // calendars, offering a Beginners family the Advanced dates offers them a
+    // room they are not counted in — and the price frozen for one of those
+    // dates would be frozen off the wrong timetable. `reg` may be null, which is
+    // a family looking before they have registered: they see the activity's own
+    // list, because nobody knows yet which group they will choose.
+    sessions: attendance.bookableDates(activity, reg ? (reg.groupId || null) : groups.ANY)
+      .map((date) => {
       const cap = R.capacityForDate(activity, all, date);
       const own = mine[date] || null;
-      const frozen = own ? own.frozen : credit.freezeSession(activity, date, null, { bookedAt: now });
+      // The price this evening WOULD cost, frozen off the same timetable the
+      // booking will use — so the group travels here too, or the screen quotes
+      // a start time from the other group's calendar and the late-price window
+      // is measured against it.
+      const frozen = own ? own.frozen
+        : credit.freezeSession(activity, date, null,
+            { bookedAt: now, groupId: reg ? (reg.groupId || null) : groups.ANY });
       return {
         date: date,
         // ⚠ THE PRICE AN EVENING WOULD COST, from the SAME function that freezes
@@ -209,6 +223,11 @@ async function sessionsPayload(activity, participantId, now) {
 
 async function bundlesPayload(activity, participantId, now) {
   const held = await bundleStore.forParticipant(participantId, activity.activityId);
+  // Which group's evenings this family is being offered. A participant with no
+  // registration yet is looking before they have chosen, so they see the
+  // activity's own calendar — the same answer sessionsPayload() gives.
+  const reg = await store.getRegistration(participantId, activity.activityId);
+  const gid = reg ? (reg.groupId || null) : groups.ANY;
   const mine = {};
   (await attendance.forParticipant(participantId, activity.activityId))
     .forEach((a) => { mine[a.sessionDate] = a; });
@@ -219,11 +238,11 @@ async function bundlesPayload(activity, participantId, now) {
   // one outside the window that was sold.
   const taken = Object.keys(mine).filter((d) => R.holdsASeat(mine[d]));
   return {
-    offers: B.bundlesAvailable(activity, now).map((b) => ({
+    offers: B.bundlesAvailable(activity, now, gid).map((b) => ({
       bundleId: b.bundleId, entries: b.entries, pricePerEntry: b.pricePerEntry,
       validityDays: b.validityDays,
       totalCents: Math.round(Number(b.pricePerEntry) * 100) * b.entries,
-      coveredDates: B.coverageFor(activity, b, now)
+      coveredDates: B.coverageFor(activity, b, now, gid)
     })),
     held: held.map((b) => {
       const view = B.bundleView(b, mine, now);
@@ -756,16 +775,7 @@ exports.handler = async (event) => {
           return json(400, { error: 'Bundles are for pay-per-session activities.' });
         }
 
-        // ⚠ THE OFFER IS RE-DECIDED HERE, from the activity, at this instant.
-        // The client sends an id and nothing else — never a price, never an
-        // entry count — so a bundle the admin has since removed or that the
-        // calendar can no longer cover is refused rather than sold.
         const now = Date.now();
-        const offer = B.bundlesAvailable(activity, now)
-          .filter((b) => b.bundleId === String(body.bundleId || ''))[0];
-        if (!offer) {
-          return json(409, { error: 'That bundle is not available at the moment.', reason: 'unavailable' });
-        }
 
         // Buying entries to an activity nobody may attend is a purchase that
         // cannot be used, so this registers too — the same one-step shape the
@@ -781,13 +791,34 @@ exports.handler = async (event) => {
           return json(200, { ok: true, awaitingApproval: true, status: reg.status });
         }
 
-        const coveredDates = B.coverageFor(activity, offer, now);
+        // ⚠ THE OFFER IS RE-DECIDED HERE, from the activity, at this instant,
+        // and AFTER the registration — because which bundles can be honoured is
+        // a question about THIS FAMILY'S CALENDAR. Where the groups keep their
+        // own dates, "the next five sessions" is a different list per group, so
+        // a bundle offered against one group's timetable and sold to somebody in
+        // the other covers evenings they cannot attend — which the nightly pass
+        // would then read as a shortfall WE caused and credit back.
+        //
+        // `reg.groupId` rather than `body.groupId`: a family already registered
+        // in one group is in that group whatever the request says.
+        //
+        // The client sends an id and nothing else — never a price, never an
+        // entry count — so a bundle the admin has since removed, or one this
+        // group's calendar can no longer cover, is refused rather than sold.
+        const gid = reg.groupId || null;
+        const offer = B.bundlesAvailable(activity, now, gid)
+          .filter((b) => b.bundleId === String(body.bundleId || ''))[0];
+        if (!offer) {
+          return json(409, { error: 'That bundle is not available at the moment.', reason: 'unavailable' });
+        }
+
+        const coveredDates = B.coverageFor(activity, offer, now, gid);
         let session;
         try {
           session = await checkout.createBundleCheckout({
             activity: activity, bundle: offer, coveredDates: coveredDates,
             participantId: participant.participantId, accountId: me.accountId,
-            purchasedAt: now, lang: lang, email: me.email,
+            groupId: gid, purchasedAt: now, lang: lang, email: me.email,
             participantName: [participant.firstName, participant.lastName].filter(Boolean).join(' ')
           });
         } catch (err) {

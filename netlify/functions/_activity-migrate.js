@@ -59,6 +59,26 @@ function parseAgeRange(langObj) {
 // every save, so a record written by an old client cannot reintroduce the old
 // shape.
 
+// One calendar normaliser, used by the activity's own `duration.sessionDates`
+// and by a named group's. Two copies would be two ways for a date to survive or
+// not, and the difference would surface as a group whose calendar loses its
+// times on save while the activity's keeps them.
+function sessionRowsOf(list) {
+  return (Array.isArray(list) ? list : [])
+    .map((r) => {
+      const date = isoDate(r && r.date);
+      if (!date) return null;
+      const row = { date: date, status: (r && r.status) === 'excluded' ? 'excluded' : 'scheduled' };
+      const time = String((r && r.time) || '').trim();
+      if (time) row.time = time;
+      const reason = String((r && r.reason) || '').trim();
+      if (reason) row.reason = reason.slice(0, 200);
+      return row;
+    })
+    .filter(Boolean)
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+}
+
 const SHAPES = {
   ages: (f) => ({ min: num(f.min), max: num(f.max) }),
   // The frequency list is taken FROM the calendar module rather than repeated
@@ -113,19 +133,7 @@ const SHAPES = {
     // `reason` is an admin note on an excluded date and is deliberately never
     // published — the page lists the sessions that are happening and nothing
     // else, so a reason has no reader on the public side.
-    sessionDates: (Array.isArray(f.sessionDates) ? f.sessionDates : [])
-      .map((r) => {
-        const date = isoDate(r && r.date);
-        if (!date) return null;
-        const row = { date: date, status: (r && r.status) === 'excluded' ? 'excluded' : 'scheduled' };
-        const time = String((r && r.time) || '').trim();
-        if (time) row.time = time;
-        const reason = String((r && r.reason) || '').trim();
-        if (reason) row.reason = reason.slice(0, 200);
-        return row;
-      })
-      .filter(Boolean)
-      .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+    sessionDates: sessionRowsOf(f.sessionDates)
   }),
   // The override is WORDS, so it is a { he, en, ru } bag like every other
   // sentence on this site — the numbers beside it render in three languages and
@@ -145,12 +153,44 @@ const SHAPES = {
     // and must not be able to change its capacity from ten to twenty. Putting
     // the list inside the fact draws that line by where the field sits rather
     // than by a rule someone has to remember.
+    //
+    // ⚠ A GROUP CAN CARRY ITS OWN SCHEDULE AND ITS OWN CALENDAR. Two groups do
+    // not only differ in size — Beginners on Mondays and Advanced on Wednesdays
+    // is the ordinary case, and until this existed the activity had one calendar
+    // that was right for at most one of them. Everything that reads a calendar
+    // and knows which group it is about now resolves through _activity-groups.js
+    // rather than reaching for the activity's list.
+    //
+    // It lives HERE rather than in `schedule` and `duration` because a group is
+    // one thing an admin sets up. Split across three panels, one of the three is
+    // what gets forgotten. The cost is that a calendar sits inside a fact called
+    // "group size"; the name is the older compromise, and it already holds the
+    // group's name and capacity for the same reason.
+    //
+    // Both are STRUCTURE — dates and times, not words — so `LANG_SUBKEYS` names
+    // only `name`, and a role that may edit only Russian can translate "Advanced"
+    // and cannot move when it meets.
     const named = (Array.isArray(f.named) ? f.named : [])
-      .map((g) => ({
-        groupId: String((g && g.groupId) || '').trim().slice(0, 40),
-        name: langObject(g && g.name),
-        capacity: num(g && g.capacity)
-      }))
+      .map((g) => {
+        const out = {
+          groupId: String((g && g.groupId) || '').trim().slice(0, 40),
+          name: langObject(g && g.name),
+          capacity: num(g && g.capacity)
+        };
+        // Reusing the two shapes the activity's own fields go through, so a
+        // group's schedule cannot normalise differently from the activity's —
+        // including the derived weekday and the surviving `date`.
+        const sched = g && g.schedule;
+        if (sched && typeof sched === 'object') {
+          const norm = SHAPES.schedule(sched);
+          if (norm.sessions.length) out.schedule = norm;
+        }
+        const dates = g && g.sessionDates;
+        if (Array.isArray(dates) && dates.length) {
+          out.sessionDates = sessionRowsOf(dates);
+        }
+        return out;
+      })
       .filter((g) => g.groupId);
     if (named.length) out.named = named;
     return out;

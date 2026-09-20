@@ -14,7 +14,7 @@
 // bare string. Section headings and sidebar labels are NOT admin-editable —
 // they are fixed per language and live in LABELS below.
 
-const { sidebarGroups, factPriceRows, sessionRows, SESSION_TABLE } = require('./_activity-facts');
+const { sidebarGroups, factPriceRows, sessionTables, SESSION_TABLE } = require('./_activity-facts');
 
 // Sidebar group icons. Lucide, drawn white inside a solid circle, which is the
 // site's icon rule. The circle is 34px rather than the 56px used for section
@@ -447,19 +447,31 @@ ${JSON.stringify(credits, null, 2)}
   // and for the same reason: an empty frame is worse than no frame. A one-off,
   // a custom schedule written as prose, or an activity nobody has finished
   // configuring all fall through to the summary in the fact card.
-  const sessionList = sessionRows((activity.facts || {}).duration, lang);
+  //
+  // ⚠ ONE TABLE PER GROUP where the groups keep their own calendars. A family in
+  // Beginners reading the Advanced dates is the bug the whole per-group calendar
+  // exists to fix, and it would have survived everything else if the page still
+  // printed one list. `title` is null when there is one table, and then this
+  // renders byte-for-byte what it always did.
+  //
+  // The caption carries the group's name rather than a second heading above the
+  // table: a caption IS the table's name, and two tables each captioned
+  // "Session dates" would be two lists a reader has to tell apart by their
+  // contents.
+  const tables = sessionTables(activity, lang);
   const T = SESSION_TABLE[lang] || SESSION_TABLE.en;
-  const sessionsBand = sessionList.length
+  const oneTable = (t) => `          <table class="session-table">
+            <caption>${esc(t.title ? `${T.caption} · ${t.title}` : T.caption)}</caption>
+            <thead><tr>${T.cols.map((c) => `<th scope="col">${esc(c)}</th>`).join('')}</tr></thead>
+            <tbody>
+${t.rows.map((r) => `              <tr><td>${esc(String(r.n))}</td><td>${esc(r.day)}</td><td>${esc(r.date)}</td></tr>`).join('\n')}
+            </tbody>
+          </table>`;
+  const sessionsBand = tables.length
     ? `    <div class="activity-sessions">
       <div class="fact-card session-columns" data-group="sessions">
         <div class="session-split">
-          <table class="session-table">
-            <caption>${esc(T.caption)}</caption>
-            <thead><tr>${T.cols.map((c) => `<th scope="col">${esc(c)}</th>`).join('')}</tr></thead>
-            <tbody>
-${sessionList.map((r) => `              <tr><td>${esc(String(r.n))}</td><td>${esc(r.day)}</td><td>${esc(r.date)}</td></tr>`).join('\n')}
-            </tbody>
-          </table>
+${tables.map(oneTable).join('\n')}
         </div>
       </div>
     </div>

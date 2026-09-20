@@ -84,13 +84,18 @@ async function spendableFor(participantId, activityId, sessionDate) {
 // the bundle's price or its window in March cannot change what somebody bought
 // in January — the record carries its own terms and nothing reads the activity
 // to find them again.
-function newBundle({ participantId, activityId, accountId, bundle, coveredDates, purchasedAt, paymentRef }) {
+function newBundle({ participantId, activityId, accountId, groupId, bundle, coveredDates, purchasedAt, paymentRef }) {
   const iso = new Date(purchasedAt).toISOString();
   return {
     bundleId: bundle.bundleId,
     participantId: participantId,
     activityId: activityId,
     accountId: accountId,
+    // WHICH TIMETABLE THIS WAS SOLD AGAINST. Frozen like everything else here:
+    // a family moved between groups later keeps the dates they bought, and
+    // reconcile() refills from the same calendar rather than another group's.
+    // Null is an activity with one calendar, which is most of them.
+    groupId: groupId || null,
     purchasedAt: iso,
     frozen: {
       entries: bundle.entries,

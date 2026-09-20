@@ -97,8 +97,19 @@ const api = read('netlify/functions/account-registrations.js');
 const buy = api.slice(api.indexOf("case 'buyBundle'"), api.indexOf("case 'rescheduleSession'"));
 H.ok(/NOTHING IS WRITTEN/.test(buy), 'the buy action commits nothing');
 H.ok(!/bundleStore\.saveBundle/.test(buy), 'and never writes a bundle record');
-H.ok(/B\.bundlesAvailable\(activity, now\)/.test(buy),
+H.ok(/B\.bundlesAvailable\(activity, now, gid\)/.test(buy),
   '⚠ and the offer is re-decided from the activity — the client sends an id, never a price');
+// ⚠ AND AGAINST THIS FAMILY'S OWN CALENDAR. Where the groups keep their own
+// dates, "the next five sessions" is a different list per group — a bundle
+// offered off one group's timetable and sold to somebody in the other covers
+// evenings they cannot attend, which the nightly pass then reads as a shortfall
+// WE caused and credits back.
+H.ok(/const gid = reg\.groupId \|\| null;/.test(buy),
+  'from the registration\'s group, not the request\'s — a family already in one group is in it');
+H.ok(buy.indexOf('const gid') > buy.indexOf('const reg = opened.reg'),
+  'and the offer is decided AFTER the registration, because that is what settles the group');
+H.ok(/B\.coverageFor\(activity, offer, now, gid\)/.test(buy), 'the covered dates are that group\'s');
+H.ok(/groupId: gid,/.test(buy), 'and the group travels to Checkout, to be frozen on the record');
 H.ok(!/body\.pricePerEntry|body\.entries/.test(buy), 'no amount is ever taken from the request');
 
 const hook = read('netlify/functions/stripe-webhook.js');

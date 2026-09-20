@@ -31,6 +31,7 @@
 
 const sessions = require('./_activity-sessions');
 const credit = require('./_credit');
+const groups = require('./_activity-groups');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -96,9 +97,15 @@ function validateBundles(price) {
 // of that day in Asia/Nicosia: a session TODAY has not gone, and a bundle bought
 // on the morning of a class covers that class. The whole-site answer to when a
 // day ends, rather than a second one here.
-function datesAhead(activity, now) {
-  const duration = ((activity || {}).facts || {}).duration || {};
-  return sessions.scheduled(duration.sessionDates)
+// ⚠ A BUNDLE IS FOR ONE GROUP'S EVENINGS. Where Beginners meet on Mondays and
+// Advanced on Wednesdays, "the next five sessions" is two different lists, and a
+// bundle sold off the wrong one covers dates its owner cannot attend — which
+// then reads as a shortfall we caused and gets CREDITED BACK at the nightly
+// pass. So the group is threaded from purchase to reconciliation, and frozen on
+// the record, exactly as the entries and the price are.
+function datesAhead(activity, now, groupId) {
+  return groups.calendarFor(activity, groupId)
+    .filter((r) => r && r.date && r.status !== 'excluded')
     .map((r) => r.date)
     .filter((d) => !credit.past(d, now))
     .sort();
@@ -111,9 +118,9 @@ function datesAhead(activity, now) {
 // MID-TERM counts forward from that day — there is nothing special about the
 // start of a term here, and an activity somebody joins in week five offers the
 // same product it offered in week one.
-function coverageFor(activity, bundle, now) {
+function coverageFor(activity, bundle, now, groupId) {
   const deadline = now + bundle.validityDays * DAY_MS;
-  return datesAhead(activity, now)
+  return datesAhead(activity, now, groupId)
     // Start of the day, not the end: a session falling on the last day of the
     // window is inside it. Every blank and every boundary in this system
     // resolves towards the family.
@@ -132,11 +139,11 @@ function coverageFor(activity, bundle, now) {
 // This is the PURCHASE-time rule, and it is deliberately stricter than the
 // after-purchase one: before money changes hands the honest answer is "not
 // this one"; afterwards the promise has been made and is kept by extending.
-function bundlesAvailable(activity, now) {
+function bundlesAvailable(activity, now, groupId) {
   if (((activity || {}).type) !== 'dropin') return [];
   const price = ((activity.facts) || {}).price || {};
   return normaliseBundles(price)
-    .filter((b) => coverageFor(activity, b, now).length >= b.entries);
+    .filter((b) => coverageFor(activity, b, now, groupId).length >= b.entries);
 }
 
 const usedOf = (bundle) => (Array.isArray((bundle || {}).usedDates) ? bundle.usedDates : []);
@@ -186,8 +193,18 @@ function reconcile(bundle, activity, now) {
   //
   // So a date that passed unused stays in the coverage, unusable, which is the
   // window doing its job; a date that left the calendar is replaced.
-  const onCalendar = sessions.scheduled(duration.sessionDates).map((r) => r.date);
-  const ahead = datesAhead(activity, now);
+  //
+  // ⚠ THE GROUP IS READ OFF THE BUNDLE, NOT LOOKED UP. It was frozen at
+  // purchase, so a family moved between groups afterwards keeps the dates they
+  // bought rather than having them silently re-pointed at another timetable —
+  // the same rule the entries, the price and the window already follow.
+  //
+  // `|| null` for a bundle bought before groups kept their own calendars: null
+  // is the activity's list, which is exactly what it was sold against.
+  const gid = (bundle || {}).groupId || null;
+  const onCalendar = groups.calendarFor(activity, gid)
+    .filter((r) => r && r.date && r.status !== 'excluded').map((r) => r.date);
+  const ahead = datesAhead(activity, now, gid);
 
   const keep = coveredOf(bundle).filter((d) => used.indexOf(d) !== -1 || onCalendar.indexOf(d) !== -1);
   const next = keep.slice();
@@ -255,7 +272,7 @@ function rescheduleTargets(bundle, activity, fromDate, now, takenDates) {
   const limit = Math.max(Number(frozen.validUntil) || 0, furthest);
   const busy = Array.isArray(takenDates) ? takenDates : [];
 
-  return datesAhead(activity, now)
+  return datesAhead(activity, now, (bundle || {}).groupId || null)
     .filter((d) => d !== fromDate)
     .filter((d) => credit.resolveLocal(d, '00:00', credit.TZ) <= limit)
     // An evening this participant is already on is not somewhere to move to,

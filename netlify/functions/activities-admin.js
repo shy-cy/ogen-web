@@ -40,6 +40,7 @@ const { migrate, normaliseFacts, normaliseVisibility, SHAPES } = require('./_act
 const SESSIONS = require('./_activity-sessions');
 const REG = require('./_activity-registration');
 const BUNDLE = require('./_bundle');
+const GROUPS = require('./_activity-groups');
 
 // How many day+time rows a frequency asks for. 'custom' means "as many as the
 // admin adds", so it has no fixed count.
@@ -614,6 +615,13 @@ function validate(activity) {
   if (activity.type === 'dropin') {
     BUNDLE.validateBundles(((activity.facts) || {}).price).forEach((m) => errors.push(m));
   }
+  // ⚠ GROUPS MEET ON DIFFERENT DAYS, NOT A DIFFERENT NUMBER OF TIMES. There is
+  // one `fullPrice`, one "(N sessions × M lessons)" qualifier and one
+  // denominator for prorated credit, so a model that cannot price two different
+  // session counts must not publish a page implying it can. Refused here rather
+  // than rendered, because the symptom would be one group's family reading the
+  // other group's term.
+  GROUPS.validateGroupCalendars(activity).forEach((m) => errors.push(m));
 
   if (errors.length) {
     const err = new Error(errors[0]);

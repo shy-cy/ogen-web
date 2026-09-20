@@ -157,9 +157,15 @@ async function reconcileBundles(at) {
 
   for (const activity of dropins) {
     const held = await bundleStore.forActivity(activity.activityId);
-    const ahead = B.datesAhead(activity, at).length;
     for (const bundle of held) {
       out.considered++;
+      // ⚠ PER BUNDLE, NOT PER ACTIVITY, because it gates a CREDIT. The shortfall
+      // is written only when nothing is left to replace a lost session with, and
+      // where the groups keep their own calendars "nothing left" is a question
+      // about this family's timetable. Asked of the activity, a Beginners bundle
+      // would be told the term is still running because Advanced meet next week,
+      // and a credit they are owed would never be written.
+      const ahead = B.datesAhead(activity, at, bundle.groupId || null).length;
       try {
         const result = B.reconcile(bundle, activity, at);
         let dirty = false;

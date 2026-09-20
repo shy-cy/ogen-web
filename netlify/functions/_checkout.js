@@ -273,6 +273,8 @@ async function createBundleCheckout({ activity, bundle, coveredDates, participan
       activity_id: activity.activityId,
       account_id: accountId,
       bundle_id: bundle.bundleId,
+      // Which timetable it was sold against, so settleBundle() can freeze it.
+      group_id: groupId || '',
       bundle_entries: String(bundle.entries),
       bundle_price_per_entry: String(bundle.pricePerEntry),
       bundle_validity_days: String(bundle.validityDays),

@@ -18,6 +18,7 @@
 // and session list, so the same record always produces the same answer.
 
 const sessions = require('./_activity-sessions');
+const groups = require('./_activity-groups');
 
 // The only distinction between a semester course and a pay-per-session
 // activity. A flag rather than a second content type: the two differ in how
@@ -158,7 +159,10 @@ function minusDays(iso, days) {
 // The calendar reading is kept as the fallback for an activity whose sessions
 // do not resolve. It is a worse answer, and it is better than an empty field.
 function thirtyPercentPoint(activity) {
-  const duration = ((activity && activity.facts) || {}).duration || {};
+  // One group's calendar on a per-group activity: every group meets the same
+  // number of times, so the 30% POINT is the same session number for all of
+  // them — the date it falls on differs, and one cutoff date has to be picked.
+  const duration = groups.durationFor(activity);
   const rows = sessions.scheduled(duration.sessionDates);
   if (rows.length) {
     const n = Math.ceil(CANCEL_FRACTION * rows.length);
@@ -187,7 +191,7 @@ function thirtyPercentPoint(activity) {
 function defaultIfBlank(activity) {
   const type = normaliseType(activity && activity.type);
   const reg = normaliseRegistration(activity && activity.registration, type);
-  const duration = ((activity && activity.facts) || {}).duration || {};
+  const duration = groups.durationFor(activity);
   let filled = false;
 
   if (reg.registrationFeeCutoffDate == null && duration.startDate) {
@@ -224,7 +228,7 @@ function basisChanged(activity) {
   const reg = (activity && activity.registration) || {};
   const basis = reg.defaultBasis;
   if (!basis) return null;
-  const duration = ((activity && activity.facts) || {}).duration || {};
+  const duration = groups.durationFor(activity);
   const now = {
     startDate: duration.startDate || '',
     sessionCount: sessions.scheduled(duration.sessionDates).length || num(duration.sessionCount)
@@ -279,7 +283,7 @@ function validateRegistration(activity) {
   // it is the default.
   if (reg.cancellationPolicy.mode === 'prorated') {
     const duration = ((activity && activity.facts) || {}).duration || {};
-    if (!sessions.scheduled(duration.sessionDates).length) {
+    if (!sessions.scheduled(groups.durationFor(activity).sessionDates).length) {
       errors.push('Prorated cancellation needs a session calendar to divide by, and this activity has none. ' +
         'Generate the sessions on the Activity facts panel, or use flat cancellation.');
     }

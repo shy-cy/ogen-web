@@ -197,6 +197,7 @@ async function settleBundle(session, meta) {
     participantId: meta.participant_id,
     activityId: meta.activity_id,
     accountId: meta.account_id,
+    groupId: meta.group_id || null,
     bundle: {
       bundleId: meta.bundle_id,
       entries: entries,

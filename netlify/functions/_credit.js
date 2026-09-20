@@ -40,6 +40,12 @@
 // instants and emits UTC precisely so it does NOT have to know one; resolving a
 // wall-clock time to an instant is the caller's job, and for a credit the caller
 // is this file.
+// The only require in this file, and it is pure: which calendar and which
+// schedule a named group has. It opens no store, reads no clock and does not
+// change the rule this module opens with — one record and one timestamp in, the
+// same figure out a year later.
+const groups = require('./_activity-groups');
+
 const TZ = 'Asia/Nicosia';
 
 // A cutoff that has been deliberately switched off. Same three-state value the
@@ -338,18 +344,28 @@ function basisFor(reg, now) {
 // into an instant. It is a parameter rather than a built-in because the caller
 // is the one that knows which zone the times were written in — the same
 // reasoning that keeps the ICS builder free of a time zone.
-function freezeCancellation(activity, resolveSessionInstant) {
+// ⚠ `groupId` IS THE SECOND ARGUMENT AND IT DECIDES MONEY. Prorated credit is
+// sessions remaining over sessions TOTAL, and on an activity where Beginners
+// meet on Mondays and Advanced on Wednesdays those are two different lists. The
+// old signature had nowhere to say which, so it froze the activity's calendar —
+// right for at most one of the two groups, and wrong in the direction nobody
+// checks, because the figure it produces is perfectly plausible.
+//
+// calendarFor() throws rather than guessing when a per-group activity is asked
+// without a group, so a call site that never learned to thread it fails loudly
+// instead of quietly crediting the wrong amount. On an activity with one
+// calendar nothing changes and nothing can throw.
+function freezeCancellation(activity, groupId, resolveSessionInstant) {
   const reg = (activity && activity.registration) || {};
   const policy = reg.cancellationPolicy || {};
-  const duration = ((activity && activity.facts) || {}).duration || {};
-  const times = ((activity && activity.facts) || {}).schedule || {};
+  const times = groups.scheduleFor(activity, groupId);
   const resolve = typeof resolveSessionInstant === 'function'
     ? resolveSessionInstant
     : (date, time) => resolveLocal(date, time, TZ);
 
   // Only the sessions that are actually happening. An excluded date never enters
   // the frozen list, which is what lets creditFor() stay ignorant of exclusions.
-  const rows = (Array.isArray(duration.sessionDates) ? duration.sessionDates : [])
+  const rows = groups.calendarFor(activity, groupId)
     .filter((r) => r && r.date && r.status !== 'excluded');
   const defaultTime = ((times.sessions || [])[0] || {}).time || '';
 
@@ -438,11 +454,14 @@ function creditForSession(att, now) {
 // `opts.bundle` short-circuits both: an entry was bought in advance at a fixed
 // rate, which is what a bundle IS, so the evening costs nothing further and
 // late pricing cannot apply to it however late it is booked.
+// `opts.groupId` for the same reason freezeCancellation() takes one: which
+// evenings exist, and at what time, is a per-group question the moment the
+// groups keep their own calendars. It rides on opts rather than becoming a
+// fifth positional argument, beside `bookedAt` and the bundle it is already
+// carrying.
 function freezeSession(activity, sessionDate, resolveSessionInstant, opts) {
   const reg = (activity && activity.registration) || {};
-  const facts = (activity && activity.facts) || {};
-  const duration = facts.duration || {};
-  const times = facts.schedule || {};
+  const times = groups.scheduleFor(activity, (opts || {}).groupId);
   const resolve = typeof resolveSessionInstant === 'function'
     ? resolveSessionInstant
     : (date, time) => resolveLocal(date, time, TZ);
@@ -453,7 +472,7 @@ function freezeSession(activity, sessionDate, resolveSessionInstant, opts) {
   // booking for a date the activity does not meet on look perfectly well formed.
   // Same rule freezeCancellation() follows, where an excluded date never enters
   // the frozen list at all.
-  const row = (Array.isArray(duration.sessionDates) ? duration.sessionDates : [])
+  const row = groups.calendarFor(activity, (opts || {}).groupId)
     .filter((r) => r && r.date === sessionDate && r.status !== 'excluded')[0] || null;
   const defaultTime = ((times.sessions || [])[0] || {}).time || '';
   const startsAt = row ? resolve(sessionDate, row.time || defaultTime) : null;

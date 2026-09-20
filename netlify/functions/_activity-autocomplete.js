@@ -22,6 +22,7 @@
 // It holds nobody's data and opens no store, so it does not arm the legal gate.
 
 const { past } = require('./_credit');
+const groups = require('./_activity-groups');
 
 // The only transition this makes. Written as a pair rather than inline so the
 // one thing this file may do to a record is visible in one line.
@@ -43,9 +44,13 @@ const TO = 'completed';
 // rule freezeCancellation() follows, and for the same reason: if a holiday
 // cannot take a number in the table, it cannot decide when the course ends.
 function lastSessionDate(activity) {
+  // ⚠ THE UNION, ACROSS EVERY GROUP. An activity is finished when the LAST group
+  // has finished — reading one calendar would archive the page, and rewrite it
+  // live, while a group that meets on Wednesdays still has two weeks to go.
+  // This is one of the two readers that is group-blind on purpose; the other is
+  // the check-in codes, for the same reason.
   const duration = ((activity || {}).facts || {}).duration || {};
-  const rows = Array.isArray(duration.sessionDates) ? duration.sessionDates : [];
-  const dates = rows
+  const dates = groups.unionDates(activity)
     .filter((r) => r && r.date && r.status !== 'excluded')
     .map((r) => String(r.date))
     .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));

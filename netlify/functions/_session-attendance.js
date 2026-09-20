@@ -29,6 +29,7 @@
 
 const { requireStore, optionalStore } = require('./_blobs');
 const credit = require('./_credit');
+const groups = require('./_activity-groups');
 const R = require('./_registration');
 
 const STORE = 'session-attendance';
@@ -97,9 +98,15 @@ const forDate = (activityId, sessionDate) => forActivity(activityId, sessionDate
 
 // Which dates this activity actually meets on, from the calendar that is already
 // the source of truth. An excluded date never appears, so it cannot be booked.
-function bookableDates(activity) {
-  const duration = (((activity || {}).facts) || {}).duration || {};
-  return (Array.isArray(duration.sessionDates) ? duration.sessionDates : [])
+// ⚠ WHICH EVENINGS THIS PARTICIPANT MAY BOOK, which is a per-group question the
+// moment the groups keep their own calendars — offering a Beginners family the
+// Advanced dates is offering them a room they are not counted in.
+//
+// `groups.ANY` is the honest answer for a caller with no participant in hand:
+// the codes an admin prints for the wall cover every evening the activity runs,
+// whoever is coming to it.
+function bookableDates(activity, groupId) {
+  return groups.calendarFor(activity, groupId)
     .filter((r) => r && r.date && r.status !== 'excluded')
     .map((r) => r.date);
 }
@@ -129,7 +136,11 @@ function newAttendance({ activity, participantId, accountId, groupId, sessionDat
   // the whole of _credit.js is: the same record and the same instant must give
   // the same figure a year later.
   const frozen = credit.freezeSession(activity, sessionDate, resolveSessionInstant, {
-    bookedAt: bookedAt || now, bundle: bundle || false, bundleId: bundleId || null
+    bookedAt: bookedAt || now, bundle: bundle || false, bundleId: bundleId || null,
+    // WHICH CALENDAR THIS EVENING IS ON. The groupId was already here, naming
+    // which room the place is counted against; it names the timetable too now,
+    // because two groups can meet on different evenings at different hours.
+    groupId: groupId || null
   });
   const owed = eur(frozen.perSessionPrice);
   return {

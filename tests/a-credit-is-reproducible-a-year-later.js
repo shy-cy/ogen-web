@@ -203,7 +203,48 @@ const fs = require('fs');
 const path = require('path');
 const src = fs.readFileSync(path.join(__dirname, '..', 'netlify/functions/_credit.js'), 'utf8');
 const code = src.replace(/\/\/[^\n]*\n/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
-H.ok(code.indexOf('require(') === -1, 'the module requires nothing at all');
+// ⚠ THE RULE IS ABOUT THE READING HALF, NOT THE FILE. This said "the module
+// requires nothing at all", which was true and was a proxy: the property that
+// matters is that creditFor() and creditForSession() reach NOTHING but the
+// frozen record and the timestamp they are handed.
+//
+// The freezing half is the other side of the same contract. freezeCancellation()
+// and freezeSession() read the activity — that is their entire job, and they run
+// at submission, which is the moment the terms are supposed to be read. They now
+// read it through _activity-groups, because which calendar a family is on is a
+// per-group question, and pinning the file's require list would have blocked a
+// correct change while leaving the real rule unstated.
+//
+// So it is stated. Scoped to the two functions that must not reach, on
+// comment-stripped source, and by NAME rather than by counting requires — a
+// second helper added to the freezing half must not need this test edited, and a
+// single `groups.` inside creditFor() must fail it.
+const bodyOf = (name) => {
+  const at = code.indexOf('function ' + name + '(');
+  H.ok(at !== -1, name + ' is in the file');
+  const next = code.indexOf('\nfunction ', at + 1);
+  return code.slice(at, next === -1 ? undefined : next);
+};
+['creditFor', 'creditForSession'].forEach((fn) => {
+  const body = bodyOf(fn);
+  H.ok(!/groups\./.test(body), fn + ' does not resolve a group — the frozen block already did');
+  H.ok(!/\.facts/.test(body), fn + ' never opens the activity');
+  H.ok(!/require\(/.test(body), fn + ' requires nothing of its own');
+});
+// And the freezing half is the ONLY thing that may. If a third function starts
+// reading the activity, it is a freeze or it is a bug.
+const readsActivity = (code.match(/function (\w+)\(activity/g) || [])
+  .map((m) => /function (\w+)\(/.exec(m)[1]).sort();
+// priceForSession is the third and belongs: it is freezeSession's own helper and
+// reads `facts.price`, which is ONE price for the whole activity. Groups differ
+// in when they meet, not in what they cost — that is the same rule
+// validateGroupCalendars() enforces from the other end, by refusing groups with
+// different session counts.
+H.eq(readsActivity.join(', '), 'freezeCancellation, freezeSession, priceForSession',
+  'exactly three functions take an activity: the two freezers and the price helper of one');
+const priced = bodyOf('priceForSession');
+H.ok(!/sessionDates|groups\./.test(priced),
+  'and the price helper reads no calendar, so it needs no group');
 H.ok(!/Date\.now\(\)/.test(code), 'and never asks what time it is — the caller passes that in');
 H.ok(!/Math\.random/.test(code), 'nor invents anything');
 H.ok(!/requireStore|optionalStore|fetch\(/.test(code), 'it opens no store and makes no request');

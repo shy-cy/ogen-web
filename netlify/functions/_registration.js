@@ -406,7 +406,13 @@ function freeze(activity, participant, groupId, flag, fee) {
     groupName: group ? (group.name || null) : null,
     // Built by _credit.js, beside the function that reads it, so the two shapes
     // cannot drift. It carries only the sessions that are actually happening.
-    cancellation: credit.freezeCancellation(activity)
+    //
+    // ⚠ THE GROUP DECIDES WHICH SESSIONS THOSE ARE. Prorated credit divides the
+    // sessions remaining by the sessions total, and where Beginners meet on
+    // Mondays and Advanced on Wednesdays those are two different lists. Frozen
+    // here, at submission, from the group the family actually chose — so a
+    // cancellation in March is judged against the term they were sold.
+    cancellation: credit.freezeCancellation(activity, groupId || null)
   };
 }
 

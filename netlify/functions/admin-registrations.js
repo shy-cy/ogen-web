@@ -34,6 +34,7 @@ const ledger = require('./_credit-ledger');
 const spend = require('./_spend-credit');
 const { cancelAndCredit } = require('./_registration-cancel');
 const attendance = require('./_session-attendance');
+const groups = require('./_activity-groups');
 const B = require('./_bundle');
 const bundleStore = require('./_bundle-store');
 const { recordAudit } = require('./_audit');
@@ -539,7 +540,7 @@ exports.handler = async (event) => {
         return json(200, {
           ok: true,
           activity: { activityId: activity.activityId, slug: activity.slug, title: activity.title },
-          dates: attendance.bookableDates(activity),
+          dates: attendance.bookableDates(activity, groups.ANY),
           sessionDate: date || null,
           capacity: date ? R.capacityForDate(activity, all, date) : null,
           register: rows
@@ -564,7 +565,10 @@ exports.handler = async (event) => {
         if (activity.type !== 'dropin') {
           return json(400, { error: 'This activity runs by the term, so it has a queue rather than a register.' });
         }
-        const dates = attendance.bookableDates(activity);
+        // ANY, and said out loud: one code per EVENING, covering whoever is
+        // coming to it. A code is pinned to a wall and the wall does not know
+        // which group is in the room.
+        const dates = attendance.bookableDates(activity, groups.ANY);
         const out = [];
         for (const date of dates) {
           const code = await codes.codeFor(activity, date);

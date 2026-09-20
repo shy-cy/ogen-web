@@ -14,6 +14,11 @@
 // falls back to `legacyText`, the words the admin originally typed, so nothing
 // regresses on the live site while records are migrated one at a time.
 
+// Which calendar and which schedule a named group is on. It requires nothing
+// itself, precisely so this file can require it — the rendering side has to ask
+// it, and the other direction would be a cycle.
+const groups = require('./_activity-groups');
+
 const FALLBACK = { he: ['he'], en: ['en', 'he'], ru: ['ru', 'en', 'he'] };
 
 function pick(field, lang) {
@@ -312,6 +317,53 @@ function formatSchedule(f, lang) {
     })
     .filter(Boolean);
   return parts.join(' · ');
+}
+
+// ⚠ THE SCHEDULE FACT WHEN THE GROUPS DIFFER. Beginners on Mondays and Advanced
+// on Wednesdays is one activity with two answers, and the card has to give both
+// — a single line would be right for at most one of the groups reading it.
+//
+// One line per group, named, joined with a NEWLINE: `.sidebar-facts span` is
+// already `white-space:pre-line` and several facts on this site are more than
+// one line, so this needs no new markup and no new CSS. A group with no schedule
+// of its own shows the activity's, which is what it meets on.
+//
+// Falls straight through to the single-line form when no group has its own,
+// which is every activity on the site today.
+function scheduleText(activity, lang) {
+  const facts = (activity && activity.facts) || {};
+  const named = groups.groupsWithSchedules(activity);
+  if (!named.length) return formatSchedule(facts.schedule || {}, lang);
+
+  return groups.namedGroups(activity)
+    .map((g) => {
+      const line = formatSchedule(groups.scheduleFor(activity, g.groupId), lang);
+      const name = pick(g.name, lang);
+      if (!line) return '';
+      return name ? `${name}: ${line}` : line;
+    })
+    .filter(Boolean)
+    .join('\n');
+}
+
+// ⚠ ONE TABLE PER GROUP when the groups keep their own calendars, because a
+// family in one of them reading the other's dates is the whole bug this exists
+// to fix. `title` is null when there is one table, so the single-calendar page —
+// which is every page on the site today — renders exactly as it did.
+function sessionTables(activity, lang) {
+  const facts = (activity && activity.facts) || {};
+  const withOwn = groups.groupsWithCalendars(activity);
+  if (!withOwn.length) {
+    const rows = sessionRows(facts.duration || {}, lang);
+    return rows.length ? [{ groupId: null, title: null, rows: rows }] : [];
+  }
+  return groups.namedGroups(activity)
+    .map((g) => ({
+      groupId: g.groupId,
+      title: pick(g.name, lang) || null,
+      rows: sessionRows({ sessionDates: groups.calendarFor(activity, g.groupId) }, lang)
+    }))
+    .filter((t) => t.rows.length);
 }
 
 // One row per session that actually happens. Excluded dates are not rendered as
@@ -733,13 +785,18 @@ function factText(activity, key, lang) {
 
   let text = '';
   if (key === 'ages') text = formatAges(f, lang);
-  else if (key === 'schedule') text = formatSchedule(f, lang);
-  else if (key === 'duration') text = formatDuration(f, lang);
+  else if (key === 'schedule') text = scheduleText(activity, lang);
+  // The duration fact and the price both COUNT the calendar, and on a per-group
+  // activity the activity's own list is empty — see durationFor(). Handing them
+  // one group's keeps every count correct with no signature threaded through
+  // six more functions, and is safe because a differing count is refused on
+  // save.
+  else if (key === 'duration') text = formatDuration(groups.durationFor(activity), lang);
   else if (key === 'groupSize') text = formatGroupSize(f, lang);
   else if (key === 'instructionLanguage') text = formatInstructionLanguage(f, lang);
   else if (key === 'prerequisites') text = formatPrerequisites(f, lang);
   else if (key === 'location' || key === 'address') text = pick(f.text, lang);
-  else if (key === 'price') text = formatPrice(f, lang, facts.duration);
+  else if (key === 'price') text = formatPrice(f, lang, groups.durationFor(activity));
 
   return text || pick(f.legacyText, lang);
 }
@@ -824,7 +881,8 @@ module.exports = {
   FACT_ORDER, TEXT_FACTS, STRUCTURED_FACTS, DEFAULT_VISIBILITY,
   ACADEMIC_MINUTES, CURRENCY,
   num, pick, ruPlural, monthYear, sessionTotal,
-  formatAges, formatSchedule, formatDuration, sessionRows, weekOrdinal, showPerLesson,
+  formatAges, formatSchedule, scheduleText, formatDuration, sessionRows, sessionTables,
+  weekOrdinal, showPerLesson,
   SESSION_TABLE, WEEK_ORDINALS, RU_DAY_GENDER, formatGroupSize, formatPrice,
   priceRows, factPriceRows,
   academicHours, pricePerHour,

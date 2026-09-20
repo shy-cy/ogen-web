@@ -861,6 +861,88 @@ extra line beside it. It carries no "(N sessions × M lessons)" qualifier, becau
 that hangs off `fullPrice` and disappears on its own. `pricePerHour()` gained one
 more source rather than a branch.
 
+### Two groups can meet on different days
+
+⚠ **An activity had ONE calendar and groups that could only differ in size.**
+Beginners on Mondays and Advanced on Wednesdays is the ordinary shape of a
+community centre's term, and `facts.duration.sessionDates` was right for at most
+one of the two. The visible half was bad — a family read a session table of dates
+they do not attend. **The invisible half was money**: prorated credit is sessions
+remaining over sessions *total*, frozen at submission, and frozen off the wrong
+group's calendar it produces a figure that is wrong and entirely plausible.
+
+A named group may now carry its own `schedule` and its own `sessionDates`. Both
+live on `facts.groupSize.named[]` beside the name and the capacity, because **a
+group is one thing an admin sets up** — split across the schedule and duration
+panels, one of the three is what gets forgotten. Both are structure, and for a
+role without full access the whole structured fact comes from the stored record,
+so nothing a Russian-only session sends can reach a timetable.
+
+**`_activity-groups.js` is the one resolver**, and it requires nothing —
+deliberately, because the rendering side has to ask it and the other direction
+would be a cycle. Every reader that knows its group comes through it:
+
+| | |
+|---|---|
+| `calendarFor(activity, groupId)` | the group's dates, or the activity's |
+| `scheduleFor(activity, groupId)` | the group's schedule line |
+| `sessionCountOf(activity)` | how many times a family meets — **one** group's, never the union |
+| `durationFor(activity)` | the duration fact carrying one group's list, for the half-dozen things that only want the count |
+| `unionDates(activity)` | every evening, for the two group-BLIND readers |
+
+⚠ **A forgotten argument is loud, and only where it is ambiguous.**
+`calendarFor(activity)` with no group **throws** on a per-group activity and
+answers normally on every other — so the ordinary activity is untouched and the
+dangerous case cannot return a plausible wrong list. A caller that genuinely has
+no group passes `groups.ANY`, which is greppable and reads as a decision. `null`
+is its own case: a registration taken while the activity was still pooled carries
+no group, and reads the activity's list, because inventing one would put a family
+on dates nobody promised.
+
+**Two readers are group-blind on purpose and say so.** Autocompletion reads the
+**union** — an activity is over when the *last* group is over, and reading one
+calendar would archive the page while another group still meets. The check-in
+codes pass `ANY`: one code per evening, and the wall does not know which group is
+in the room. The bundle shortfall is the opposite case and is judged **per
+bundle**: asked of the activity, a Beginners bundle would be told the term is
+still running because Advanced meet next week, and a credit that family is owed
+would never be written.
+
+⚠ **Every group meets the same NUMBER of times**, refused on save by
+`validateGroupCalendars()` with both counts named. It is not a limitation being
+worked around, it is the shape of the data: one `fullPrice`, one "(N sessions ×
+M lessons)" qualifier, one denominator. A model that cannot price two counts must
+not publish a page implying it can, and an admin who genuinely needs that has
+**two activities in one series**, which `seriesId` already links for the fee.
+Half a configuration — one group with a calendar beside one without — is refused
+for the same reason.
+
+**The group is frozen where money is.** `freezeCancellation(activity, groupId,
+…)` takes it second; `freezeSession` takes it on `opts`; a bundle stores
+`groupId` at purchase so `reconcile()` refills from the calendar it was sold
+against rather than another group's. `_credit.js` gained its first `require` for
+this, which broke the letter of a test asserting it had none — the rule that test
+existed for is that **`creditFor()` and `creditForSession()` reach nothing but
+the frozen record and a timestamp**, and it says that now, scoped to those two
+functions by name. The freezing half reads the activity; that is its job.
+
+**The page shows both.** The schedule fact renders a line per group, joined with
+a newline — `.sidebar-facts span` is already `white-space:pre-line`, so this
+needed no new markup. `sessionTables()` returns one table per group, each
+captioned with its name, and returns a single untitled table when there is one
+calendar, which is every published page today.
+
+**In the admin, a group opens a sub-page.** Inlining a frequency, date rows and a
+ten-row calendar into the named-groups list would put all of it twice inside a
+panel called "Group size". It is a **view swap** rather than a second HTML page:
+the record is already loaded and dirty-tracked, the save path and the optimistic
+lock are one, and a real second page would have to re-implement all three to edit
+a slice of the same record. The back button is also the commit, and says so. One
+`scheduleRowBox()` builds the rows for both editors, namespaced by prefix. ⚠ And
+`syncNamedGroups()` **carries** the schedule and calendar it does not draw — a
+read-back returning only what it can see would delete them every time a group is
+added, which is the undrawn-field trap in its newest costume.
+
 ### `creditFor()` — what a cancellation credits
 
 `netlify/functions/_credit.js`. The first piece of Phase 5, written before
