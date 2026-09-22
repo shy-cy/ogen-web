@@ -58,7 +58,13 @@
     editors: {},        // field id -> Quill instance, for the rich fields
     pendingEditors: [], // built during a render, mounted once they are in the DOM
     previewLang: 'he',
-    scheduleSessions: [],
+    // Who meets when, held in the model rather than read back off the form.
+    // None of these has an input on the main screen any more — they are edited
+    // on a sub-page — so the save reads these. primeScheduleModel() loads them.
+    schedule: { frequency: 'weekly', weekOfMonth: 1, sessions: [] },
+    sessionDates: [],
+    namedGroups: [],
+    ownerEdit: null,   // the sub-page's working copy, or null
     dirty: false
   };
 
@@ -1119,92 +1125,6 @@
     return out;
   }
 
-  function scheduleRows(fact) {
-    var box = el('div', { class: 'session-rows', id: 'schedule-rows' });
-    var freq = ($('fact-schedule-frequency') || {}).value || fact.frequency || 'weekly';
-    var spec = (S.schema.frequencies || []).filter(function (f) { return f.key === freq; })[0];
-    var wanted = spec && spec.sessions;
-    var sessions = S.scheduleSessions.slice();
-    if (wanted) {
-      while (sessions.length < wanted) sessions.push({ day: null, time: '' });
-      sessions = sessions.slice(0, wanted);
-    }
-    if (!wanted && !sessions.length) sessions.push({ day: null, time: '' });
-    S.scheduleSessions = sessions;
-
-    sessions.forEach(function (sess, i) {
-      var daySel = el('select', { id: 'fact-schedule-' + i + '-day' });
-      daySel.appendChild(el('option', { value: '', text: '— day —' }));
-      DAY_NAMES.forEach(function (name, d) {
-        daySel.appendChild(el('option', { value: String(d), text: name, selected: sess.day === d || null }));
-      });
-      daySel.addEventListener('change', function () { S.dirty = true; refreshLegacyNotes(); });
-      var time = timeField('fact-schedule-' + i + '-time', sess.time);
-
-      // ⚠ A CUSTOM SCHEDULE CAN NAME ITS DATES, and that is the difference
-      // between "Wednesday, 16:00" and "Wednesday, 14 October, 16:00". An
-      // activity that meets on a handful of particular days could not say which
-      // ones: a weekday and a time is the right shape for something repeating
-      // and says almost nothing about something that is not.
-      //
-      // Only for `custom`. Every other frequency IS a rule for repeating, and a
-      // date on one of those rows would be a second, contradictory answer to
-      // the question the frequency already settles.
-      var dateInput = null;
-      if (freq === 'custom') {
-        dateInput = el('input', { type: 'date', id: 'fact-schedule-' + i + '-date' });
-        dateInput.value = sess.date || '';
-        dateInput.addEventListener('input', function () {
-          S.dirty = true;
-          syncDay();
-          refreshLegacyNotes();
-        });
-      }
-
-      // THE WEEKDAY IS DERIVED, NEVER TYPED TWICE. With a date in the row the
-      // select shows that date's day and is disabled — a row claiming "Tuesday"
-      // and "14 October 2026", which is a Wednesday, is two claims that can
-      // disagree with nothing to say which one a reader should believe. The
-      // server derives it too, on every save, so this is the screen agreeing
-      // with a rule rather than the screen being the rule.
-      function syncDay() {
-        var d = dateInput && weekdayOf(dateInput.value);
-        if (d == null) {
-          daySel.disabled = false;
-          daySel.removeAttribute('title');
-          return;
-        }
-        daySel.value = String(d);
-        daySel.disabled = true;
-        daySel.title = 'Taken from the date';
-      }
-      if (dateInput) syncDay();
-
-      var row = el('div', { class: 'session-row' },
-        dateInput ? [dateInput, daySel, time] : [daySel, time]);
-      if (!wanted) {
-        row.appendChild(el('button', {
-          type: 'button', class: 'del', text: 'Remove',
-          onclick: function () { syncSchedule(); S.scheduleSessions.splice(i, 1); S.dirty = true; redrawSchedule(); }
-        }));
-      }
-      box.appendChild(row);
-    });
-
-    if (!wanted) {
-      box.appendChild(el('button', {
-        type: 'button', class: 'add-btn',
-        text: freq === 'custom' ? '+ Add another date' : '+ Add another day',
-        onclick: function () { syncSchedule(); S.scheduleSessions.push({ day: null, time: '' }); S.dirty = true; redrawSchedule(); }
-      }));
-    }
-    return box;
-  }
-
-  // The weekday of an ISO date, or null. Built through Date.UTC rather than
-  // `new Date('2026-10-14')` parsed locally, for the same reason the server
-  // enumerates in UTC: a local parse puts a DST boundary between the string and
-  // the day it names, and the symptom is one row of a schedule off by a day.
   function weekdayOf(iso) {
     var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '').trim());
     if (!m) return null;
@@ -1217,35 +1137,6 @@
 
   // Same rule the repeatable lists live by: read the inputs into the model
   // BEFORE redrawing, or a redraw eats whatever was just typed.
-  function syncSchedule() {
-    S.scheduleSessions = S.scheduleSessions.map(function (sess, i) {
-      var d = $('fact-schedule-' + i + '-day');
-      var t = $('fact-schedule-' + i + '-time');
-      var dt = $('fact-schedule-' + i + '-date');
-      if (!d && !t && !dt) return sess;
-      var date = dt && dt.value ? dt.value : null;
-      var out = {
-        // Derived where there is a date, so the two cannot disagree. This is
-        // also what the server does on save; doing it here as well means the
-        // form never shows one answer and stores another.
-        day: date ? weekdayOf(date) : (d && d.value !== '' ? Number(d.value) : null),
-        time: t ? t.value : ''
-      };
-      if (date) out.date = date;
-      return out;
-    });
-    return S.scheduleSessions;
-  }
-
-  function redrawSchedule() {
-    var old = $('schedule-rows');
-    if (old && old.parentNode) old.parentNode.replaceChild(scheduleRows(currentSchedule()), old);
-  }
-
-  function currentSchedule() {
-    return ((S.record.facts || {}).schedule) || {};
-  }
-
   // Price per academic hour, recomputed as you type. Same arithmetic as the
   // server, with the 45-minute basis taken FROM the server so there is one
   // source of truth for it rather than a copy that can drift.
@@ -1372,43 +1263,11 @@
         numField('fact-ages-max', 'Oldest', fact.max)
       ]);
     } else if (d.kind === 'schedule') {
-      S.scheduleSessions = (fact.sessions || []).map(function (x) {
-        return { day: x.day == null ? null : Number(x.day), time: x.time || '' };
-      });
-      var freqSel = el('select', { id: 'fact-schedule-frequency' });
-      (S.schema.frequencies || []).forEach(function (f) {
-        freqSel.appendChild(el('option', {
-          value: f.key, text: f.label, selected: f.key === (fact.frequency || 'weekly') || null
-        }));
-      });
-      freqSel.addEventListener('change', function () {
-        syncSchedule(); S.dirty = true; redrawSchedule(); refreshLegacyNotes();
-      });
-      // Which week of the month, for a monthly activity only. 'last' is a real
-      // option rather than an error state: a month with only four of that
-      // weekday uses the last one instead of inventing a fifth.
-      var weekCell = el('div', { id: 'week-of-month-cell' });
-      var drawWeek = function () {
-        weekCell.innerHTML = '';
-        if (((freqSel && freqSel.value) || fact.frequency) !== 'monthly') return;
-        var wsel = el('select', { id: 'fact-schedule-weekOfMonth' });
-        (S.schema.weeksOfMonth || []).forEach(function (w) {
-          wsel.appendChild(el('option', { value: String(w.key), text: w.label,
-            selected: String(w.key) === String(fact.weekOfMonth == null ? 1 : fact.weekOfMonth) || null }));
-        });
-        wsel.addEventListener('change', function () { S.dirty = true; refreshLegacyNotes(); });
-        weekCell.appendChild(el('label', { for: 'fact-schedule-weekOfMonth', text: 'Which week' }));
-        weekCell.appendChild(wsel);
-      };
-      drawWeek();
-      freqSel.addEventListener('change', drawWeek);
-      body = el('div', {}, [
-        el('div', { class: 'fact-grid' }, [
-          el('div', {}, [el('label', { for: 'fact-schedule-frequency', text: 'How often' }), freqSel]),
-          weekCell
-        ]),
-        scheduleRows(fact)
-      ]);
+      // ⚠ THE WHOLE PANEL IS THE OWNER LIST NOW. The frequency select, the
+      // day/time rows and the week-of-month cell all moved onto the sub-page,
+      // where a named group's have always been — so there is one editor and one
+      // place to look, whether an activity names groups or not.
+      body = scheduleOwnersEditor();
     } else if (d.kind === 'duration') {
       body = el('div', {}, [
         el('div', { class: 'fact-grid' }, [
@@ -1417,7 +1276,13 @@
           numField('fact-duration-sessionCount', 'Number of sessions', fact.sessionCount),
           numField('fact-duration-sessionMinutes', 'Minutes per session', fact.sessionMinutes)
         ]),
-        sessionCalendar(fact)
+        // The calendar moved to the sub-page with the schedule it is generated
+        // from. It was here and the schedule was one panel up, which is two
+        // places for one job and the reason the two calendars drifted apart.
+        el('div', { class: 'hint', text:
+          'The dates themselves are under Schedule \u00b7 Everyone, with the timetable they ' +
+          'are generated from. The number of sessions above is a CAP on generation; the ' +
+          'calendar is what the page prints and what a cancellation is divided by.' })
       ]);
     } else if (d.kind === 'groupSize') {
       // Three languages, through the same fieldRow the location fact uses, so
@@ -1440,7 +1305,17 @@
           numField('fact-groupSize-maxPerGroup', 'Max per group', fact.maxPerGroup)
         ]),
         override,
-        namedGroupsEditor(fact)
+        // ⚠ THE GROUPS THEMSELVES ARE UNDER SCHEDULE. A group is one thing an
+        // admin sets up — a name, a number of places, a timetable and a
+        // calendar — and it had its name and places here while its timetable
+        // was a panel away. Both are on its own sub-page now, reached from the
+        // one list of who meets when.
+        el('div', { class: 'hint', text:
+          'Named groups are under Schedule, with the timetable each one keeps \u2014 a group ' +
+          'is a name, a number of places, a schedule and a calendar, and having half of it ' +
+          'here and half there is how one of them gets forgotten. While this activity names ' +
+          'groups the two numbers above are ignored: the count is the length of that list and ' +
+          'the capacity is the sum of theirs.' })
       ]);
     } else if (d.kind === 'price') {
       // A course quotes the term, a drop-in quotes the session, and only one of
@@ -1480,102 +1355,6 @@
       body,
       legacyNote(d, fact)
     ]);
-  }
-
-  // ---------- the session calendar ---------------------------------------------
-  //
-  // GENERATE ONCE, THEN EDIT. The dates are a real stored field, not a formula
-  // re-evaluated on read: generating fills the list from the frequency and the
-  // dates, and after that it is edited by hand like any other value. That is
-  // what lets an admin drop a holiday and have it stay dropped.
-  //
-  // The enumeration happens on the SERVER, through the same module the page and
-  // the credit arithmetic use. Writing it again here would be a second
-  // implementation of the one list that decides both what a family reads and
-  // what they are refunded, and the two would eventually disagree.
-  //
-  // An excluded date keeps its place in the list rather than being deleted, so
-  // it can be put back, it survives a regeneration, and the reason is there for
-  // whoever asks next year. None of that reaches the page: the published table
-  // lists the sessions that are happening and nothing else.
-  function sessionCalendar(fact) {
-    S.sessionDates = (fact.sessionDates || []).map(function (r) {
-      return { date: r.date, status: r.status === 'excluded' ? 'excluded' : 'scheduled',
-               reason: r.reason || '' };
-    });
-    var box = el('div', { id: 'session-calendar', style: 'margin-top:18px;' });
-    drawSessionCalendar(box);
-    return box;
-  }
-
-  function drawSessionCalendar(box) {
-    box.innerHTML = '';
-    box.appendChild(el('div', { class: 'field-label', text: 'Session dates' }));
-    box.appendChild(sessionCalendarBox({
-      prefix: 'sess',
-      dates: S.sessionDates || [],
-      canEdit: canEditAll(),
-      lead: 'This list is what the page prints and what a cancellation is priced against, ' +
-            'so the session count is taken from it rather than from the number typed above.',
-      empty: 'Generate the dates from the schedule and the start date, then edit them by hand. ' +
-             'Without a calendar the page shows no session table and prorated cancellation ' +
-             'cannot be used.',
-      generateLabel: { generate: 'Generate sessions', regenerate: 'Regenerate from the schedule' },
-      onGenerate: function () { generateSessions(box); },
-      onChange: function (next, o) {
-        S.sessionDates = next;
-        S.dirty = true;
-        if (!(o && o.quiet)) drawSessionCalendar(box);
-      }
-    }));
-  }
-
-  // ⚠ NO LONGER A DOM WALK. It read every checkbox and every reason box back by
-  // id on each call, which is what made the inverted checkbox a two-place bug:
-  // the meaning of `checked` was written here as well as where it was drawn,
-  // and the two had to agree. The component owns the list and hands it back on
-  // every change, so there is one statement of what a tick means.
-  function syncSessionCalendar() {
-    return S.sessionDates || [];
-  }
-
-  function generateSessions(box) {
-    syncSessionCalendar();
-    syncSchedule();
-    var freqNode = $('fact-schedule-frequency');
-    send({
-      action: 'sessions',
-      schedule: {
-        frequency: (freqNode && freqNode.value) || 'weekly',
-        sessions: S.scheduleSessions || [],
-        weekOfMonth: ($('fact-schedule-weekOfMonth') || {}).value
-      },
-      duration: {
-        startDate: ($('fact-duration-startDate') || {}).value || '',
-        endDate: ($('fact-duration-endDate') || {}).value || '',
-        sessionCount: readNum('fact-duration-sessionCount'),
-        sessionDates: S.sessionDates
-      }
-    }).then(function (res) {
-      if (!res.ok) { message('err', failure(res, 'generate the sessions')); return; }
-      var rows = res.data.sessionDates || [];
-      if (!rows.length) {
-        message('err', 'Nothing to generate. A calendar needs a start date, a day of the week, ' +
-          'and either an end date or a number of sessions — and a custom frequency cannot be ' +
-          'generated at all, because it is whatever you typed.');
-        return;
-      }
-      S.sessionDates = rows.map(function (r) {
-        return { date: r.date, status: r.status, reason: r.reason || '' };
-      });
-      S.dirty = true;
-      drawSessionCalendar(box);
-      // The disagreement between a typed count and the span it is supposed to
-      // cover, surfaced while an admin is here to settle it. hebrew4kids has
-      // had it since before any of this was built.
-      message(res.data.note ? 'warn' : 'ok',
-        res.data.note || (rows.length + ' dates generated. Nothing is saved until you save.'));
-    });
   }
 
   // ---------- named groups ----------------------------------------------------
@@ -1712,107 +1491,162 @@
     return 'g-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   }
 
-  function namedGroupsEditor(fact) {
-    S.namedGroups = (fact.named || []).map(function (g) {
-      var out = { groupId: g.groupId || mintGroupId(), name: langObj(g.name), capacity: g.capacity };
-      // Loaded into the model even though this editor draws neither: they are
-      // edited on the group's own sub-page and have to survive the round trip.
-      if (g.schedule) out.schedule = g.schedule;
-      if (g.sessionDates) out.sessionDates = g.sessionDates;
-      return out;
+  // ---------- who meets when --------------------------------------------------
+  //
+  // ⚠ ONE SCHEDULE SYSTEM, NOT TWO. An activity's own schedule was edited inline
+  // in the Schedule panel with its own frequency select and its own row builder,
+  // its calendar inline in Duration, and a named group's on a sub-page — three
+  // placements for one job. That is how the tick-means-excluded bug came to be
+  // worded two different ways, and it is what an admin had to hold in their head
+  // to know where a timetable was set.
+  //
+  // There is one list now: WHO MEETS WHEN. Every row opens the same sub-page and
+  // the same editor.
+  //
+  // ⚠ AND THE FIRST ROW IS NOT A GROUP. It is "Everyone", and that distinction
+  // is the whole reason this is a UI change rather than a data change. Naming
+  // groups is a promise to a FAMILY that there is a choice to make: it puts a
+  // picker on the registration form, the group's name on the public page, on
+  // the roster and on every receipt, and it switches capacity from
+  // `groups × maxPerGroup` to the sum of the named capacities — so an activity
+  // holding 14 would start holding whatever one auto-created group was given.
+  // An activity with one class has no choice to offer, so it names no group and
+  // none of that happens. Naming a row is what creates a group, and that is the
+  // one moment any of it changes.
+  //
+  // With groups present, "Everyone" stays as row 0 and is the DEFAULT any group
+  // that has not set its own timetable follows — which is what calendarFor()
+  // already does in one function. Making the fallback a visible row is what
+  // keeps it editable; it was reachable only through the Schedule panel before,
+  // which this list replaces.
+  function ownerRows() {
+    var out = [{ groupId: null, label: 'Everyone' }];
+    (S.namedGroups || []).forEach(function (g) {
+      out.push({ groupId: g.groupId, label: groupLabel(g) });
     });
-    var box = el('div', { id: 'named-groups', style: 'margin-top:18px;' });
-    drawNamedGroups(box);
+    return out;
+  }
+
+  function groupById(groupId) {
+    return (S.namedGroups || []).filter(function (g) { return g.groupId === groupId; })[0] || null;
+  }
+
+  function groupLabel(g) {
+    return ['en', 'he', 'ru'].map(function (l) { return (g.name || {})[l]; })
+      .filter(Boolean)[0] || 'Unnamed group';
+  }
+
+  // What this owner's own schedule and calendar are, or null where it has none
+  // and follows the activity's.
+  function ownerSchedule(groupId) {
+    if (groupId == null) return S.schedule;
+    var g = groupById(groupId);
+    return (g && g.schedule && (g.schedule.sessions || []).length) ? g.schedule : null;
+  }
+  function ownerDates(groupId) {
+    if (groupId == null) return S.sessionDates || [];
+    var g = groupById(groupId);
+    return (g && g.sessionDates) || null;
+  }
+
+  // "Wednesdays 16:00 · 11 dates", for the row. A summary rather than the
+  // fields, because the fields are one click away and a list of them is what
+  // this list exists not to be.
+  function ownerSummary(row) {
+    var sch = ownerSchedule(row.groupId);
+    var dates = ownerDates(row.groupId);
+    if (row.groupId != null && !sch && !dates) return 'Follows Everyone';
+    var bits = [];
+    var sessions = (sch && sch.sessions) || [];
+    var said = sessions.map(function (x) {
+      var day = x.day == null ? '' : DAY_NAMES[x.day];
+      return [x.date || day, x.time].filter(Boolean).join(' ');
+    }).filter(Boolean);
+    bits.push(said.length ? said.join(' · ') : 'No schedule yet');
+    var live = (dates || []).filter(function (r) { return r.status !== 'excluded'; }).length;
+    bits.push((dates || []).length ? live + ' dates' : 'no dates');
+    return bits.join(' · ');
+  }
+
+  function scheduleOwnersEditor() {
+    var box = el('div', { id: 'schedule-owners' });
+    drawScheduleOwners(box);
     return box;
   }
 
-  function drawNamedGroups(box) {
+  function drawScheduleOwners(box) {
     box.innerHTML = '';
-    box.appendChild(el('div', { class: 'field-label', text: 'Named groups (optional)' }));
-    box.appendChild(el('div', { class: 'hint', text: S.namedGroups.length
-      ? 'The numbers above are ignored while this list has entries: the group count is the ' +
-        'length of the list and the capacity is the sum of these. A family chooses one when they register.'
-      : 'Leave empty unless a family has to CHOOSE which group — Beginners or Advanced. ' +
-        'Two groups meeting at the same hour do not need this.' }));
+    var groups = S.namedGroups || [];
+    box.appendChild(el('div', { class: 'hint', text: groups.length
+      ? 'This activity names its groups, so a family chooses one when they register. ' +
+        'A group with no timetable of its own follows Everyone. Every group has to meet ' +
+        'the same NUMBER of times — one term price and one session count are quoted to ' +
+        'every family — so a group with a different count is refused on save.'
+      : 'One class, so nobody has to choose. Add a named group only when a family has to ' +
+        'pick between them — Beginners or Advanced. Naming groups puts a chooser on the ' +
+        'registration form and the name on the page, the roster and every receipt.' }));
 
-    S.namedGroups.forEach(function (g, i) {
-      var row = el('div', { class: 'item', 'data-group-id': g.groupId });
-      row.appendChild(fieldRow({ label: 'Group name' }, g.name, 'grp-' + g.groupId + '-name'));
-      var cap = el('input', { type: 'number', min: '1', step: '1', id: 'grp-' + g.groupId + '-cap',
-                              disabled: !canEditAll() || null });
-      cap.value = g.capacity == null ? '' : g.capacity;
-      cap.addEventListener('input', function () { S.dirty = true; });
-      var remove = el('button', { type: 'button', class: 'add-btn', text: 'Remove this group',
-                                  disabled: !canEditAll() || null });
-      remove.addEventListener('click', function () {
-        syncNamedGroups();
-        S.namedGroups.splice(i, 1);
-        S.dirty = true;
-        drawNamedGroups(box);
-      });
-      var own = (g.schedule && (g.schedule.sessions || []).length) || (g.sessionDates || []).length;
-      var open = el('button', { type: 'button', class: 'add-btn',
-                                disabled: !canEditAll() || null,
-                                text: 'Schedule & dates \u2192' });
-      open.addEventListener('click', function () { openGroupPage(g.groupId); });
-      row.appendChild(el('div', { class: 'fact-grid' }, [
-        el('div', {}, [el('label', { for: 'grp-' + g.groupId + '-cap', text: 'Places in this group' }), cap]),
-        el('div', {}, [el('label', { text: '\u00a0' }), open]),
-        el('div', {}, [el('label', { text: '\u00a0' }), remove])
+    ownerRows().forEach(function (row) {
+      var open = el('button', { type: 'button', class: 'add-btn', text: 'Schedule & dates \u2192',
+                                disabled: !canEditAll() || null });
+      open.addEventListener('click', function () { openOwnerPage(row.groupId); });
+      box.appendChild(el('div', { class: 'item' }, [
+        el('div', { class: 'owner-row' }, [
+          el('span', { class: 'owner-name', text: row.label }),
+          el('span', { class: 'owner-when', text: ownerSummary(row) }),
+          open
+        ])
       ]));
-      // Said on the row rather than only behind the button: whether a group has
-      // a timetable of its own is the thing an admin is scanning this list for.
-      row.appendChild(el('div', { class: 'hint', text: own
-        ? 'Has its own schedule and ' + ((g.sessionDates || []).length || 'no') + ' dates.'
-        : 'Follows the activity\'s own schedule and dates.' }));
-      box.appendChild(row);
     });
 
     var add = el('button', { type: 'button', class: 'add-btn', text: '+ Add a named group',
                              disabled: !canEditAll() || null });
     add.addEventListener('click', function () {
-      // Read the form into the model BEFORE redrawing, or adding a row eats
-      // whatever was typed into the row above it.
-      syncNamedGroups();
       S.namedGroups.push({ groupId: mintGroupId(), name: { he: '', en: '', ru: '' }, capacity: null });
       S.dirty = true;
-      drawNamedGroups(box);
+      drawScheduleOwners(box);
+      refreshLegacyNotes();
     });
     box.appendChild(add);
   }
 
-  // ⚠ A SUB-PAGE PER GROUP, not more fields on the list.
+  // ⚠ A SUB-PAGE PER OWNER, not more fields on the list.
   //
-  // A group now carries a schedule and a calendar of its own, and inlining
-  // those into the named-groups list would put two date pickers, a frequency
-  // and a table of ten rows inside a row that used to be a name and a number —
-  // twice over, for two groups, inside a panel called "Group size".
+  // A timetable is a frequency, a set of day/time rows and a calendar of ten or
+  // more dates. Inlining that into a list would put all of it on the page once
+  // per owner, inside a panel that is meant to answer "who meets when" at a
+  // glance.
   //
-  // So the list stays a list and each row opens a screen. It is a VIEW SWAP
-  // rather than a second HTML page on purpose: the record is already loaded and
-  // already dirty-tracked here, the save path and the optimistic lock are one,
-  // and a real second page would have to re-implement all three to edit a slice
-  // of the same record. Visually it is a sub-page with a way back; technically
-  // nothing forks. It is also the place any later per-group field goes.
-  function openGroupPage(groupId) {
-    syncNamedGroups();
-    var g = (S.namedGroups || []).filter(function (x) { return x.groupId === groupId; })[0];
-    if (!g) return;
+  // It is a VIEW SWAP rather than a second HTML page on purpose: the record is
+  // already loaded and already dirty-tracked here, the save path and the
+  // optimistic lock are one, and a real second page would have to re-implement
+  // all three to edit a slice of the same record. Visually it is a sub-page with
+  // a way back; technically nothing forks.
+  //
+  // The SAME page serves "Everyone" and a named group. The only difference is
+  // two fields at the top: a group has a name a family reads and a number of
+  // places, and the activity itself has neither.
+  function openOwnerPage(groupId) {
+    var g = groupId == null ? null : groupById(groupId);
+    if (groupId != null && !g) return;
 
-    // Working copies. Edits live here until the sub-page is left, so a group
+    // A working copy. Edits live here until the sub-page is left, so an owner
     // half-edited and abandoned does not leave the record in that state.
-    S.groupEdit = {
+    var sch = (groupId == null ? S.schedule : (g.schedule || {})) || {};
+    S.ownerEdit = {
       groupId: groupId,
-      freq: (g.schedule && g.schedule.frequency) || 'weekly',
-      sessions: ((g.schedule && g.schedule.sessions) || []).map(function (x) {
-        return { day: x.day, time: x.time || '', date: x.date || null };
+      name: g ? langObj(g.name) : null,
+      capacity: g ? g.capacity : null,
+      freq: sch.frequency || 'weekly',
+      weekOfMonth: sch.weekOfMonth == null ? 1 : sch.weekOfMonth,
+      sessions: (sch.sessions || []).map(function (x) {
+        return { day: x.day == null ? null : Number(x.day), time: x.time || '', date: x.date || null };
       }),
-      dates: (g.sessionDates || []).map(function (r) {
+      dates: ((groupId == null ? S.sessionDates : g.sessionDates) || []).map(function (r) {
         return { date: r.date, status: r.status === 'excluded' ? 'excluded' : 'scheduled',
                  reason: r.reason || '' };
       })
     };
-    if (!S.groupEdit.sessions.length) S.groupEdit.sessions.push({ day: null, time: '', date: null });
 
     // There is no single form wrapper to hide — the panels are direct children
     // of .main — so the swap is done by hiding them. Hidden rather than
@@ -1829,11 +1663,11 @@
       if (n !== page) n.hidden = true;
     });
     page.hidden = false;
-    drawGroupPage(page, g);
+    drawOwnerPage(page);
     if (page.scrollIntoView) page.scrollIntoView();
   }
 
-  function closeGroupPage() {
+  function closeOwnerPage() {
     var main = document.querySelector('.main');
     var page = $('group-page');
     if (page) { page.hidden = true; page.innerHTML = ''; }
@@ -1842,38 +1676,54 @@
         if (n !== page) n.hidden = false;
       });
     }
-    S.groupEdit = null;
-    // The list shows whether a group has its own timetable, so it has to be
-    // redrawn on the way back or it still says "shares the activity's".
-    var box = $('named-groups');
-    if (box) drawNamedGroups(box);
+    S.ownerEdit = null;
+    // The list summarises each owner's timetable, so it has to be redrawn on the
+    // way back or it still says what was true before.
+    var box = $('schedule-owners');
+    if (box) drawScheduleOwners(box);
+    refreshLegacyNotes();
   }
 
   var GROUP_PREFIX = 'grp-schedule';
 
-  function readGroupEdit() {
-    var e = S.groupEdit;
+  // ⚠ ONLY THE SCHEDULE ROWS ARE READ BACK FROM THE DOM. The calendar is not:
+  // sessionCalendarBox() hands its list to onChange on every edit, so e.dates is
+  // already current. It used to be walked by id here, which put the meaning of a
+  // ticked box in a second place that had to agree with where it was drawn —
+  // and they did agree, on the wrong answer.
+  function readOwnerEdit() {
+    var e = S.ownerEdit;
     if (!e) return null;
     e.sessions = readScheduleRows(GROUP_PREFIX, e.sessions.length);
     var freqNode = $(GROUP_PREFIX + '-frequency');
     if (freqNode) e.freq = freqNode.value;
-    // The calendar is NOT read back from the DOM: sessionCalendarBox() hands
-    // its list to onChange on every edit, so e.dates is already current. It
-    // used to be walked by id here, which put the meaning of a ticked box in
-    // two places that had to agree — and they did agree, on the wrong answer.
+    var wom = $(GROUP_PREFIX + '-weekOfMonth');
+    if (wom) e.weekOfMonth = wom.value === 'last' ? 'last' : Number(wom.value);
+    if (e.groupId != null) {
+      if ($(GROUP_PREFIX + '-name-he')) e.name = readLangField(GROUP_PREFIX + '-name');
+      var cap = $(GROUP_PREFIX + '-cap');
+      if (cap) e.capacity = cap.value !== '' ? Number(cap.value) : null;
+    }
     return e;
   }
 
-  // Back into S.namedGroups, which is what the save reads. A group with no
-  // schedule rows and no dates carries neither key rather than empty ones —
-  // absent is what "shares the activity's" is spelled as everywhere else.
-  function commitGroupEdit() {
-    var e = readGroupEdit();
+  // Back into the model the save reads. An owner with no schedule rows and no
+  // dates carries neither key rather than empty ones — absent is what "follows
+  // the activity's" is spelled as everywhere else.
+  function commitOwnerEdit() {
+    var e = readOwnerEdit();
     if (!e) return;
+    var rows = e.sessions.filter(function (x) { return x.day != null || x.time || x.date; });
+
+    if (e.groupId == null) {
+      S.schedule = { frequency: e.freq, weekOfMonth: e.weekOfMonth, sessions: rows };
+      S.sessionDates = e.dates || [];
+      S.dirty = true;
+      return;
+    }
     S.namedGroups = (S.namedGroups || []).map(function (g) {
       if (g.groupId !== e.groupId) return g;
-      var out = { groupId: g.groupId, name: g.name, capacity: g.capacity };
-      var rows = e.sessions.filter(function (x) { return x.day != null || x.time || x.date; });
+      var out = { groupId: g.groupId, name: e.name, capacity: e.capacity };
       if (rows.length) out.schedule = { frequency: e.freq, sessions: rows };
       if ((e.dates || []).length) out.sessionDates = e.dates;
       return out;
@@ -1881,33 +1731,71 @@
     S.dirty = true;
   }
 
-  function drawGroupPage(page, g) {
+  function drawOwnerPage(page) {
     page.innerHTML = '';
-    var e = S.groupEdit;
-    var title = ['en', 'he', 'ru'].map(function (l) { return (g.name || {})[l]; })
-      .filter(Boolean)[0] || 'This group';
+    var e = S.ownerEdit;
+    var isGroup = e.groupId != null;
+    var title = isGroup ? (groupLabel({ name: e.name })) : 'Everyone';
 
     // The back button is also the COMMIT. Edits live on a working copy until
-    // this is pressed, so a group opened and abandoned leaves the record as it
+    // this is pressed, so an owner opened and abandoned leaves the record as it
     // was — and the label says so, because a button that quietly discards is
     // the same button as one that quietly keeps.
     var back = el('button', { type: 'button', class: 'add-btn',
                               text: '\u2190 Back to the activity \u00b7 keeps these changes' });
-    back.addEventListener('click', function () { commitGroupEdit(); closeGroupPage(); });
-    page.appendChild(el('div', { class: 'panel' }, [
+    back.addEventListener('click', function () { commitOwnerEdit(); closeOwnerPage(); });
+
+    var head = el('div', { class: 'panel' }, [
       back,
-      el('h2', { text: 'Group · ' + title }),
-      el('div', { class: 'hint', text:
-        'When this group meets, and the dates it meets on. Leave both empty and it ' +
-        'follows the activity\'s own schedule. Every group has to meet the same NUMBER ' +
-        'of times \u2014 one term price and one session count are quoted to every family \u2014 ' +
-        'so a group with a different count is refused on save.' })
-    ]));
+      el('h2', { text: isGroup ? 'Group \u00b7 ' + title : 'Everyone' }),
+      el('div', { class: 'hint', text: isGroup
+        ? 'When this group meets and the dates it meets on. Leave both empty and it follows ' +
+          'Everyone. Every group has to meet the same NUMBER of times \u2014 one term price ' +
+          'and one session count are quoted to every family \u2014 so a group with a ' +
+          'different count is refused on save.'
+        : 'When this activity meets and the dates it meets on. With no named groups this is ' +
+          'simply the timetable. With named groups it is the default any group that has not ' +
+          'set its own follows.' })
+    ]);
+    page.appendChild(head);
+
+    // --- who this group is ---------------------------------------------------
+    // ⚠ ON THE SAME PAGE AS ITS TIMETABLE. A group is one thing an admin sets
+    // up, and splitting its name and its places into a different panel from its
+    // schedule is how one of the three gets forgotten. The activity itself has
+    // no name to give and no places of its own — its capacity is the pooled
+    // numbers on Group size — so this half is simply absent for Everyone.
+    if (isGroup) {
+      var who = el('div', { class: 'panel' });
+      who.appendChild(el('h3', { text: 'Who they are' }));
+      who.appendChild(fieldRow({
+        label: 'Group name',
+        hint: 'What a family picks between when they register. A group with no name in any ' +
+              'language is dropped on save rather than offered as a nameless choice.'
+      }, e.name, GROUP_PREFIX + '-name'));
+      var cap = el('input', { type: 'number', min: '1', step: '1', id: GROUP_PREFIX + '-cap',
+                              disabled: !canEditAll() || null });
+      cap.value = e.capacity == null ? '' : e.capacity;
+      cap.addEventListener('input', function () { S.dirty = true; });
+      var remove = el('button', { type: 'button', class: 'del', text: 'Remove this group',
+                                  disabled: !canEditAll() || null });
+      remove.addEventListener('click', function () {
+        S.namedGroups = (S.namedGroups || []).filter(function (g) { return g.groupId !== e.groupId; });
+        S.dirty = true;
+        S.ownerEdit = null;
+        closeOwnerPage();
+      });
+      who.appendChild(el('div', { class: 'fact-grid' }, [
+        el('div', {}, [el('label', { for: GROUP_PREFIX + '-cap', text: 'Places in this group' }), cap]),
+        el('div', {}, [el('label', { text: '\u00a0' }), remove])
+      ]));
+      page.appendChild(who);
+    }
 
     // --- when it meets -------------------------------------------------------
     var schedBox = el('div', { class: 'panel' });
-    schedBox.appendChild(el('h3', { text: 'When this group meets' }));
-    var freqSel = el('select', { id: GROUP_PREFIX + '-frequency' });
+    schedBox.appendChild(el('h3', { text: 'When they meet' }));
+    var freqSel = el('select', { id: GROUP_PREFIX + '-frequency', disabled: !canEditAll() || null });
     (S.schema.frequencies || []).forEach(function (f) {
       freqSel.appendChild(el('option', { value: f.key, text: f.label, selected: f.key === e.freq || null }));
     });
@@ -1915,60 +1803,94 @@
       e.sessions = readScheduleRows(GROUP_PREFIX, e.sessions.length);
       e.freq = freqSel.value;
       S.dirty = true;
-      drawGroupPage(page, g);
+      drawOwnerPage(page);
     });
-    schedBox.appendChild(el('div', { class: 'fact-grid' }, [
-      el('div', {}, [el('label', { for: GROUP_PREFIX + '-frequency', text: 'How often' }), freqSel])
-    ]));
+
+    // Which week of the month, for a monthly activity only. 'last' is a real
+    // option rather than an error state: a month with only four of that weekday
+    // uses the last one instead of inventing a fifth.
+    var cells = [el('div', {}, [el('label', { for: GROUP_PREFIX + '-frequency', text: 'How often' }), freqSel])];
+    if (e.freq === 'monthly') {
+      var wsel = el('select', { id: GROUP_PREFIX + '-weekOfMonth', disabled: !canEditAll() || null });
+      (S.schema.weeksOfMonth || []).forEach(function (w) {
+        wsel.appendChild(el('option', { value: String(w.key), text: w.label,
+          selected: String(w.key) === String(e.weekOfMonth) || null }));
+      });
+      wsel.addEventListener('change', function () {
+        e.weekOfMonth = wsel.value === 'last' ? 'last' : Number(wsel.value);
+        S.dirty = true;
+      });
+      cells.push(el('div', {}, [el('label', { for: GROUP_PREFIX + '-weekOfMonth', text: 'Which week' }), wsel]));
+    }
+    schedBox.appendChild(el('div', { class: 'fact-grid' }, cells));
+
+    // ⚠ A FREQUENCY THAT NAMES A COUNT GETS EXACTLY THAT MANY ROWS. The
+    // activity's own editor padded and trimmed to it and a group's did not, so a
+    // group could be set to "twice weekly" and given one day — which enumerates
+    // half a term with nothing erroring. One editor, one rule.
+    var spec = (S.schema.frequencies || []).filter(function (f) { return f.key === e.freq; })[0];
+    var wanted = spec && spec.sessions;
+    if (wanted) {
+      while (e.sessions.length < wanted) e.sessions.push({ day: null, time: '', date: null });
+      e.sessions = e.sessions.slice(0, wanted);
+    }
+    if (!wanted && !e.sessions.length) e.sessions.push({ day: null, time: '', date: null });
+
     schedBox.appendChild(scheduleRowBox({
       prefix: GROUP_PREFIX, freq: e.freq, sessions: e.sessions,
       onChange: function () { S.dirty = true; },
-      onAdd: function () {
+      onAdd: wanted ? null : function () {
         e.sessions = readScheduleRows(GROUP_PREFIX, e.sessions.length);
         e.sessions.push({ day: null, time: '', date: null });
-        S.dirty = true; drawGroupPage(page, g);
+        S.dirty = true; drawOwnerPage(page);
       },
-      onRemove: function (i) {
+      onRemove: wanted ? null : function (i) {
         e.sessions = readScheduleRows(GROUP_PREFIX, e.sessions.length);
         e.sessions.splice(i, 1);
-        S.dirty = true; drawGroupPage(page, g);
+        S.dirty = true; drawOwnerPage(page);
       }
     }));
     page.appendChild(schedBox);
 
     // --- the dates -----------------------------------------------------------
-    // THE SAME EDITOR the activity's own dates use. It was a second, simpler
-    // copy: no reason box, no delete, and a checkbox that said " not meeting"
-    // where the other said "No class this date" — both inverted, each in its
-    // own words.
     var calBox = el('div', { class: 'panel' });
-    calBox.appendChild(el('h3', { text: 'The dates this group meets on' }));
+    calBox.appendChild(el('h3', { text: 'The dates they meet on' }));
     calBox.appendChild(sessionCalendarBox({
       prefix: GROUP_PREFIX,
       dates: e.dates || [],
       canEdit: canEditAll(),
-      lead: 'This is the list a cancellation is prorated against for this group.',
-      empty: 'None yet. Generate them from the schedule above, or leave empty to follow ' +
-             'the activity\'s calendar.',
-      generateLabel: { generate: 'Generate this group\'s dates',
-                       regenerate: 'Regenerate this group\'s dates' },
-      onGenerate: function () { generateGroupSessions(page, g); },
+      lead: isGroup
+        ? 'This is the list a cancellation is prorated against for this group.'
+        : 'This list is what the page prints and what a cancellation is priced against, ' +
+          'so the session count is taken from it rather than from the number typed on the form.',
+      empty: isGroup
+        ? 'None yet. Generate them from the schedule above, or leave empty to follow Everyone.'
+        : 'None yet. Generate them from the schedule above and the start date. Without a ' +
+          'calendar the page shows no session table and prorated cancellation cannot be used.',
+      generateLabel: { generate: 'Generate the dates', regenerate: 'Regenerate from the schedule' },
+      onGenerate: function () { generateOwnerSessions(page); },
       onChange: function (next, o) {
         e.dates = next;
         S.dirty = true;
-        if (!(o && o.quiet)) drawGroupPage(page, g);
+        if (!(o && o.quiet)) drawOwnerPage(page);
       }
     }));
     page.appendChild(calBox);
   }
 
-  // The SAME server action the activity's own calendar uses, so a group's dates
-  // are enumerated by the one generator rather than a second one that can drift.
-  function generateGroupSessions(page, g) {
-    var e = readGroupEdit();
+  // The SAME server action for every owner, so dates are enumerated by the one
+  // generator rather than a second one that can drift. The start date, end date
+  // and session count are the ACTIVITY's — they are not per-group, because a
+  // group meeting a different number of times is refused on save.
+  //
+  // Those fields are on the main form, which is hidden rather than detached
+  // while this page is open, so they are still readable by id.
+  function generateOwnerSessions(page) {
+    var e = readOwnerEdit();
     send({
       action: 'sessions',
-      schedule: { frequency: e.freq, sessions: e.sessions, weekOfMonth: '' },
+      schedule: { frequency: e.freq, sessions: e.sessions,
+                  weekOfMonth: e.freq === 'monthly' ? e.weekOfMonth : '' },
       duration: {
         startDate: ($('fact-duration-startDate') || {}).value || '',
         endDate: ($('fact-duration-endDate') || {}).value || '',
@@ -1979,56 +1901,83 @@
       if (!res.ok) { message('err', failure(res, 'generate the sessions')); return; }
       var rows = res.data.sessionDates || [];
       if (!rows.length) {
-        message('err', 'Nothing to generate for this group. It needs a day and a time, ' +
-          'and the activity needs a start date and either an end date or a session count.');
+        message('err', 'Nothing to generate. A calendar needs a start date, a day of the week, ' +
+          'and either an end date or a number of sessions — and a custom frequency cannot be ' +
+          'generated at all, because it is whatever you typed. Clear the dates and type them ' +
+          'on the schedule above instead.');
         return;
       }
       e.dates = rows.map(function (r) {
         return { date: r.date, status: r.status, reason: r.reason || '' };
       });
       S.dirty = true;
-      drawGroupPage(page, g);
-      message('ok', rows.length + ' dates generated for this group. Nothing is saved until you save.');
+      drawOwnerPage(page);
+      // The disagreement between a typed count and the span it is supposed to
+      // cover, surfaced while an admin is here to settle it.
+      message(res.data.note ? 'warn' : 'ok',
+        res.data.note || (rows.length + ' dates generated. Nothing is saved until you save.'));
     });
   }
 
-  // A restricted role gets the words and not the structure, here as everywhere.
   function canEditAll() {
     return ['he', 'en', 'ru'].every(function (l) { return canEdit(l); });
   }
 
+  // ⚠ NO LONGER A DOM WALK. The names and capacities live on each group's own
+  // sub-page, so none of their inputs is on the main form — a read-back by id
+  // would find nothing and save every group nameless. The model is the record.
   function syncNamedGroups() {
-    S.namedGroups = (S.namedGroups || []).map(function (g) {
-      var capNode = $('grp-' + g.groupId + '-cap');
-      var out = {
-        groupId: g.groupId,
-        // A row whose fields are not on screen — every row, while the group
-        // sub-page is open — keeps what it had. Reading an absent input as an
-        // empty name is how a redraw eats a group.
-        name: $('grp-' + g.groupId + '-name-he')
-          ? readLangField('grp-' + g.groupId + '-name') : g.name,
-        capacity: capNode ? (capNode.value !== '' ? Number(capNode.value) : null) : g.capacity
-      };
-      // ⚠ CARRIED, NOT REBUILT. The schedule and the calendar are edited on the
-      // sub-page and have no inputs in this list, so a read-back that returned
-      // only what it can see would delete them every time a group is added or
-      // removed — the same silent loss the undrawn-panel rule exists for.
-      if (g.schedule) out.schedule = g.schedule;
-      if (g.sessionDates) out.sessionDates = g.sessionDates;
-      return out;
-    });
-    return S.namedGroups;
+    return S.namedGroups || [];
   }
 
   // A group with no name in any language is dropped rather than saved as a
   // nameless choice a family would be asked to make.
   function readNamedGroups() {
     return syncNamedGroups().filter(function (g) {
-      return ['he', 'en', 'ru'].some(function (l) { return String(g.name[l] || '').trim(); });
+      return ['he', 'en', 'ru'].some(function (l) { return String((g.name || {})[l] || '').trim(); });
     });
   }
 
+  // ⚠ THE MODEL IS PRIMED BEFORE ANY FACT BLOCK IS DRAWN, and it has to be: the
+  // Schedule panel draws the list of who meets when, which reads the named
+  // groups — and Group size, where those used to be loaded, is rendered after
+  // it. Loading each fact's state inside its own block worked only while
+  // nothing read anything but its own.
+  //
+  // It is also what makes the sub-page safe. The schedule, the calendar, the
+  // group names and the capacities have no inputs on the main form any more, so
+  // the save reads THIS rather than walking the DOM — the undrawn-field rule
+  // this project keeps meeting: absent from the screen must never mean cleared
+  // on the record.
+  function primeScheduleModel() {
+    var facts = S.record.facts || {};
+    var sch = facts.schedule || {};
+    var dur = facts.duration || {};
+    var gs = facts.groupSize || {};
+    S.schedule = {
+      frequency: sch.frequency || 'weekly',
+      weekOfMonth: sch.weekOfMonth == null ? 1 : sch.weekOfMonth,
+      sessions: (sch.sessions || []).map(function (x) {
+        return { day: x.day == null ? null : Number(x.day), time: x.time || '', date: x.date || null };
+      })
+    };
+    S.sessionDates = (dur.sessionDates || []).map(function (r) {
+      return { date: r.date, status: r.status === 'excluded' ? 'excluded' : 'scheduled',
+               reason: r.reason || '' };
+    });
+    S.namedGroups = (gs.named || []).map(function (g) {
+      var out = { groupId: g.groupId || mintGroupId(), name: langObj(g.name), capacity: g.capacity };
+      // Carried rather than rebuilt: they are edited on the sub-page and have
+      // no inputs here at all.
+      if (g.schedule) out.schedule = g.schedule;
+      if (g.sessionDates) out.sessionDates = g.sessionDates;
+      return out;
+    });
+    S.ownerEdit = null;
+  }
+
   function renderFacts() {
+    primeScheduleModel();
     $('facts').innerHTML = '';
     S.schema.facts.forEach(function (d) { $('facts').appendChild(factBlock(d)); });
     refreshPerHour();
@@ -2063,19 +2012,22 @@
       }
       else if (d.kind === 'ages') out = { min: readNum('fact-ages-min'), max: readNum('fact-ages-max') };
       else if (d.kind === 'schedule') {
+        // FROM THE MODEL, not the DOM. These inputs live on the sub-page and are
+        // not on screen while the main form is — reading them back by id would
+        // find nothing and save an empty schedule over a real one.
+        var sch = S.schedule || {};
         out = {
-          frequency: ($('fact-schedule-frequency') || {}).value || 'weekly',
+          frequency: sch.frequency || 'weekly',
           // The SAME test the server's shape applies — see SHAPES.schedule in
           // _activity-migrate.js. Two filters that differ is one of them
           // dropping a row the other keeps, and the symptom is a schedule that
           // loses a line on save with nothing erroring.
-          sessions: syncSchedule().filter(function (x) {
+          sessions: (sch.sessions || []).filter(function (x) {
             return x.day != null || x.time || x.date;
           })
         };
-        var wom = $('fact-schedule-weekOfMonth');
-        if (out.frequency === 'monthly' && wom) {
-          out.weekOfMonth = wom.value === 'last' ? 'last' : Number(wom.value);
+        if (out.frequency === 'monthly') {
+          out.weekOfMonth = sch.weekOfMonth === 'last' ? 'last' : Number(sch.weekOfMonth);
         }
       } else if (d.kind === 'duration') {
         out = {
@@ -2220,13 +2172,15 @@
     // record's own id. Sent as null rather than omitted, so "the admin unlinked
     // it" and "this form did not draw it" stay different requests.
     rec.seriesId = ($('f-series') && $('f-series').value) || null;
-    // ⚠ A GROUP LEFT OPEN IS STILL SAVED. The sub-page holds its edits on a
-    // working copy until the back button commits them, and somebody who opens a
-    // group, changes its schedule and presses Publish without going back would
+    // ⚠ AN OWNER LEFT OPEN IS STILL SAVED. The sub-page holds its edits on a
+    // working copy until the back button commits them, and somebody who opens
+    // one, changes its schedule and presses Publish without going back would
     // otherwise publish the old one — with the new one on screen in front of
     // them. Committing here makes "what I can see" and "what is saved" the same
-    // thing whichever screen is up.
-    commitGroupEdit();
+    // thing whichever screen is up. It is also why readFacts() does NOT commit:
+    // it runs on every keystroke behind the legacy notes, and committing there
+    // would mark a form dirty just for being read.
+    commitOwnerEdit();
     var facts = readFacts();
     rec.facts = facts.facts;
     rec.factVisibility = facts.factVisibility;

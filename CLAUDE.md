@@ -891,6 +891,34 @@ says ten sessions run out on 16 December against an end date of 23 December, a
 disagreement that has been in the record since before any of this existed and
 that nothing has ever read.
 
+⚠ **A TICK MEANS THE CLASS HAPPENS.** It meant the opposite: `cb.checked` was
+`status === 'excluded'`, so the dates that were **not** happening were the ticked
+ones. Each half was defensible — the label read "No class this date", and
+`excluded` is genuinely the stored status — and the pair was not. A column of
+dates is a list, a tick in a list means "this one counts", and it is what every
+other checkbox in the admin means; an admin scanning a term saw the two holidays
+lit up and the eleven teaching dates blank. Nothing downstream moved: `excluded`
+is still what is stored.
+
+⚠ **AND IT WAS WRITTEN TWICE, WORDED DIFFERENTLY.** The activity's editor said
+"No class this date" and a group's said " not meeting"; one had a reason box and
+the other dropped it on save. Both inverted. The two collapsed into one
+`sessionCalendarBox()` **before** the bug was fixed, so it could only be fixed
+once — and neither reads a checkbox back out of the DOM by id any more, which is
+what put the meaning of a tick in a second place that had to agree with the
+first.
+
+⚠ **DELETING A DATE IS A DIFFERENT ACT FROM UNTICKING ONE**, and there was no
+way to do it. Regeneration already **replaces** the list — `mergeExclusions()`
+returns the newly enumerated dates and reads the old list only to carry
+exclusions and their reasons forward — so a wrong frequency is usually fixed by
+regenerating. Usually: switch to `custom` and regeneration refuses outright,
+because a custom schedule is whatever was typed and there is nothing to
+enumerate. The wrong dates then sat there with no way to shift them, and
+unticking all eleven stored eleven exclusions describing a term that never
+existed. There is a per-row **Delete** and a **Clear all N dates** that names its
+count, because it cannot be undone.
+
 **An excluded date keeps its place in the record** so it can be put back and so
 it survives a regeneration, and its `reason` travels with it. None of that
 reaches the page: the published table lists the sessions that are happening and
@@ -1002,16 +1030,68 @@ needed no new markup. `sessionTables()` returns one table per group, each
 captioned with its name, and returns a single untitled table when there is one
 calendar, which is every published page today.
 
-**In the admin, a group opens a sub-page.** Inlining a frequency, date rows and a
-ten-row calendar into the named-groups list would put all of it twice inside a
-panel called "Group size". It is a **view swap** rather than a second HTML page:
-the record is already loaded and dirty-tracked, the save path and the optimistic
-lock are one, and a real second page would have to re-implement all three to edit
-a slice of the same record. The back button is also the commit, and says so. One
-`scheduleRowBox()` builds the rows for both editors, namespaced by prefix. ⚠ And
-`syncNamedGroups()` **carries** the schedule and calendar it does not draw — a
-read-back returning only what it can see would delete them every time a group is
-added, which is the undrawn-field trap in its newest costume.
+### ⚠ One schedule system: the list of who meets when
+
+There were **three placements for one job**. An activity's own frequency and
+day/time rows were inline in the Schedule panel; its calendar was inline in
+Duration, a panel away from the schedule it is generated from; a named group's
+were on a sub-page. Two of those were separate implementations, and they had
+drifted in every way two copies drift — different labels on the same checkbox,
+a reason box on one and not the other, and only the inline one ever grew the
+`date` field, so a **group on a custom schedule could not name its dates at
+all**. It is also how the inverted-checkbox bug came to be worded two ways.
+
+There is one list now — **who meets when** — in the Schedule panel. Every row
+opens the same sub-page and the same editor: frequency, week-of-month, the
+day/time rows, and the calendar. A group's row also carries its **name and its
+places**, because a group is one thing an admin sets up and having half of it in
+Group size and half behind a different panel is how one of the three gets
+forgotten.
+
+⚠ **THE FIRST ROW IS NOT A GROUP.** It is "Everyone", and that is the whole
+reason this is a UI change rather than a data change. Naming groups is a promise
+to a **family** that there is a choice to make, and the record already treats it
+that way: `submissionErrors()` *requires* a `groupId` once an activity names
+groups and refuses one when it does not. So an auto-created "Group 1" would put
+a one-option picker on the registration form, the name on the public page, the
+roster and every receipt — and it would switch capacity from
+`groups × maxPerGroup` to **the sum of the named capacities**, so an activity
+holding 14 would start holding whatever that one group was given, with nothing
+erroring. The single-versus-multi branch would not even disappear: `sessionTables()`
+captions per group and `scheduleText()` prefixes each line the moment groups
+carry calendars, so the renderer would grow the special case the admin shed,
+somewhere harder to see and where being wrong is visible to families.
+
+An activity with one class offers no choice, so it names no group. **Naming a
+row is what creates one**, and that is the single moment any of it changes.
+
+With groups present, "Everyone" stays as row 0 and is the **default** any group
+that has not set its own timetable follows — which is what `calendarFor()`
+already does in one function. Making the fallback a visible row is what keeps it
+editable; it was only reachable through the Schedule panel that this list
+replaced.
+
+It is a **view swap** rather than a second HTML page: the record is already
+loaded and dirty-tracked, the save path and the optimistic lock are one, and a
+real second page would have to re-implement all three to edit a slice of the same
+record. The back button is also the commit and says so, and a sub-page left open
+is committed on save, so what is on screen is what is stored.
+
+⚠ **NOTHING ABOUT AN OWNER IS READ BACK OFF THE MAIN FORM.** Not the schedule,
+not the calendar, not a group's name or its places — none of it has an input
+there any more, and the sub-page is hidden rather than detached. A save that
+walked the DOM would find nothing and clear all of it. The model is the record:
+`primeScheduleModel()` loads `S.schedule`, `S.sessionDates` and `S.namedGroups`
+from the record **before the first panel draws** — it has to run first, because
+the Schedule panel reads the named groups that Group size, rendered after it,
+used to be the thing that loaded — and `readFacts()` saves from those. That is
+the undrawn-field trap this project keeps meeting, and the answer is the same
+every time.
+
+One consequence worth having: a frequency that names a session count now pads
+and trims to it **for every owner**. The activity's editor did and a group's did
+not, so a group could be set to "twice weekly" and given one day, which
+enumerates half a term with nothing erroring.
 
 ### `creditFor()` — what a cancellation credits
 

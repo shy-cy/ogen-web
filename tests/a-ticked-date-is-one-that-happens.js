@@ -218,8 +218,11 @@ console.log('\n[⚠ THERE IS ONE OF THESE, NOT TWO]');
 // The bug was worded two ways because it was written twice. Both editors call
 // this builder now, and neither reads a checkbox back out of the DOM by id —
 // which is what put the meaning of a tick in a second place that had to agree.
+// ONE call site, because the two editors became one screen: the activity's own
+// dates and a named group's are both "an owner's dates" now and open the same
+// sub-page. It was two when the panels were still separate.
 const calls = (src.match(/sessionCalendarBox\(\{/g) || []).length;
-H.eq(calls, 2, 'both the activity calendar and a group\'s go through it');
+H.eq(calls, 1, 'there is one place a calendar is drawn');
 H.eq((src.match(/function sessionCalendarBox/g) || []).length, 1, 'and there is one of it');
 H.ok(!/-ex-/.test(src), 'the group editor no longer walks its checkboxes back by id');
 H.ok(!/cb\.checked \? 'excluded'/.test(src),
@@ -235,5 +238,130 @@ H.ok(!/No class this date/.test(bare),
 // a box that was ticked when it WAS not meeting. The surviving "not meeting" is
 // the new tag: a span, no leading space, shown only on a row that is off.
 H.ok(!/' not meeting'/.test(bare), 'and the group editor\'s');
+
+
+
+// ---------------------------------------------------------------------------
+// ⚠ AND THEN THE TWO EDITORS BECAME ONE SCREEN.
+//
+// An activity's schedule was edited inline in the Schedule panel with its own
+// frequency select and its own row builder, its calendar inline in Duration,
+// and a named group's on a sub-page. Three placements for one job, which is how
+// the bug above came to be worded two different ways, and how a group on a
+// custom schedule ended up unable to name its dates at all — only the inline
+// builder ever grew the date field.
+//
+// There is one list now, WHO MEETS WHEN, and every row opens the same sub-page.
+//
+// ⚠ THE FIRST ROW IS NOT A GROUP. Naming groups is a promise to a family that
+// there is a choice to make: it puts a picker on the registration form, the
+// name on the public page, the roster and every receipt, and it switches
+// capacity from `groups × maxPerGroup` to the sum of the named capacities — so
+// an activity holding 14 would start holding whatever one auto-created group
+// was given. An activity with one class offers no choice, so it names no group.
+// That is why this is a UI change and not a data change, and it is the thing
+// most worth pinning here.
+
+console.log('\n[the list of who meets when]');
+const listSrc = ['function ownerRows', 'function groupById', 'function groupLabel',
+                 'function ownerSchedule', 'function ownerDates', 'function ownerSummary']
+  .map((name) => {
+    const a = src.indexOf('  ' + name);
+    H.ok(a !== -1, 'found ' + name);
+    // Up to the next top-level function in the file.
+    const b = src.indexOf('\n  function ', a + 1);
+    return src.slice(a, b);
+  }).join('\n');
+
+const listCtx = {
+  S: null,
+  DAY_NAMES: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+  out: null
+};
+vm.createContext(listCtx);
+vm.runInContext(listSrc + '\nout = { ownerRows, ownerSummary, groupLabel };', listCtx);
+const L = listCtx.out;
+const setState = (st) => { listCtx.S = st; };
+
+const WED = { frequency: 'weekly', sessions: [{ day: 3, time: '16:00' }] };
+const MON = { frequency: 'weekly', sessions: [{ day: 1, time: '16:00' }] };
+const DATES = (n) => Array.from({ length: n }, (_, i) => ({ date: '2026-10-' + (14 + i * 7), status: 'scheduled' }));
+
+console.log('  -- an activity with one class');
+setState({ schedule: WED, sessionDates: DATES(3), namedGroups: [] });
+let rows = L.ownerRows();
+H.eq(rows.length, 1, 'one row');
+H.eq(rows[0].label, 'Everyone', 'and it is Everyone, not "Group 1"');
+H.eq(rows[0].groupId, null, '⚠ with NO groupId — it is not a named group, so a family is asked to choose nothing');
+H.eq(L.ownerSummary(rows[0]), 'Wednesday 16:00 · 3 dates', 'summarised on the row');
+
+console.log('  -- and one that names two');
+setState({
+  schedule: WED, sessionDates: DATES(3),
+  namedGroups: [
+    { groupId: 'g1', name: { he: 'מתחילים', en: 'Beginners', ru: '' }, capacity: 7,
+      schedule: MON, sessionDates: DATES(3) },
+    { groupId: 'g2', name: { he: '', en: 'Advanced', ru: '' }, capacity: 7 }
+  ]
+});
+rows = L.ownerRows();
+H.eq(rows.length, 3, 'Everyone plus the two groups');
+H.eq(rows.map((r) => r.label).join(', '), 'Everyone, Beginners, Advanced', 'in that order');
+H.eq(L.ownerSummary(rows[1]), 'Monday 16:00 · 3 dates', 'a group with its own timetable shows it');
+// ⚠ The inheritance, made visible. calendarFor() already falls back in one
+// function; the row is what makes the thing being fallen back TO editable.
+H.eq(L.ownerSummary(rows[2]), 'Follows Everyone',
+  'and one without says so rather than repeating the activity\'s as if it were its own');
+
+console.log('  -- a group half set up says which half');
+setState({ schedule: WED, sessionDates: [], namedGroups: [
+  { groupId: 'g1', name: { en: 'Beginners' }, capacity: 7, schedule: MON }
+] });
+H.eq(L.ownerSummary(L.ownerRows()[1]), 'Monday 16:00 · no dates',
+  'a schedule with no calendar generated yet');
+setState({ schedule: { sessions: [] }, sessionDates: [], namedGroups: [] });
+H.eq(L.ownerSummary(L.ownerRows()[0]), 'No schedule yet · no dates',
+  'and a brand-new activity says both');
+
+console.log('  -- an unnamed group is still listed, so it can be named or removed');
+setState({ schedule: WED, sessionDates: [], namedGroups: [
+  { groupId: 'g1', name: { he: '', en: '', ru: '' }, capacity: null }
+] });
+H.eq(L.ownerRows()[1].label, 'Unnamed group',
+  'a group added and not yet named is visible rather than a blank row');
+H.eq(L.groupLabel({ name: { he: 'מתחילים', en: '', ru: '' } }), 'מתחילים',
+  'and a group named in one language is labelled by it');
+
+console.log('\n[⚠ nothing about an owner is read back off the main form any more]');
+// The panels that used to hold these fields do not draw them, and the sub-page
+// is hidden — not detached — while the main form is up. A save that walked the
+// DOM would find nothing and clear the schedule, the calendar, every group name
+// and every capacity. This is the undrawn-field trap this project keeps meeting,
+// and the answer is the same every time: the model is the record.
+const reads = src.slice(src.indexOf('function readFacts'));
+H.ok(/var sch = S\.schedule \|\| \{\};/.test(reads), 'the schedule is saved from the model');
+H.ok(/sessionDates: S\.sessionDates/.test(reads), 'and the calendar');
+H.ok(/return S\.namedGroups \|\| \[\];/.test(src), 'and the groups');
+H.ok(!/\$\('fact-schedule-frequency'\)/.test(src),
+  'and the id the old inline frequency select carried is referenced nowhere');
+H.ok(!/grp-' \+ g\.groupId \+ '-cap/.test(src),
+  'nor the per-row capacity inputs the named list used to draw');
+
+// The model has to be loaded before the Schedule panel draws, because that
+// panel reads the named groups — which Group size, rendered after it, used to
+// be the thing that loaded.
+H.ok(/function renderFacts\(\) \{\s*\n\s*primeScheduleModel\(\);/.test(src),
+  'and it is primed before the first panel is drawn');
+
+console.log('\n[a frequency that names a count gets exactly that many rows]');
+// The activity's inline editor padded and trimmed to spec.sessions and a
+// group's did not, so a group could be "twice weekly" with one day — half a
+// term enumerated, nothing erroring. One editor, one rule.
+const ownerPage = src.slice(src.indexOf('function drawOwnerPage'),
+                            src.indexOf('function generateOwnerSessions'));
+H.ok(/while \(e\.sessions\.length < wanted\)/.test(ownerPage), 'short rows are padded');
+H.ok(/e\.sessions = e\.sessions\.slice\(0, wanted\)/.test(ownerPage), 'and extra ones trimmed');
+H.ok(/onAdd: wanted \? null :/.test(ownerPage),
+  'and a fixed-count frequency offers no Add, which is what made the two disagree');
 
 H.done();

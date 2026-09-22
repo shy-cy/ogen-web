@@ -296,6 +296,16 @@ input:disabled,textarea:disabled,select:disabled{background:#f2f0ea;color:#8b8b8
 .session-date{
   font-variant-numeric:tabular-nums; font-weight:600; padding:9px 0;
 }
+/* The one list of who meets when. A row is a name, a summary of its timetable
+   and the way in — deliberately not the fields themselves, which are a
+   frequency, a set of day/time rows and a calendar of eleven dates, and which
+   are one click away on the owner's own sub-page. */
+.owner-row{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.owner-row .owner-name{ font-weight:700; color:var(--ink); flex:0 0 auto; }
+.owner-row .owner-when{
+  font-size:13px; color:#5a5a54; flex:1 1 200px; font-variant-numeric:tabular-nums;
+}
+
 /* The date is the checkbox's LABEL, so clicking it toggles — the row is mostly
    date, and a 13px box is a small target for a list of eleven. */
 .session-row > .session-date{ cursor:pointer; flex:0 0 auto; }

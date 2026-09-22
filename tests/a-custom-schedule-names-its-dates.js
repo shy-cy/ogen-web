@@ -152,9 +152,15 @@ H.eq(normalise('24:00'), '24:00', 'an hour that does not exist is handed back fo
 H.eq(normalise('9:5'), '9:5', 'and so is a minute that is one digit — 9:05 and 9:50 are both readings');
 
 console.log('\n[the form: a date, and a weekday it cannot contradict]');
-const rowsFn = admin.slice(admin.indexOf('function scheduleRows'), admin.indexOf('function syncSchedule'));
+// ⚠ ONE ROW BUILDER. There were two — an inline one for the activity's own
+// schedule and scheduleRowBox() for a named group's — and only the inline one
+// ever grew the date field, so a group on a custom schedule could not name its
+// dates at all. They are one editor on one sub-page now, so this is the only
+// place to look.
+const rowsFn = admin.slice(admin.indexOf('function scheduleRowBox'),
+                           admin.indexOf('function readScheduleRows'));
 H.ok(/if \(freq === 'custom'\)/.test(rowsFn), 'the date input is drawn only for a custom schedule');
-H.ok(/type: 'date', id: 'fact-schedule-' \+ i \+ '-date'/.test(rowsFn), 'as a real date field');
+H.ok(/type: 'date', id: id \+ '-date'/.test(rowsFn), 'as a real date field');
 H.ok(/daySel\.disabled = true;/.test(rowsFn),
   'and the weekday select is disabled once a date fills it');
 H.ok(/daySel\.value = String\(d\);/.test(rowsFn), 'having been set from that date');
