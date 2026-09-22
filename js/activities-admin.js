@@ -976,6 +976,129 @@
     return box;
   }
 
+  // ⚠ ONE CALENDAR EDITOR, for the activity's own dates AND for a group's.
+  //
+  // There were two, written a release apart, and they had already drifted in
+  // every way two copies drift: one labelled the checkbox "No class this date"
+  // and the other " not meeting", one had a box for the reason and the other
+  // silently dropped it, one struck the row through and the other did not. The
+  // bug below was in both, worded differently in each — which is the whole
+  // argument for there being one of these.
+  //
+  // ⚠ A TICK MEANS THE GROUP MEETS. It used to mean the opposite: `checked`
+  // was `status === 'excluded'`, so the dates that were NOT happening were the
+  // ticked ones. Read as a list — which is what a column of dates is — a tick
+  // means "this one counts", and every other checkbox in this admin means
+  // "yes, do this". The label carried the inversion ("No class this date") and
+  // so the two halves were each defensible and the pair was not: an admin
+  // scanning for what the term looks like saw the holidays highlighted and the
+  // teaching invisible.
+  //
+  // What goes onto the record is unchanged — `excluded` is still the stored
+  // status and an unticked date still keeps its place — so nothing downstream
+  // moves. This is a display that was telling the truth backwards.
+  //
+  // opts: { prefix, dates, canEdit, onChange, generateLabel, onGenerate, lead }
+  function sessionCalendarBox(opts) {
+    var prefix = opts.prefix;
+    var rows = opts.dates || [];
+    var editable = opts.canEdit !== false;
+    var live = rows.filter(function (r) { return r.status !== 'excluded'; }).length;
+    var box = el('div', { class: 'session-cal' });
+
+    box.appendChild(el('div', { class: 'hint', text: rows.length
+      ? live + ' of ' + rows.length + ' dates are going ahead. ' + opts.lead
+      : opts.empty }));
+
+    var gen = el('button', { type: 'button', class: 'add-btn',
+      text: rows.length ? opts.generateLabel.regenerate : opts.generateLabel.generate,
+      disabled: !editable || null });
+    gen.addEventListener('click', opts.onGenerate);
+    box.appendChild(gen);
+
+    // ⚠ CLEARING IS NOT THE SAME ACT AS UNTICKING, and the gap was real.
+    //
+    // Regenerating already REPLACES the list — mergeExclusions() returns the
+    // newly enumerated dates and reads the old list only to carry exclusions
+    // and their reasons forward — so an admin who picks the wrong frequency can
+    // usually just regenerate. Usually. Switch to `custom` and regeneration
+    // refuses outright, because a custom schedule is whatever was typed and
+    // there is nothing to enumerate; the wrong dates then sit there with no way
+    // to shift them, and unticking them all leaves eleven excluded dates on the
+    // record rather than none. There was no way to get back to empty.
+    if (rows.length) {
+      var clear = el('button', { type: 'button', class: 'del',
+        text: 'Clear all ' + rows.length + ' dates', disabled: !editable || null });
+      clear.addEventListener('click', function () {
+        opts.onChange([]);
+      });
+      box.appendChild(clear);
+    }
+
+    if (!rows.length) return box;
+
+    box.appendChild(el('div', { class: 'field-label', style: 'margin-top:14px;',
+      text: 'Tick the dates it meets on' }));
+
+    var list = el('div', { class: 'session-rows' });
+    rows.forEach(function (r, i) {
+      var on = r.status !== 'excluded';
+      var id = prefix + '-on-' + i;
+      var cb = el('input', { type: 'checkbox', id: id, disabled: !editable || null });
+      cb.checked = on;
+      cb.addEventListener('change', function () {
+        var next = rows.slice();
+        next[i] = { date: r.date, status: cb.checked ? 'scheduled' : 'excluded',
+                    reason: cb.checked ? '' : (r.reason || '') };
+        opts.onChange(next);
+      });
+
+      // The reason is only askable about a date that is NOT happening, and it
+      // travels through a regeneration — an admin writes "Hanukkah" once and
+      // whoever asks next year can still find out why there was no class.
+      var why = el('input', { type: 'text', id: prefix + '-why-' + i,
+        placeholder: 'Why (admin only)', disabled: !editable || on || null });
+      why.value = on ? '' : (r.reason || '');
+      why.addEventListener('input', function () {
+        var next = rows.slice();
+        next[i] = { date: r.date, status: r.status, reason: why.value };
+        // Not a redraw: retyping the whole box on every keystroke would move
+        // the caret to the end of it.
+        opts.onChange(next, { quiet: true });
+      });
+
+      var row = el('div', { class: 'session-row' + (on ? '' : ' is-off') }, [
+        cb,
+        el('label', { for: id, class: 'session-date', text: r.date }),
+        el('span', { class: 'session-off-tag', text: on ? '' : 'not meeting' }),
+        why
+      ]);
+      // ⚠ DELETE, which is a different act from unticking. An unticked date is
+      // a date this activity was going to meet on and does not — it keeps its
+      // place, it survives a regeneration, and it carries a reason. A deleted
+      // one was never real: the wrong frequency produced it. Conflating the two
+      // is how a record ends up carrying a list of exclusions describing a term
+      // that never existed.
+      row.appendChild(el('button', {
+        type: 'button', class: 'del', text: 'Delete',
+        disabled: !editable || null,
+        onclick: function () {
+          var next = rows.slice();
+          next.splice(i, 1);
+          opts.onChange(next);
+        }
+      }));
+      list.appendChild(row);
+    });
+    box.appendChild(list);
+
+    box.appendChild(el('div', { class: 'hint', text:
+      'An unticked date keeps its place here so it can be put back, and it survives a ' +
+      'regeneration along with its reason. It reaches the page in neither form — not the ' +
+      'date and not the reason. Delete is for a date that should not be in the list at all.' }));
+    return box;
+  }
+
   // Read a schedule editor's inputs back into a plain array. Same prefix in,
   // same shape out — including the weekday derived from a date, so the form
   // never shows one answer and stores another.
@@ -1387,66 +1510,33 @@
 
   function drawSessionCalendar(box) {
     box.innerHTML = '';
-    var rows = S.sessionDates || [];
-    var live = rows.filter(function (r) { return r.status !== 'excluded'; }).length;
-
     box.appendChild(el('div', { class: 'field-label', text: 'Session dates' }));
-    box.appendChild(el('div', { class: 'hint', text: rows.length
-      ? live + ' of ' + rows.length + ' dates are going ahead. This list is what the page prints ' +
-        'and what a cancellation is priced against, so the session count is taken from it rather ' +
-        'than from the number typed above.'
-      : 'Generate the dates from the schedule and the start date, then edit them by hand. ' +
-        'Without a calendar the page shows no session table and prorated cancellation cannot be used.' }));
-
-    var gen = el('button', { type: 'button', class: 'add-btn',
-      text: rows.length ? 'Regenerate from the schedule' : 'Generate sessions',
-      disabled: !canEditAll() || null });
-    gen.addEventListener('click', function () { generateSessions(box); });
-    box.appendChild(gen);
-
-    if (!rows.length) return;
-
-    var list = el('div', { class: 'items', style: 'margin-top:12px;' });
-    rows.forEach(function (r, i) {
-      var off = r.status === 'excluded';
-      var cb = el('input', { type: 'checkbox', id: 'sess-' + i + '-off', disabled: !canEditAll() || null });
-      cb.checked = off;
-      var why = el('input', { type: 'text', id: 'sess-' + i + '-why', placeholder: 'Why (admin only)',
-                              disabled: !canEditAll() || !off || null });
-      why.value = r.reason || '';
-      why.addEventListener('input', function () { S.dirty = true; });
-      cb.addEventListener('change', function () {
-        syncSessionCalendar();
-        S.sessionDates[i].status = cb.checked ? 'excluded' : 'scheduled';
+    box.appendChild(sessionCalendarBox({
+      prefix: 'sess',
+      dates: S.sessionDates || [],
+      canEdit: canEditAll(),
+      lead: 'This list is what the page prints and what a cancellation is priced against, ' +
+            'so the session count is taken from it rather than from the number typed above.',
+      empty: 'Generate the dates from the schedule and the start date, then edit them by hand. ' +
+             'Without a calendar the page shows no session table and prorated cancellation ' +
+             'cannot be used.',
+      generateLabel: { generate: 'Generate sessions', regenerate: 'Regenerate from the schedule' },
+      onGenerate: function () { generateSessions(box); },
+      onChange: function (next, o) {
+        S.sessionDates = next;
         S.dirty = true;
-        drawSessionCalendar(box);
-      });
-      list.appendChild(el('div', { class: 'item' + (off ? ' is-off' : '') }, [
-        el('div', { class: 'fact-grid' }, [
-          el('div', {}, [el('label', { text: 'Date' }),
-            el('div', { class: 'session-date', text: r.date })]),
-          el('div', {}, [el('label', { for: 'sess-' + i + '-off', class: 'check-row' },
-            [cb, el('span', { text: 'No class this date' })]), why])
-        ])
-      ]));
-    });
-    box.appendChild(list);
-    box.appendChild(el('div', { class: 'hint', text:
-      'A date switched off keeps its place here so it can be switched back, and it survives a ' +
-      'regeneration. It does not appear on the page at all — neither the date nor the reason.' }));
+        if (!(o && o.quiet)) drawSessionCalendar(box);
+      }
+    }));
   }
 
+  // ⚠ NO LONGER A DOM WALK. It read every checkbox and every reason box back by
+  // id on each call, which is what made the inverted checkbox a two-place bug:
+  // the meaning of `checked` was written here as well as where it was drawn,
+  // and the two had to agree. The component owns the list and hands it back on
+  // every change, so there is one statement of what a tick means.
   function syncSessionCalendar() {
-    S.sessionDates = (S.sessionDates || []).map(function (r, i) {
-      var cb = $('sess-' + i + '-off');
-      var why = $('sess-' + i + '-why');
-      return {
-        date: r.date,
-        status: cb ? (cb.checked ? 'excluded' : 'scheduled') : r.status,
-        reason: why ? why.value : (r.reason || '')
-      };
-    });
-    return S.sessionDates;
+    return S.sessionDates || [];
   }
 
   function generateSessions(box) {
@@ -1767,10 +1857,10 @@
     e.sessions = readScheduleRows(GROUP_PREFIX, e.sessions.length);
     var freqNode = $(GROUP_PREFIX + '-frequency');
     if (freqNode) e.freq = freqNode.value;
-    e.dates = (e.dates || []).map(function (r, i) {
-      var cb = $(GROUP_PREFIX + '-ex-' + i);
-      return { date: r.date, status: cb && cb.checked ? 'excluded' : 'scheduled', reason: r.reason || '' };
-    });
+    // The calendar is NOT read back from the DOM: sessionCalendarBox() hands
+    // its list to onChange on every edit, so e.dates is already current. It
+    // used to be walked by id here, which put the meaning of a ticked box in
+    // two places that had to agree — and they did agree, on the wrong answer.
     return e;
   }
 
@@ -1847,37 +1937,28 @@
     page.appendChild(schedBox);
 
     // --- the dates -----------------------------------------------------------
+    // THE SAME EDITOR the activity's own dates use. It was a second, simpler
+    // copy: no reason box, no delete, and a checkbox that said " not meeting"
+    // where the other said "No class this date" — both inverted, each in its
+    // own words.
     var calBox = el('div', { class: 'panel' });
     calBox.appendChild(el('h3', { text: 'The dates this group meets on' }));
-    var live = (e.dates || []).filter(function (r) { return r.status !== 'excluded'; }).length;
-    calBox.appendChild(el('div', { class: 'hint', text: e.dates.length
-      ? live + ' session' + (live === 1 ? '' : 's') +
-        (e.dates.length !== live ? ' \u00b7 ' + (e.dates.length - live) + ' excluded' : '') +
-        ' \u00b7 this is the list a cancellation is prorated against.'
-      : 'None yet. Generate them from the schedule above, or leave empty to follow the activity\'s calendar.' }));
-
-    var gen = el('button', { type: 'button', class: 'add-btn', text: 'Generate this group\'s dates' });
-    gen.addEventListener('click', function () { generateGroupSessions(page, g); });
-    calBox.appendChild(gen);
-
-    if (e.dates.length) {
-      var list = el('div', { class: 'session-rows' });
-      e.dates.forEach(function (r, i) {
-        var cb = el('input', { type: 'checkbox', id: GROUP_PREFIX + '-ex-' + i });
-        cb.checked = r.status === 'excluded';
-        cb.addEventListener('change', function () {
-          e.dates[i].status = cb.checked ? 'excluded' : 'scheduled';
-          S.dirty = true;
-          drawGroupPage(page, g);
-        });
-        list.appendChild(el('div', { class: 'session-row' }, [
-          el('span', { class: 'num', text: r.date }),
-          el('label', { for: GROUP_PREFIX + '-ex-' + i, text: ' not meeting' }),
-          cb
-        ]));
-      });
-      calBox.appendChild(list);
-    }
+    calBox.appendChild(sessionCalendarBox({
+      prefix: GROUP_PREFIX,
+      dates: e.dates || [],
+      canEdit: canEditAll(),
+      lead: 'This is the list a cancellation is prorated against for this group.',
+      empty: 'None yet. Generate them from the schedule above, or leave empty to follow ' +
+             'the activity\'s calendar.',
+      generateLabel: { generate: 'Generate this group\'s dates',
+                       regenerate: 'Regenerate this group\'s dates' },
+      onGenerate: function () { generateGroupSessions(page, g); },
+      onChange: function (next, o) {
+        e.dates = next;
+        S.dirty = true;
+        if (!(o && o.quiet)) drawGroupPage(page, g);
+      }
+    }));
     page.appendChild(calBox);
   }
 

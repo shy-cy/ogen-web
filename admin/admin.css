@@ -296,10 +296,22 @@ input:disabled,textarea:disabled,select:disabled{background:#f2f0ea;color:#8b8b8
 .session-date{
   font-variant-numeric:tabular-nums; font-weight:600; padding:9px 0;
 }
+/* The date is the checkbox's LABEL, so clicking it toggles — the row is mostly
+   date, and a 13px box is a small target for a list of eleven. */
+.session-row > .session-date{ cursor:pointer; flex:0 0 auto; }
+.session-row > input[type=checkbox]{ width:auto; margin:0; flex:none; }
+.session-row .session-off-tag{
+  font-size:12px; font-weight:700; color:#8a3220; flex:0 0 auto;
+}
+.session-row input[type=text]{ flex:1 1 160px; min-width:120px; }
+
 /* A date switched off keeps its place in the list, so it has to be legible as
-   "still here, not happening" rather than looking deleted. */
+   "still here, not happening" rather than looking deleted. The strike-through
+   is on the date alone: striking the reason box would make the one thing an
+   admin is meant to type into look disabled. */
 .item.is-off{ opacity:.62; }
 .item.is-off .session-date{ text-decoration:line-through; }
+.session-row.is-off .session-date{ text-decoration:line-through; opacity:.7; }
 
 /* ---------- the approval queue ----------
    A table rather than the card list the rest of the admin uses, because this is
