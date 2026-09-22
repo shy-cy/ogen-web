@@ -37,10 +37,10 @@ process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
 (async () => {
   const blobs = H.makeBlobs();
   const activity = F.course({
-    facts: Object.assign({}, F.course().facts, {
+    facts: Object.assign({}, F.rawCourse().facts, {
       // Starts well after the cancellation, so the course credits in full and
       // there is a real number to move around.
-      duration: Object.assign({}, F.course().facts.duration, { startDate: '2027-01-11' })
+      duration: Object.assign({}, F.rawCourse().facts.duration, { startDate: '2027-01-11' })
     })
   });
   const github = H.makeGithub({ 'activities/course-fixture.json': JSON.stringify(activity) });

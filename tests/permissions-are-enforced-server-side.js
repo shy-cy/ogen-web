@@ -89,10 +89,17 @@ const H = require('./_helpers');
   // fact by name and the second one was added later.
   const factEdit = JSON.parse(JSON.stringify(after));
   factEdit.facts.groupSize = {
-    groups: 9, maxPerGroup: 9,
     overrideText: { he: 'HEBREW TAMPERED', en: 'ENGLISH TAMPERED', ru: 'Одна смешанная группа' }
   };
-  factEdit.facts.address = { text: { he: 'HEBREW TAMPERED', en: 'ENGLISH TAMPERED', ru: 'улица Ленина, 1' } };
+  // The address is a GROUP's fact now, and so is every other word inside one —
+  // which is the thing mergeGroups() had to be written for, because LANG_SUBKEYS
+  // merges a sub-key of one fact and cannot reach a sub-key of one ITEM.
+  factEdit.groups[0].facts.address = {
+    text: { he: 'HEBREW TAMPERED', en: 'ENGLISH TAMPERED', ru: 'улица Ленина, 1' } };
+  // A name they may translate, sitting beside a capacity they may not touch.
+  factEdit.groups[0].name = { he: 'HEBREW TAMPERED', en: 'ENGLISH TAMPERED', ru: 'Смешанная группа' };
+  factEdit.groups[0].capacity = 999;
+  factEdit.groups.push({ groupId: 'g-smuggled', name: { he: 'x', en: 'x', ru: 'x' } });
 
   const third = await H.call(admin.handler, Object.assign({
     action: 'saveDraft', baseUpdatedAt: after.isoUpdated, activity: factEdit
@@ -105,12 +112,17 @@ const H = require('./_helpers');
   H.eq(facts.groupSize.overrideText.he, '',
        'the Hebrew override is as it was — empty here, and their edit was dropped');
   H.eq(facts.groupSize.overrideText.en, '', 'so is the English');
-  H.eq(facts.groupSize.groups, null,
-       'and the numbers beside it did not move, because a count is structure');
 
-  H.eq(facts.address.text.ru, 'улица Ленина, 1',
+  const grp = third.body.activity.groups;
+  H.eq(grp.length, 1, 'they cannot ADD a group — membership is structure');
+  H.eq(grp[0].capacity, after.groups[0].capacity,
+       'and the capacity beside the name did not move, because a count is structure');
+  H.eq(grp[0].name.ru, 'Смешанная группа', 'but the group NAME translates');
+  H.eq(grp[0].name.he, after.groups[0].name.he, 'without letting them touch the Hebrew');
+
+  H.eq(grp[0].facts.address.text.ru, 'улица Ленина, 1',
        'the address translates too — words are words even in a members-only fact');
-  H.eq(facts.address.text.he, '', 'without letting them touch the Hebrew');
+  H.eq(grp[0].facts.address.text.he, '', 'without letting them touch the Hebrew');
 
   console.log('\n[a session with no access at all is refused outright]');
   const nobody = await H.installSession(blobs, H.superAdminSession({

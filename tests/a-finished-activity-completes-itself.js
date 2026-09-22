@@ -41,13 +41,9 @@ const cal = (dates) => dates.map((d) => ({ date: d, status: 'scheduled' }));
 const act = (over) => F.course(Object.assign({
   slug: 'course-fixture', status: 'closed'
 }, over || {}));
-const withDates = (over, duration) => {
-  const a = act(over);
-  a.facts = Object.assign({}, a.facts, {
-    duration: Object.assign({}, a.facts.duration, duration)
-  });
-  return a;
-};
+// The calendar is the GROUP's now, not the activity's — patching activity.facts
+// here would be a quiet no-op, which is the whole reason setGroupFacts exists.
+const withDates = (over, duration) => F.setGroupFacts(act(over), { duration: duration });
 const AT = (iso) => Date.parse(iso);
 
 console.log('[the last day is the later of the calendar and the typed end date]');

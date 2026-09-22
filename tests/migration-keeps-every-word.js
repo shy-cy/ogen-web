@@ -80,9 +80,9 @@ H.eq(F.factText(moved, 'instructionLanguage', 'he'), legacy.instructionLanguage.
 H.eq(F.factText(moved, 'prerequisites', 'he'), legacy.prerequisites.he, 'prerequisites move across');
 
 console.log('\n[ages convert, because an age range can only mean one thing]');
-H.eq(moved.facts.ages.min, 6, 'the youngest age is parsed out');
-H.eq(moved.facts.ages.max, 10, 'and the oldest');
-H.ok(!moved.facts.ages.legacyText, 'so no legacy text is kept for it');
+H.eq(moved.groups[0].facts.ages.min, 6, 'the youngest age is parsed out');
+H.eq(moved.groups[0].facts.ages.max, 10, 'and the oldest');
+H.ok(!moved.groups[0].facts.ages.legacyText, 'so no legacy text is kept for it');
 H.eq(F.factText(moved, 'ages', 'he'), '6-10', 'and it renders identically to before');
 // The parser is deliberately narrow. Anything with a word in it is left alone.
 H.eq(JSON.stringify(parseAgeRange({ he: '6-10' })), '{"min":6,"max":10}', 'a plain range parses');
@@ -97,27 +97,27 @@ console.log('\n[the old shape cannot come back]');
 H.ok(moved.programLength === undefined, 'programLength is gone from the top level');
 H.ok(moved.instructionLanguage === undefined, 'and instructionLanguage');
 H.ok(moved.prerequisites === undefined, 'and prerequisites');
-H.ok(!isLangObject(moved.facts.location), 'location is a structured fact, not a bare lang object');
+H.ok(!isLangObject(moved.groups[0].facts.location), 'location is a structured fact, not a bare lang object');
 // ⚠ AND NEITHER OF THESE IS A LANG OBJECT ANY MORE. They were the last two
 // free-text facts — three boxes holding whatever somebody typed, which is the
 // shape the whole module exists to replace. A code and a level now, with the
 // typed words CARRIED into `text` rather than dropped: an admin who wrote
 // "Beginners" three times still has those words on the page until somebody
 // picks the level from the list.
-H.ok(!isLangObject(moved.facts.prerequisites), 'prerequisites is structured now');
-H.ok(moved.facts.prerequisites.text, 'and keeps its words in text');
-H.ok(!isLangObject(moved.facts.instructionLanguage), 'and so is the language of instruction');
+H.ok(!isLangObject(moved.groups[0].facts.prerequisites), 'prerequisites is structured now');
+H.ok(moved.groups[0].facts.prerequisites.text, 'and keeps its words in text');
+H.ok(!isLangObject(moved.groups[0].facts.instructionLanguage), 'and so is the language of instruction');
 const lifted = migrate({ facts: {
   instructionLanguage: { he: 'עברית', en: 'Hebrew', ru: '' },
   prerequisites: { he: 'אין צורך בניסיון', en: '', ru: '' } } });
-H.eq(lifted.facts.instructionLanguage.text.en, 'Hebrew',
+H.eq(lifted.groups[0].facts.instructionLanguage.text.en, 'Hebrew',
   'a bare lang object is lifted into text, word for word');
-H.eq(lifted.facts.prerequisites.text.he, 'אין צורך בניסיון', 'and so is the other');
-H.eq(lifted.facts.prerequisites.level, null, 'with no level invented for it');
+H.eq(lifted.groups[0].facts.prerequisites.text.he, 'אין צורך בניסיון', 'and so is the other');
+H.eq(lifted.groups[0].facts.prerequisites.level, null, 'with no level invented for it');
 // ⚠ The loop that copies these used to iterate TEXT_FACTS, which was exactly
 // these two — so emptying that list stopped copying them at all, and every
 // record came back blank with nothing erroring.
-H.ok(lifted.facts.instructionLanguage.text.he, 'and they are COPIED AT ALL, which they briefly were not');
+H.ok(lifted.groups[0].facts.instructionLanguage.text.he, 'and they are COPIED AT ALL, which they briefly were not');
 
 console.log('\n[visibility is filled in for every fact]');
 const vis = moved.factVisibility;

@@ -43,9 +43,9 @@ function activity() {
     perSessionPrice: 12,
     bundles: [{ bundleId: 'b5', entries: 5, pricePerEntry: 10, validityDays: 90 }]
   });
-  a.facts.duration = Object.assign({}, a.facts.duration, {
+  F.setGroupFacts(a, { duration: {
     sessionDates: DATES.map((d) => ({ date: d, status: 'scheduled' }))
-  });
+  } });
   return a;
 }
 
@@ -210,7 +210,7 @@ H.eq(afterTerm.shortfall, 0,
   'dates a family simply let pass are NOT a shortfall — the entry was theirs');
 // Now two of them leave the calendar entirely, with nothing to replace them.
 const shrunk = activity();
-shrunk.facts.duration.sessionDates = [{ date: '2026-10-06', status: 'scheduled' }];
+F.groupFacts(shrunk).duration.sessionDates = [{ date: '2026-10-06', status: 'scheduled' }];
 const broken = B.reconcile(bought, shrunk, Date.parse('2026-12-01T09:00:00Z'));
 H.eq(broken.shortfall, 2, 'two sessions we removed and could not replace are');
 H.eq(broken.shortfallCents, 2000, 'at the rate that was paid — 2 × €10, not the standard price');

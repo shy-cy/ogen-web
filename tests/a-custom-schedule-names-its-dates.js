@@ -45,6 +45,10 @@ const S = require('../netlify/functions/_activity-sessions');
 const F = require('../netlify/functions/_activity-facts');
 const { migrate } = require('../netlify/functions/_activity-migrate');
 
+// The schedule is the GROUP's fact now, and migrate() is what puts it there —
+// so a record with no groups of its own comes back with one holding it.
+const sched = (record) => ((record.groups || [])[0] || {}).facts.schedule;
+
 // 14 October 2026 is a Wednesday; 1 November 2026 is a Sunday.
 const DATED = {
   frequency: 'custom',
@@ -53,35 +57,35 @@ const DATED = {
 
 console.log('[the date survives a save, which is where the last one was lost]');
 const saved = migrate({ slug: 'x', facts: { schedule: JSON.parse(JSON.stringify(DATED)) } });
-const rows = saved.facts.schedule.sessions;
+const rows = sched(saved).sessions;
 H.eq(rows.length, 2, 'both rows are kept');
 H.eq(rows[0].date, '2026-11-01', 'and each keeps its date');
 H.eq(rows[1].date, '2026-10-14', 'in the order it was given');
 // Idempotent, like the rest of migrate(): the second pass finds what the first
 // wrote rather than normalising it away.
-const again = migrate(saved).facts.schedule.sessions;
+const again = sched(migrate(saved)).sessions;
 H.eq(JSON.stringify(again), JSON.stringify(rows), 'and a second pass changes nothing');
 
 console.log('\n[the weekday is derived, so it cannot disagree with the date]');
 // A row insisting on Monday for a date that is a Wednesday. The date wins,
 // because it is the more specific claim and the one somebody typed on purpose.
-const lying = migrate({ slug: 'x', facts: { schedule: {
+const lying = sched(migrate({ slug: 'x', facts: { schedule: {
   frequency: 'custom', sessions: [{ day: 1, date: '2026-10-14', time: '16:00' }]
-} } }).facts.schedule.sessions[0];
+} } })).sessions[0];
 H.eq(lying.day, 3, 'the stored weekday is replaced by the date\'s own');
 H.eq(lying.date, '2026-10-14', 'and the date is untouched');
 // A row with no date keeps the weekday it was given — this is still the shape
 // every repeating frequency uses.
-const plain = migrate({ slug: 'x', facts: { schedule: {
+const plain = sched(migrate({ slug: 'x', facts: { schedule: {
   frequency: 'weekly', sessions: [{ day: 2, time: '17:00' }]
-} } }).facts.schedule.sessions[0];
+} } })).sessions[0];
 H.eq(plain.day, 2, 'a row with no date keeps its weekday');
 H.eq(plain.date, undefined, 'and gains no empty date key');
 // An unreadable date is not a date. It must not silently become one, and it
 // must not take the weekday down with it.
-const bad = migrate({ slug: 'x', facts: { schedule: {
+const bad = sched(migrate({ slug: 'x', facts: { schedule: {
   frequency: 'custom', sessions: [{ day: 4, date: '2026-02-30', time: '09:00' }]
-} } }).facts.schedule.sessions[0];
+} } })).sessions[0];
 H.eq(bad.date, undefined, '30 February is refused rather than rolled into March');
 H.eq(bad.day, 4, 'and the row keeps the weekday it did have');
 
@@ -111,7 +115,7 @@ H.ok(S.GENERATED.indexOf('custom') !== -1, 'custom is generable now');
 });
 
 console.log('\n[and it reads as a date on the page, in all three languages]');
-const line = (lang) => F.formatSchedule(saved.facts.schedule, lang);
+const line = (lang) => F.formatSchedule(sched(saved), lang);
 H.eq(line('en'), 'Sunday, 1 November, 10:30 · Wednesday, 14 October, 16:00',
   'English: the weekday leads, then the date, then the time');
 H.eq(line('he'), 'יום ראשון, 1 בנובמבר, 10:30 · יום רביעי, 14 באוקטובר, 16:00',

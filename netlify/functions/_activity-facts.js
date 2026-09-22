@@ -175,6 +175,24 @@ const FACT_ORDER = [
 // an empty list is a truthful statement that nothing is free text any more.
 const TEXT_FACTS = [];
 
+// ⚠ WHICH FACTS BELONG TO A GROUP. The two lists live in _activity-groups.js —
+// the module that requires nothing — and are re-exported here so a caller with
+// the facts module in hand does not need a second import. The assertion is the
+// point: a fact added to FACT_ORDER and to neither list would render nowhere,
+// and a fact in both would be asked of two records that can disagree.
+const { GROUP_FACTS, ACTIVITY_FACTS } = groups;
+
+(function assertEveryFactBelongsSomewhere() {
+  const seen = GROUP_FACTS.concat(ACTIVITY_FACTS);
+  const missing = FACT_ORDER.filter((k) => seen.indexOf(k) === -1);
+  const extra = seen.filter((k) => FACT_ORDER.indexOf(k) === -1);
+  const twice = seen.filter((k, i) => seen.indexOf(k) !== i);
+  if (missing.length || extra.length || twice.length) {
+    throw new Error('GROUP_FACTS + ACTIVITY_FACTS is out of step with FACT_ORDER: ' +
+      JSON.stringify({ missing, extra, twice }));
+  }
+})();
+
 const STRUCTURED_FACTS = ['ages', 'schedule', 'duration', 'groupSize',
                           'instructionLanguage', 'prerequisites', 'location', 'address', 'price'];
 
@@ -209,6 +227,12 @@ const visibilityOf = (activity, key) =>
 function isPubliclyVisible(visibility) {
   return visibility !== 'members';
 }
+
+// The same decision, asked about a fact of a particular activity. Two readers
+// need it — the published rows and the per-group breakdown under them — and a
+// second `isPubliclyVisible(visibilityOf(...))` in either of them would be a
+// second place the rule is spelled out. It is spelled out here, once.
+const isPublicFact = (activity, key) => isPubliclyVisible(visibilityOf(activity, key));
 
 // --- formatters ------------------------------------------------------------
 // Each returns display text for one language, or '' if there is nothing to say.
@@ -331,19 +355,7 @@ function formatSchedule(f, lang) {
 // Falls straight through to the single-line form when no group has its own,
 // which is every activity on the site today.
 function scheduleText(activity, lang) {
-  const facts = (activity && activity.facts) || {};
-  const named = groups.groupsWithSchedules(activity);
-  if (!named.length) return formatSchedule(facts.schedule || {}, lang);
-
-  return groups.namedGroups(activity)
-    .map((g) => {
-      const line = formatSchedule(groups.scheduleFor(activity, g.groupId), lang);
-      const name = pick(g.name, lang);
-      if (!line) return '';
-      return name ? `${name}: ${line}` : line;
-    })
-    .filter(Boolean)
-    .join('\n');
+  return aggregateText(activity, 'schedule', lang);
 }
 
 // ⚠ ONE TABLE PER GROUP when the groups keep their own calendars, because a
@@ -351,19 +363,31 @@ function scheduleText(activity, lang) {
 // to fix. `title` is null when there is one table, so the single-calendar page —
 // which is every page on the site today — renders exactly as it did.
 function sessionTables(activity, lang) {
-  const facts = (activity && activity.facts) || {};
-  const withOwn = groups.groupsWithCalendars(activity);
-  if (!withOwn.length) {
-    const rows = sessionRows(facts.duration || {}, lang);
+  const list = groups.groupList(activity);
+  if (!list.length) {
+    const rows = sessionRows(((activity && activity.facts) || {}).duration || {}, lang);
     return rows.length ? [{ groupId: null, title: null, rows: rows }] : [];
   }
-  return groups.namedGroups(activity)
-    .map((g) => ({
-      groupId: g.groupId,
-      title: pick(g.name, lang) || null,
-      rows: sessionRows({ sessionDates: groups.calendarFor(activity, g.groupId) }, lang)
-    }))
-    .filter((t) => t.rows.length);
+
+  const tables = list.map((g) => ({
+    groupId: g.groupId,
+    title: pick(g.name, lang) || null,
+    rows: sessionRows({ sessionDates: groups.calendarFor(activity, g.groupId) }, lang)
+  }));
+
+  // ⚠ ONE UNTITLED TABLE WHEN THE GROUPS MEET ON THE SAME DATES, which is every
+  // published page today. Every activity has groups now, so keying the shape off
+  // "does it have groups" would have put a caption on pages that have never had
+  // one and split a single timetable into two identical copies. The question is
+  // whether the groups actually DIFFER — which is the same question every fact
+  // on this page asks of itself.
+  const first = JSON.stringify(tables[0].rows);
+  if (tables.every((t) => JSON.stringify(t.rows) === first)) {
+    return tables[0].rows.length
+      ? [{ groupId: list.length === 1 ? list[0].groupId : null, title: null, rows: tables[0].rows }]
+      : [];
+  }
+  return tables.filter((t) => t.rows.length);
 }
 
 // One row per session that actually happens. Excluded dates are not rendered as
@@ -459,13 +483,11 @@ function formatDuration(f, lang) {
   return [range, rest].filter(Boolean).join('\n');
 }
 
-// The groups an activity has named, if any. Empty means the pooled model, which
-// is what every activity had before this existed and what most still want: two
-// groups meeting at the same hour, and which one a child lands in is the
-// teacher's business. Named groups are for the case where the family chooses.
-function namedGroups(f) {
-  const list = f && Array.isArray(f.named) ? f.named : [];
-  return list.filter((g) => g && g.groupId);
+// ⚠ THE GROUPS AN ACTIVITY HAS, AND THERE IS ALWAYS AT LEAST ONE. This used to
+// take the groupSize FACT and return an opt-in list that was usually empty. It
+// takes the ACTIVITY now and the list is the model — see _activity-groups.js.
+function namedGroups(activity) {
+  return groups.groupList(activity);
 }
 
 // "Beginners, up to 7". A group with no capacity is still named — the name is
@@ -480,23 +502,26 @@ function namedGroupLine(g, lang) {
   return `${name}, up to ${cap} ${cap === 1 ? 'student' : 'students'}`;
 }
 
-// How many places an activity has in total. The product for a pooled activity,
-// the sum of the named capacities when it has them. Null means uncapped, which
-// is deliberately NOT zero: defaulting a missing number to zero would silently
-// refuse every registration for an activity nobody had finished filling in.
-function totalCapacity(f) {
-  const named = namedGroups(f);
-  if (named.length) {
-    const caps = named.map((g) => num(g.capacity)).filter((c) => c != null && c > 0);
-    return caps.length === named.length ? caps.reduce((a, b) => a + b, 0) : null;
-  }
-  const groups = num(f && f.groups);
-  const per = num(f && f.maxPerGroup);
-  if (groups == null || per == null || groups <= 0 || per <= 0) return null;
-  return groups * per;
+// The one group's size, with no name and no count in front of it. One group is
+// not a grouping, so "1 group / up to 20 students" says the same thing twice and
+// the first half of it says nothing at all.
+function soleGroupLine(g, lang) {
+  const cap = num(g.capacity);
+  if (cap == null || cap <= 0) return '';
+  if (lang === 'he') return `עד ${cap} תלמידים`;
+  if (lang === 'ru') return `до ${cap} ${ruPlural(cap, 'ученика', 'учеников', 'учеников')}`;
+  return `Up to ${cap} ${cap === 1 ? 'student' : 'students'}`;
 }
 
-function formatGroupSize(f, lang) {
+// How many places an activity has in total — the sum of its groups' capacities.
+// The arithmetic lives in _activity-groups.js beside the list it sums; this is
+// the name the rest of the codebase already calls it by.
+function totalCapacity(activity) {
+  return groups.totalCapacity(activity);
+}
+
+function formatGroupSize(activity, lang) {
+  const f = ((activity && activity.facts) || {}).groupSize || {};
   // A filled-in override replaces the computed sentence outright, the same shape
   // perHourOverride already has on price: some groupings are not "N groups of up
   // to M" and no amount of number-formatting makes them so. Blank falls through
@@ -508,51 +533,18 @@ function formatGroupSize(f, lang) {
   // text says the same thing in the wrong language, whereas the computed line
   // would have the English page making a different claim about the grouping
   // than the Hebrew one, which is the failure this override exists to avoid.
-  const override = pick(f && f.overrideText, lang);
+  const override = pick(f.overrideText, lang);
   if (override) return override;
 
-  // NAMED GROUPS, when an activity has them, replace the counted sentence
-  // rather than being appended to it. "2 groups / up to 7 per group" and
-  // "Beginners, up to 7 · Advanced, up to 10" are the same fact told two ways,
-  // and maxPerGroup stops meaning anything the moment two groups differ.
-  //
-  // This is the single place a group size becomes words, the way priceRows() is
-  // for money, so the derived form costs nothing downstream: no arithmetic
-  // reads `groups`, the price does not, and capacity is the one consumer.
-  const named = namedGroups(f);
-  if (named.length) return named.map((g) => namedGroupLine(g, lang)).filter(Boolean).join('\n');
-
-  const groups = num(f.groups);
-  const per = num(f.maxPerGroup);
-  const hasGroups = groups != null && groups > 0;
-  const hasPer = per != null && per > 0;
-  if (!hasGroups && !hasPer) return '';
-
-  // Two lines, not one sentence: "how many groups" and "how big is a group" are
-  // separate numbers a reader compares, and joining them with "of" made a
-  // 320px column wrap them mid-phrase. NEWLINE, not <br> — the value is escaped
-  // text and stays text; .sidebar-facts span carries white-space:pre-line.
-  //
-  // Hebrew takes the numeral here rather than the HE_FEM word form. On its own
-  // line "2 קבוצות" reads as the data point it is, which is what the rest of
-  // the card does.
-  let g = '';
-  let pr = '';
-  if (lang === 'he') {
-    if (hasGroups) g = groups === 1 ? 'קבוצה אחת' : `${groups} קבוצות`;
-    if (hasPer) pr = hasGroups ? `עד ${per} תלמידים בקבוצה` : `עד ${per} תלמידים`;
-  } else if (lang === 'ru') {
-    if (hasGroups) g = `${groups} ${ruPlural(groups, 'группа', 'группы', 'групп')}`;
-    const students = `${per} ${ruPlural(per, 'ученика', 'учеников', 'учеников')}`;
-    if (hasPer) pr = hasGroups ? `до ${students} в группе` : `до ${students}`;
-  } else {
-    if (hasGroups) g = `${groups} ${groups === 1 ? 'group' : 'groups'}`;
-    const students = `up to ${per} ${per === 1 ? 'student' : 'students'}`;
-    if (hasPer) pr = hasGroups ? `${students} per group` : students.charAt(0).toUpperCase() + students.slice(1);
-  }
-  return [g, pr].filter(Boolean).join('\n');
+  // The computed sentence is now read off the GROUP LIST rather than off two
+  // numbers that had to be kept in step with it. `groups` and `maxPerGroup` are
+  // gone: a count is the length of the list and a size is a field on one of its
+  // entries, so the sentence and the capacity check can no longer disagree.
+  const list = groups.groupList(activity);
+  if (!list.length) return '';
+  if (list.length === 1) return soleGroupLine(list[0], lang);
+  return list.map((g) => namedGroupLine(g, lang)).filter(Boolean).join('\n');
 }
-
 
 // Total teaching hours a course is worth, in academic (45-minute) hours.
 // Returns null when either half of the sum is missing — a price per hour
@@ -711,7 +703,14 @@ function priceRows(f, lang, duration) {
     const sessions = sessionTotal(duration);
     const lessons = lessonsPerSession(duration);
     let note = '';
-    if (sessions != null && sessions > 0 && lessons != null) {
+    // ⚠ THE QUALIFIER IS A CLAIM ABOUT ONE GROUP'S TERM, and on an activity
+    // whose groups meet six times for two hours and twelve times for one, there
+    // is no single true version of it. The price above it survives, because the
+    // equal-hours rule means every group is sold the same teaching — see
+    // pricingDuration() in _activity-groups.js, which is what sets this flag.
+    if (duration && duration.qualify === false) {
+      // nothing: the figure is right for everybody, the sentence is not
+    } else if (sessions != null && sessions > 0 && lessons != null) {
       // A multiplication sign, because that is the arithmetic: N meetings each
       // worth M academic hours. "of" / "של" / "по" read as prose and needed
       // three translations to say one operator.
@@ -781,29 +780,173 @@ function formatPrerequisites(f, lang) {
 // Display text for one fact in one language. Falls back to the words an admin
 // typed before this field was structured, so migrating a record is something
 // that can happen later without the page going blank in the meantime.
-function factText(activity, key, lang) {
-  const facts = (activity && activity.facts) || {};
-  const f = facts[key];
-
-  if (TEXT_FACTS.indexOf(key) !== -1) return pick(f, lang);
+// One fact, one group, one language. `f` is already the right group's copy — the
+// resolving happened in _activity-groups.js, which is the only place that knows
+// how.
+function formatOne(activity, key, f, lang) {
   if (!f || typeof f !== 'object') return '';
-
   let text = '';
   if (key === 'ages') text = formatAges(f, lang);
-  else if (key === 'schedule') text = scheduleText(activity, lang);
-  // The duration fact and the price both COUNT the calendar, and on a per-group
-  // activity the activity's own list is empty — see durationFor(). Handing them
-  // one group's keeps every count correct with no signature threaded through
-  // six more functions, and is safe because a differing count is refused on
-  // save.
-  else if (key === 'duration') text = formatDuration(groups.durationFor(activity), lang);
-  else if (key === 'groupSize') text = formatGroupSize(f, lang);
+  else if (key === 'schedule') text = formatSchedule(f, lang);
+  else if (key === 'duration') text = formatDuration(f, lang);
+  else if (key === 'groupSize') text = formatGroupSize(activity, lang);
   else if (key === 'instructionLanguage') text = formatInstructionLanguage(f, lang);
   else if (key === 'prerequisites') text = formatPrerequisites(f, lang);
   else if (key === 'location' || key === 'address') text = pick(f.text, lang);
-  else if (key === 'price') text = formatPrice(f, lang, groups.durationFor(activity));
+  // The price is sold against HOURS, and every group has the same number of
+  // them — so any group's session length and count give the right figure, and
+  // pricingDuration() is what decides whether the "(N × M)" qualifier under it
+  // is still a true sentence.
+  else if (key === 'price') text = formatPrice(f, lang, groups.pricingDuration(activity));
 
   return text || pick(f.legacyText, lang);
+}
+
+// ⚠ WHAT THE WHOLE ACTIVITY SAYS ABOUT A FACT ITS GROUPS MAY DISAGREE ON.
+//
+// When they agree — which is every published page today, and every activity that
+// has only one group — the answer is that value, rendered exactly as it was
+// before groups existed. Nothing about the model change reaches the page until
+// an admin actually makes two groups differ.
+//
+// When they differ, each group answers for itself and says which one it is. A
+// single line would be right for at most one of the families reading it, which
+// is the bug this whole restructuring exists to fix.
+function aggregateText(activity, key, lang) {
+  const across = groups.factAcross(activity, key);
+  const lines = across.map((row) => ({
+    name: row.group ? pick(row.group.name, lang) : '',
+    text: formatOne(activity, key, row.value, lang)
+  }));
+
+  const first = lines[0] ? lines[0].text : '';
+  if (lines.every((l) => l.text === first)) return first;
+
+  const agg = aggregateOf(key, across, lines, lang);
+  if (agg) return agg;
+
+  return lines
+    .filter((l) => l.text)
+    // The name on the same line for a one-line value and on its own line above a
+    // multi-line one. `.sidebar-facts span` is already `white-space:pre-line`,
+    // so both render as written with no new markup.
+    .map((l) => (!l.name ? l.text
+      : l.text.indexOf('\n') === -1 ? `${l.name}: ${l.text}` : `${l.name}:\n${l.text}`))
+    .join('\n');
+}
+
+// ⚠ THREE FACTS HAVE A TRUE SHORT ANSWER ACROSS GROUPS, and the rest do not.
+//
+// Returns '' when there is no honest aggregate, and the caller falls back to a
+// line per group. That is the important direction: a made-up summary on the one
+// card a parent decides from is worse than three lines they have to read.
+function aggregateOf(key, across, lines, lang) {
+  // ⚠ THE UNION RANGE, and it says LESS than it looks like it says. "6-13"
+  // across a 6-9 group and a 10-13 one means a nine-year-old has somewhere to
+  // go, not that they may join either — which is exactly why the groups section
+  // under it spells out which, and why "choose your group" is on the page
+  // rather than implied. A bound is aggregated only when EVERY group states it:
+  // one group with no upper limit makes the activity's upper limit unknown, and
+  // taking the highest stated one would invent a ceiling nobody set.
+  if (key === 'ages') {
+    const mins = across.map((r) => num(r.value.min)).filter((v) => v != null);
+    const maxs = across.map((r) => num(r.value.max)).filter((v) => v != null);
+    return formatAges({
+      min: mins.length === across.length ? Math.min.apply(null, mins) : null,
+      max: maxs.length === across.length ? Math.max.apply(null, maxs) : null
+    }, lang);
+  }
+
+  // ⚠ THE DISTINCT CITIES, JOINED — "Limassol, Nicosia". Computed on the PICKED
+  // text rather than on the stored bag, because pick() falls back across
+  // languages: two groups sharing a Hebrew city name and differing in English
+  // would otherwise report one city on one page and two on another, about the
+  // same activity on the same day.
+  if (key === 'location' || key === 'address') {
+    const seen = [];
+    lines.forEach((l) => { if (l.text && seen.indexOf(l.text) === -1) seen.push(l.text); });
+    return seen.join(', ');
+  }
+
+  // Every language anybody is taught in, in written order — the same order one
+  // group's own list is rendered in, so the aggregate cannot read as a different
+  // kind of statement. The optional free-text note is dropped: it belongs to one
+  // group and there is no union of two sentences.
+  if (key === 'instructionLanguage') {
+    const names = LANGUAGE_NAMES[lang] || LANGUAGE_NAMES.en;
+    const all = [];
+    across.forEach((r) => (Array.isArray(r.value.codes) ? r.value.codes : [])
+      .forEach((c) => { if (all.indexOf(c) === -1) all.push(c); }));
+    return INSTRUCTION_LANGUAGES.filter((c) => all.indexOf(c) !== -1).map((c) => names[c]).join(' · ');
+  }
+
+  // schedule, duration and prerequisites have no union worth printing. "January
+  // to June and February to May" is not a date range, and "Beginners and
+  // Advanced" is not a level.
+  return '';
+}
+
+// "2 groups" / "2 קבוצות" / "2 группы".
+function groupCountText(n, lang) {
+  if (lang === 'he') return n === 1 ? 'קבוצה אחת' : `${n} קבוצות`;
+  if (lang === 'ru') return `${n} ${ruPlural(n, 'группа', 'группы', 'групп')}`;
+  return `${n} ${n === 1 ? 'group' : 'groups'}`;
+}
+
+// ⚠ THE ONE BUILDER BOTH SURFACES READ. The listing card and the activity page
+// ask the same function what an activity's groups are, so a card cannot start
+// describing a choice the page under it does not offer — the same rule that
+// already makes the card's tags come out of sidebarRows().
+//
+// Null when there is no choice to describe, which is one group: nothing is
+// published, nobody is asked, and every page on the site today renders as it
+// always has.
+//
+// `facts` on each row is only what that group does NOT share with the others.
+// Repeating the agreed facts under every name would make two identical lists
+// and bury the one line that differs, which is the whole thing a reader is
+// there to compare.
+function groupChoice(activity, lang) {
+  const list = groups.groupList(activity);
+  if (list.length < 2) return null;
+
+  const differing = groups.GROUP_FACTS.filter((key) => {
+    if (!isPublicFact(activity, key)) return false;
+    const texts = groups.factAcross(activity, key)
+      .map((r) => formatOne(activity, key, r.value, lang));
+    return texts.some((t) => t !== texts[0]);
+  });
+
+  return {
+    count: list.length,
+    countText: groupCountText(list.length, lang),
+    differing: differing,
+    groups: list.map((g) => ({
+      groupId: g.groupId,
+      name: pick(g.name, lang),
+      capacity: num(g.capacity),
+      facts: differing
+        .map((key) => ({ key: key, value: factText(activity, key, lang, g.groupId) }))
+        .filter((f) => f.value)
+    }))
+  };
+}
+
+// Display text for one fact in one language. Falls back to the words an admin
+// typed before this field was structured, so migrating a record is something
+// that can happen later without the page going blank in the meantime.
+//
+// ⚠ `groupId` IS OPTIONAL AND ITS ABSENCE MEANS SOMETHING. Given one, this is
+// what that group is told. Left out, it is what the ACTIVITY says — the shared
+// value when the groups agree and the per-group breakdown when they do not. The
+// public page leaves it out; the family area, which knows which group somebody
+// is in, passes it.
+function factText(activity, key, lang, groupId) {
+  const facts = (activity && activity.facts) || {};
+  if (TEXT_FACTS.indexOf(key) !== -1) return pick(facts[key], lang);
+  if (!groups.isGroupFact(key)) return formatOne(activity, key, facts[key], lang);
+  if (groupId === undefined) return aggregateText(activity, key, lang);
+  return formatOne(activity, key, groups.factFor(activity, key, groupId), lang);
 }
 
 // The price fact, as rows, for the one card that renders them individually.
@@ -814,15 +957,18 @@ function factPriceRows(activity, lang) {
   const facts = (activity && activity.facts) || {};
   const f = facts.price;
   if (!f || typeof f !== 'object') return [];
-  return priceRows(f, lang, facts.duration);
+  return priceRows(f, lang, groups.pricingDuration(activity));
 }
 
-// The sidebar, in order, with empty rows dropped.
-function sidebarRows(activity, lang) {
+// The sidebar, in order, with empty rows dropped. `groupId` is passed straight
+// through to factText(): absent means the activity's own answer, present means
+// one group's.
+function sidebarRows(activity, lang, groupId) {
   return FACT_ORDER
-    .map((key) => ({ key, visibility: visibilityOf(activity, key), value: factText(activity, key, lang) }))
+    .map((key) => ({ key, visibility: visibilityOf(activity, key),
+                     value: factText(activity, key, lang, groupId) }))
     .filter((row) => row.value)
-    .filter((row) => isPubliclyVisible(row.visibility));
+    .filter((row) => isPublicFact(activity, row.key));
 }
 
 // The facts are four cards, each with an icon and a label, rather than nine
@@ -867,8 +1013,8 @@ const FACT_GROUPS = [
 // Groups with their facts resolved, ready to render. A group whose facts are all
 // empty or all members-only is dropped whole, so an activity that has not filled
 // in its schedule gets no empty "When & where" heading with an icon beside it.
-function sidebarGroups(activity, lang) {
-  const rows = sidebarRows(activity, lang);
+function sidebarGroups(activity, lang, groupId) {
+  const rows = sidebarRows(activity, lang, groupId);
   const byKey = {};
   rows.forEach((r) => { byKey[r.key] = r; });
   return FACT_GROUPS
@@ -882,7 +1028,8 @@ function sidebarGroups(activity, lang) {
 module.exports = {
   INSTRUCTION_LANGUAGES, LANGUAGE_NAMES, LEVELS, LEVEL_NAMES,
   formatInstructionLanguage, formatPrerequisites,
-  namedGroups, namedGroupLine, totalCapacity,
+  namedGroups, namedGroupLine, soleGroupLine, totalCapacity,
+  GROUP_FACTS, ACTIVITY_FACTS, aggregateText, groupChoice, groupCountText,
   FACT_ORDER, TEXT_FACTS, STRUCTURED_FACTS, DEFAULT_VISIBILITY,
   ACADEMIC_MINUTES, CURRENCY,
   num, pick, ruPlural, monthYear, sessionTotal,

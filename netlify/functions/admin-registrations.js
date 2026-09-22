@@ -35,6 +35,7 @@ const spend = require('./_spend-credit');
 const { cancelAndCredit } = require('./_registration-cancel');
 const attendance = require('./_session-attendance');
 const groups = require('./_activity-groups');
+const facts = require('./_activity-facts');
 const B = require('./_bundle');
 const bundleStore = require('./_bundle-store');
 const { recordAudit } = require('./_audit');
@@ -477,10 +478,7 @@ exports.handler = async (event) => {
         if (!R.hasRoom(report, body.groupId)) {
           return json(409, { error: 'That group is full.', full: true });
         }
-        const facts = require('./_activity-facts');
-        const target = facts
-          .namedGroups(((activity.facts || {}).groupSize) || {})
-          .filter((g) => g.groupId === body.groupId)[0];
+        const target = groups.groupById(activity, body.groupId);
         if (!target) return json(400, { error: 'No such group on this activity.' });
 
         // ⚠ THE HISTORY NAMES THE GROUPS, NOT THEIR IDS, and it names BOTH.

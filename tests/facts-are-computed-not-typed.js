@@ -38,7 +38,11 @@ H.eq(over.source, 'override', 'and it is labelled as an override, not as a calcu
 H.eq(F.pricePerHour({ perHourOverride: 12 }, {}).value, 12, 'an override needs no duration at all');
 
 console.log('\n[the built sentences]');
-const ACT = {
+// ⚠ MIGRATED, because every record the site reads has been. migrate() moves the
+// seven per-group facts onto a group and leaves the price and the grouping
+// override on the activity — so a fixture built the old way would be testing a
+// shape nothing can produce.
+const ACT = require('../netlify/functions/_activity-migrate').migrate({
   facts: {
     ages: { min: 6, max: 10 },
     schedule: { frequency: 'weekly', sessions: [{ day: 3, time: '16:30' }] },
@@ -54,22 +58,31 @@ const ACT = {
     instructionLanguage: { codes: ['he'], text: { he: '', en: '', ru: '' } },
     prerequisites: { level: 'beginner', text: { he: '', en: '', ru: '' } }
   }
-};
+});
 const text = (key, lang) => F.factText(ACT, key, lang);
 
-// Two lines, not a sentence: how many groups, then how big one is. They are
-// separate numbers a reader compares, and as one phrase they wrapped mid-clause
-// in a 320px column. The Hebrew takes the numeral rather than the feminine word
-// form ("2 קבוצות", not "שתי קבוצות") — on its own line it is a data point.
-H.eq(text('groupSize', 'he'), '2 קבוצות\nעד 7 תלמידים בקבוצה', 'Hebrew group size is two lines');
-H.eq(text('groupSize', 'en'), '2 groups\nup to 7 students per group', 'English group size');
-H.eq(text('groupSize', 'ru'), '2 группы\nдо 7 учеников в группе', 'Russian group size');
-H.eq(F.formatGroupSize({ groups: 1, maxPerGroup: 7 }, 'he'), 'קבוצה אחת\nעד 7 תלמידים בקבוצה', 'one group is singular');
-// With no group count there is nothing to say "per group" about.
-H.eq(F.formatGroupSize({ maxPerGroup: 7 }, 'en'), 'Up to 7 students', 'and no group count drops the qualifier');
-H.eq(F.formatGroupSize({ maxPerGroup: 7 }, 'he'), 'עד 7 תלמידים', 'no group count, just a cap');
-H.eq(F.formatGroupSize({ groups: 5 }, 'ru'), '5 групп', 'Russian takes the right plural for 5');
-H.eq(F.formatGroupSize({ groups: 2 }, 'ru'), '2 группы', 'and for 2');
+// ⚠ THE GROUPING SENTENCE IS READ OFF THE GROUP LIST, not off two numbers kept
+// beside it. `groups` and `maxPerGroup` are gone: a count is the length of
+// activity.groups and a size is a field on one of its entries, so the sentence
+// and the capacity check can no longer disagree about the same activity.
+//
+// One group prints no count, because one group is not a grouping and "1 group /
+// up to 7" says the same thing twice with the first half saying nothing.
+const sized = (caps) => ({ groups: caps.map((c, i) => ({ groupId: 'g' + i, capacity: c })) });
+H.eq(F.formatGroupSize(sized([7]), 'he'), 'עד 7 תלמידים', 'one group is just its size');
+H.eq(F.formatGroupSize(sized([7]), 'en'), 'Up to 7 students', 'in English too');
+H.eq(F.formatGroupSize(sized([7]), 'ru'), 'до 7 учеников', 'and in Russian');
+H.eq(F.formatGroupSize(sized([null]), 'en'), '', 'and a group with no capacity says nothing at all');
+// Two groups name themselves, because now there is a choice to describe.
+const named2 = { groups: [
+  { groupId: 'g1', name: { he: 'מתחילים', en: 'Beginners', ru: 'Начинающие' }, capacity: 7 },
+  { groupId: 'g2', name: { he: 'מתקדמים', en: 'Advanced', ru: 'Продолжающие' }, capacity: 10 }
+] };
+H.eq(F.formatGroupSize(named2, 'en'), 'Beginners, up to 7 students\nAdvanced, up to 10 students',
+     'two groups are a line each, named, because a family picks by the name');
+H.eq(F.formatGroupSize(named2, 'he'), 'מתחילים, עד 7 תלמידים\nמתקדמים, עד 10 תלמידים', 'in Hebrew');
+H.eq(F.formatGroupSize(named2, 'ru'), 'Начинающие, до 7 учеников\nПродолжающие, до 10 учеников',
+     'and Russian takes the right plural');
 
 H.eq(text('ages', 'he'), '6-10', 'an age range');
 H.eq(F.formatAges({ min: 6 }, 'he'), 'מגיל 6', 'a minimum only');
@@ -180,8 +193,8 @@ H.eq(F.priceRows({ fullPrice: 360 }, 'en', { sessionCount: 12, sessionMinutes: 6
 // factPriceRows() is the entry point the template uses, and it takes the whole
 // activity so the duration it divides by cannot be passed in wrong.
 H.eq(JSON.stringify(F.factPriceRows(ACT, 'en')),
-     JSON.stringify(F.priceRows(ACT.facts.price, 'en', ACT.facts.duration)),
-     'factPriceRows finds the duration itself');
+     JSON.stringify(F.priceRows(ACT.facts.price, 'en', ACT.groups[0].facts.duration)),
+     'factPriceRows finds the duration itself — off the group, which is where it lives');
 H.eq(JSON.stringify(F.factPriceRows({ facts: { price: { legacyText: { en: '50 euro' } } } }, 'en')), '[]',
      'a price that is still free text has no rows, so it renders as an ordinary fact');
 
@@ -238,24 +251,25 @@ console.log('\n[group size takes a free-text override, like price already does]'
 // English words on the Hebrew and Russian pages, where every other sentence in
 // the same card was translated. It is words, so it is a { he, en, ru } bag.
 const OVERRIDE = { he: 'קבוצה אחת מעורבת', en: 'One mixed-age group', ru: 'Одна смешанная группа' };
-H.eq(F.formatGroupSize({ groups: 2, maxPerGroup: 7, overrideText: OVERRIDE }, 'en'),
+const withOverride = (text) => ({ groups: sized([7]).groups, facts: { groupSize: { overrideText: text } } });
+H.eq(F.formatGroupSize(withOverride(OVERRIDE), 'en'),
      'One mixed-age group', 'a filled override replaces the computed sentence outright');
-H.eq(F.formatGroupSize({ groups: 2, maxPerGroup: 7, overrideText: OVERRIDE }, 'he'),
+H.eq(F.formatGroupSize(withOverride(OVERRIDE), 'he'),
      'קבוצה אחת מעורבת', 'and each language gets its own words, not the first one typed');
-H.eq(F.formatGroupSize({ groups: 2, maxPerGroup: 7, overrideText: OVERRIDE }, 'ru'),
+H.eq(F.formatGroupSize(withOverride(OVERRIDE), 'ru'),
      'Одна смешанная группа', 'including Russian, which the single-string version could never reach');
-H.eq(F.formatGroupSize({ groups: 2, maxPerGroup: 7, overrideText: { he: '   ', en: '', ru: '' } }, 'en'),
-     F.formatGroupSize({ groups: 2, maxPerGroup: 7 }, 'en'),
+H.eq(F.formatGroupSize(withOverride({ he: '   ', en: '', ru: '' }), 'en'),
+     F.formatGroupSize(sized([7]), 'en'),
      'whitespace is blank, so it falls through rather than publishing an empty fact');
-H.eq(F.formatGroupSize({ overrideText: OVERRIDE }, 'he'), 'קבוצה אחת מעורבת',
-     'and it works with no numbers at all behind it');
+H.eq(F.formatGroupSize({ facts: { groupSize: { overrideText: OVERRIDE } } }, 'he'), 'קבוצה אחת מעורבת',
+     'and it works with no groups at all behind it');
 
 // An override half-translated shows the words that ARE there rather than the
 // computed line. Two pages saying the same thing in one language beats two
 // pages making different claims about how the activity is grouped.
 const HE_ONLY = { he: 'קבוצה אחת מעורבת', en: '', ru: '' };
 ['he', 'en', 'ru'].forEach((lang) => {
-  H.eq(F.formatGroupSize({ groups: 2, maxPerGroup: 7, overrideText: HE_ONLY }, lang),
+  H.eq(F.formatGroupSize(withOverride(HE_ONLY), lang),
        'קבוצה אחת מעורבת',
        lang + ': an untranslated override still overrides, following the site-wide fallback');
 });
@@ -263,7 +277,8 @@ const HE_ONLY = { he: 'קבוצה אחת מעורבת', en: '', ru: '' };
 // A record written before the field was split still holds a bare string, and
 // migrate() is what turns it into a bag. Both halves are pinned: the formatter
 // reads a legacy string directly, and the migration puts it where Hebrew is.
-H.eq(F.formatGroupSize({ overrideText: 'קבוצה אחת מעורבת' }, 'he'), 'קבוצה אחת מעורבת',
+H.eq(F.formatGroupSize({ facts: { groupSize: { overrideText: 'קבוצה אחת מעורבת' } } }, 'he'),
+     'קבוצה אחת מעורבת',
      'a pre-split single string is still published, so no page blanks mid-migration');
 const migratedOverride = require('../netlify/functions/_activity-migrate')
   .migrate({ slug: 'x', facts: { groupSize: { overrideText: 'קבוצה אחת מעורבת' } } })
@@ -286,9 +301,10 @@ console.log('\n[legacy free text keeps publishing until the fields are filled in
 const half = { facts: { groupSize: { legacyText: { he: 'שתי קבוצות של 7 תלמידים', en: '', ru: '' } } } };
 H.eq(F.factText(half, 'groupSize', 'he'), 'שתי קבוצות של 7 תלמידים', 'the old words still show');
 H.eq(F.factText(half, 'groupSize', 'en'), 'שתי קבוצות של 7 תלמידים', 'and fall back the same way translations do');
-const filled = { facts: { groupSize: { groups: 2, maxPerGroup: 7, legacyText: { he: 'ישן', en: '', ru: '' } } } };
-H.eq(F.factText(filled, 'groupSize', 'he'), '2 קבוצות\nעד 7 תלמידים בקבוצה',
-     'once the numbers are in, the built value wins over the old text');
+const filled = { groups: [{ groupId: 'g1', capacity: 7 }],
+                 facts: { groupSize: { legacyText: { he: 'ישן', en: '', ru: '' } } } };
+H.eq(F.factText(filled, 'groupSize', 'he'), 'עד 7 תלמידים',
+     'once a group carries a capacity, the built value wins over the old text');
 
 console.log('\n[visibility is carried AND enforced]');
 // Where an activity happens is two facts now. The general one is public, so a
@@ -309,7 +325,7 @@ H.ok(F.sidebarRows(ACT, 'he').some((r) => r.key === 'location'),
 // Enforcement means OMISSION. Rendering it and hiding it with CSS would publish
 // it: the file is static and anyone can read it.
 const withAddress = JSON.parse(JSON.stringify(ACT));
-withAddress.facts.address = { text: { he: 'רחוב הרצל 5', en: '5 Herzl St', ru: '' } };
+withAddress.groups[0].facts.address = { text: { he: 'רחוב הרצל 5', en: '5 Herzl St', ru: '' } };
 const addrRows = F.sidebarRows(withAddress, 'he');
 H.ok(!addrRows.some((r) => r.key === 'address'), 'the exact address is not among the published rows');
 H.ok(F.factText(withAddress, 'address', 'he') === 'רחוב הרצל 5',

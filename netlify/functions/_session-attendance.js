@@ -117,7 +117,11 @@ function bookableDates(activity, groupId) {
 function validate(activity, sessionDate) {
   if ((activity && activity.type) !== 'dropin') return 'dropin-only';
   if (!ISO_DATE.test(String(sessionDate || ''))) return 'session-needs-a-date';
-  if (bookableDates(activity).indexOf(sessionDate) === -1) return 'not-a-meeting-date';
+  // ⚠ ANY, EXPLICITLY. The question is "does this activity meet on that evening
+  // at all", which is the union across its groups — and omitting the argument
+  // would THROW on an activity with more than one, which is precisely the case
+  // this has to answer for. Greppable, and a decision rather than an oversight.
+  if (bookableDates(activity, groups.ANY).indexOf(sessionDate) === -1) return 'not-a-meeting-date';
   return null;
 }
 

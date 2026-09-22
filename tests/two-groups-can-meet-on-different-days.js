@@ -27,23 +27,23 @@
 //      calendarFor(activity) throws on a per-group activity and answers on every
 //      other, so the ordinary activity is untouched and the dangerous case
 //      cannot return a plausible wrong list.
-//   2. Every group meets the same NUMBER of times. Refused on save, because
-//      there is one fullPrice, one "(N sessions x M lessons)" qualifier and one
-//      denominator — a model that cannot price two counts must not publish a
-//      page implying it can.
+//   2. Every group is sold the same number of HOURS. Refused on save, because
+//      there is one fullPrice and it buys the same teaching whichever group a
+//      family picks. Groups may cut that time up differently — six two-hour
+//      meetings and twelve one-hour ones are both twelve hours — and the "(N
+//      sessions x M lessons)" qualifier is then suppressed, because it describes
+//      one group's term and there is no single true version of it.
 //   3. `schedule` and `sessionDates` on a group are STRUCTURE, and nothing a
 //      restricted role sends can reach them — for a session without full access
 //      the whole structured fact is taken from the STORED record.
 //
-// ⚠ AND ONE THING THIS FOUND AND DID NOT FIX. CLAUDE.md says a role permitted to
-// edit only Russian "must be able to translate Advanced", and it cannot: group
-// names live inside facts.groupSize, LANG_SUBKEYS lists only `overrideText` for
-// that fact, so the whole of it comes from the stored record for a restricted
-// role. That is a pre-existing gap, not one per-group calendars introduced, and
-// it is written down here rather than quietly widened — adding `named` to
-// LANG_SUBKEYS would need a per-ITEM language merge, which mergeLang does not
-// do, and doing it carelessly is how a restricted role ends up able to rewrite a
-// capacity.
+// ⚠ AND THE ONE THING THIS FOUND AND COULD NOT FIX IS FIXED NOW. A role
+// permitted to edit only Russian could not translate "Advanced": group names
+// lived inside facts.groupSize, and LANG_SUBKEYS merges a sub-key of a FACT, not
+// a sub-key of one ITEM in a list. mergeGroups() is that per-item merge — the
+// name and the word half of each group's facts merge per language, and the
+// capacity, the calendar and the membership of the list come from the stored
+// record. Pinned below.
 
 const fs = require('fs');
 const path = require('path');
@@ -66,7 +66,10 @@ const rows = (list) => list.map((d) => ({ date: d, status: 'scheduled' }));
 function activity(over) {
   return migrate(Object.assign({
     slug: 'hebrew', activityId: 'act-0000000000000001', type: 'course',
-    registration: { cancellationPolicy: { mode: 'prorated' } },
+    // An explicit late cutoff, so the assertions below are about PRORATION
+    // rather than about the hard cutoff — which now resolves per group and is
+    // pinned separately.
+    registration: { cancellationPolicy: { mode: 'prorated', cancellationCutoffDate: '2026-12-31' } },
     facts: {
       schedule: { frequency: 'weekly', sessions: [{ day: 1, time: '16:00' }] },
       duration: { startDate: '2026-10-12', endDate: '2026-11-04', sessionMinutes: 90, sessionDates: [] },
@@ -85,45 +88,67 @@ function activity(over) {
 
 console.log('[a group keeps its own schedule and its own dates, across a save]');
 const act = activity();
-const named = act.facts.groupSize.named;
-H.eq(named[0].sessionDates.map((r) => r.date).join(' '), MON.join(' '), 'Beginners keeps its Mondays');
-H.eq(named[1].schedule.sessions[0].day, 3, 'and Advanced its Wednesday');
-// SHAPES.groupSize runs on every read and every save, so a key it does not name
+const named = act.groups;
+H.eq(named.length, 2, 'the named groups became the activity\'s groups');
+H.eq(named[0].facts.duration.sessionDates.map((r) => r.date).join(' '), MON.join(' '),
+  'Beginners keeps its Mondays');
+H.eq(named[1].facts.schedule.sessions[0].day, 3, 'and Advanced its Wednesday');
+// normaliseGroups() runs on every read and every save, so a key it does not name
 // is deleted by the next write — which is exactly how sessionDates was lost
 // before it was listed on the duration shape.
-H.eq(JSON.stringify(migrate(act).facts.groupSize.named),
-     JSON.stringify(named), 'and a second pass through migrate changes nothing');
+H.eq(JSON.stringify(migrate(act).groups), JSON.stringify(named),
+  'and a second pass through migrate changes nothing');
 
 console.log('\n[the resolver answers per group, and is loud where it cannot]');
 H.eq(G.calendarFor(act, 'g-beg').map((r) => r.date).join(' '), MON.join(' '), 'Beginners resolves to Mondays');
 H.eq(G.calendarFor(act, 'g-adv').map((r) => r.date).join(' '), WED.join(' '), 'Advanced to Wednesdays');
-// A place taken while the activity was still pooled carries no group. It reads
-// the activity's own list, which is the only honest answer — nobody knows which
-// group they are in, and inventing one puts them on dates nobody promised.
-H.eq(G.calendarFor(act, null).length, 0, 'a registration with no group reads the activity\'s own list');
-H.eq(G.calendarFor(act, G.ANY).length, 0, 'and so does a caller that says ANY');
+// A place taken while the activity was still pooled carries no group. On an
+// activity with a CHOICE there is no honest single answer, so it reads the union
+// — inventing a group would put a family on dates nobody promised them.
+H.eq(G.calendarFor(act, null).length, 8, 'a registration with no group reads every evening, not one group\'s');
+H.eq(G.calendarFor(act, G.ANY).length, 8, 'and so does a caller that says ANY');
 // ⚠ THE ONE THAT MATTERS: a reader that never learned to thread the group.
 let threw = null;
 try { G.calendarFor(act); } catch (e) { threw = e.message; }
-H.ok(threw && /per group/.test(threw), 'a forgotten group THROWS rather than returning a plausible wrong list');
-// And is silent on the ordinary activity, which is every activity on the site.
-const plain = activity({ facts: Object.assign({}, activity().facts, {
-  groupSize: { named: [] },
-  duration: { startDate: '2026-10-12', endDate: '2026-11-04', sessionMinutes: 90, sessionDates: rows(WED) }
-}) });
-H.eq(G.calendarFor(plain).length, 4, 'an activity with one calendar needs no argument and gets no throw');
+H.ok(threw && /more than one group/.test(threw),
+  'a forgotten group THROWS rather than returning a plausible wrong list');
+// And is silent on the ordinary activity, which is every activity on the site:
+// one group, one calendar, no argument to forget.
+const plain = migrate({
+  slug: 'plain', activityId: 'act-0000000000000002', type: 'course',
+  facts: {
+    schedule: { frequency: 'weekly', sessions: [{ day: 3, time: '16:00' }] },
+    duration: { startDate: '2026-10-12', endDate: '2026-11-04', sessionMinutes: 90, sessionDates: rows(WED) },
+    price: { registrationFee: 50, fullPrice: 300 }
+  }
+});
+H.eq(G.calendarFor(plain).length, 4, 'an activity with one group needs no argument and gets no throw');
+H.eq(G.offersAChoice(plain), false, 'and offers no choice, so no family is ever asked');
+H.eq(G.offersAChoice(act), true, 'while two groups is a choice, which is the only thing that decides it');
 
 console.log('\n[how many times a family meets is ONE number, not the union]');
-H.eq(G.sessionCountOf(act), 4, 'four, not eight — the union would quote every family double their term');
+H.eq(G.sessionCountOf(act, 'g-beg'), 4, 'four, not eight — the union would quote every family double their term');
 H.eq(G.unionDates(act).length, 8, 'while the union is all eight, for the readers that want every evening');
-H.eq(G.durationFor(act).sessionDates.length, 4,
-  'and the duration fact hands the counters one group\'s list');
+H.eq(G.durationFor(act, 'g-beg').sessionDates.length, 4,
+  'and the duration fact hands the counters that group\'s list');
 // ⚠ WHERE IT SURFACES: the price card's qualifier. Counted off the union it
 // would quote "(8 sessions x 2 lessons)" for a 300 EUR term every family
 // attends four times — the term itself, restated wrongly, on the card a family
 // decides from.
-H.eq(F.priceRows(act.facts.price, 'en', G.durationFor(act))[1].note, '(4 sessions × 2 lessons)',
+H.eq(F.priceRows(act.facts.price, 'en', G.pricingDuration(act))[1].note, '(4 sessions × 2 lessons)',
   'the price qualifier counts one group\'s sessions, not both groups\' dates');
+// ⚠ AND IT DISAPPEARS THE MOMENT THE GROUPS GENUINELY DIFFER. Under the
+// equal-HOURS rule two groups can meet four times for 90 minutes and six times
+// for 60 — the same six hours, priced the same, and no single true "(N x M)".
+// The figure survives because it is right for everybody; the sentence does not.
+const cut = activity();
+cut.groups[1].facts.duration = Object.assign({}, cut.groups[1].facts.duration, {
+  sessionMinutes: 60, sessionDates: rows(WED.concat(['2026-11-11', '2026-11-18']))
+});
+H.eq(G.validateGroups(cut).length, 0, 'four 90-minute meetings and six 60-minute ones are both six hours');
+const cutRows = F.priceRows(cut.facts.price, 'en', G.pricingDuration(cut));
+H.eq(cutRows[1].note, '', 'so the qualifier is suppressed rather than quoting one group at the other');
+H.eq(cutRows[1].value, '300 €', 'while the price itself is unchanged, because the teaching is');
 
 console.log('\n[⚠ the credit is frozen against the family\'s OWN calendar]');
 // The whole point. Freeze both groups on the same activity and they must differ.
@@ -151,6 +176,21 @@ H.eq(owed(adv), 22500, 'Advanced: three of four left, 225 EUR');
 H.ok(owed(beg) !== owed(adv),
   '⚠ 75 EUR apart on the same day, on the same activity — which is the figure ' +
   'one calendar would have got wrong for one of them, plausibly and silently');
+
+// ⚠ AND THE HARD CUTOFF ITSELF RESOLVES PER GROUP. Left unconfigured it is the
+// date of session ceil(30% x count), which for Beginners is their second Monday
+// and for Advanced their second Wednesday. One activity-level default would have
+// held one of the two groups to the other's date — and it would have looked
+// perfectly reasonable on both receipts.
+const open2 = activity({ registration: { cancellationPolicy: { mode: 'prorated' } } });
+H.eq(C.freezeCancellation(open2, 'g-beg').cancellationCutoffDate, '2026-10-19',
+  'Beginners are held to their own second session');
+H.eq(C.freezeCancellation(open2, 'g-adv').cancellationCutoffDate, '2026-10-21',
+  'and Advanced to theirs, two days later');
+// A date an admin actually typed wins for everybody, which is what makes this a
+// DEFAULT rather than a formula that re-evaluates behind their back.
+H.eq(C.freezeCancellation(act, 'g-beg').cancellationCutoffDate, '2026-12-31',
+  'a typed cutoff governs every group, because somebody decided it');
 
 console.log('\n[the page shows both, rather than one of them]');
 const line = (lang) => F.scheduleText(act, lang);
@@ -182,22 +222,31 @@ const admin = read('netlify/functions/admin-registrations.js');
 H.ok(/attendance\.bookableDates\(activity, groups\.ANY\)/.test(admin),
   'and the codes on the wall pass ANY explicitly rather than omitting it');
 
-console.log('\n[groups meet on different days, not a different number of times]');
-H.eq(G.validateGroupCalendars(act).length, 0, 'two groups of four are fine');
+console.log('\n[groups may differ in when and how often, never in how many hours]');
+H.eq(G.validateGroups(act).length, 0, 'two groups of four 90-minute meetings are fine');
 const uneven = activity();
-uneven.facts.groupSize.named[1].sessionDates = rows(WED.slice(0, 3));
-const errs = G.validateGroupCalendars(uneven);
-H.eq(errs.length, 1, 'three against four is refused');
-H.ok(/meets 4 times and "Advanced" meets 3/.test(errs[0]), 'naming both groups and both counts');
+uneven.groups[1].facts.duration.sessionDates = rows(WED.slice(0, 3));
+const errs = G.validateGroups(uneven);
+H.eq(errs.length, 1, 'six hours against four and a half is refused');
+H.ok(/"Beginners" totals 6 hours of teaching and "Advanced" totals 4h 30min/.test(errs[0]),
+  'naming both groups and both totals');
 H.ok(/two activities in the same series/.test(errs[0]),
   'and pointing at the thing that DOES express it, which the site already supports');
-// A group with a calendar beside one without is the same problem: the one
-// without falls back to a list written for nobody in particular.
+// A group nobody can work the hours out for is the same problem: it cannot be
+// checked against the others, on an activity where the rest have been filled in.
 const half = activity();
-delete half.facts.groupSize.named[1].sessionDates;
-H.ok(/has no calendar of its own while another group does/.test(G.validateGroupCalendars(half)[0] || ''),
+half.groups[1].facts.duration.sessionDates = [];
+half.groups[1].facts.duration.sessionMinutes = null;
+H.ok(/has no session length or session count while another/.test(G.validateGroups(half)[0] || ''),
   'and so is half a configuration');
-H.ok(/GROUPS\.validateGroupCalendars\(activity\)/.test(read('netlify/functions/activities-admin.js')),
+// A NAME once there is a choice, because that is what a family picks by.
+const unnamed = activity();
+unnamed.groups[1].name = { he: '', en: '', ru: '' };
+H.ok(/Group 2 has no name/.test(G.validateGroups(unnamed).join(' ')),
+  'a second group with no name is refused — an unnamed option is a question nobody can answer');
+H.eq(G.validateGroups(plain).length, 0,
+  'while ONE group needs no name, because nothing is published and nobody is asked');
+H.ok(/GROUPS\.validateGroups\(activity\)/.test(read('netlify/functions/activities-admin.js')),
   'validate() calls it, so this is refused on SAVE rather than found on a page');
 
 console.log('\n[a bundle is sold against the buyer\'s own evenings]');
@@ -224,6 +273,16 @@ H.ok(!/schedule|sessionDates/.test(subkeys[0]),
 // Russian-only session sends can reach a group's timetable at all.
 H.ok(/const incFact = full \? REG\.keepUndrawnFactKeys\(key, cur, inc, out\.type\) : cur;/.test(adminFn),
   'a role without full access has its structure taken from the stored record, not its request');
+// ⚠ THE PER-ITEM MERGE, which is what the note at the top of this file said was
+// missing. The name merges per language; the capacity, the facts and the
+// MEMBERSHIP of the list do not.
+H.ok(/function mergeGroups\(baseGroups, incomingGroups, full, mergeLang\)/.test(adminFn),
+  'groups merge through their own function');
+H.ok(/const skeleton = \(full \? incoming : current\)/.test(adminFn),
+  'and a restricted role cannot add, remove or reorder a group');
+H.ok(/name: mergeLang\(cur\.name, inc\.name\)/.test(adminFn),
+  'while the name is words, and merges per language like every other sentence');
+H.ok(/capacity: full \? /.test(adminFn), 'and the capacity beside it is structure');
 
 console.log('\n[the admin can reach it, which is the half a pure module never has]');
 const adminJs = read('js/activities-admin.js');

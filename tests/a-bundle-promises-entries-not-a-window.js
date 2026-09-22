@@ -43,15 +43,13 @@ const withBundles = (list, extra) => {
   return a;
 };
 // Ten Tuesdays, so a 10-entry bundle has something to be covered by.
-const longActivity = (list, extra) => {
-  const a = withBundles(list, extra);
-  a.facts.duration = Object.assign({}, a.facts.duration, {
+const longActivity = (list, extra) => F.setGroupFacts(withBundles(list, extra), {
+  duration: {
     sessionDates: ['2026-10-06', '2026-10-13', '2026-10-20', '2026-10-27', '2026-11-03',
                    '2026-11-10', '2026-11-17', '2026-11-24', '2026-12-01', '2026-12-08']
       .map((d) => ({ date: d, status: 'scheduled' }))
-  });
-  return a;
-};
+  }
+});
 const B3 = { bundleId: 'b3', entries: 3, pricePerEntry: 9, validityDays: 60 };
 // Ninety days, deliberately: at sixty the tenth session (8 December) falls
 // outside the window and the bundle is correctly not offered — which is the
@@ -65,7 +63,7 @@ H.eq(B.bundlesAvailable(short, NOW).map((b) => b.bundleId).join(','), 'b3',
 const long = longActivity([B3, B10]);
 H.eq(B.bundlesAvailable(long, NOW).map((b) => b.bundleId).join(','), 'b3,b10',
   'with ten sessions ahead, both are offered');
-H.eq(B.bundlesAvailable(F.course({ facts: long.facts }), NOW).length, 0,
+H.eq(B.bundlesAvailable(Object.assign({}, long, { type: 'course' }), NOW).length, 0,
   'and a COURSE offers none — a term is already bought whole');
 
 console.log('\n[the window is measured from the purchase, so mid-term is ordinary]');
@@ -110,7 +108,7 @@ const pulled = B.reconcile(bought, long, NOW);
 H.eq(pulled.changed, false, 'nothing to do while the calendar agrees');
 // Drop the third session from the calendar.
 const holed = JSON.parse(JSON.stringify(long));
-holed.facts.duration.sessionDates = holed.facts.duration.sessionDates
+F.groupFacts(holed).duration.sessionDates = F.groupFacts(holed).duration.sessionDates
   .map((r) => (r.date === '2026-10-20' ? { date: r.date, status: 'excluded', reason: 'holiday' } : r));
 const fixed = B.reconcile(bought, holed, NOW);
 H.eq(fixed.coveredDates.join(','), '2026-10-06,2026-10-13,2026-10-27',
@@ -163,7 +161,7 @@ H.eq(lapsed.changed, false, 'and nothing is rewritten');
 H.eq(lapsed.shortfall, 0, 'nothing is owed: we did not break this promise');
 
 const pulledOut = JSON.parse(JSON.stringify(long));
-pulledOut.facts.duration.sessionDates = pulledOut.facts.duration.sessionDates
+F.groupFacts(pulledOut).duration.sessionDates = F.groupFacts(pulledOut).duration.sessionDates
   .map((r) => (r.date === '2026-10-20' ? { date: r.date, status: 'excluded', reason: 'holiday' } : r));
 const replaced = B.reconcile(lapsedOne, pulledOut, afterTheSixth);
 H.ok(replaced.coveredDates.indexOf('2026-10-20') === -1, 'a date we EXCLUDED leaves the coverage');

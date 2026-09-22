@@ -45,6 +45,12 @@
 // change the rule this module opens with — one record and one timestamp in, the
 // same figure out a year later.
 const groups = require('./_activity-groups');
+// ⚠ THE FREEZING HALF MAY READ. creditFor() and creditForSession() reach nothing
+// but the frozen record and a timestamp — that is the contract, and a test pins
+// it by name. freezeCancellation() runs at submission, which is exactly when the
+// terms are supposed to be read, and it needs the cutoff rules to resolve a
+// blank one against the group being registered.
+const REG = require('./_activity-registration');
 
 const TZ = 'Asia/Nicosia';
 
@@ -369,12 +375,19 @@ function freezeCancellation(activity, groupId, resolveSessionInstant) {
     .filter((r) => r && r.date && r.status !== 'excluded');
   const defaultTime = ((times.sessions || [])[0] || {}).time || '';
 
+  // ⚠ RESOLVED PER GROUP, HERE, at the one moment the group is known and the
+  // terms are being written down. A stored date wins — including "none", which
+  // means switched off — and only a date nobody ever configured is computed, off
+  // THIS family's calendar. Under the equal-hours rule two groups can be sold
+  // the same teaching across four meetings and six, so there is no single third
+  // session and no single start date: one activity-level default would have
+  // governed the other group's families, plausibly and silently.
+  const cutoffs = REG.resolveCutoffs(activity, groupId);
+
   return {
     mode: policy.mode === 'prorated' ? 'prorated' : 'flat',
-    registrationFeeCutoffDate: reg.registrationFeeCutoffDate == null
-      ? null : reg.registrationFeeCutoffDate,
-    cancellationCutoffDate: policy.cancellationCutoffDate == null
-      ? null : policy.cancellationCutoffDate,
+    registrationFeeCutoffDate: cutoffs.registrationFeeCutoffDate,
+    cancellationCutoffDate: cutoffs.cancellationCutoffDate,
     sessionStartsAt: rows
       .map((r) => resolve(r.date, r.time || defaultTime))
       .filter((t) => t != null)

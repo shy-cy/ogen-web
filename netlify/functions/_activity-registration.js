@@ -158,11 +158,15 @@ function minusDays(iso, days) {
 //
 // The calendar reading is kept as the fallback for an activity whose sessions
 // do not resolve. It is a worse answer, and it is better than an empty field.
-function thirtyPercentPoint(activity) {
-  // One group's calendar on a per-group activity: every group meets the same
-  // number of times, so the 30% POINT is the same session number for all of
-  // them — the date it falls on differs, and one cutoff date has to be picked.
-  const duration = groups.durationFor(activity);
+// ⚠ PER GROUP. It used to take one group's calendar and say why: every group met
+// the same number of times, so the 30% POINT was the same session number for all
+// of them and one date had to be picked. The equal-hours rule broke that — four
+// meetings and six are both six hours, and the third session of one group is not
+// the third session of the other — so the group is an argument now and the date
+// is resolved at registration, onto the frozen block, from the calendar that
+// family was actually sold.
+function thirtyPercentPoint(activity, groupId) {
+  const duration = groups.durationFor(activity, groupId);
   const rows = sessions.scheduled(duration.sessionDates);
   if (rows.length) {
     const n = Math.ceil(CANCEL_FRACTION * rows.length);
@@ -191,20 +195,37 @@ function thirtyPercentPoint(activity) {
 function defaultIfBlank(activity) {
   const type = normaliseType(activity && activity.type);
   const reg = normaliseRegistration(activity && activity.registration, type);
-  const duration = groups.durationFor(activity);
   let filled = false;
 
-  if (reg.registrationFeeCutoffDate == null && duration.startDate) {
-    const d = minusDays(duration.startDate, FEE_CUTOFF_DAYS);
+  // ⚠ FILLED ONLY WHEN EVERY GROUP AGREES ON THE ANSWER. Written into the record
+  // it becomes one date for the whole activity, and on groups that start on
+  // different days or meet a different number of times there is no such date —
+  // storing one group's would quietly govern the other group's families. When
+  // they disagree the field stays null and resolveCutoffs() answers per group at
+  // registration, which is where the group is finally known.
+  //
+  // With one group — every activity on the site today — this is exactly the
+  // behaviour it has always had: the date is computed on save and an admin can
+  // see it and change it in the form.
+  const agreed = (fn) => {
+    const answers = groups.groupList(activity).map((g) => fn(g.groupId));
+    if (!answers.length) answers.push(fn(undefined));
+    return answers.every((a) => a === answers[0]) ? answers[0] : null;
+  };
+
+  if (reg.registrationFeeCutoffDate == null) {
+    const d = agreed((gid) => minusDays(groups.durationFor(activity, gid).startDate, FEE_CUTOFF_DAYS) || null);
     if (d) { reg.registrationFeeCutoffDate = d; filled = true; }
   }
   // A drop-in has no term to withdraw from, so it has no cancellation cutoff to
   // compute. Leaving it null keeps the field meaningless rather than filling it
   // with a date that governs nothing.
   if (type !== 'dropin' && reg.cancellationPolicy.cancellationCutoffDate == null) {
-    const d = thirtyPercentPoint(activity);
+    const d = agreed((gid) => thirtyPercentPoint(activity, gid));
     if (d) { reg.cancellationPolicy.cancellationCutoffDate = d; filled = true; }
   }
+  const duration = groups.durationFor(activity, groups.groupList(activity)[0]
+    ? groups.groupList(activity)[0].groupId : undefined);
 
   // Stamp the inputs only when something was actually computed from them, and
   // only once. Re-stamping on every save would erase the record of what the
@@ -219,6 +240,33 @@ function defaultIfBlank(activity) {
   return reg;
 }
 
+// ⚠ THE CUTOFFS A PARTICULAR FAMILY IS HELD TO, resolved at the moment their
+// terms are frozen and never afterwards.
+//
+// A stored date always wins, including the string "none", which is a value
+// meaning the cutoff is switched off — that is the whole reason the field has
+// three states rather than a date beside a boolean. Only `null`, which means
+// nobody ever configured it, is computed here, and it is computed from THIS
+// GROUP's calendar.
+//
+// This is where the equal-hours rule is paid for. Two groups sold the same six
+// hours across four meetings and six have different third sessions and can
+// begin on different days, so there is no one date that is fair to both — and
+// picking one would have been invisible until two families compared receipts.
+function resolveCutoffs(activity, groupId) {
+  const type = normaliseType(activity && activity.type);
+  const reg = normaliseRegistration(activity && activity.registration, type);
+  const policy = reg.cancellationPolicy || {};
+  return {
+    registrationFeeCutoffDate: reg.registrationFeeCutoffDate != null
+      ? reg.registrationFeeCutoffDate
+      : (minusDays(groups.durationFor(activity, groupId).startDate, FEE_CUTOFF_DAYS) || null),
+    cancellationCutoffDate: policy.cancellationCutoffDate != null
+      ? policy.cancellationCutoffDate
+      : (type === 'dropin' ? null : thirtyPercentPoint(activity, groupId))
+  };
+}
+
 // Have the inputs moved since the dates were computed? Detect it, offer it,
 // never apply it. An activity postponed by a month keeps two cutoff dates
 // computed from where it used to be, and both are then wrong in the direction
@@ -228,7 +276,8 @@ function basisChanged(activity) {
   const reg = (activity && activity.registration) || {};
   const basis = reg.defaultBasis;
   if (!basis) return null;
-  const duration = groups.durationFor(activity);
+  const first = groups.groupList(activity)[0];
+  const duration = groups.durationFor(activity, first ? first.groupId : undefined);
   const now = {
     startDate: duration.startDate || '',
     sessionCount: sessions.scheduled(duration.sessionDates).length || num(duration.sessionCount)
@@ -282,10 +331,15 @@ function validateRegistration(activity) {
   // configuration gap. Flat has no such requirement, which is a second reason
   // it is the default.
   if (reg.cancellationPolicy.mode === 'prorated') {
-    const duration = ((activity && activity.facts) || {}).duration || {};
-    if (!sessions.scheduled(groups.durationFor(activity).sessionDates).length) {
+    // Every group needs one, not just the first: proration divides by the
+    // calendar the family was sold, so a group without one is a family whose
+    // cancellation divides by nothing at the moment they are cancelling.
+    const list = groups.groupList(activity);
+    const without = list.filter(
+      (g) => !sessions.scheduled(groups.durationFor(activity, g.groupId).sessionDates).length);
+    if (!list.length || without.length) {
       errors.push('Prorated cancellation needs a session calendar to divide by, and this activity has none. ' +
-        'Generate the sessions on the Activity facts panel, or use flat cancellation.');
+        'Generate the sessions on the Schedule panel, or use flat cancellation.');
     }
   }
 
@@ -458,5 +512,6 @@ module.exports = {
   normaliseType, normaliseRegistration, validateRegistration,
   defaultIfBlank, basisChanged, resolveExpiryDays,
   thirtyPercentPoint, minusDays, cutoff,
-  FIELDS, draws, mergeRegistration, keepUndrawnFactKeys, TYPE_SCOPED_FACT_KEYS
+  FIELDS, draws, mergeRegistration, keepUndrawnFactKeys, TYPE_SCOPED_FACT_KEYS,
+  resolveCutoffs
 };

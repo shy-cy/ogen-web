@@ -47,8 +47,18 @@ console.log('\n[the flag is enforced, in exactly one place]');
 H.ok(!F.isPubliclyVisible('members'), 'members-only is not publicly visible');
 H.ok(F.isPubliclyVisible('public'), 'public is');
 const src = require('fs').readFileSync(require.resolve('../netlify/functions/_activity-facts'), 'utf8');
-H.eq((src.match(/isPubliclyVisible\(/g) || []).length, 2,
+// ⚠ COMMENT-STRIPPED, which is the rule this codebase already follows for the
+// paired CSS declarations: the function is explained in prose right beside
+// itself, and a naive search finds the words in the explanation and passes
+// whether or not the declaration is still there — or, here, fails because the
+// prose mentions it. Same reasoning, other direction.
+const code = src.replace(/\/\/[^\n]*\n/g, '\n').replace(/\/\*[\s\S]*?\*\//g, '');
+H.eq((code.match(/isPubliclyVisible\(/g) || []).length, 2,
      'isPubliclyVisible is defined once and called once — no second copy of the rule');
+// And the one caller is the helper both readers share, rather than each of them
+// spelling the rule out again.
+H.ok(/const isPublicFact = \(activity, key\) => isPubliclyVisible\(visibilityOf\(activity, key\)\);/.test(code),
+     'the published rows and the per-group breakdown ask the same helper');
 
 console.log('\n[so it never reaches the published rows]');
 const act = activity();
@@ -76,16 +86,16 @@ H.ok(he.indexOf('לימסול') !== -1, 'the general location IS on the page');
 
 console.log('\n[but it is stored, because an authenticated view will need it]');
 H.eq(F.factText(act, 'address', 'he'), STREET.he, 'the fact still reads back for a caller that may see it');
-H.eq(act.facts.address.text.en, STREET.en, 'and survives in the record');
+H.eq(act.groups[0].facts.address.text.en, STREET.en, 'and survives in the record');
 const round = migrate(JSON.parse(JSON.stringify(act)));
-H.eq(round.facts.address.text.ru, STREET.ru, 'and survives a second migration');
+H.eq(round.groups[0].facts.address.text.ru, STREET.ru, 'and survives a second migration');
 
 console.log('\n[migrating an old record invents no address]');
 // The words in `location` are a city. Moving them into the address field would
 // claim an activity has a street address nobody ever typed.
 const old = migrate({ facts: { location: { he: 'לימסול', en: 'Limassol', ru: '' } } });
-H.eq(old.facts.location.text.he, 'לימסול', 'the general location keeps its words');
-H.eq(old.facts.address.text.he, '', 'and the address starts empty');
+H.eq(old.groups[0].facts.location.text.he, 'לימסול', 'the general location keeps its words');
+H.eq(old.groups[0].facts.address.text.he, '', 'and the address starts empty');
 H.eq(F.factText(old, 'address', 'he'), '', 'so nothing is published for it');
 
 console.log('\n[the admin draws two of them without collapsing them into one]');

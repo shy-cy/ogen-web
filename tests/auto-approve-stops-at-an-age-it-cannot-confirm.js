@@ -37,14 +37,17 @@ const NOW = Date.parse('2026-08-01T09:00:00Z');
 
   // Ages 6-10, auto-approving, one place per group so nothing is refused for
   // capacity by accident.
-  const withAges = (base, extra) => Object.assign({}, base, {
-    facts: Object.assign({}, base.facts, { ages: { min: 6, max: 10 } }, extra || {}),
+  // The age range lives on the GROUP now, so it is patched there — on the
+  // activity it would be a field nothing reads.
+  const withAges = (base, extra) => F.setGroupFacts(Object.assign({}, base, {
+    facts: Object.assign({}, base.facts, extra || {}),
     registration: Object.assign({}, base.registration, { autoApprove: true })
-  });
+  }), { ages: { min: 6, max: 10 } });
   const autoCourse = withAges(F.course({ slug: 'auto-course', activityId: 'act-00000000000a0001' }));
   const autoDropin = withAges(F.dropin({ slug: 'auto-dropin', activityId: 'act-00000000000a0002' }));
   const namedAuto = withAges(
-    F.course({ slug: 'auto-named', activityId: 'act-00000000000a0003' }), { groupSize: F.NAMED });
+    F.course({ slug: 'auto-named', activityId: 'act-00000000000a0003',
+               facts: Object.assign({}, F.rawCourse().facts, { groupSize: F.NAMED }) }));
   const noRange = Object.assign({}, F.course({ slug: 'no-range', activityId: 'act-00000000000a0004' }), {
     registration: Object.assign({}, F.course().registration, { autoApprove: true })
   });
@@ -93,16 +96,14 @@ const NOW = Date.parse('2026-08-01T09:00:00Z');
   // A child who turns seven the week before a 7-10 class begins is seven for
   // that class, and a family registering in August must not be told otherwise.
   const sevenInSeptember = { participantId: 'p-4', firstName: 'Yael', dateOfBirth: '2019-09-20' };
-  const sept = Object.assign({}, autoCourse, {
-    facts: Object.assign({}, autoCourse.facts, { ages: { min: 7, max: 10 } })
-  });
+  const sept = F.setGroupFacts(JSON.parse(JSON.stringify(autoCourse)), { ages: { min: 7, max: 10 } });
   const f = R.flagFor(sept, sevenInSeptember, Date.parse('2026-08-01T00:00:00Z'));
   H.eq(f.checkedAgainst, 'activity-start', 'the moment is the start date');
   H.eq(f.age, 7, 'so the child is seven, as they will be on the day');
   H.eq(f.inRange, true, 'and in range');
   H.eq(R.ageCheckMoment(F.dropin(), NOW).against, 'activity-start',
     'a drop-in with a start date uses it too');
-  H.eq(R.ageCheckMoment({ facts: { duration: {} } }, NOW).against, 'submission',
+  H.eq(R.ageCheckMoment({ groups: [{ groupId: 'g', facts: { duration: {} } }] }, NOW).against, 'submission',
     'and only an activity with no start date falls back to the submission moment');
 
   // ------------------------------------------------------------- end to end
@@ -171,13 +172,12 @@ const NOW = Date.parse('2026-08-01T09:00:00Z');
     'the slug is kept for auditing only — nothing keys off it, so a rename is a rename working');
 
   console.log('\n[and an edit to the activity afterwards does not reach it]');
-  github._files.set('activities/auto-named.json', JSON.stringify(Object.assign({}, namedAuto, {
-    facts: Object.assign({}, namedAuto.facts, {
-      ages: { min: 11, max: 14 },
-      price: { registrationFee: 90, fullPrice: 600 },
-      groupSize: { named: [{ groupId: 'g-beginners', name: F.lang('רמה 1', 'Level 1', 'Уровень 1'), capacity: 7 }] }
-    })
-  })));
+  github._files.set('activities/auto-named.json', JSON.stringify(
+    F.setGroupFacts(Object.assign(JSON.parse(JSON.stringify(namedAuto)), {
+      facts: Object.assign({}, namedAuto.facts, { price: { registrationFee: 90, fullPrice: 600 } }),
+      groups: [Object.assign({}, namedAuto.groups[0],
+        { name: F.lang('רמה 1', 'Level 1', 'Уровень 1'), capacity: 7 })]
+    }), { ages: { min: 11, max: 14 } })));
   const after = (await store.getRegistration(noa, 'act-00000000000a0003')).frozen;
   H.eq(after.price.fullPrice, 300, 'the price the family agreed to is still 300');
   H.eq(after.ageRange.max, 10, 'the range they were judged against is still 6-10');

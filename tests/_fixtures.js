@@ -14,11 +14,40 @@
 // These are minimal on purpose. They carry what the thing under test needs and
 // nothing else, so a failure names a field rather than a fixture.
 
+const { migrate } = require('../netlify/functions/_activity-migrate');
+
 const lang = (he, en, ru) => ({ he: he, en: en, ru: ru });
+
+// ⚠ EVERY FIXTURE IS A MIGRATED RECORD, because every real one is. migrate()
+// runs on every read, so an activity that reaches any code under test has
+// already had its facts moved onto its groups — and a fixture that skipped that
+// step would be testing a shape the site cannot produce. It is also what makes
+// these fixtures carry a group at all: the builders below still describe an
+// activity the way an admin thinks about one, and migrate() is what turns that
+// into the group the model actually stores.
+//
+// Reach a group's facts with groupFacts() rather than `fixture.facts.duration`,
+// which after migration holds only the price and the grouping override.
+const built = (record) => migrate(record);
+const groupFacts = (activity, i) => ((activity.groups || [])[i || 0] || {}).facts || {};
+
+// Patch a fact on EVERY group. Almost every suite wants to say "this activity
+// meets on these dates" or "this activity is for 6-10 year olds", which after
+// the move to groups is a statement about the groups rather than about the
+// record — and patching `activity.facts` instead is the quiet no-op this helper
+// exists to prevent.
+function setGroupFacts(activity, patch) {
+  (activity.groups || []).forEach((g) => {
+    Object.keys(patch || {}).forEach((k) => {
+      g.facts[k] = Object.assign({}, g.facts[k], patch[k]);
+    });
+  });
+  return activity;
+}
 
 // A semester course: a term price, a start and an end, a resolved calendar.
 // Modelled on hebrew4kids, which is the shape everything so far assumes.
-function course(over) {
+function rawCourse(over) {
   return Object.assign({
     slug: 'course-fixture',
     activityId: 'act-000000000000c0de',
@@ -47,11 +76,12 @@ function course(over) {
     }
   }, over || {});
 }
+const course = (over) => built(rawCourse(over));
 
 // Weekly folk dancing: it runs indefinitely, a family pays for the evenings they
 // come, and there is no term to withdraw from. No fullPrice, no endDate, no
 // cancellation policy — those are absent rather than configured differently.
-function dropin(over) {
+function rawDropin(over) {
   return Object.assign({
     slug: 'dropin-fixture',
     activityId: 'act-000000000000d00d',
@@ -79,6 +109,7 @@ function dropin(over) {
     }
   }, over || {});
 }
+const dropin = (over) => built(rawDropin(over));
 
 // THE THIRD PAIR: an autumn term and the spring term of the same course.
 //
@@ -94,8 +125,8 @@ function dropin(over) {
 // are both 2026/27. That is the point — on a CALENDAR year they would not be,
 // and a returning child would be charged the fee twice.
 function secondTerm(over) {
-  const first = course();
-  return Object.assign(course(), {
+  const first = rawCourse();
+  return built(Object.assign(rawCourse(), {
     slug: 'course-fixture-spring',
     activityId: 'act-000000000000spr1',
     // Points at the autumn term's id, which is what an admin choosing "another
@@ -109,7 +140,7 @@ function secondTerm(over) {
                        '2027-03-31', '2027-04-07'].map((d) => ({ date: d, status: 'scheduled' }))
       })
     })
-  }, over || {});
+  }, over || {}));
 }
 
 // The other pair. Pooled is the default and is what hebrew4kids is: two groups
@@ -141,5 +172,5 @@ const GROUP_PAIR = [
   { name: 'named', groupSize: NAMED }
 ];
 
-module.exports = { course, dropin, secondTerm, POOLED, NAMED,
-                   TYPE_PAIR, GROUP_PAIR, TERM_PAIR, lang };
+module.exports = { course, dropin, secondTerm, rawCourse, rawDropin, POOLED, NAMED,
+                   TYPE_PAIR, GROUP_PAIR, TERM_PAIR, lang, groupFacts, setGroupFacts };

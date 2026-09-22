@@ -18,6 +18,11 @@ const { FACT_ORDER, TEXT_FACTS, DEFAULT_VISIBILITY, num,
         INSTRUCTION_LANGUAGES, LEVELS } = require('./_activity-facts');
 const sessionsModule = require('./_activity-sessions');
 const registration = require('./_activity-registration');
+// Which facts belong to a group and which to the activity. The list lives in
+// _activity-groups.js because that module requires nothing, so importing it
+// here cannot make a cycle — see the note at the top of it.
+const groupsModule = require('./_activity-groups');
+const { GROUP_FACTS, ACTIVITY_FACTS } = groupsModule;
 
 const LANGS = ['he', 'en', 'ru'];
 
@@ -135,66 +140,20 @@ const SHAPES = {
     // else, so a reason has no reader on the public side.
     sessionDates: sessionRowsOf(f.sessionDates)
   }),
-  // The override is WORDS, so it is a { he, en, ru } bag like every other
-  // sentence on this site — the numbers beside it render in three languages and
-  // the text replacing them has to as well. langObject() puts a bare string in
-  // `he`, which is what a pre-trilingual override was: one line typed by a
-  // Hebrew-first admin. The other two fall back to the computed sentence, which
-  // is the honest reading of "this has not been translated yet".
-  groupSize: (f) => {
-    const out = { groups: num(f.groups), maxPerGroup: num(f.maxPerGroup),
-                  overrideText: langObject(f.overrideText) };
-    // Named groups are OPT-IN. Absent or empty means the pooled model, exactly
-    // as before, and nothing anywhere asks about groups. Present, `groups` and
-    // the capacity become derived from this list — see formatGroupSize().
-    //
-    // The name is a { he, en, ru } bag because it is words a family reads: a
-    // role permitted to edit only Russian must be able to translate "Advanced"
-    // and must not be able to change its capacity from ten to twenty. Putting
-    // the list inside the fact draws that line by where the field sits rather
-    // than by a rule someone has to remember.
-    //
-    // ⚠ A GROUP CAN CARRY ITS OWN SCHEDULE AND ITS OWN CALENDAR. Two groups do
-    // not only differ in size — Beginners on Mondays and Advanced on Wednesdays
-    // is the ordinary case, and until this existed the activity had one calendar
-    // that was right for at most one of them. Everything that reads a calendar
-    // and knows which group it is about now resolves through _activity-groups.js
-    // rather than reaching for the activity's list.
-    //
-    // It lives HERE rather than in `schedule` and `duration` because a group is
-    // one thing an admin sets up. Split across three panels, one of the three is
-    // what gets forgotten. The cost is that a calendar sits inside a fact called
-    // "group size"; the name is the older compromise, and it already holds the
-    // group's name and capacity for the same reason.
-    //
-    // Both are STRUCTURE — dates and times, not words — so `LANG_SUBKEYS` names
-    // only `name`, and a role that may edit only Russian can translate "Advanced"
-    // and cannot move when it meets.
-    const named = (Array.isArray(f.named) ? f.named : [])
-      .map((g) => {
-        const out = {
-          groupId: String((g && g.groupId) || '').trim().slice(0, 40),
-          name: langObject(g && g.name),
-          capacity: num(g && g.capacity)
-        };
-        // Reusing the two shapes the activity's own fields go through, so a
-        // group's schedule cannot normalise differently from the activity's —
-        // including the derived weekday and the surviving `date`.
-        const sched = g && g.schedule;
-        if (sched && typeof sched === 'object') {
-          const norm = SHAPES.schedule(sched);
-          if (norm.sessions.length) out.schedule = norm;
-        }
-        const dates = g && g.sessionDates;
-        if (Array.isArray(dates) && dates.length) {
-          out.sessionDates = sessionRowsOf(dates);
-        }
-        return out;
-      })
-      .filter((g) => g.groupId);
-    if (named.length) out.named = named;
-    return out;
-  },
+  // ⚠ WHAT IS LEFT OF THE GROUP SIZE FACT IS THE OVERRIDE, AND NOTHING ELSE.
+  //
+  // It used to hold `groups`, `maxPerGroup` and the `named[]` list — the whole
+  // idea of a group, filed under a fact called "group size" because that is
+  // where the first of them happened to fit. Groups are their own thing now
+  // (see _activity-groups.js): a count is the length of activity.groups, a
+  // capacity is a field on one of them, and a name is words a family picks by.
+  //
+  // The override survives because it is a different kind of statement: not
+  // "how many and how big" but a sentence replacing the computed one outright,
+  // for a grouping that is not "N groups of up to M" and never will be. It is
+  // WORDS, so it is a { he, en, ru } bag; langObject() puts a bare string in
+  // `he`, which is what a pre-trilingual override was.
+  groupSize: (f) => ({ overrideText: langObject(f.overrideText) }),
   // ⚠ THE LAST TWO FREE-TEXT FACTS, STRUCTURED.
   //
   // Both were a Hebrew box, an English box and a Russian box holding whatever
@@ -283,11 +242,53 @@ function normaliseFact(key, raw) {
   return out;
 }
 
+// ⚠ THE ACTIVITY'S OWN FACTS, WHICH IS NO LONGER ALL OF THEM. Seven of the nine
+// moved onto the groups, so walking FACT_ORDER here would write an empty `ages`
+// beside every group's real one — two answers to one question, on a record where
+// only one of them is ever read. What is left is what is genuinely one answer
+// for the whole activity: the grouping override and the price.
 function normaliseFacts(rawFacts) {
   const facts = rawFacts && typeof rawFacts === 'object' ? rawFacts : {};
   const out = {};
-  FACT_ORDER.forEach((key) => { out[key] = normaliseFact(key, facts[key]); });
+  ACTIVITY_FACTS.forEach((key) => { out[key] = normaliseFact(key, facts[key]); });
   return out;
+}
+
+// One group's facts, through exactly the same shapes the activity's went
+// through — so a group's calendar cannot normalise differently from the one it
+// was copied out of, including the derived weekday and the surviving `date`.
+function normaliseGroupFacts(rawFacts) {
+  const facts = rawFacts && typeof rawFacts === 'object' ? rawFacts : {};
+  const out = {};
+  GROUP_FACTS.forEach((key) => { out[key] = normaliseFact(key, facts[key]); });
+  return out;
+}
+
+// ⚠ THE GROUP LIST, AND IT IS APPLIED ON EVERY READ AND EVERY SAVE. A key this
+// does not name is a key the next save deletes — the lesson sessionDates taught
+// twice. teacherIds is listed for that reason, and so is the whole facts bag.
+//
+// The name is a { he, en, ru } bag because it is words a family picks by. The
+// capacity beside it is not, and that split is what lets a translator rename a
+// group without being able to resize it — see mergeGroups() in
+// activities-admin.js.
+function normaliseGroups(list) {
+  return (Array.isArray(list) ? list : [])
+    .map((g) => {
+      const raw = g && typeof g === 'object' ? g : {};
+      return {
+        groupId: String(raw.groupId || '').trim().slice(0, 40),
+        name: langObject(raw.name),
+        capacity: num(raw.capacity),
+        // Empty means the whole roster. See teachersFor() in _activity-groups.js:
+        // teachers are REFERENCED rather than copied, so one photograph is one
+        // file however many groups a person teaches.
+        teacherIds: (Array.isArray(raw.teacherIds) ? raw.teacherIds : [])
+          .map((id) => String(id || '').trim()).filter(Boolean),
+        facts: normaliseGroupFacts(raw.facts)
+      };
+    })
+    .filter((g) => g.groupId);
 }
 
 // `preAddress` marks a record written before the exact address existed — which
@@ -316,6 +317,62 @@ function normaliseVisibility(raw, preAddress) {
     out[key] = stated || DEFAULT_VISIBILITY[key] || 'public';
   });
   return out;
+}
+
+// ⚠ THE ONE-TIME BUILD: AN ACTIVITY'S FACTS BECOME ITS FIRST GROUP'S.
+//
+// Two shapes arrive here and neither loses anything.
+//
+//   A POOLED ACTIVITY — no named groups — becomes exactly ONE group, holding
+//   what the activity held. Its name is blank, which is right: one group offers
+//   no choice, so nothing is published and nobody is asked. Its capacity is the
+//   product that used to be computed from `groups × maxPerGroup`, so an
+//   activity holding twenty goes on holding twenty rather than silently
+//   becoming one group of ten.
+//
+//   AN ACTIVITY WITH NAMED GROUPS keeps their ids — frozen registrations point
+//   at them — and each group is SEEDED with the activity's shared facts as a
+//   starting point, with its own schedule and calendar layered on top where it
+//   had them. Seeding is deliberately a copy rather than a guess: two groups
+//   that differ in language and teacher still shared an age range and a room,
+//   and an admin adjusts from something true rather than from blank fields.
+//
+// `teacherIds` is empty on every seeded group, which MEANS the whole roster
+// rather than meaning nobody — see teachersFor(). Writing the roster out would
+// freeze it, so a teacher added to the activity next month would appear in the
+// credits and in no group.
+const SOLE_GROUP_ID = 'g-default';
+
+function seedGroups(old, facts) {
+  const size = old.groupSize && typeof old.groupSize === 'object' && !isLangObject(old.groupSize)
+    ? old.groupSize : {};
+  const named = (Array.isArray(size.named) ? size.named : []).filter((g) => g && g.groupId);
+
+  // A fresh copy per group. Sharing one object would give two groups the same
+  // calendar array, so editing one would edit the other — invisible until an
+  // admin excluded a date for Beginners and took it off Advanced as well.
+  const shared = () => {
+    const out = {};
+    GROUP_FACTS.forEach((k) => { out[k] = facts[k]; });
+    return JSON.parse(JSON.stringify(out));
+  };
+
+  if (named.length) {
+    return named.map((g) => {
+      const f = shared();
+      if (g.schedule && typeof g.schedule === 'object') f.schedule = g.schedule;
+      if (Array.isArray(g.sessionDates) && g.sessionDates.length) {
+        f.duration = Object.assign({}, f.duration, { sessionDates: g.sessionDates });
+      }
+      return { groupId: g.groupId, name: g.name, capacity: g.capacity, teacherIds: [], facts: f };
+    });
+  }
+
+  const groups = num(size.groups);
+  const per = num(size.maxPerGroup);
+  const capacity = groups != null && per != null && groups > 0 && per > 0 ? groups * per : null;
+  return [{ groupId: SOLE_GROUP_ID, name: emptyLang(), capacity: capacity,
+            teacherIds: [], facts: shared() }];
 }
 
 // --- the migration ---------------------------------------------------------
@@ -385,7 +442,17 @@ function migrate(record, options) {
   out.type = registration.normaliseType(out.type);
   // Read from the RAW record, before normaliseFacts() gives every record an
   // (empty) address fact and the question becomes unanswerable.
-  const preAddress = !(record.facts && record.facts.address);
+  //
+  // ⚠ AND IT HAS TO LOOK AT THE GROUPS TOO, or this function stops being
+  // idempotent. The address fact moved onto the groups, so after one pass
+  // `record.facts.address` is gone — and a second pass would read that as "this
+  // record predates the address field", reset every visibility flag to public,
+  // and quietly republish whatever an admin had marked members-only. The
+  // question is "has this record ever seen an address field", and both places it
+  // could live have to be asked.
+  const preAddress = !(record.facts && record.facts.address) &&
+    !(Array.isArray(record.groups) &&
+      record.groups.some((g) => g && g.facts && g.facts.address));
   const old = out.facts || {};
   const facts = {};
 
@@ -444,6 +511,14 @@ function migrate(record, options) {
   ['instructionLanguage', 'prerequisites'].forEach((key) => {
     facts[key] = old[key] != null ? old[key] : langObject(out[key]);
   });
+
+  // ⚠ EVERY ACTIVITY HAS AT LEAST ONE GROUP, AND THIS IS WHERE THAT BECOMES
+  // TRUE. Built when the record has none and left alone when it has some, so a
+  // second pass finds what the first one wrote and does nothing — the same
+  // shape activityId already has, and the reason migrate() can run on every
+  // read rather than being a one-off nobody dares repeat.
+  const carried = (Array.isArray(out.groups) ? out.groups : []).filter((g) => g && g.groupId);
+  out.groups = normaliseGroups(carried.length ? carried : seedGroups(old, facts));
 
   out.facts = normaliseFacts(facts);
   out.factVisibility = normaliseVisibility(out.factVisibility, preAddress);
@@ -504,6 +579,7 @@ function migrate(record, options) {
 }
 
 module.exports = {
-  migrate, normaliseFacts, normaliseFact, normaliseVisibility,
+  migrate, normaliseFacts, normaliseFact, normaliseGroups, normaliseGroupFacts,
+  normaliseVisibility, SOLE_GROUP_ID,
   isLangObject, parseAgeRange, langObject, isoDate, SHAPES
 };

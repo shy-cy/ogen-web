@@ -122,42 +122,53 @@ H.eq(courseRows.map((r) => r.label).join(' | '), 'Registration fee | Cost per se
 
 // Per-lesson, opted in, derives from whichever figure the activity actually has.
 const perLessonDropin = facts.priceRows(
-  Object.assign({ showPerLesson: true }, F.dropin().facts.price), 'en', D);
+  Object.assign({}, F.dropin().facts.price, { showPerLesson: true }), 'en', D);
 H.ok(perLessonDropin.some((r) => r.label === 'Cost per lesson' && r.value === '6 €'),
   'a 90-minute session at 12 EUR is two academic hours, so 6 EUR a lesson');
 
 console.log('\n[pooled and named groups, the other pair]');
+// ⚠ BOTH HALVES OF THE PAIR ARE GROUPS NOW. "Pooled" used to mean an activity
+// with no groups at all and two numbers describing one; migrate() turns those
+// numbers into a single group holding the product, so the pair is now one group
+// against two rather than none against some. What it still tests is the thing
+// that matters: the sentence and the capacity are read off the same list, so
+// they cannot disagree.
+const asActivity = (groupSize) => migrate({ slug: 'x', facts: { groupSize: groupSize } });
 F.GROUP_PAIR.forEach((g) => {
-  const text = facts.formatGroupSize(g.groupSize, 'en');
-  H.ok(text.length > 0, g.name + ': renders a sentence');
+  H.ok(facts.formatGroupSize(asActivity(g.groupSize), 'en').length > 0, g.name + ': renders a sentence');
 });
-H.eq(facts.formatGroupSize(F.POOLED, 'en'), '2 groups\nup to 7 students per group',
-  'pooled is unchanged, which is what "opt-in" has to mean');
-// "up to 7 students", not "up to 7": the pooled sentence says students and a
-// named group saying only a number reads as seven of something unstated.
-H.eq(facts.formatGroupSize(F.NAMED, 'en'), 'Beginners, up to 7 students\nAdvanced, up to 10 students',
-  'named replaces the counted sentence rather than being appended to it');
-H.eq(facts.formatGroupSize(F.NAMED, 'he'), 'מתחילים, עד 7 תלמידים\nמתקדמים, עד 10 תלמידים',
+H.eq(facts.formatGroupSize(asActivity(F.POOLED), 'en'), 'Up to 14 students',
+  'two pooled groups of seven are ONE group of fourteen — the places did not move, ' +
+  'which is the whole promise the migration makes');
+// "up to 7 students", not "up to 7": a named group saying only a number reads as
+// seven of something unstated.
+H.eq(facts.formatGroupSize(asActivity(F.NAMED), 'en'), 'Beginners, up to 7 students\nAdvanced, up to 10 students',
+  'two groups are a line each, named, because now there is a choice to describe');
+H.eq(facts.formatGroupSize(asActivity(F.NAMED), 'he'), 'מתחילים, עד 7 תלמידים\nמתקדמים, עד 10 תלמידים',
   'in Hebrew');
-H.eq(facts.formatGroupSize(F.NAMED, 'ru'), 'Начинающие, до 7 учеников\nПродолжающие, до 10 учеников',
+H.eq(facts.formatGroupSize(asActivity(F.NAMED), 'ru'), 'Начинающие, до 7 учеников\nПродолжающие, до 10 учеников',
   'and in Russian, with the plural agreeing');
-// A name is words and a capacity is not, which is the whole reason the list
-// lives inside the fact rather than in the registration block.
-H.eq(facts.formatGroupSize({ named: [{ groupId: 'g', name: F.lang('מתחילים', '', ''), capacity: 7 }] }, 'en'),
-  'מתחילים, up to 7 students',
+// A name is words and a capacity is not, which is the whole reason mergeGroups()
+// splits them the way it does.
+H.eq(facts.formatGroupSize(asActivity({ named: [
+    { groupId: 'g', name: F.lang('מתחילים', '', ''), capacity: 7 },
+    { groupId: 'h', name: F.lang('מתקדמים', '', ''), capacity: 9 }] }), 'en'),
+  'מתחילים, up to 7 students\nמתקדמים, up to 9 students',
   'an untranslated group name falls back like every other sentence on this site');
-H.eq(facts.formatGroupSize({ named: [{ groupId: 'g', name: F.lang('א', 'A', 'А') }] }, 'en'), 'A',
+H.eq(facts.formatGroupSize(asActivity({ named: [
+    { groupId: 'g', name: F.lang('א', 'A', 'А') },
+    { groupId: 'h', name: F.lang('ב', 'B', 'Б') }] }), 'en'), 'A\nB',
   'a group with no capacity yet is still named, because the name is what a family chooses by');
 
 console.log('\n[capacity is derived, and uncapped is not zero]');
-H.eq(facts.totalCapacity(F.POOLED), 14, 'pooled capacity is the product');
-H.eq(facts.totalCapacity(F.NAMED), 17, 'named capacity is the sum, not a product');
-H.eq(facts.totalCapacity({}), null,
+H.eq(facts.totalCapacity(asActivity(F.POOLED)), 14, 'the pooled product became one group holding it');
+H.eq(facts.totalCapacity(asActivity(F.NAMED)), 17, 'and two named groups sum, never multiply');
+H.eq(facts.totalCapacity(asActivity({})), null,
   'nothing filled in is UNCAPPED — zero would silently refuse every registration ' +
   'for an activity nobody had finished setting up');
-H.eq(facts.totalCapacity({ groups: 2 }), null, 'and half the numbers is still nothing');
-H.eq(facts.totalCapacity({ named: [{ groupId: 'g', capacity: 7 }, { groupId: 'h' }] }), null,
-  'a named group with no capacity makes the total unknown rather than understated');
+H.eq(facts.totalCapacity(asActivity({ groups: 2 })), null, 'and half the numbers is still nothing');
+H.eq(facts.totalCapacity(asActivity({ named: [{ groupId: 'g', capacity: 7 }, { groupId: 'h' }] })), null,
+  'a group with no capacity makes the total unknown rather than understated');
 
 console.log('\n[the two cutoff dates: filled when blank, never overwritten]');
 const filled = REG.defaultIfBlank(F.course());
@@ -214,7 +225,7 @@ H.eq(stamped.registration.defaultBasis.sessionCount, 10, 'both of them');
 H.eq(REG.basisChanged(stamped), null, 'and nothing has moved yet');
 
 const postponed = JSON.parse(JSON.stringify(stamped));
-postponed.facts.duration.startDate = '2026-11-14';
+F.groupFacts(postponed).duration.startDate = '2026-11-14';
 const moved = REG.basisChanged(postponed);
 H.ok(moved && moved.was.startDate === '2026-10-14' && moved.now.startDate === '2026-11-14',
   'moving the start date is DETECTED');

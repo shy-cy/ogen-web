@@ -22,6 +22,7 @@ const facts = require('./_activity-facts');
 const credit = require('./_credit');
 const { ageFlag } = require('./_participant-store');
 const REG = require('./_activity-registration');
+const groups = require('./_activity-groups');
 
 // Five, and deliberately five. `rejected` and `expired` and `cancelled` are all
 // "does not hold a spot", but they are different things that happened and the
@@ -105,20 +106,31 @@ function countSpots(regs, now) {
 // nobody had finished filling in. Same direction as every other blank in this
 // codebase, which resolves towards the family.
 function capacityReport(activity, regs, now) {
-  const f = (((activity || {}).facts) || {}).groupSize || {};
-  const named = facts.namedGroups(f);
+  const named = groups.groupList(activity);
   const counts = countSpots(regs, now);
-  const capacity = facts.totalCapacity(f);
+  const capacity = groups.totalCapacity(activity);
 
-  // Registrations taken while the activity was pooled carry groupId null, so
-  // they land under '' and appear in `taken` without belonging to any named
-  // row. That is the honest reading — the place is occupied and nobody knows by
-  // which group — and it is why the totals are counted separately rather than
-  // summed from the rows.
+  // ⚠ WITH ONE GROUP, A REGISTRATION THAT NAMES NO GROUP BELONGS TO IT.
+  //
+  // Every registration taken while an activity was pooled carries `groupId:
+  // null`. Once every activity has a group, bucketing strictly by id would file
+  // all of them under "unassigned" and show the one group at nought taken — a
+  // class that is full reporting as empty, with nothing erroring and nobody
+  // finding out until somebody turned up to a room with no chair. With exactly
+  // one group there is only one honest answer, so they are counted into it.
+  //
+  // With two or more there is not: nobody knows which group they are in, and
+  // inventing one would be worse than leaving the row short. Those stay in
+  // `unassigned`, appear in `taken`, and belong to no row — which is why the
+  // rows deliberately do not sum to the total.
+  const sole = groups.soleGroup(activity);
+  const unassigned = counts.byGroup[''] || 0;
+
   const rows = named.map((g) => {
     const cap = g.capacity == null || g.capacity === '' ? null : Number(g.capacity);
     const has = cap != null && isFinite(cap) && cap > 0 ? cap : null;
-    const taken = counts.byGroup[g.groupId] || 0;
+    const taken = (counts.byGroup[g.groupId] || 0) +
+                  (sole && sole.groupId === g.groupId ? unassigned : 0);
     return {
       groupId: g.groupId,
       name: g.name || null,
@@ -139,7 +151,9 @@ function capacityReport(activity, regs, now) {
     // admin list says "23 / 20 — over capacity" and an admin rejects the
     // surplus, which is a smaller problem than a lost counter update.
     over: capacity != null && counts.taken > capacity,
-    unassigned: counts.byGroup[''] || 0,
+    // Counted into the sole group above, so there is nothing left over to
+    // report. Kept as a field because the multi-group case still has some.
+    unassigned: sole ? 0 : unassigned,
     named: rows.length ? rows : null
   };
 }
@@ -155,8 +169,7 @@ function capacityReport(activity, regs, now) {
 // It takes the attendance records rather than reading them, so this stays pure
 // and testable with no fixtures — the same shape capacityReport() has.
 function capacityForDate(activity, attendances, sessionDate) {
-  const f = (((activity || {}).facts) || {}).groupSize || {};
-  const capacity = facts.totalCapacity(f);
+  const capacity = groups.totalCapacity(activity);
   const held = (attendances || []).filter(
     (a) => a && a.sessionDate === sessionDate && holdsASeat(a));
   const byGroup = Object.create(null);
@@ -183,7 +196,14 @@ const holdsASeat = (att) => !!att && SEAT_STATUSES.indexOf(att.status) !== -1;
 // Is there room for one more, in the group they asked for?
 function hasRoom(report, groupId) {
   if (report.named) {
-    const row = report.named.filter((r) => r.groupId === groupId)[0];
+    // ⚠ ONE ROW ANSWERS FOR A CALLER THAT NAMED NO GROUP. Every activity has a
+    // group now, so `report.named` is always populated and a strict id match
+    // would refuse every registration that did not name one — which on a
+    // single-group activity is every registration, because the family was never
+    // asked. With one row there is one answer; with several, a caller that named
+    // nothing is refused, which is what submissionErrors already told them.
+    const row = report.named.filter((r) => r.groupId === groupId)[0] ||
+                (report.named.length === 1 ? report.named[0] : null);
     if (!row) return false;
     return row.left == null || row.left > 0;
   }
@@ -197,17 +217,24 @@ function hasRoom(report, groupId) {
 // that class, and a family registering in August should not be told otherwise.
 // Falls back to the submission moment when an activity has no start date, which
 // is the drop-in case.
-function ageCheckMoment(activity, now) {
-  const start = ((((activity || {}).facts) || {}).duration || {}).startDate;
+// ⚠ THE START DATE AND THE AGE RANGE ARE BOTH THE GROUP'S NOW. Two groups under
+// one activity can genuinely begin on different days and be pitched at different
+// ages — that is the whole point of the restructuring — so an age checked
+// against "the activity's" range is an age checked against nobody's. The group
+// is resolved the way everything else resolves it: named, or the sole group when
+// there is one, or (on a multi-group activity with no group chosen, which
+// submissionErrors refuses anyway) nothing to check.
+function ageCheckMoment(activity, now, groupId) {
+  const start = (groups.factFor(activity, 'duration', groupId) || {}).startDate;
   const t = credit.parseDateParts(start) ? credit.resolveLocal(start, '', credit.TZ) : null;
   return t == null
     ? { at: ms(now) == null ? Date.now() : ms(now), against: 'submission' }
     : { at: t, against: 'activity-start' };
 }
 
-function flagFor(activity, participant, now) {
-  const when = ageCheckMoment(activity, now);
-  const ages = (((activity || {}).facts) || {}).ages || {};
+function flagFor(activity, participant, now, groupId) {
+  const when = ageCheckMoment(activity, now, groupId);
+  const ages = groups.factFor(activity, 'ages', groupId) || {};
   return Object.assign(ageFlag(participant, ages, when.at), { checkedAgainst: when.against });
 }
 
@@ -264,8 +291,8 @@ function academicYearOf(isoDate) {
 // that course's year, and a registration taken on 31 August must not land in a
 // different year from one taken on 1 September for the same term. Falls back to
 // the submission moment only for an activity with no start date.
-function feeYearOf(activity, now) {
-  const start = ((((activity || {}).facts) || {}).duration || {}).startDate;
+function feeYearOf(activity, now, groupId) {
+  const start = (groups.factFor(activity, 'duration', groupId) || {}).startDate;
   const byStart = academicYearOf(start);
   if (byStart) return byStart;
   return academicYearOf(new Date(ms(now) == null ? Date.now() : ms(now)).toISOString().slice(0, 10));
@@ -365,8 +392,7 @@ function owedCentsFor(activity, feeCharged) {
 function freeze(activity, participant, groupId, flag, fee) {
   const f = ((activity || {}).facts) || {};
   const price = f.price || {};
-  const group = facts.namedGroups(f.groupSize || {})
-    .filter((g) => g.groupId === groupId)[0] || null;
+  const group = groups.resolveGroup(activity, groupId);
 
   return {
     // Which activity and which year the fee was judged against. Frozen so the
@@ -431,14 +457,32 @@ function submissionErrors(activity, participant, groupId) {
   if (activity.status !== 'open') {
     errors.push('registration-not-open');
   }
-  const named = facts.namedGroups((((activity.facts) || {}).groupSize) || {});
-  if (named.length) {
+  // ⚠ THE COUNT DECIDES WHETHER A FAMILY IS ASKED, not whether the groups are
+  // named. Every activity has at least one group now, so the old test — "does
+  // this activity name any groups" — would put a one-option picker in front of
+  // every family on the site and refuse every submission that did not answer it.
+  //
+  // With one group there is nothing to choose and the group is assigned
+  // silently. With two or more the family picks, and a pick that names no group
+  // of this activity is refused rather than quietly reassigned.
+  const list = groups.groupList(activity);
+  if (list.length > 1) {
     if (!groupId) errors.push('group-required');
-    else if (!named.some((g) => g.groupId === groupId)) errors.push('no-such-group');
-  } else if (groupId) {
+    else if (!list.some((g) => g.groupId === groupId)) errors.push('no-such-group');
+  } else if (groupId && !list.some((g) => g.groupId === groupId)) {
     errors.push('no-groups-to-choose');
   }
   return errors;
+}
+
+// The group a submission is actually recorded against. With one group the family
+// was never asked, so the answer is that group rather than the null they sent —
+// which is what keeps the capacity count, the frozen calendar and the roster all
+// pointing at the same thing from the first registration onwards.
+function groupIdFor(activity, groupId) {
+  if (groupId) return groupId;
+  const sole = groups.soleGroup(activity);
+  return sole ? sole.groupId : null;
 }
 
 // expiresAt is STAMPED HERE, at submission, never computed on read.
@@ -456,7 +500,14 @@ function newRegistration({ activity, participant, accountId, groupId, now, env, 
   const at = ms(now) == null ? Date.now() : ms(now);
   const iso = new Date(at).toISOString();
   const expiry = REG.resolveExpiryDays(activity, env || process.env);
-  const flag = flagFor(activity, participant, at);
+  // ⚠ RESOLVED ONCE, HERE, AND USED FOR EVERYTHING AFTER IT. With one group the
+  // family was never asked, so the null they sent becomes that group's id before
+  // anything is frozen against it — the age range, the start date, the calendar
+  // and the capacity count are all per-group now, and a registration that knows
+  // its group from the first line cannot end up freezing one group's terms under
+  // another group's roster.
+  const gid = groupIdFor(activity, groupId);
+  const flag = flagFor(activity, participant, at, gid);
   const auto = autoApproves(activity, flag);
 
   // Decided ONCE, here, from this participant's own prior registrations — and
@@ -464,7 +515,7 @@ function newRegistration({ activity, participant, accountId, groupId, now, env, 
   // must not change what this family was billed today.
   const fee = {
     seriesId: seriesOf(activity),
-    feeYear: feeYearOf(activity, at),
+    feeYear: feeYearOf(activity, at, gid),
     charged: false
   };
   fee.charged = feeApplies(priorRegistrations, fee.seriesId, fee.feeYear);
@@ -476,7 +527,7 @@ function newRegistration({ activity, participant, accountId, groupId, now, env, 
     // primary guardian — a second guardian who registers a child is the one the
     // bill and the credit belong to.
     accountId: accountId,
-    groupId: groupId || null,
+    groupId: gid,
     status: auto ? 'approved' : 'pending',
     submittedAt: iso,
     expiresAt: new Date(at + expiry.days * 24 * 60 * 60 * 1000).toISOString(),
@@ -489,7 +540,7 @@ function newRegistration({ activity, participant, accountId, groupId, now, env, 
     cancelledAt: null,
     cancelledBy: null,
     cancelSource: null,
-    frozen: freeze(activity, participant, groupId || null, flag, fee),
+    frozen: freeze(activity, participant, gid, flag, fee),
     // ADVISORY ONLY. It annotates the queue and nothing branches on it except
     // autoApproves above, which reads it to decide whether to stand aside.
     ageFlag: flag,
@@ -550,5 +601,5 @@ module.exports = {
   holdsASpot, hasLapsed, countSpots, capacityReport, hasRoom,
   capacityForDate, holdsASeat, SEAT_STATUSES,
   ageCheckMoment, flagFor, autoApproves,
-  freeze, submissionErrors, newRegistration, transition
+  freeze, submissionErrors, groupIdFor, newRegistration, transition
 };

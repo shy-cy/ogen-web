@@ -49,7 +49,17 @@ function lastSessionDate(activity) {
   // live, while a group that meets on Wednesdays still has two weeks to go.
   // This is one of the two readers that is group-blind on purpose; the other is
   // the check-in codes, for the same reason.
-  const duration = ((activity || {}).facts || {}).duration || {};
+  // The typed end date is a group's field now too, so the LATEST across the
+  // groups is the one that answers — same direction as the calendar above, and
+  // for the same reason: completing early rewrites a live page under a family
+  // still attending, and completing late is the harmless error.
+  const typedEnds = groups.groupList(activity)
+    .map((g) => ((g.facts || {}).duration || {}).endDate)
+    .concat([(((activity || {}).facts || {}).duration || {}).endDate])
+    .map((d) => String(d || ''))
+    .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+    .sort();
+  const duration = { endDate: typedEnds.length ? typedEnds[typedEnds.length - 1] : '' };
   const dates = groups.unionDates(activity)
     .filter((r) => r && r.date && r.status !== 'excluded')
     .map((r) => String(r.date))

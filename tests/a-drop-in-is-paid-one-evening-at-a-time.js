@@ -43,7 +43,7 @@ const HOUR = 3600 * 1000;
   const blobs = H.makeBlobs();
   // 19:30 Tuesdays, 12 EUR a session, a 24-hour cancellation window, room for 2.
   const dropin = F.dropin({
-    facts: Object.assign({}, F.dropin().facts, { groupSize: { groups: 1, maxPerGroup: 2 } })
+    facts: Object.assign({}, F.rawDropin().facts, { groupSize: { groups: 1, maxPerGroup: 2 } })
   });
   const course = F.course();
   const github = H.makeGithub({

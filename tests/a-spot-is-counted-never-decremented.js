@@ -47,14 +47,14 @@ const REG_DEFAULT_DAYS = require(H.fnPath('_activity-registration')).DEFAULT_EXP
 
 (async () => {
   const blobs = H.makeBlobs();
-  const pooledCourse = F.course({ facts: Object.assign(F.course().facts, { groupSize: F.POOLED }) });
+  const pooledCourse = F.course({ facts: Object.assign(F.rawCourse().facts, { groupSize: F.POOLED }) });
   const namedCourse = F.course({
     slug: 'named-course', activityId: 'act-00000000000naaaa',
-    facts: Object.assign({}, F.course().facts, { groupSize: F.NAMED })
+    facts: Object.assign({}, F.rawCourse().facts, { groupSize: F.NAMED })
   });
   const namedDropin = F.dropin({
     slug: 'named-dropin', activityId: 'act-00000000000ndddd',
-    facts: Object.assign({}, F.dropin().facts, { groupSize: F.NAMED })
+    facts: Object.assign({}, F.rawDropin().facts, { groupSize: F.NAMED })
   });
 
   const github = H.makeGithub({
@@ -151,14 +151,14 @@ const REG_DEFAULT_DAYS = require(H.fnPath('_activity-registration')).DEFAULT_EXP
     'and so is expiry, with no write at all');
 
   console.log('\n[a missing group size is uncapped, never zero]');
-  const blank = F.course({ facts: Object.assign({}, F.course().facts, { groupSize: {} }) });
+  const blank = F.course({ facts: Object.assign({}, F.rawCourse().facts, { groupSize: {} }) });
   const blankRep = R.capacityReport(blank, [make(blank, 1)], NOW);
   H.eq(blankRep.capacity, null, 'no capacity stated');
   H.eq(blankRep.left, null, 'so nothing is "left" to run out');
   H.eq(R.hasRoom(blankRep, null), true, 'and there is room — a blank must never read as a restriction');
 
   console.log('\n[over capacity is reported plainly, not pretended impossible]');
-  const tiny = F.course({ facts: Object.assign({}, F.course().facts, { groupSize: { groups: 1, maxPerGroup: 2 } }) });
+  const tiny = F.course({ facts: Object.assign({}, F.rawCourse().facts, { groupSize: { groups: 1, maxPerGroup: 2 } }) });
   const three = [make(tiny, 1), make(tiny, 2), make(tiny, 3)];
   const over = R.capacityReport(tiny, three, NOW);
   H.eq(over.taken, 3, 'three registrations');
@@ -218,7 +218,7 @@ const REG_DEFAULT_DAYS = require(H.fnPath('_activity-registration')).DEFAULT_EXP
   // A one-place activity, so "full" is one registration away.
   github._files.set('activities/one-place.json', JSON.stringify(F.course({
     slug: 'one-place', activityId: 'act-0000000000001111',
-    facts: Object.assign({}, F.course().facts, { groupSize: { groups: 1, maxPerGroup: 1 } })
+    facts: Object.assign({}, F.rawCourse().facts, { groupSize: { groups: 1, maxPerGroup: 1 } })
   })));
 
   const first = await H.call(regs.handler, {

@@ -14,7 +14,8 @@
 // bare string. Section headings and sidebar labels are NOT admin-editable —
 // they are fixed per language and live in LABELS below.
 
-const { sidebarGroups, sidebarRows, factPriceRows, sessionTables, SESSION_TABLE } = require('./_activity-facts');
+const { sidebarGroups, sidebarRows, factPriceRows, sessionTables, SESSION_TABLE,
+        groupChoice } = require('./_activity-facts');
 
 // Sidebar group icons. Lucide, drawn white inside a solid circle, which is the
 // site's icon rule. The circle is 34px rather than the 56px used for section
@@ -135,6 +136,8 @@ const LABELS = {
     // which is also why the price card renders its four derived rows rather than
     // one row labelled "מחיר" under a heading saying the same thing.
     gParticipants: 'למי זה מתאים', gSchedule: 'מתי ואיפה', gPrice: 'מחיר', gCredits: 'צוות וחסות',
+    groups: 'קבוצות', gGroups: 'הקבוצות',
+    chooseGroup: 'בוחרים קבוצה בהרשמה', chooseShort: 'בוחרים בהרשמה',
     indexTitle: 'הפעילויות שלנו', indexLead: 'מה אפשר למצוא במרכז עוגן',
     indexEmpty: 'בקרוב נפרסם כאן את הפעילויות.', more: 'לפרטים',
     indexOpen: 'פתוח להרשמה', indexRunning: 'פעיל', indexArchived: 'ארכיון'
@@ -148,6 +151,8 @@ const LABELS = {
     ages: 'Ages', schedule: 'When', duration: 'Duration', location: 'Location', address: 'Address',
     groupSize: 'Group size', price: 'Price',
     gParticipants: 'Who it is for', gSchedule: 'When &amp; where', gPrice: 'Price', gCredits: 'Staff &amp; sponsors',
+    groups: 'Groups', gGroups: 'The groups',
+    chooseGroup: 'Choose your group when you register', chooseShort: 'choose at registration',
     indexTitle: 'Our activities', indexLead: 'What you can find at Ogen Center',
     indexEmpty: 'Activities will be published here soon.', more: 'Details',
     indexOpen: 'Open for registration', indexRunning: 'Currently Running', indexArchived: 'Archived'
@@ -325,6 +330,40 @@ function renderActivityPage(activity, lang) {
       <div data-optional>
         <h2>${L.faq}</h2>
 ${faqItems}
+      </div>
+`
+    : '';
+
+  // ⚠ THE GROUPS, SPELLED OUT — and only the facts they actually DISAGREE on.
+  //
+  // The fact cards above answer "is this for us" with an aggregate: a union age
+  // range, the distinct cities, every language anybody is taught in. That is the
+  // right answer for somebody deciding whether to read on, and it is the wrong
+  // answer for somebody deciding WHICH — "6-13" across a 6-9 group and a 10-13
+  // one does not mean a nine-year-old may join either.
+  //
+  // So this is the chooser's half. It repeats nothing the groups agree on,
+  // because two identical lists under two names bury the one line that differs,
+  // and it says out loud that the choice is made at registration rather than
+  // leaving a reader to infer it from a heading.
+  //
+  // It sits in the ARTICLE, not in a new grid area: the grid's areas and its
+  // row list have to move together or a 117px hole opens under the picture, and
+  // this is prose a reader works through rather than a fact they scan. On a
+  // phone that puts it after About and before the price, which is the order the
+  // question is asked in.
+  const choice = groupChoice(activity, lang);
+  const groupsBlock = choice
+    ? `
+      <div class="activity-groups">
+        <h2>${L.gGroups}</h2>
+        <p class="groups-choose">${esc(L.chooseGroup)}</p>
+${choice.groups.map((g) => `        <div class="group-card">
+          <h3>${esc(g.name)}</h3>
+          <ul class="sidebar-facts">
+${g.facts.map((f) => `            <li data-fact="${esc(f.key)}"><strong>${LABELS[lang][f.key]}</strong><span>${esc(f.value)}</span></li>`).join('\n')}
+          </ul>
+        </div>`).join('\n')}
       </div>
 `
     : '';
@@ -539,7 +578,7 @@ ${GENERATED_NOTE(`activities/${slug}.json`)}
 ${cardImageBlock}${factRow}    <div class="activity-main">
       <h2>${L.about}</h2>
 ${richText(pick(activity.about, lang))}
-${faqBlock}    </div>
+${groupsBlock}${faqBlock}    </div>
 
     <div class="activity-aside">
 ${asideCards}
@@ -581,14 +620,25 @@ ${sessionsBand}  </div>
 //
 // And it adds no copy. All four labels are already in LABELS in three
 // languages, because the page's own fact rows use them.
-const CARD_TAGS = ['ages', 'instructionLanguage', 'schedule', 'price'];
+// ⚠ `groups` LEADS, and it is not a fact. It frames everything under it: "Ages
+// 6-13" on an activity with two groups is a union, and read without knowing
+// there is a choice it says a nine-year-old may join either one. It appears
+// ONLY when there are two or more groups, so every card on the site today is
+// unchanged.
+const CARD_TAGS = ['groups', 'ages', 'instructionLanguage', 'schedule', 'price'];
 
 function cardTags(activity, lang) {
   const L = LABELS[lang];
   const byKey = {};
   sidebarRows(activity, lang).forEach((r) => { byKey[r.key] = r.value; });
+  // The SAME builder the page's own groups section reads, so a card cannot
+  // advertise a choice the page does not offer, or a different number of them.
+  const choice = groupChoice(activity, lang);
 
   return CARD_TAGS.map((key) => {
+    if (key === 'groups') {
+      return choice ? { key, label: L.groups, value: `${choice.countText} · ${L.chooseShort}` } : null;
+    }
     // ONE figure, and it is the one activities are compared by — the term
     // price, or the per-session price on a drop-in. Never the registration fee,
     // which is charged once a year and would read as the cost of the course,

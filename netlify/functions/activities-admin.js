@@ -36,11 +36,13 @@ const {
   FACT_ORDER, TEXT_FACTS, DEFAULT_VISIBILITY, ACADEMIC_MINUTES,
   num, pricePerHour
 } = FACTS;
-const { migrate, normaliseFacts, normaliseVisibility, SHAPES } = require('./_activity-migrate');
+const { migrate, normaliseFacts, normaliseGroups, normaliseVisibility, SHAPES } =
+  require('./_activity-migrate');
 const SESSIONS = require('./_activity-sessions');
 const REG = require('./_activity-registration');
 const BUNDLE = require('./_bundle');
 const GROUPS = require('./_activity-groups');
+const { GROUP_FACTS } = GROUPS;
 
 // How many day+time rows a frequency asks for. 'custom' means "as many as the
 // admin adds", so it has no fixed count.
@@ -76,6 +78,7 @@ const WEEKS_OF_MONTH = [
 // identifier rather than a secret, but it is also permanent and public, and
 // Math.random() collides far sooner than its output length suggests.
 const mintActivityId = () => 'act-' + require('crypto').randomBytes(8).toString('hex');
+const mintGroupId = () => 'g-' + require('crypto').randomBytes(6).toString('hex');
 // A seriesId is always some activity's id, never a new identifier, so this is
 // the only shape it may take. Validated on the way in because it decides whether
 // a family is billed a registration fee: a client able to write an arbitrary
@@ -411,6 +414,19 @@ function imagePathsOf(activity) {
   return out.filter((v, i) => out.indexOf(v) === i);
 }
 
+// Which sub-keys of a structured fact are WORDS. A role that may only edit
+// Russian may translate these and nothing else — so the language codes and the
+// level, which are one answer for all three pages, are deliberately absent.
+//
+// Module scope rather than inside the merge, because the SAME table now governs
+// two merges: the activity's own facts and every group's copy of them. Two
+// copies would be two places `address` can be forgotten, which is the bug this
+// list was written to end.
+const LANG_SUBKEYS = {
+  location: ['text'], address: ['text'], groupSize: ['overrideText'],
+  instructionLanguage: ['text'], prerequisites: ['text']
+};
+
 // --- normalising + permissions --------------------------------------------
 
 const emptyLang = () => ({ he: '', en: '', ru: '' });
@@ -424,6 +440,50 @@ function langObject(value) {
 }
 
 const hasAnyText = (langObj) => LANGS.some((l) => String(langObj[l] || '').trim() !== '');
+
+// One group list merged over another. `mergeLang` is passed in rather than
+// imported because it closes over which languages this session may edit — the
+// whole permission model in one function, and there is deliberately only one of
+// it.
+//
+// A group's STRUCTURE — its capacity, its teachers, its timetable, its age range
+// — comes from the request only with full access, and from the stored record
+// otherwise. Its NAME and the word half of its facts merge per language. That is
+// the same line every other field on this record is split along, drawn here by
+// where the value sits rather than by a rule somebody has to remember.
+function mergeGroups(baseGroups, incomingGroups, full, mergeLang) {
+  const current = Array.isArray(baseGroups) ? baseGroups : [];
+  const incoming = Array.isArray(incomingGroups) ? incomingGroups : [];
+  const byId = (list, id) => list.filter((g) => g && g.groupId === id)[0];
+
+  const skeleton = (full ? incoming : current).map((g) => g && g.groupId).filter(Boolean);
+
+  return skeleton
+    .filter((id, i) => skeleton.indexOf(id) === i)
+    .map((id) => {
+      const cur = byId(current, id) || { groupId: id };
+      const inc = byId(incoming, id) || {};
+      const out = {
+        groupId: id,
+        name: mergeLang(cur.name, inc.name),
+        capacity: full ? (inc.capacity === undefined ? cur.capacity : inc.capacity) : cur.capacity,
+        teacherIds: full && Array.isArray(inc.teacherIds) ? inc.teacherIds : (cur.teacherIds || []),
+        facts: {}
+      };
+      GROUP_FACTS.forEach((key) => {
+        const curF = (cur.facts || {})[key] || {};
+        const incF = (inc.facts || {})[key] || {};
+        const merged = SHAPES[key] ? SHAPES[key](full ? incF : curF) : {};
+        (LANG_SUBKEYS[key] || []).forEach((sub) => {
+          merged[sub] = mergeLang(curF[sub], incF[sub]);
+        });
+        const legacy = mergeLang(curF.legacyText, incF.legacyText);
+        if (LANGS.some((l) => String(legacy[l] || '').trim())) merged.legacyText = legacy;
+        out.facts[key] = merged;
+      });
+      return out;
+    });
+}
 
 // Merge an incoming record over the stored one, honouring which languages this
 // session may edit. A permission enforced only in the UI is not enforced.
@@ -519,14 +579,6 @@ function mergeByPermission(current, incoming, session) {
   // Russian-only role could never translate the address — the numbers path took
   // it from the stored record and the merge never ran. A list makes forgetting
   // one a visible omission instead of a silent read-only field.
-  // Which sub-keys of a structured fact are WORDS. A role that may only edit
-  // Russian may translate these and nothing else — so the language codes and the
-  // level, which are one answer for all three pages, are deliberately absent.
-  const LANG_SUBKEYS = {
-    location: ['text'], address: ['text'], groupSize: ['overrideText'],
-    instructionLanguage: ['text'], prerequisites: ['text']
-  };
-
   const baseFacts = (base && base.facts) || {};
   const incFacts = incoming.facts || {};
   const facts = {};
@@ -551,6 +603,33 @@ function mergeByPermission(current, incoming, session) {
     facts[key] = merged;
   });
   out.facts = normaliseFacts(facts);
+
+  // ⚠ THE GROUPS, MERGED PER ITEM — which is the thing LANG_SUBKEYS could not do.
+  //
+  // That table merges a scalar sub-key of ONE fact. A group's name lives at
+  // groups[i].name, per item, which it cannot reach — so a translator-only role
+  // had no way to rename a group and, worse, would have had the stored list
+  // written back over itself by any merge that walked the record key by key.
+  //
+  // Matched by groupId, never by position: reordering the list in the admin must
+  // not hand one group's capacity to another. With full access the membership
+  // and the order come from the request; a restricted role keeps the stored list
+  // exactly and may change only the words in it — the same rule LIST_KEYS below
+  // already applies to teachers and sponsors.
+  out.groups = mergeGroups(base && base.groups, incoming.groups, full, mergeLang);
+
+  // ⚠ EVERY ACTIVITY HAS AT LEAST ONE GROUP, and a brand-new one gets it here —
+  // in the merge rather than in stamp(), because PREVIEW does not stamp. Put it
+  // in stamp() and a new activity previews as a validation failure and publishes
+  // fine, which is the one asymmetry `preview-matches-publish` exists to forbid.
+  //
+  // migrate() builds the group for a record that predates groups, out of the
+  // facts that record already had. A record created today has no facts to build
+  // from, so there is nothing for a pure function to derive and the id has to be
+  // minted — the same reason activityId is minted on this side and not in there.
+  // Its name stays blank: one group offers no choice, so nothing is published
+  // and nobody is asked.
+  if (!out.groups.length) out.groups = normaliseGroups([{ groupId: mintGroupId() }]);
 
   // Which facts are members-only is structure, not words.
   out.factVisibility = normaliseVisibility(
@@ -615,13 +694,17 @@ function validate(activity) {
   if (activity.type === 'dropin') {
     BUNDLE.validateBundles(((activity.facts) || {}).price).forEach((m) => errors.push(m));
   }
-  // ⚠ GROUPS MEET ON DIFFERENT DAYS, NOT A DIFFERENT NUMBER OF TIMES. There is
-  // one `fullPrice`, one "(N sessions × M lessons)" qualifier and one
-  // denominator for prorated credit, so a model that cannot price two different
-  // session counts must not publish a page implying it can. Refused here rather
-  // than rendered, because the symptom would be one group's family reading the
-  // other group's term.
-  GROUPS.validateGroupCalendars(activity).forEach((m) => errors.push(m));
+  // ⚠ EQUAL TOTAL INSTRUCTIONAL HOURS, AND A NAME ONCE THERE IS A CHOICE.
+  //
+  // There is one `fullPrice` for an activity, so what it buys has to be the same
+  // whichever group a family joins — groups may cut that time up differently
+  // (six two-hour meetings, twelve one-hour ones) and may not differ in how much
+  // of it there is. Refused here rather than rendered, because the symptom would
+  // be one group's family being quoted the other group's term.
+  //
+  // This REPLACES the older rule that every group met the same NUMBER of times,
+  // which was strictly stronger and refused a shape Ogen actually runs.
+  GROUPS.validateGroups(activity).forEach((m) => errors.push(m));
 
   if (errors.length) {
     const err = new Error(errors[0]);

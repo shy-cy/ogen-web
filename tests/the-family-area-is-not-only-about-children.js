@@ -178,7 +178,7 @@ H.ok(/&amp;/.test(LABELS.en.gSchedule), 'the source really does carry an entity 
 // an account adds itself and a child, and the screen can tell the two apart.
 (async () => {
   const blobs = H.makeBlobs();
-  const activity = F.course({ facts: Object.assign({}, F.course().facts, {
+  const activity = F.course({ facts: Object.assign({}, F.rawCourse().facts, {
     location: { text: { he: 'לימסול', en: 'Limassol', ru: 'Лимасол' } },
     // The members-only one, and it defaults to `members` — it is here precisely
     // so the assertion below is about a field that exists rather than about an

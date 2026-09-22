@@ -46,7 +46,7 @@ const tableOf = (html) => (html.match(/<table class="session-table">[\s\S]*?<\/t
 
 console.log('[the table lists the sessions that are happening, and nothing else]');
 const withGap = F.course();
-withGap.facts.duration.sessionDates = [
+F.groupFacts(withGap).duration.sessionDates = [
   { date: '2026-10-14', status: 'scheduled' },
   { date: '2026-10-21', status: 'excluded', reason: 'Teacher away — hospital' },
   { date: '2026-10-28', status: 'scheduled' }
@@ -74,8 +74,8 @@ console.log('\n[the same list the credit arithmetic divides by]');
 // scheduled-session count come from one function, and this is what says so.
 const sessions = require('../netlify/functions/_activity-sessions');
 LANGS.forEach((lang) => {
-  const rows = facts.sessionRows(withGap.facts.duration, lang);
-  H.eq(rows.length, sessions.sessionCount(withGap.facts.duration.sessionDates),
+  const rows = facts.sessionRows(F.groupFacts(withGap).duration, lang);
+  H.eq(rows.length, sessions.sessionCount(F.groupFacts(withGap).duration.sessionDates),
     lang + ': the table has exactly as many rows as there are scheduled sessions');
 });
 
@@ -89,18 +89,18 @@ console.log('\n[one number, not two: the count IS the calendar]');
 // changes a published price. It was done at the moment both numbers agreed, so
 // nothing visible moved.
 const eleven = F.course();
-eleven.facts.duration.sessionCount = 10;          // the stale typed value
-H.eq(facts.sessionTotal(eleven.facts.duration), 10, 'ten dates and a typed ten agree');
-eleven.facts.duration.sessionDates.push({ date: '2026-12-23', status: 'scheduled' });
-H.eq(facts.sessionTotal(eleven.facts.duration), 11,
+F.groupFacts(eleven).duration.sessionCount = 10;          // the stale typed value
+H.eq(facts.sessionTotal(F.groupFacts(eleven).duration), 10, 'ten dates and a typed ten agree');
+F.groupFacts(eleven).duration.sessionDates.push({ date: '2026-12-23', status: 'scheduled' });
+H.eq(facts.sessionTotal(F.groupFacts(eleven).duration), 11,
   'add the eleventh date and the total is eleven, whatever the field still says');
-H.eq(facts.priceRows(eleven.facts.price, 'en', eleven.facts.duration)[1].note,
+H.eq(facts.priceRows(eleven.facts.price, 'en', F.groupFacts(eleven).duration)[1].note,
   '(11 sessions × 2 lessons)',
   'so the price qualifier follows the calendar rather than the stale number beside it');
 // An excluded date is not a session, in the count as on the page.
-eleven.facts.duration.sessionDates[0].status = 'excluded';
-H.eq(facts.sessionTotal(eleven.facts.duration), 10, 'excluding one takes it back to ten');
-H.eq(facts.sessionRows(eleven.facts.duration, 'en').length, facts.sessionTotal(eleven.facts.duration),
+F.groupFacts(eleven).duration.sessionDates[0].status = 'excluded';
+H.eq(facts.sessionTotal(F.groupFacts(eleven).duration), 10, 'excluding one takes it back to ten');
+H.eq(facts.sessionRows(F.groupFacts(eleven).duration, 'en').length, facts.sessionTotal(F.groupFacts(eleven).duration),
   'and the table and the count can never disagree, because they are one list');
 // No calendar at all still falls back, or an activity nobody has scheduled
 // would lose its price qualifier entirely.
@@ -128,7 +128,7 @@ H.ok(/14 октября/.test(tableOf(render(withGap, 'ru'))),
 
 // The one exception: a term running December into January.
 const newYear = F.course();
-newYear.facts.duration.sessionDates = [
+F.groupFacts(newYear).duration.sessionDates = [
   { date: '2026-12-16', status: 'scheduled' },
   { date: '2027-01-06', status: 'scheduled' }
 ];
@@ -138,7 +138,7 @@ H.ok(/16 December 2026/.test(spanning) && /6 January 2027/.test(spanning),
 
 console.log('\n[no calendar, no table — an empty frame is worse than no frame]');
 const noCal = F.course();
-noCal.facts.duration.sessionDates = [];
+F.groupFacts(noCal).duration.sessionDates = [];
 LANGS.forEach((lang) => {
   const html = render(noCal, lang);
   H.eq(tableOf(html), '', lang + ': an activity with no calendar renders no table at all');
@@ -147,7 +147,7 @@ LANGS.forEach((lang) => {
 // Every date excluded is the same thing as no dates. It would be easy for the
 // band to survive because the LIST is non-empty while the rendered rows are not.
 const allOff = F.course();
-allOff.facts.duration.sessionDates = [{ date: '2026-10-14', status: 'excluded' }];
+F.groupFacts(allOff).duration.sessionDates = [{ date: '2026-10-14', status: 'excluded' }];
 H.eq(tableOf(render(allOff, 'en')), '',
   'and an activity whose every date is excluded renders none either');
 
