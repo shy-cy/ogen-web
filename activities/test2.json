@@ -1,0 +1,178 @@
+{
+  "slug": "test2",
+  "status": "open",
+  "motif": "ring",
+  "corner": "tl",
+  "cardImage": "/images/activities/test2-card-c8031266.jpg",
+  "shareImage": null,
+  "robots": "noindex",
+  "type": "course",
+  "registration": {
+    "autoApprove": false,
+    "pendingExpiryDays": null,
+    "registrationFeeCutoffDate": "2026-09-23",
+    "cancellationPolicy": {
+      "mode": "flat",
+      "cancellationCutoffDate": "2026-09-24"
+    },
+    "defaultBasis": null
+  },
+  "seriesId": "act-ca412442b8698dcf",
+  "title": {
+    "he": "טסט 2",
+    "en": "Test 2",
+    "ru": "Test 2"
+  },
+  "summary": {
+    "he": "טסט",
+    "en": "Test",
+    "ru": "Test"
+  },
+  "about": {
+    "he": "<p>דאעדגע</p>",
+    "en": "<p>sgsrdg</p>",
+    "ru": "<p>sgsdg</p>"
+  },
+  "metaTitle": {
+    "he": "",
+    "en": "",
+    "ru": ""
+  },
+  "metaDescription": {
+    "he": "",
+    "en": "",
+    "ru": ""
+  },
+  "facts": {
+    "groupSize": {
+      "overrideText": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      }
+    },
+    "price": {
+      "registrationFee": 50,
+      "fullPrice": 300,
+      "perHourOverride": null,
+      "perSessionPrice": null,
+      "showPerLesson": true,
+      "lateDropIn": {
+        "enabled": false,
+        "hoursBefore": null,
+        "price": null
+      },
+      "bundles": []
+    }
+  },
+  "groups": [
+    {
+      "groupId": "g-mue7bc9iwle0",
+      "name": {
+        "he": "sdfsf",
+        "en": "",
+        "ru": ""
+      },
+      "capacity": null,
+      "teacherIds": [],
+      "facts": {
+        "ages": {
+          "min": 2,
+          "max": 4
+        },
+        "schedule": {
+          "frequency": "weekly",
+          "sessions": [
+            {
+              "day": 0,
+              "time": "15:00"
+            }
+          ]
+        },
+        "duration": {
+          "startDate": "2025-09-23",
+          "endDate": "2026-09-30",
+          "sessionCount": 1,
+          "sessionMinutes": 90,
+          "sessionDates": [
+            {
+              "date": "2025-09-28",
+              "status": "scheduled"
+            }
+          ]
+        },
+        "instructionLanguage": {
+          "codes": [
+            "he"
+          ],
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "prerequisites": {
+          "level": "beginner",
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "location": {
+          "text": {
+            "he": "לימסול",
+            "en": "Limassol",
+            "ru": "Лимассол"
+          }
+        },
+        "address": {
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        }
+      }
+    }
+  ],
+  "factVisibility": {
+    "ages": "public",
+    "schedule": "public",
+    "duration": "public",
+    "groupSize": "public",
+    "instructionLanguage": "public",
+    "prerequisites": "public",
+    "location": "public",
+    "address": "members",
+    "price": "public"
+  },
+  "faq": [],
+  "teachers": [
+    {
+      "id": "tea-mue7e7dy-1",
+      "name": {
+        "he": ";שכגדכ",
+        "en": "sfsd",
+        "ru": "sfdsdf"
+      },
+      "photo": "/images/activities/test2-teachers-tea-mue7e7dy-1-cb74b50f.png"
+    },
+    {
+      "id": "tea-mue7emcn-2",
+      "name": {
+        "he": "ש;גכדגכ",
+        "en": "a`dfaf",
+        "ru": "afsdf"
+      },
+      "photo": "/images/activities/test2-teachers-tea-mue7emcn-2-c79ea665.jpg"
+    }
+  ],
+  "sponsors": [],
+  "isoUpdated": "2026-09-23T14:41:49.374Z",
+  "isoCreated": "2026-09-23T14:41:49.374Z",
+  "lastEditedBy": "michal@ogen.cy",
+  "lastEditedByName": "Michal",
+  "activityId": "act-ca412442b8698dcf",
+  "lastPublishedAt": "2026-09-23T14:41:49.374Z"
+}

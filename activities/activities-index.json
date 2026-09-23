@@ -118,5 +118,29 @@
     },
     "cardImage": "/images/activities/test1-card-c8031266.jpg",
     "isoUpdated": "2026-09-23T13:32:30.604Z"
+  },
+  {
+    "slug": "test2",
+    "activityId": "act-ca412442b8698dcf",
+    "seriesId": "act-ca412442b8698dcf",
+    "type": "course",
+    "status": "open",
+    "langs": [
+      "he",
+      "en",
+      "ru"
+    ],
+    "title": {
+      "he": "טסט 2",
+      "en": "Test 2",
+      "ru": "Test 2"
+    },
+    "summary": {
+      "he": "טסט",
+      "en": "Test",
+      "ru": "Test"
+    },
+    "cardImage": "/images/activities/test2-card-c8031266.jpg",
+    "isoUpdated": "2026-09-23T14:41:49.374Z"
   }
 ]
