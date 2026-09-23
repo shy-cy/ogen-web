@@ -800,7 +800,7 @@ on `.activity-card-more` now — with the paragraph a fixed height, the slack ha
 to be absorbed **below** the facts, or the bands float at different heights again
 and the clamp buys nothing.
 
-The limit is a **recommendation, not a refusal**. `SUMMARY_CHARS` is 140, the
+The limit is a **recommendation, not a refusal**. `SUMMARY_CHARS` is 100, the
 admin counts against it per language and marks itself when it is past, and a
 longer summary still saves — summaries are words, and a form that refuses a save
 over one character is a form people fight. It is the same figure the template
@@ -808,6 +808,21 @@ already sliced off `about` when nobody wrote a summary, so the count and the
 generated fallback cannot drift. The **clamp** is what actually guarantees the
 layout, in every language, whatever is stored: the same sentence is not the same
 length in three of them, so a character count could never have done it.
+
+⚠ **AND IT WAS 140, WHICH IS MORE THAN THREE LINES HOLD.** The counter read
+`140 / 140` in olive and the card then cut the sentence off mid-word. Neither
+half was wrong on its own, which is why it survived: the clamp guarantees the
+layout whatever is stored, and the count is a recommendation. The pair was
+wrong — a count that recommends a length the card cannot show is a count that
+lies, in the one place it exists to help.
+
+The clamp is the half that cannot move, so the count came to it. Three lines of
+14.5px in a 320px card, less the 22px gutters, is 274px a line — about half an
+em a character in both Heebo and Mulish, less a few per cent to ragged word
+wrapping. That is a little over a hundred characters, and **100 is the figure
+that fits in all three languages rather than in the most compact one**. A test
+computes it from the stylesheet rather than pinning the digit, so moving the
+clamp or the card width moves the ceiling with it.
 
 ⚠ **AND THE FACTS SIT IN A TINTED BAND, EDGE TO EDGE.** They ran straight on
 from the paragraph with nothing between them, so a card read as four paragraphs
@@ -2035,6 +2050,48 @@ except wording.
 project, where household members are an array inside the member record and
 "linked to two guardians" is literally unrepresentable. Here the link is its own
 record precisely so it can be.
+
+⚠ **AN ACCOUNT IS HELD BY AN ADULT, AND "ADD MYSELF" IS THE ONE PLACE THAT CAN
+KNOW IT.**
+
+A fourteen-year-old opened an account and added themselves, which made a minor
+the guardian: the person who accepts the terms, holds other people's records,
+invites the second guardian, is billed, and is who we write to about a child's
+registration. Nothing objected, because nothing was being asked.
+
+The model is not what was wrong and must not change. A participant makes no
+claim about age **on purpose** — that is the whole argument for one entity
+rather than a second one for adults — and a minor taking part is the ordinary
+case here. The age is a fact about a **participant**; being a guardian is a fact
+about an **account**; and `isSelf` on the link is the only place in the system
+where the two meet, because it is the client saying that this participant *is*
+the person holding the account, which makes that date of birth the only one we
+ever learn about them.
+
+`MIN_SELF_AGE` is 18, which is majority in Cyprus and in Israel, and that is
+what agreeing to the terms turns on. The number lives in `_participant-store.js`
+because that is where the date of birth lives; the **rule** is applied in
+`account-family.js`, which is the only module that knows a particular
+participant is the account holder. Four details carry it:
+
+- **Checked before anything is written**, so a refusal leaves no participant and
+  no link behind — the mirror of the creator-link failure, which deletes a
+  participant rather than keeping one.
+- **Asked on `updateParticipant` too**, or the gate is one save wide: add
+  yourself with a passing date and correct it downwards. And asked of **every**
+  link rather than the caller's own, because `isSelf` is a fact about a pair —
+  the second guardian editing this record is editing somebody else's self
+  record.
+- **A blank is not refused by it.** The store already requires a date of birth,
+  so the case does not arise on create; what matters is that it stays a
+  *different* refusal, or an empty field becomes a locked account. This is the
+  one rule in the family area where a null resolves towards the gate rather than
+  towards the family, and it does so by saying nothing rather than by guessing.
+- **It refuses a role, not a person.** "You are too young" and nothing else
+  reads as *you are not welcome here*, which is the opposite of true, so the
+  sentence carries the answer: ask a parent or guardian to open the account and
+  add you to it. Three languages, in `_family-errors.js`, like every other
+  refusal a family can be shown.
 
 **Age is derived, never stored.** `ageAt()` counts birthdays rather than
 dividing by 365.25 — off by a day near the end of February, and "11 not 12" is
@@ -3604,10 +3661,45 @@ would have sent**, so the two doors cannot word it differently, and through
 keeping on the tallest form in the family area.
 
 **The other nine `required` fields keep it, deliberately.** On a text or email
-box the attribute also buys format checking, focus and scroll, and the message
-is the browser's own UI in the language its owner set. A checkbox has no format
-to check, so `required` buys the bubble and nothing else — which makes it the
-one place the trade is free.
+box the attribute also buys format checking, focus and scroll. A checkbox has no
+format to check, so `required` buys the bubble and nothing else — which makes it
+the one place the trade is free.
+
+### ⚠ And the bubble's words are ours to set
+
+The paragraph above used to end by saying the native message was acceptable
+because it is "the browser's own UI in the language its owner set". That was an
+acceptance rather than a preference, and it was reported again from the same
+screen: a family on the **Hebrew** page, filling in a **Hebrew** form, under a
+**Hebrew** heading, typed a partial date of birth and was answered
+
+> Please enter a valid value. The field is incomplete or has an invalid date.
+
+**`setCustomValidity()` is the attribute that does not exist for
+`<input type="time">`.** It puts our sentence in the browser's bubble and keeps
+every property `required` was kept for — anchored to the field, scrolled to,
+still blocking the submit. So nothing was removed, no form gained `novalidate`,
+and no second validation pass was added to fall out of step with the server's.
+
+It is wired in **`field()`**, once, because there is one builder and a dozen
+callers — the same reason `say()` scrolls rather than each handler moving its
+own message. Four sentences, one per validity flag, and those four are the
+complete set the file's attributes can raise: `valueMissing` from `required`,
+`typeMismatch` from `type="email"`, `tooShort` from `minlength`, and `badInput`
+from `type="date"`. A test reads the attributes off the source and fails when a
+fifth one appears, because an unnamed flag falls through to the English.
+
+⚠ **The date is the one that could not have been fixed in a handler.**
+`31/mm/yyyy` reads as the **empty string** from script, so a submit handler
+checking the value cannot tell an incomplete date from an untouched box. Only
+the widget knows, which is why the words have to go in the widget's bubble —
+and why dropping `required` would have changed nothing: `badInput` blocks a
+submit on its own.
+
+⚠ **And it has to be cleared on `input`.** A custom message **is** the invalid
+state rather than a description of one, so a field set once and never cleared
+can never be submitted again, whatever is typed into it — a worse bug than the
+one being fixed. Both halves are executed by a test rather than read.
 
 ### The wait has a shape
 
@@ -4239,6 +4331,36 @@ nobody reading a record months later can resolve, which is why `groupName` is
 frozen at all. It names **both** groups now: the frozen one on the way out and
 the activity's current one on the way in, which is correct rather than
 inconsistent.
+
+⚠ **A cancellation that left no trace, and the payload had it all along.**
+
+A family registered, cancelled, and registered again for the same activity, and
+the Roster showed one row with nothing saying a place had been given up and
+taken back.
+
+Nothing was lost. There is **one record per participant per activity**, so a
+second request lands in the same blob on purpose, and `openRegistration()`
+carries the earlier history forward with a comment saying exactly why — "an
+admin looking at a second request can see the first". `admin-registrations.js`
+has put `history` on every row since it was written. **The screen never read
+it**, so the data was right, the API was right, the comment explaining the
+design was right, and the capability was absent from the product. Same shape as
+the invite button labelled with a description, and as the pure bundle module
+wired to nothing for a release.
+
+**A second row was the wrong fix.** Two rows for one place read as two places,
+and the capacity line above the table counts records — a cancelled row beside
+its live replacement would say `2 / 20` for one child on one place, on the one
+screen that exists to answer whether there is room. It is one row carrying what
+it has been through.
+
+Only the **endings** are listed — cancelled, rejected, expired — most recent
+first and capped at three. Every submission and approval in between is the
+ordinary run of a registration and would bury the one line somebody opened the
+row for, and a row that always carries a line teaches an admin to stop reading
+it. The **last** history entry is excluded, because the pill beside it already
+says what it is: a currently cancelled row does not also report itself as
+previously cancelled.
 
 ⚠ **And the parity test now runs in BOTH directions.** It checked that every
 action the screen sends exists on the server, and carried a comment saying the

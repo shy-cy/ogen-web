@@ -158,6 +158,17 @@ const MESSAGES = {
     en: (p) => `Password must be at least ${p.min} characters. This link still works — choose a longer password and try again.`,
     ru: (p) => `Пароль должен содержать не менее ${p.min} символов. Ссылка ещё действует — выберите более длинный пароль и попробуйте ещё раз.`
   },
+  // ⚠ THE PERSON IS NOT REFUSED, THE ROLE IS -- and the sentence has to say
+  // so, or somebody reads it as "you are too young to come here". What is
+  // refused is holding the account: it accepts the terms and carries other
+  // people's records. It says what to do instead, because "ask a parent to open
+  // the account and add you" is the whole of the answer and a refusal that does
+  // not carry it sends somebody away.
+  'self-too-young': {
+    he: (p) => `חשבון באתר מנוהל על ידי מי שגילו ${p.min} ומעלה. אפשר בהחלט להשתתף בפעילויות — בקשו מהורה לפתוח את החשבון ולהוסיף אתכם אליו.`,
+    en: (p) => `An account here is held by somebody aged ${p.min} or over. You can certainly take part — ask a parent or guardian to open the account and add you to it.`,
+    ru: (p) => `Учётная запись здесь оформляется на человека от ${p.min} лет. Участвовать вы, конечно, можете — попросите родителя или опекуна создать учётную запись и добавить вас.`
+  },
   'verify-link-dead': {
     he: 'הקישור הזה פג או שכבר נעשה בו שימוש.',
     en: 'That link has expired or has already been used.',

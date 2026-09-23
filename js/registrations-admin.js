@@ -119,6 +119,38 @@
     return el('div', {}, bits);
   }
 
+  // ⚠ THE EARLIER ATTEMPT WAS IN THE PAYLOAD THE WHOLE TIME AND ON NO SCREEN.
+  //
+  // There is one record per participant per activity, so a family who cancels
+  // and registers again lands back in the SAME blob -- and its history is
+  // carried forward rather than overwritten, on purpose, "so an admin looking at
+  // a second request can see the first". admin-registrations.js has been sending
+  // `history` on every row since it was written. Nothing here read it, so from
+  // the Roster the cancellation had simply never happened, and an admin went
+  // looking for a row that does not exist and never did.
+  //
+  // It is a LINE UNDER THE STATUS, not a second row. Two rows for one place
+  // would read as two places, and the capacity line above counts records: a
+  // cancelled row beside a live one would say 2 / 20 for one child on one place.
+  // One row, saying what it has been through.
+  //
+  // Only the endings are shown -- cancelled, rejected, expired. Every submission
+  // and approval in between is the ordinary run of a registration and would bury
+  // the one entry somebody is looking for.
+  var ENDINGS = { cancelled: 1, rejected: 1, expired: 1 };
+  function priorCell(r) {
+    var h = r.history || [];
+    // The LAST entry is what the pill beside this already says, so a currently
+    // cancelled registration does not also report itself as previously
+    // cancelled. Everything before it is a previous life of this record.
+    var was = h.slice(0, -1).filter(function (e) { return ENDINGS[e.action]; });
+    if (!was.length) return null;
+    return el('div', {}, was.slice(-3).reverse().map(function (e) {
+      return el('div', {}, [el('span', { class: 'why',
+        text: 'was ' + e.action + ' ' + String(e.iso || '').slice(0, 10) })]);
+    }));
+  }
+
   function when(r) {
     var out = [el('span', { class: 'num', text: (r.submittedAt || '').slice(0, 10) })];
     // The DERIVED answer, not the stored one. A pending request whose deadline
@@ -262,7 +294,8 @@
         el('td', {}, [groupCell(r)]),
         el('td', {}, [
           el('span', { class: 'pill ' + r.status, text: r.status }),
-          r.autoApproved ? el('div', {}, [el('span', { class: 'why', text: 'automatic' })]) : null
+          r.autoApproved ? el('div', {}, [el('span', { class: 'why', text: 'automatic' })]) : null,
+          priorCell(r)
         ]),
         el('td', {}, [when(r)]),
         el('td', {}, [moneyCell(r)]),

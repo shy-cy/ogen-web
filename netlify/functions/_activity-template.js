@@ -63,7 +63,22 @@ const SITE = 'https://www.ogen.cy';
 // The recommended length of a listing card's summary. See the note above the
 // card builder: it is the figure the admin counts against AND the slice taken
 // off `about` when nobody wrote a summary, so the two cannot drift.
-const SUMMARY_CHARS = 140;
+//
+// ⚠ IT HAS TO BE THE NUMBER THE CLAMP ACTUALLY HOLDS, AND IT WAS 140.
+//
+// The counter said 140/140 in olive and the card then cut the sentence off
+// mid-word, which is the count and the clamp making two different promises
+// about one box. Neither was wrong on its own -- the clamp guarantees the
+// layout in every language whatever is stored, and that is exactly why it is
+// the half that cannot move -- so the count is what had to come to it.
+//
+// Three lines of 14.5px at line-height 1.6 in a 320px card, less the 22px
+// gutters, is 274px a line: about 34 characters of Heebo and about 37 of
+// Mulish, less roughly a tenth to ragged word wrapping. That is a little over a
+// hundred in Hebrew and a little under it in Russian, whose words are the
+// longest of the three. 100 is the figure that fits in all three rather than in
+// the most compact one.
+const SUMMARY_CHARS = 100;
 const LANGS = ['he', 'en', 'ru'];
 const STATUSES = ['draft', 'announcement', 'open', 'waitlist', 'closed', 'cancelled', 'completed'];
 

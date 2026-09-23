@@ -48,6 +48,14 @@ const refuse = (lang) => (status, key, extra, params) =>
 // A store throws with a code, never with a sentence for a person.
 const codeOf = (err) => (err && err.code) || 'server-error';
 
+// Is this date of birth too young to HOLD an account? Written once because it is
+// asked on the way in and on the way back out, and two copies would be two
+// places a null can come to mean opposite things.
+const tooYoungToHold = (dateOfBirth) => {
+  const age = participants.ageAt(dateOfBirth);
+  return age != null && age < participants.MIN_SELF_AGE;
+};
+
 // THE SESSION TOKEN IS `token`, AND AN INVITE TOKEN IS NEVER CALLED THAT.
 //
 // sessions.authenticate(body) reads body.token, so an invite action that also
@@ -120,6 +128,28 @@ exports.handler = async (event) => {
       }
 
       case 'createParticipant': {
+        // ⚠ "ADD MYSELF" IS THE ONE PLACE WE EVER LEARN THE ACCOUNT HOLDER'S
+        // AGE, so it is the one place this can be asked.
+        //
+        // A fourteen-year-old opened an account and added themselves, which made
+        // a minor the guardian: the person who accepts the terms, holds other
+        // people's records, invites the second guardian and is billed. Nothing
+        // objected, and nothing in the model should -- a participant makes no
+        // claim about age on purpose, and a minor taking part is the ordinary
+        // case. The age is a fact about a PARTICIPANT and being a guardian is a
+        // fact about an ACCOUNT, and `isSelf` is the only place the two meet.
+        //
+        // Checked BEFORE anything is written, so a refusal leaves no participant
+        // and no link behind -- the same ordering the creator-link failure
+        // already takes the other way round.
+        //
+        // ⚠ AN UNKNOWN DATE IS NOT REFUSED. A missing date of birth has never
+        // been a blocker here, and reading a blank as "under 18" would turn an
+        // empty field into a locked account. It is also cosmetic on the client
+        // by the same rule as everywhere else: this is the decision.
+        if (body.isSelf === true && tooYoungToHold((body.participant || {}).dateOfBirth)) {
+          return no(403, 'self-too-young', null, { min: participants.MIN_SELF_AGE });
+        }
         let created;
         try {
           created = await participants.createParticipant(body.participant || {}, me.accountId);
@@ -153,6 +183,19 @@ exports.handler = async (event) => {
       case 'updateParticipant': {
         const p = await mustGuard(body.participantId, me.accountId);
         if (!p) return no(404, 'no-such-participant');
+        // The same rule on the way back in, or the gate above is one save wide:
+        // create yourself with the date left blank, then fill it in.
+        //
+        // EVERY link is asked, not the caller's own. `isSelf` is a fact about a
+        // PAIR -- a couple who each manage the other's record are self on one of
+        // their two links and not on the other -- so the second guardian editing
+        // this record is editing somebody else's self record, and the rule is
+        // about whose account it is rather than about who is typing.
+        if ((body.participant || {}).dateOfBirth
+            && tooYoungToHold(body.participant.dateOfBirth)
+            && (await guardians.guardiansOf(p.participantId)).some((l) => l.isSelf)) {
+          return no(403, 'self-too-young', null, { min: participants.MIN_SELF_AGE });
+        }
         try {
           // Either guardian may edit. The primary/secondary distinction governs
           // who may bring somebody else in, not who may correct a spelling.

@@ -148,6 +148,22 @@ function makeDom(opts) {
         const fns = n._handlers.submit || [];
         if (!fns.length) throw new Error('submitted a form with no submit handler');
         fns.forEach((f) => f({ preventDefault() {}, stopPropagation() {}, currentTarget: n, target: n }));
+      },
+      // Constraint validation, enough to execute guardNative() and no more.
+      // `validity` is what a test sets to say which rule the browser found
+      // broken; `validationMessage` is what the page then put in the bubble.
+      validity: {},
+      validationMessage: '',
+      setCustomValidity(msg) { n.validationMessage = String(msg); },
+      // click() and submit() are GESTURES a person makes. This is for the
+      // events the BROWSER raises at a field on its own — `invalid` is the
+      // only one so far — which a test has to stand in for. It throws when
+      // nothing is listening, for the same reason click() does: a field with no
+      // handler is exactly the state the bubble bug was.
+      dispatch(ev) {
+        const fns = n._handlers[ev] || [];
+        if (!fns.length) throw new Error('dispatched ' + ev + ' at a node with no ' + ev + ' handler');
+        fns.forEach((f) => f({ preventDefault() {}, currentTarget: n, target: n }));
       }
     };
     return n;

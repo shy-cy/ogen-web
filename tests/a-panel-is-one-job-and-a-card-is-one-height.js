@@ -140,5 +140,40 @@ const admin = require(H.fnPath('activities-admin'))._internal;
   H.ok(/is-over/.test(client) && /is-over/.test(read('admin/admin.css')),
     'and it marks itself when it is past — the state and its style both exist');
 
+  // ⚠ AND THE NUMBER HAS TO BE ONE THREE LINES ACTUALLY HOLD.
+  //
+  // It was 140. The counter read 140 / 140 in olive and the card then cut the
+  // sentence off mid-word, which is the count and the clamp making two
+  // different promises about one box. Neither was broken on its own, and that
+  // is why it survived: the clamp is what guarantees the layout in every
+  // language whatever is stored, so it is the half that cannot move, and the
+  // count is what had to come to it.
+  //
+  // What follows is an approximation and is meant to be. Its job is to refuse a
+  // number the card visibly cannot hold, not to certify one it can — three
+  // languages in two typefaces have no single characters-per-line, which is the
+  // whole reason the clamp exists rather than a character limit.
+  const cardRule = (css.match(/\.activity-card\s*\{[^}]*\}/g) || [])[0];
+  const width = Number((cardRule.match(/max-width:\s*(\d+)px/) || [])[1]);
+  const gutter = Number((pRule[0].match(/margin:\s*0\s+(\d+)px/) || [])[1]);
+  const size = Number((pRule[0].match(/font-size:\s*([\d.]+)px/) || [])[1]);
+  const lines = Number((pRule[0].match(/line-clamp:\s*(\d+)/) || [])[1]);
+  H.ok(width && gutter && size && lines,
+    'the card states its width, gutter, size and line count: ' +
+    [width, gutter, size, lines].join(' / '));
+
+  // The text column, and a conservative average advance: Heebo and Mulish both
+  // sit near half an em at this size, and ragged word wrapping costs a few per
+  // cent of every line.
+  const column = width - 2 - (2 * gutter);
+  const perLine = column / (size * 0.52);
+  const holds = Math.floor(lines * perLine * 0.95);
+  H.ok(template.SUMMARY_CHARS <= holds,
+    'the recommended summary length fits the clamp — ' + template.SUMMARY_CHARS +
+    ' against about ' + holds + ' characters in ' + lines + ' lines of ' + column + 'px');
+  // The other direction, so nobody closes this by dropping the count to ten.
+  H.ok(template.SUMMARY_CHARS >= holds * 0.75,
+    'and is not so far under it that the box is smaller than the card');
+
   H.done();
 })();

@@ -110,8 +110,9 @@ const FIELD_SCHEMA = {
     { key: 'title', label: 'Title', required: true },
     { key: 'summary', label: 'Card summary', counter: TEMPLATE_SUMMARY_CHARS,
       hint: 'Shown on the activities listing. The card gives it three lines and trims anything ' +
-            'longer with an ellipsis, so keep it near the count under each box — that is a ' +
-            'recommendation, not a limit, and a longer one still saves.' },
+            'longer with an ellipsis. The count under each box is what three lines hold in the ' +
+            'tightest of the three languages, so a summary inside it is not cut in any of them — ' +
+            'it is a recommendation rather than a limit, and a longer one still saves.' },
     { key: 'about', label: 'About this activity', textarea: true, rich: true, required: true }
   ],
   // There is no `optional` group any more. It held exactly one field, "What to

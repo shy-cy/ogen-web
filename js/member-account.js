@@ -101,6 +101,9 @@
       forgotSent: 'אם קיים חשבון בכתובת הזו, הקישור נשלח. בדקו את תיבת הדואר.',
       resetTitle: 'בחירת סיסמה חדשה', newPassword: 'סיסמה חדשה', resetSave: 'שמירה',
       passwordHint: 'לפחות {n} תווים.',
+      needValue: 'צריך למלא את השדה הזה.',
+      needEmail: 'זו לא כתובת דוא״ל.',
+      needDate: 'צריך תאריך מלא — יום, חודש ושנה.',
       resetDone: 'הסיסמה עודכנה. אפשר להיכנס.',
       linkDead: 'הקישור פג או כבר נוצל. אפשר לבקש חדש.',
       verifyOk: 'כתובת הדוא״ל אומתה. תודה.',
@@ -221,6 +224,9 @@
       forgotSent: 'If there is an account at that address, the link is on its way. Check your inbox.',
       resetTitle: 'Choose a new password', newPassword: 'New password', resetSave: 'Save',
       passwordHint: 'At least {n} characters.',
+      needValue: 'Please fill in this field.',
+      needEmail: 'That is not an email address.',
+      needDate: 'Please give a full date — day, month and year.',
       resetDone: 'Your password has been changed. You can sign in.',
       linkDead: 'That link has expired or has already been used. You can ask for a new one.',
       verifyOk: 'Your email address is confirmed. Thank you.',
@@ -343,6 +349,9 @@
       forgotSent: 'Если учётная запись с таким адресом существует, ссылка отправлена. Проверьте почту.',
       resetTitle: 'Новый пароль', newPassword: 'Новый пароль', resetSave: 'Сохранить',
       passwordHint: 'Не менее {n} символов.',
+      needValue: 'Пожалуйста, заполните это поле.',
+      needEmail: 'Это не адрес электронной почты.',
+      needDate: 'Укажите полную дату — день, месяц и год.',
       resetDone: 'Пароль изменён. Можно войти.',
       linkDead: 'Ссылка истекла или уже была использована. Можно запросить новую.',
       verifyOk: 'Адрес электронной почты подтверждён. Спасибо.',
@@ -859,12 +868,52 @@
   // it is broken rather than as a refusal afterwards. It is `aria-describedby`
   // and not a second label, so a screen reader reads it after the label rather
   // than in place of it.
+  // ⚠ THE NATIVE BUBBLE IS THE BROWSER'S UI, AND ITS WORDS ARE OURS TO SET.
+  //
+  // A family on the HEBREW page, filling in a HEBREW form, under a HEBREW
+  // heading, typed a partial date of birth and was answered "Please enter a
+  // valid value. The field is incomplete or has an invalid date." That is the
+  // same class of bug as the terms checkbox one screen over and as the native
+  // <input type="time"> the admin dropped: the VALUE was never in question, the
+  // display was one the page could not control.
+  //
+  // The difference is that this one has an API for it. setCustomValidity()
+  // replaces the sentence and keeps every property `required` was kept for --
+  // the bubble is anchored to the field, the browser scrolls there, and the
+  // submit is still blocked. So `required`, `minlength` and type="email" stay
+  // exactly as they were and only the words change; there is no second
+  // validation pass to fall out of step with the server's.
+  //
+  // It is done HERE rather than per form, because there is one field() and a
+  // dozen callers, and the next form added would otherwise bring the English
+  // straight back -- the same reason say() scrolls rather than each handler.
+  //
+  // ⚠ IT MUST BE CLEARED ON INPUT. A custom message IS the invalid state
+  // rather than a description of one, so a field set once and never cleared can
+  // never be submitted again, whatever is typed into it.
+  function guardNative(input) {
+    input.addEventListener('invalid', function () {
+      var v = input.validity;
+      input.setCustomValidity(
+        v.valueMissing ? T.needValue
+        : v.typeMismatch ? T.needEmail
+        // An incomplete date -- "31/mm/yyyy". It reads as EMPTY from script, so
+        // no handler of ours could tell it from an untouched box; only the
+        // widget knows, which is why this one has to be said in the bubble.
+        : v.badInput ? T.needDate
+        : v.tooShort ? pwHint()
+        : T.needValue);
+    });
+    input.addEventListener('input', function () { input.setCustomValidity(''); });
+  }
+
   function field(label, attrs, hint) {
     var id = 'f-' + label.replace(/\W+/g, '') + Math.random().toString(36).slice(2, 7);
     var tipId = hint ? id + '-h' : null;
     var input = el('input', Object.assign({ id: id, type: 'text' },
                                           tipId ? { 'aria-describedby': tipId } : {},
                                           attrs || {}));
+    guardNative(input);
     return { row: el('div', { class: 'acc-field' }, [
       el('label', { for: id, text: label }), input,
       hint ? el('p', { class: 'acc-hint', id: tipId, text: hint }) : null

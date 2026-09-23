@@ -50,6 +50,25 @@ function validDateOfBirth(value, now) {
   return y >= 1900;
 }
 
+// ⚠ THE AGE AT WHICH SOMEBODY MAY HOLD THE ACCOUNT, NOT THE AGE AT WHICH
+// SOMEBODY MAY TAKE PART.
+//
+// A participant makes no claim about age and that is deliberate: a guardian
+// must be able to register themselves, so there is one entity rather than a
+// second one for adults. Nothing in this file gates on age and nothing should.
+//
+// But an ACCOUNT is a different thing from a participant. Whoever holds one
+// accepts the terms, holds other people's records, invites the second guardian
+// and is billed -- and a fourteen-year-old did exactly that, by opening an
+// account and pressing "Add myself", with nothing in the model objecting
+// because nothing in the model was being asked.
+//
+// The number lives here because this is where the date of birth lives; the rule
+// is applied in account-family.js, which is the only place that knows that a
+// particular participant IS the account holder. Eighteen is majority in Cyprus
+// and in Israel, which is what agreeing to the terms turns on.
+const MIN_SELF_AGE = 18;
+
 // Whole years at a moment, counting birthdays rather than dividing by 365.25 —
 // which is off by a day for anyone born near the end of February in the years
 // around a leap year, and "11 not 12" is exactly the difference an age flag
@@ -204,7 +223,7 @@ async function deleteParticipant(participantId) {
 }
 
 module.exports = {
-  STORE, mintParticipantId, validDateOfBirth, ageAt, ageFlag, publicParticipant,
+  STORE, MIN_SELF_AGE, mintParticipantId, validDateOfBirth, ageAt, ageFlag, publicParticipant,
   getParticipant, saveParticipant, createParticipant, updateParticipant, deleteParticipant,
   _keys: { key }
 };
