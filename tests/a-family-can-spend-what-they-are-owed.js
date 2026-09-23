@@ -102,7 +102,7 @@ H.ok(/if \(!\(owing > 0\) \|\| !\(balance > 0\)\) return null;/.test(ui),
 // send different things: the cost card wraps the button in a block, and a row
 // of per-evening actions wants a link beside the others.
 H.ok(/function creditBlock\(owing, balance, body, onDone\)/.test(ui) &&
-     /creditButton\(owing, balance, body, onDone, 'btn-primary acc-credit-go'\)/.test(ui),
+     /creditButton\(owing, balance, body, onDone, 'btn-secondary acc-credit-go'\)/.test(ui),
   'the block on the cost card is that same button in a wrapper, not a second one');
 H.ok(/creditBlock\(left, balance/.test(ui), 'offered on the term cost card');
 H.ok(/creditButton\(owing, balance, \{\n\s*participantId/.test(ui), 'and on a single evening');

@@ -639,7 +639,13 @@
   }
 
   function creditBlock(owing, balance, body, onDone) {
-    var btn = creditButton(owing, balance, body, onDone, 'btn-primary acc-credit-go');
+    // ⚠ SECONDARY, NOT PRIMARY. It was .btn-primary and sat directly above the
+    // pay button, which is also .btn-primary — two solid terracotta pills, the
+    // credit one wider because its label is longer, with nothing saying which
+    // one the card is for. Paying is what this screen is for; putting credit
+    // towards it is a step on the way, after which the rest is still owed and
+    // the pay button is still the thing to press.
+    var btn = creditButton(owing, balance, body, onDone, 'btn-secondary acc-credit-go');
     if (!btn) return null;
     var amount = Math.min(owing, balance);
     var after = owing - amount;
@@ -698,6 +704,13 @@
   // SAME figure the server will apply, so the question and the outcome cannot
   // disagree — a family told "€7 comes back" and credited nothing would have
   // been told a lie by the screen that asked them.
+  // ⚠ ONE KEY, BECAUSE THE SERVER NOW SENDS ONE SHAPE. This read `.credit`,
+  // which _credit.js puts on a SESSION's answer and has never put on a
+  // registration's — that one says `total`. So `undefined > 0` was false and the
+  // dialog said "this cancellation earns no credit back" on every registration,
+  // whatever was actually owed back: the last sentence somebody reads before an
+  // action that cannot be undone, about money, and confidently backwards.
+  // cancellationView() in account-registrations.js is what makes the two agree.
   function creditNote(cancellation) {
     if (!cancellation) return null;
     return cancellation.credit > 0
@@ -2065,7 +2078,7 @@
       // Offered only when the frozen terms allow it. The same creditFor() the
       // server will apply decided this, so what is shown is what happens.
       if ((r.status === 'pending' || r.status === 'approved') &&
-          r.cancellation && r.cancellation.guardianMayCancel !== false) {
+          r.cancellation && r.cancellation.mayCancel !== false) {
         body.appendChild(actions([
           el('button', { type: 'button', class: 'acc-link is-danger', text: T.cancelReg,
             onclick: function () {

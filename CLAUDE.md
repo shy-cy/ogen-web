@@ -3445,6 +3445,74 @@ waived; with no fee on the activity there is nothing to have been waived, and it
 says nothing at all. `feeIncluded` is deleted rather than left as dead copy in
 three languages.
 
+### ⚠ A dialog about money said the opposite of what happened
+
+`_credit.js` answers *what would cancelling do* twice, and both answers are
+right in their own module:
+
+```
+creditFor()        -> { guardianMayCancel, feeCredit, courseCredit, total }
+creditForSession() -> { mayCancel, credit, deadline }
+```
+
+A term's credit is a fee part plus a course part and `total` is their sum, which
+a ledger entry has to itemise; one evening has a single figure and nothing to
+split. **The family's screen reads one shape.** `creditNote()` asked for
+`.credit`, which a session's answer carries and a registration's never has, so
+`undefined > 0` was false and the confirmation said *"this cancellation earns no
+credit back"* on **every** registration, whatever was owed.
+
+It is the worst place on the site for a wrong number: the last sentence somebody
+reads before something that cannot be undone, about money, and confidently
+backwards. A family owed €330 was told they would get nothing — which either
+stops a cancellation that should happen, or lets one happen under a false
+account of what it costs. Nothing errored and the ledger was right throughout.
+
+`cancellationView()` in `account-registrations.js` is the one adapter both
+payload builders pass through, so the client sees `{mayCancel, credit, reason,
+deadline, closedOn}` whichever it is looking at. Adapted at the **boundary**
+rather than renamed in `_credit.js`, because those names carry meaning there —
+`total` is a sum with parts, `guardianMayCancel` says which of two callers is
+refused. Same place and same reason `plainLabel()` decodes an entity: JSON is
+not the thing that produced it. And it tests `!== undefined` rather than `||`,
+because a genuine `0` and a genuine `false` are answers.
+
+⚠ **AND A TEST WAS WATCHING THIS AND PASSED THROUGH IT.** It asserted, against
+the client source, that the client reads `.credit` and falls back to the
+no-credit sentence. Both halves true, read separately, never once together — the
+same failure as the suite that clicked the invite button by its label while no
+human could find it. Reading each side proves each side is self-consistent and
+can never prove they agree. `a-dialog-about-money-must-not-be-backwards.js`
+builds both payloads from real records, executes `creditNote()` on them, and
+then **cancels and reads the ledger**, because a dialog agreeing with a payload
+proves only that two readers of one bug agree.
+
+### ⚠ Two solid terracotta pills side by side are not a choice
+
+The cost card ended up with *Use credit · €330.00* and *Pay now* stacked, both
+`.btn-primary` — same fill, same radius, same weight, the credit one **wider**
+because its label is longer, so the eye landed on it first.
+
+Rule 5 did not cause this and is not broken by the fix: every actionable CTA is
+still terracotta. What was missing is that two actionable things can be
+terracotta and still not be peers. **Paying is what the card is for**; putting
+credit towards it is a step on the way, after which the rest is still owed and
+the pay button is still the thing to press. `.btn-secondary` is the outlined
+peer of `.btn-primary`: solid pill = the action this screen exists for, outlined
+pill = a real action one rank down.
+
+It **keeps the pill on purpose**. "Solid fill plus a full pill means pressable"
+is this site's oldest visual rule, learned from a status badge mistaken for a
+button — and that badge was fixed by dropping the pill *as well as* the fill.
+Dropping both here would push a genuine control towards reading as a label,
+which is the same bug pointing the other way. One signal goes, not two.
+
+`#A74D21` rather than `--terracotta`, and it is the **same darkened value the
+open status badge already uses**: `--terracotta` on the credit block's `#EBEBE5`
+ground is 3.98:1, which fails AA for a 15px label; `#A74D21` is 4.75:1 there and
+6.24:1 on paper. Computed against the ground the letters actually sit on, which
+is how the badge colours were chosen.
+
 ### ⚠ `window.confirm` is not ours to style
 
 Three destructive actions in the family area asked through the browser's dialog.

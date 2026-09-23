@@ -240,9 +240,60 @@ async function sessionsPayload(activity, participantId, now) {
         paidCents: own ? own.payment.paidCents : null,
         // What cancelling would do, from the SAME function the server will
         // apply — so what is shown is what happens.
-        cancellation: own ? credit.creditForSession(own, now) : null
+        cancellation: own ? cancellationView(credit.creditForSession(own, now)) : null
       };
     })
+  };
+}
+
+// ⚠ ONE SHAPE FOR "WHAT WOULD CANCELLING DO", BECAUSE THERE WERE TWO.
+//
+// _credit.js answers this question twice, for two different things, and the two
+// answers were handed to the client under different key names:
+//
+//   creditFor()        -> { guardianMayCancel, feeCredit, courseCredit, total }
+//   creditForSession() -> { mayCancel, credit, deadline }
+//
+// Both are correct in their own module: a term's credit is a fee part plus a
+// course part and the total is their sum, where one evening has a single figure
+// and nothing to split. What was not correct is that the FAMILY'S SCREEN reads
+// one shape. creditNote() asks for `.credit`, which exists on a session and has
+// never existed on a registration — so `undefined > 0` was false and the
+// confirmation dialog said "this cancellation earns no credit back" on EVERY
+// registration, whatever was owed back.
+//
+// It is the worst place on the site for that sentence to be wrong. It is the
+// last thing somebody reads before an action that cannot be undone, it is about
+// money, and it was confidently backwards: a family owed €330 was told they
+// would get nothing, which either stops a cancellation that should happen or
+// makes one happen under a false account of what it costs. Nothing errored, and
+// the ledger was right the whole time — only the sentence was wrong.
+//
+// Adapted HERE rather than renamed in _credit.js. The two modules' own names
+// carry meaning that would be lost by flattening: `total` is the SUM of two
+// parts a ledger entry has to itemise, and `guardianMayCancel` says which of
+// the two callers is being refused. This is the boundary where a rule module
+// becomes a payload, which is the same place plainLabel() decodes an entity for
+// the same reason: JSON is not the thing that produced it.
+function cancellationView(c) {
+  if (!c) return null;
+  return {
+    // A guardian's own button. creditForSession() never refuses one — an evening
+    // is always cancellable and past the deadline simply earns nothing — so the
+    // two arrive at the same meaning from different defaults.
+    //
+    // `!== undefined` rather than `||`, here and below: a genuine `false` and a
+    // genuine `0` are answers, and reading either as missing would fall through
+    // to the other shape's field and report the wrong one.
+    mayCancel: c.mayCancel !== undefined ? c.mayCancel : c.guardianMayCancel !== false,
+    // THE ONE FIGURE A FAMILY IS SHOWN. A term's is the sum of its two parts; an
+    // evening's is the whole of it.
+    credit: c.credit !== undefined ? c.credit : c.total,
+    reason: c.reason || null,
+    // Only one of these is ever set, and each is named by what it is: the
+    // instant one evening stops being creditable, and the date a whole term did.
+    deadline: c.deadline == null ? null : c.deadline,
+    closedOn: c.closedOn == null ? null : c.closedOn
   };
 }
 
@@ -453,7 +504,7 @@ function regRow(reg, participant) {
     // What cancelling would do, computed from the terms frozen onto this
     // registration — so the answer shown is the answer that will be applied, and
     // both come from the same function.
-    cancellation: credit.creditFor(reg)
+    cancellation: cancellationView(credit.creditFor(reg))
   };
 }
 

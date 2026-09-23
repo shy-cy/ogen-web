@@ -309,6 +309,52 @@ html[lang="he"] .hero-text p{ margin-inline-start:0; margin-inline-end:0; }
 .btn-primary:disabled{ opacity:.6; cursor:progress; transform:none; }
 .btn-primary:disabled:hover{ background: var(--terracotta); }
 html[lang="he"] .btn-primary{ font-family: var(--font-he); }
+
+/* ⚠ TWO SOLID TERRACOTTA PILLS SIDE BY SIDE ARE NOT A CHOICE, THEY ARE A COIN
+   TOSS.
+   -------------------------------------------------------------------------
+   The family's cost card ended up with "Use credit · €330.00" and "Pay now"
+   stacked, both .btn-primary — same fill, same radius, same weight, the credit
+   one WIDER because its label is longer, so the eye landed on it first. Nothing
+   on the card said which one the page was for.
+
+   Rule 5 is not what caused it and is not being broken here: every actionable
+   CTA is still terracotta. What was missing is that two actionable things can
+   be terracotta and still not be peers. Paying is what the card is FOR; putting
+   credit towards it is a step taken on the way, after which €50 is still owed
+   and the pay button is still the thing to press. So the hierarchy is fill,
+   which is the one signal this site has spare:
+
+     solid pill  = the action this screen exists for
+     outlined pill = a real action, one rank down
+
+   It keeps the PILL, deliberately. "Solid fill plus a full pill means
+   pressable" is this codebase's oldest visual rule, learned from a status badge
+   that was mistaken for a button — and the badge was fixed by taking the pill
+   away as well as the fill. Taking the pill away here too would push a genuine
+   control towards reading as a label, which is that same bug in the other
+   direction. One signal is dropped, not both.
+
+   #A74D21 rather than --terracotta, and it is the SAME darkened value the open
+   status badge already uses. --terracotta on the credit block's #EBEBE5 ground
+   is 3.98:1, which fails AA for a 15px label; #A74D21 is 4.75:1 there and
+   6.24:1 on paper. Computed against the ground the letters actually sit on,
+   which is the rule the badge colours were chosen by.
+
+   13px/29px rather than 14px/30px so the 1px border does not make it a pixel
+   taller than the button it sits above. */
+.btn-secondary{
+  display:inline-block; background:transparent; color:#A74D21;
+  font-family: var(--font-latin); font-weight:700; font-size:15px;
+  padding:13px 29px; border-radius:999px; border:1px solid currentColor; cursor:pointer;
+  transition: background-color .15s ease, transform .06s ease, opacity .15s ease;
+}
+.btn-secondary:hover{ background: color-mix(in srgb, var(--terracotta) 12%, transparent); }
+.btn-secondary:active{ transform: translateY(1px); }
+.btn-secondary:focus-visible{ outline:2px solid var(--navy); outline-offset:2px; }
+.btn-secondary:disabled{ opacity:.6; cursor:progress; transform:none; }
+.btn-secondary:disabled:hover{ background:transparent; }
+html[lang="he"] .btn-secondary{ font-family: var(--font-he); }
 .link-arrow{ font-family: var(--font-latin); font-weight:700; font-size:15px; color: var(--navy); }
 html[lang="he"] .link-arrow{ font-family: var(--font-he); }
 
