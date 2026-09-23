@@ -86,8 +86,14 @@ H.eq(G.totalCapacity(h4k), 20, 'and the activity still holds twenty altogether')
 H.eq(FACTS.pick(h4k.groups[0].name, 'en'), '',
   'with no name, because one group offers no choice and nothing is published');
 
-const folk = migrate(record('folk-dance'));
-H.eq(folk.groups[0].capacity, null,
+// ⚠ THE UNCAPPED RULE IS PINNED ON A RECORD BUILT HERE, not on whichever real
+// activity happens to have no size today. It was folk-dance, until an admin gave
+// folk-dance a capacity of 50 — an ordinary edit, through the form, which broke a
+// suite that was not about folk-dance at all. The real records are worth reading
+// for what MIGRATION does to them; a rule about blanks needs a guaranteed blank.
+const noSize = migrate({ slug: 'no-size', activityId: 'act-0000000000000f0f', type: 'course',
+                         facts: { groupSize: {} } });
+H.eq(noSize.groups[0].capacity, null,
   'an activity with no stated size is UNCAPPED, deliberately not zero — a blank must ' +
   'never read as a restriction');
 

@@ -170,10 +170,18 @@ const bare = JSON.parse(JSON.stringify(record));
 // Every fact the card holds, not just the two it is named for — Location moved
 // in here when Details was retired, and a card with only a location left is not
 // an empty card.
-bare.facts.schedule = {};
-bare.facts.duration = {};
-bare.facts.location = {};
-bare.facts.address = {};
+//
+// ⚠ EMPTIED ON THE GROUPS, NOT ON THE ACTIVITY. All four of these moved onto
+// `groups[].facts`, so clearing `record.facts.*` is a no-op — and this block
+// went on passing for a while because the real record it reads had not been
+// re-saved yet and still carried its facts at the top level. The next admin
+// publish moved them and the assertion failed with nothing about the TEST having
+// changed. Anything reaching for a group fact by way of `.facts` is asking a
+// record that no longer answers.
+['schedule', 'duration', 'location', 'address'].forEach((k) => {
+  if (bare.facts) bare.facts[k] = {};
+  (bare.groups || []).forEach((g) => { g.facts[k] = {}; });
+});
 const bareGroups = facts.sidebarGroups(bare, 'en').map((g) => g.key);
 H.ok(bareGroups.indexOf('schedule') === -1, 'the empty schedule group is dropped, not rendered blank');
 H.ok(bareGroups.indexOf('participants') !== -1, 'the groups that still have facts stay');
