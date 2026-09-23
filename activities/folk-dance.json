@@ -48,85 +48,8 @@
     "ru": "Израильские народные танцы в центре OGEN в Лимассоле - танцуем под израильскую музыку, разучиваем любимые танцы и приятно проводим время вместе."
   },
   "facts": {
-    "ages": {
-      "min": 12,
-      "max": 120
-    },
-    "schedule": {
-      "frequency": "biweekly",
-      "sessions": [
-        {
-          "day": 3,
-          "time": "20:30"
-        }
-      ]
-    },
-    "duration": {
-      "startDate": "2026-10-14",
-      "endDate": "2026-12-23",
-      "sessionCount": null,
-      "sessionMinutes": null,
-      "sessionDates": [
-        {
-          "date": "2026-10-14",
-          "status": "scheduled"
-        },
-        {
-          "date": "2026-10-28",
-          "status": "scheduled"
-        },
-        {
-          "date": "2026-11-11",
-          "status": "scheduled"
-        },
-        {
-          "date": "2026-11-25",
-          "status": "scheduled"
-        },
-        {
-          "date": "2026-12-09",
-          "status": "scheduled"
-        },
-        {
-          "date": "2026-12-23",
-          "status": "scheduled"
-        }
-      ]
-    },
     "groupSize": {
-      "groups": 1,
-      "maxPerGroup": null,
       "overrideText": {
-        "he": "",
-        "en": "",
-        "ru": ""
-      }
-    },
-    "instructionLanguage": {
-      "codes": [],
-      "text": {
-        "he": "",
-        "en": "",
-        "ru": ""
-      }
-    },
-    "prerequisites": {
-      "level": null,
-      "text": {
-        "he": "",
-        "en": "",
-        "ru": ""
-      }
-    },
-    "location": {
-      "text": {
-        "he": "לימסול",
-        "en": "Limassol",
-        "ru": "Limassol"
-      }
-    },
-    "address": {
-      "text": {
         "he": "",
         "en": "",
         "ru": ""
@@ -177,10 +100,99 @@
     }
   ],
   "sponsors": [],
-  "isoUpdated": "2026-09-19T15:48:42.234Z",
+  "isoUpdated": "2026-09-23T13:17:25.347Z",
   "isoCreated": "2026-09-18T15:36:40.995Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
   "activityId": "act-a17993ff6a2b4f4f",
-  "lastPublishedAt": "2026-09-19T15:48:42.234Z"
+  "lastPublishedAt": "2026-09-23T13:17:25.347Z",
+  "groups": [
+    {
+      "groupId": "g-default",
+      "name": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      },
+      "capacity": null,
+      "teacherIds": [],
+      "facts": {
+        "ages": {
+          "min": 12,
+          "max": 120
+        },
+        "schedule": {
+          "frequency": "biweekly",
+          "sessions": [
+            {
+              "day": 3,
+              "time": "20:30"
+            }
+          ]
+        },
+        "duration": {
+          "startDate": "2026-10-14",
+          "endDate": "2026-12-23",
+          "sessionCount": null,
+          "sessionMinutes": null,
+          "sessionDates": [
+            {
+              "date": "2026-10-14",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-10-28",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-11-11",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-11-25",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-12-09",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-12-23",
+              "status": "scheduled"
+            }
+          ]
+        },
+        "instructionLanguage": {
+          "codes": [],
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "prerequisites": {
+          "level": null,
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "location": {
+          "text": {
+            "he": "לימסול",
+            "en": "Limassol",
+            "ru": "Limassol"
+          }
+        },
+        "address": {
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        }
+      }
+    }
+  ]
 }
