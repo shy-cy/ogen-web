@@ -174,22 +174,6 @@ const FIELD_SCHEMA = {
   // or on neither.
   activityFacts: FACTS.ACTIVITY_FACTS,
   groupFacts: FACTS.GROUP_FACTS,
-  // Which sections of a group can be copied out of another group, and what each
-  // one carries. The client offers exactly this list, so a section added here
-  // is offered without the form being edited — and a section that is NOT here
-  // cannot be copied at all, which is the point for `duration`: its dates are
-  // absolute, and copying them out of another activity imports last year's term.
-  copySections: [
-    { key: 'teachers', label: 'Teachers', crossActivity: false },
-    { key: 'schedule', label: 'Schedule (how often, which days)', crossActivity: true },
-    { key: 'duration', label: 'Dates and length', crossActivity: false },
-    { key: 'ages', label: 'Ages', crossActivity: true },
-    { key: 'instructionLanguage', label: 'Language of instruction', crossActivity: true },
-    { key: 'prerequisites', label: 'Level', crossActivity: true },
-    { key: 'location', label: 'Location', crossActivity: true },
-    { key: 'address', label: 'Exact address', crossActivity: true },
-    { key: 'capacity', label: 'Places', crossActivity: true }
-  ],
   instructionLanguages: FACTS.INSTRUCTION_LANGUAGES.map((c) => ({ key: c, label: FACTS.LANGUAGE_NAMES.en[c] })),
   levels: FACTS.LEVELS.map((k) => ({ key: k, label: FACTS.LEVEL_NAMES.en[k] })),
   frequencies: FREQUENCIES,

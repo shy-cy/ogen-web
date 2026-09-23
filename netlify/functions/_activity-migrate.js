@@ -15,7 +15,8 @@
 // already-migrated record returns the same record.
 
 const { FACT_ORDER, TEXT_FACTS, DEFAULT_VISIBILITY, num,
-        INSTRUCTION_LANGUAGES, LEVELS } = require('./_activity-facts');
+        INSTRUCTION_LANGUAGES, LEVELS,
+        LANGUAGE_NAMES, LEVEL_NAMES } = require('./_activity-facts');
 const sessionsModule = require('./_activity-sessions');
 const registration = require('./_activity-registration');
 // Which facts belong to a group and which to the activity. The list lives in
@@ -167,15 +168,23 @@ const SHAPES = {
   // lost: an old value was a bare {he,en,ru} bag, and it lands in `text` exactly
   // as it was — the same promise legacyText makes for the facts that were
   // converted before these.
-  instructionLanguage: (f) => ({
-    codes: (Array.isArray(f.codes) ? f.codes : [])
-      .filter((c) => INSTRUCTION_LANGUAGES.indexOf(c) !== -1),
-    text: langObject(f.text)
-  }),
-  prerequisites: (f) => ({
-    level: LEVELS.indexOf(f.level) !== -1 ? f.level : null,
-    text: langObject(f.text)
-  }),
+  instructionLanguage: (f) => {
+    const codes = (Array.isArray(f.codes) ? f.codes : [])
+      .filter((c) => INSTRUCTION_LANGUAGES.indexOf(c) !== -1);
+    return {
+      codes: codes,
+      text: dropRestatement(langObject(f.text),
+                            codes.map((c) => namesOf(LANGUAGE_NAMES, c)))
+    };
+  },
+  prerequisites: (f) => {
+    const level = LEVELS.indexOf(f.level) !== -1 ? f.level : null;
+    return {
+      level: level,
+      text: dropRestatement(langObject(f.text),
+                            level ? [namesOf(LEVEL_NAMES, level)] : [])
+    };
+  },
   location: (f) => ({ text: langObject(f.text) }),
   address: (f) => ({ text: langObject(f.text) }),
   price: (f) => ({
@@ -225,6 +234,77 @@ function isoDate(value) {
 // by a version flag: a record with no `text`, `codes` or `level` and at least
 // one language key is unambiguously the old form, and a record already
 // converted has `text` and is left alone.
+// ⚠ A NOTE THAT ONLY REPEATS THE LIST IS NOT A NOTE.
+//
+// `instructionLanguage` and `prerequisites` are a closed list plus an optional
+// line, and the line exists to ADD to the list. The live hebrew4kids page was
+// printing each of them twice:
+//
+//     Prerequisites             Language of instruction
+//     Beginners                 Hebrew · English
+//     Beginners                 Hebrew and English
+//
+// Nobody typed anything twice, and neither half was wrong. liftBareText() moved
+// the old free-text fact into `text`, which is the only place those words could
+// go; the admin then picked the level and the two languages from the controls
+// that replaced it, which is exactly what they were for. It is the PAIR that is
+// wrong, and nothing on either screen could have shown it — the form draws a
+// filled-in box beside a filled-in select and neither knows about the other.
+//
+// So the words the structured half already prints are stripped out, in all
+// three languages rather than the one being read: the Russian slot on that
+// record holds the ENGLISH sentence, because the free text predates anybody
+// translating it. If what is left holds no letters or digits, the line was only
+// ever a restatement and goes.
+//
+// A line that says anything else is untouched — "Hebrew and English, some
+// Greek" keeps "some Greek", which is the whole reason the free line exists.
+// Idempotent, like everything here: once dropped there is nothing to drop.
+const JOINERS = ['\u05d5', '\u05d5\u05d2\u05dd', 'and', '\u0438', '&', '+'];
+const SPLIT_ON = /[\s,.;:\u00b7\u2022()\/\u2013\u2014-]+/;
+const A_WORD = /[\p{L}\p{N}]/u;
+
+function namesOf(table, key) {
+  return ['he', 'en', 'ru'].map((lang) => (table[lang] || {})[key]).filter(Boolean);
+}
+
+// Case-insensitive and global. A name can appear more than once, and the Latin
+// ones arrive capitalised or not depending on who typed them.
+function stripAll(hay, needle) {
+  if (!needle) return hay;
+  const lowN = String(needle).toLowerCase();
+  const lowH = hay.toLowerCase();
+  let out = '', i = 0;
+  while (i < hay.length) {
+    if (lowH.substr(i, lowN.length) === lowN) { out += ' '; i += lowN.length; }
+    else { out += hay[i]; i += 1; }
+  }
+  return out;
+}
+
+function restatesOnly(text, names) {
+  const value = String(text == null ? '' : text);
+  if (!value.trim() || !names.length) return false;
+  let left = value;
+  names.forEach((n) => { left = stripAll(left, n); });
+  // ו is a PREFIX in Hebrew — "\u05e2\u05d1\u05e8\u05d9\u05ea \u05d5\u05d0\u05e0\u05d2\u05dc\u05d9\u05ea" is two names with the
+  // conjunction glued to the second, so it only becomes a token of its own once
+  // the names either side of it have been taken out.
+  const rest = left.split(SPLIT_ON).filter(Boolean)
+    .filter((w) => JOINERS.indexOf(w.toLowerCase()) === -1)
+    .join('');
+  return !A_WORD.test(rest);
+}
+
+function dropRestatement(text, nameGroups) {
+  const names = [].concat.apply([], nameGroups || []);
+  const out = {};
+  ['he', 'en', 'ru'].forEach((lang) => {
+    out[lang] = restatesOnly(text[lang], names) ? '' : text[lang];
+  });
+  return out;
+}
+
 const WAS_TEXT = { instructionLanguage: 1, prerequisites: 1 };
 function liftBareText(key, raw) {
   if (!WAS_TEXT[key] || !raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;

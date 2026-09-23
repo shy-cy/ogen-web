@@ -494,6 +494,35 @@ The `text` half is in `LANG_SUBKEYS` and the list half deliberately is not — a
 Russian-only role may translate the sentence and cannot change which languages a
 class is taught in.
 
+⚠ **A LINE THAT ONLY REPEATS THE LIST IS DROPPED ON READ.** The live
+hebrew4kids page printed both of these facts twice — `Beginners` under
+`Beginners`, and `Hebrew and English` under `Hebrew · English`. Nobody typed
+anything twice, and neither half of the record was wrong on its own:
+`liftBareText()` moved the old free-text fact into `text`, which is the only
+place those words could go, and the admin then picked the level and the two
+languages from the controls that replaced the free text, which is what they are
+for. **It is the pair that is wrong**, and no screen could have shown it — the
+form draws a filled-in box beside a filled-in select and neither control knows
+what the other says. Only the rendered page puts them one under the other.
+
+So the names the structured half already prints are stripped out and, if what is
+left holds no letters or digits, the line goes. Three details carry it:
+
+- **All three languages are stripped, not the one being read.** That record's
+  *Russian* slot held the *English* sentence, because the free text predates
+  anybody translating it. A rule looking only at the language on the page would
+  have kept it — and the fix is why the Russian page now reads
+  `иврит · английский` instead of an English sentence under a Russian list.
+- **`ו` is a prefix**, so `עברית ואנגלית` is two names with the conjunction glued
+  to the front of the second. It only becomes a word of its own once the names
+  either side are removed, which is why the names come out before anything is
+  split on whitespace.
+- **Anything else survives untouched.** “Hebrew and English, some Greek” keeps
+  its Greek, a note naming a language the codes leave out is not a restatement,
+  and — the direction that would do real damage — with **no** level or codes set
+  the prose *is* the fact, so it stays. Every record written before the closed
+  lists existed is in that state, and dropping it would blank a published row.
+
 ⚠ **The loop that copies these two through `migrate()` used to iterate
 `TEXT_FACTS`**, which was exactly them — so emptying that list stopped copying
 them at all, and every record came back blank with nothing erroring. They are
@@ -1117,7 +1146,7 @@ per group. Beside the field it would be the same setting on two groups' pages,
 where changing one silently changes both: the same shape that gave this codebase
 a checkbox meaning opposite things in two editors a release apart.
 
-**Copy comes in two sizes.** *Duplicate* on the list takes a whole group as a
+**Copy is one thing, not two.** *Duplicate* on the list takes a whole group as a
 starting point — two groups of one activity usually differ in one or two things
 and agree about the rest, so starting from a copy and editing down is fewer
 fields, and fewer fields is fewer forgotten. ⚠ It mints a **fresh groupId**;
@@ -1127,14 +1156,20 @@ because an unnamed second group is refused on save and a silent blank would read
 as the copy having failed. It is a **deep** copy, or two groups would share one
 calendar object and excluding a date for one would take it off the other.
 
-*Copy from another group* on the sub-page takes one **section** — the teachers,
-the schedule, the ages — out of a group of this activity or of another. ⚠ **The
-dates never cross an activity.** A schedule is a pattern ("Wednesdays at 16:00")
-and copies anywhere; a calendar is absolute dates, and last year's term copied
-into this one is a page of dates nobody meets on, quietly and plausibly.
-Cross-activity copy offers the pattern, refuses the calendar, and says to
-regenerate. It reads the source through the ordinary `load` action, so there is
-nothing new on the server for it.
+⚠ **AND *COPY FROM ANOTHER GROUP* IS GONE, BY REQUEST.** A second panel on the
+sub-page took one **section** — the teachers, the schedule, the ages — out of a
+group of this activity or of another, with a rule that dates never cross an
+activity. It was built from the original brief and then asked for the other
+thing instead: *Duplicate* already covers starting a group from one that exists,
+and a per-section picker on top of it is a second way to do most of the same job,
+on the screen where an admin is trying to get one group right. `copySections` is
+off `FIELD_SCHEMA` as well as the form, so nothing advertises a capability that
+is not there.
+
+If it comes back, the rule it carried is the part worth keeping: a schedule is a
+pattern ("Wednesdays at 16:00") and copies anywhere, a calendar is absolute dates,
+and last year's term copied into this one is a page of dates nobody meets on —
+quietly and plausibly.
 
 ⚠ **NOTHING ABOUT A GROUP IS READ BACK OFF THE MAIN FORM.** Not a name, a
 capacity, a teacher list, a fact, a schedule or a calendar — none of it has an

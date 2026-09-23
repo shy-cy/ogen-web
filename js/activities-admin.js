@@ -2048,8 +2048,6 @@
       }
     }));
     page.appendChild(calBox);
-
-    page.appendChild(copyPanel(page));
   }
 
   // ⚠ TEACHERS BY REFERENCE, NOT BY COPY. The roster is the activity's — one
@@ -2094,115 +2092,6 @@
     return box;
   }
 
-  // ⚠ COPY ONE SECTION OUT OF ANOTHER GROUP. The duplicate button on the list
-  // takes a whole group; this takes a part of one — the teachers, the schedule,
-  // the ages — out of a group of THIS activity or of another.
-  //
-  // ⚠ AND THE DATES NEVER CROSS AN ACTIVITY. A schedule is a pattern ("Wednesdays
-  // at 16:00") and copies anywhere; a calendar is absolute dates, and last
-  // year's term copied into this one is a page of dates nobody meets on, quietly
-  // and plausibly. Cross-activity copy offers the pattern and refuses the
-  // calendar, and says to regenerate.
-  function copyPanel(page) {
-    var box = el('div', { class: 'panel' });
-    box.appendChild(el('h3', { text: 'Copy from another group' }));
-    box.appendChild(el('div', { class: 'hint', text:
-      'Takes one section out of another group as a starting point. From another ACTIVITY the ' +
-      'schedule comes across as a pattern and the dates do not — they are last term’s ' +
-      'days — so generate them again afterwards.' }));
-
-    var srcSel = el('select', { id: GROUP_PREFIX + '-copy-src', disabled: !canEditAll() || null });
-    srcSel.appendChild(el('option', { value: '', text: '— choose a group —' }));
-    (S.groups || []).forEach(function (g) {
-      if (g.groupId === S.ownerEdit.groupId) return;
-      srcSel.appendChild(el('option', { value: 'self:' + g.groupId, text: 'This activity · ' + groupLabel(g) }));
-    });
-    (S.activities || []).forEach(function (a) {
-      if (a.slug === S.slug) return;
-      var title = (a.title && (a.title.he || a.title.en || a.title.ru)) || a.slug;
-      srcSel.appendChild(el('option', { value: 'other:' + a.slug, text: title }));
-    });
-
-    var secSel = el('select', { id: GROUP_PREFIX + '-copy-section', disabled: !canEditAll() || null });
-    (S.schema.copySections || []).forEach(function (c) {
-      secSel.appendChild(el('option', { value: c.key, text: c.label }));
-    });
-
-    var go = el('button', { type: 'button', class: 'add-btn', text: 'Copy it in',
-                            disabled: !canEditAll() || null });
-    go.addEventListener('click', function () { doCopy(srcSel.value, secSel.value, page); });
-
-    box.appendChild(el('div', { class: 'fact-grid' }, [
-      el('div', {}, [el('label', { for: GROUP_PREFIX + '-copy-src', text: 'From' }), srcSel]),
-      el('div', {}, [el('label', { for: GROUP_PREFIX + '-copy-section', text: 'What' }), secSel])
-    ]));
-    box.appendChild(go);
-    return box;
-  }
-
-  function doCopy(source, section, page) {
-    if (!source || !section) { message('err', 'Choose a group and a section first.'); return; }
-    var spec = (S.schema.copySections || []).filter(function (c) { return c.key === section; })[0];
-    if (source.indexOf('self:') === 0) {
-      var g = groupById(source.slice(5));
-      if (!g) return;
-      applyCopy(g, section, false, page);
-      return;
-    }
-    // Another activity: its record is not in hand, so it is loaded. `load` is
-    // the same action the form itself opens a record with, so there is nothing
-    // new on the server for this.
-    send({ action: 'load', slug: source.slice(6) }).then(function (res) {
-      if (!res.ok) { message('err', failure(res, 'read that activity')); return; }
-      var groups = (res.data.activity || {}).groups || [];
-      if (!groups.length) { message('err', 'That activity has no groups to copy from.'); return; }
-      if (!spec || spec.crossActivity === false) {
-        message('err', 'That section cannot be copied between activities — its dates belong ' +
-          'to that activity’s term. Copy the schedule instead and generate the dates again.');
-        return;
-      }
-      applyCopy(groups[0], section, true, page);
-    });
-  }
-
-  function applyCopy(source, section, crossActivity, page) {
-    var e = readOwnerEdit();
-    var f = JSON.parse(JSON.stringify(source.facts || {}));
-    if (section === 'teachers') {
-      if (crossActivity) { message('err', 'Teachers belong to one activity’s roster.'); return; }
-      e.teacherIds = (source.teacherIds || []).slice();
-    } else if (section === 'capacity') {
-      e.capacity = source.capacity == null ? null : source.capacity;
-    } else if (section === 'schedule') {
-      var sch = f.schedule || {};
-      e.freq = sch.frequency || 'weekly';
-      e.weekOfMonth = sch.weekOfMonth == null ? 1 : sch.weekOfMonth;
-      e.sessions = (sch.sessions || []).map(function (x) {
-        return { day: x.day == null ? null : Number(x.day), time: x.time || '', date: x.date || null };
-      });
-    } else if (section === 'duration') {
-      var d = f.duration || {};
-      e.facts.duration = {
-        startDate: d.startDate || '', endDate: d.endDate || '',
-        sessionCount: d.sessionCount == null ? null : d.sessionCount,
-        sessionMinutes: d.sessionMinutes == null ? null : d.sessionMinutes,
-        sessionDates: (d.sessionDates || []).slice()
-      };
-      e.dates = ((d.sessionDates) || []).map(function (r) {
-        return { date: r.date, status: r.status === 'excluded' ? 'excluded' : 'scheduled',
-                 reason: r.reason || '' };
-      });
-    } else {
-      e.facts[section] = f[section] || {};
-    }
-    S.dirty = true;
-    drawOwnerPage(page);
-    message('ok', 'Copied. Nothing is saved until you save.');
-  }
-
-  // The SAME server action for every group, so dates are enumerated by the one
-  // generator rather than a second one that can drift. The start date, end date
-  // and session count are this GROUP's now, and they are on this page.
   function generateOwnerSessions(page) {
     var e = readOwnerEdit();
     send({
