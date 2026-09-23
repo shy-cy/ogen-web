@@ -148,6 +148,16 @@
       paidSlow: 'התשלום התקבל. הרישום לוקח עוד קצת זמן — אם הסכומים כאן עדיין לא '
               + 'מתעדכנים, אפשר לרענן בעוד דקה, ואם גם אז לא, כתבו לנו.',
       waitLead: 'ההרשמה בוצעה — התשלום ייפתח בקרוב',
+      // ⚠ WHY IT IS WAITING, which the family was never told. See pendingReason()
+      // in account-registrations.js: auto-approve stands aside when a stated age
+      // range is not positively satisfied, and a screen saying only "we will
+      // confirm" reads as a setting being ignored.
+      waitAge: 'הגיל של {name} מחוץ לטווח שהפעילות מציינת, ולכן ההרשמה ממתינה לאישור אנושי. '
+             + 'זו לא דחייה — נחזור אליכם.',
+      waitAgeUnknown: 'חסר תאריך לידה ל{name}, ולכן לא יכולנו לבדוק את הגיל מול הטווח שהפעילות מציינת. '
+                    + 'ההרשמה ממתינה לאישור אנושי — זו לא דחייה.',
+      lateWhy: 'הרשמה מאוחרת · רגיל {price}',
+      eveningsBooked: 'מפגשים שנקבעו', noEveningsYet: 'עוד לא נקבעו מפגשים, ולכן אין מה לשלם עדיין.',
       waitBody: '{name} נרשם/ה. אנחנו משלימים כמה פרטים אחרונים, והתשלום ייפתח כאן. '
               + 'נעדכן אתכם במייל ברגע שאפשר.',
       payNeedsVerify: 'כדי לשלם, יש לאשר את כתובת האימייל. הקישור לאישור נמצא בעמוד החשבון.',
@@ -277,6 +287,12 @@
               + 'figures here have not caught up, reload in a minute, and write to us if '
               + 'they still have not.',
       waitLead: 'Registered — payment opens soon',
+      waitAge: '{name}\u2019s age is outside the range this activity states, so the registration '
+             + 'is waiting for a person to look at it. This is not a refusal — we will come back to you.',
+      waitAgeUnknown: 'We have no date of birth for {name}, so we could not check the age against '
+                    + 'the range this activity states. It is waiting for a person — not a refusal.',
+      lateWhy: 'late booking \u00b7 usually {price}',
+      eveningsBooked: 'Sessions booked', noEveningsYet: 'No sessions booked yet, so there is nothing to pay.',
       waitBody: '{name} is registered. We\u2019re confirming the last few details, and payment '
               + 'will open here. We\u2019ll email you the moment it does.',
       payNeedsVerify: 'To pay, please confirm your email address. The link to resend it is on your account page.',
@@ -406,6 +422,12 @@
               + 'не обновились, обновите страницу через минуту, а если и тогда нет, '
               + 'напишите нам.',
       waitLead: 'Запись оформлена — оплата откроется скоро',
+      waitAge: 'Возраст {name} вне диапазона, указанного для этого занятия, поэтому запись ждёт '
+             + 'решения человека. Это не отказ — мы с вами свяжемся.',
+      waitAgeUnknown: 'У {name} не указана дата рождения, поэтому мы не смогли сверить возраст с '
+                    + 'диапазоном занятия. Запись ждёт решения человека — это не отказ.',
+      lateWhy: 'поздняя запись \u00b7 обычно {price}',
+      eveningsBooked: 'Записанные занятия', noEveningsYet: 'Пока нет записанных занятий, поэтому платить нечего.',
       waitBody: '{name} записан(а). Мы уточняем последние детали, оплата откроется здесь. '
               + 'Напишем вам, как только всё будет готово.',
       payNeedsVerify: 'Чтобы оплатить, подтвердите адрес электронной почты. Ссылка для повторной отправки — на странице аккаунта.',
@@ -1346,6 +1368,32 @@
     return who;
   }
 
+  // ⚠ WHY A REGISTRATION IS WAITING, in the family's own words.
+  //
+  // One helper, because the same question is asked on two screens: the notice
+  // after registering for a drop-in, and the waiting block on the cost card of a
+  // registration that is still pending. Two copies would be two accounts of one
+  // rule, and the rule itself lives on the server — this only renders what
+  // pendingReason() concluded.
+  //
+  // `manual-approval` deliberately returns nothing: the surrounding message
+  // already says a person will confirm, and "a person will confirm because a
+  // person confirms these" is not an explanation. What was missing is the case
+  // where the admin switched auto-approve ON and it stood aside anyway.
+  function waitWhy(reason, name) {
+    if (reason === 'age-outside-range') return T.waitAge.replace('{name}', name || '');
+    if (reason === 'age-unknown') return T.waitAgeUnknown.replace('{name}', name || '');
+    return null;
+  }
+
+  // The chosen person's name, from the MODEL the panel was handed rather than
+  // out of the select's own DOM — the id is what the form sends, so resolving it
+  // against the same list keeps one source and needs nothing of the element.
+  function nameOf(people, participantId) {
+    var p = (people || []).filter(function (c) { return c.participantId === participantId; })[0];
+    return p ? full(p) : '';
+  }
+
   // ⚠ WHAT CANCELLING WILL BE WORTH, SAID BEFORE THE BUTTON THAT COMMITS.
   //
   // The cutoffs have been frozen onto every registration since Phase 5 and the
@@ -1524,9 +1572,16 @@
         var note = d.awaitingApproval ? T.awaitingOk
                  : d.paymentFailed ? T.bookedUnpaid
                  : T.bookedFree;
-        where.appendChild(section(null, [
-          el('p', { class: 'acc-notice is-ok', text: note }), link
-        ]));
+        var body = [el('p', { class: 'acc-notice is-ok', text: note })];
+        // ⚠ AND WHY, WHEN IT IS WAITING. "We will confirm the place" on an
+        // activity whose Approve automatically is ON reads as a setting being
+        // ignored — see pendingReason() in account-registrations.js. The reason
+        // is the server's, from the ageFlag already on the record, so the screen
+        // cannot reach a different conclusion from autoApproves().
+        var whyWait = d.awaitingApproval ? waitWhy(d.pendingReason, nameOf(people, who.value)) : null;
+        if (whyWait) body.push(el('p', { class: 'acc-meta', text: whyWait }));
+        body.push(link);
+        where.appendChild(section(null, body));
       });
     } }, [
       el('div', { class: 'acc-field' }, [el('label', { text: T.registerWho }), who]),
@@ -1570,10 +1625,25 @@
           var box = el('input', { type: 'checkbox', value: s.date, disabled: off || null,
                                   onchange: retotal });
           var why = taken ? T.dateBooked : s.full ? T.dateFull : money(s.priceCents);
+          // ⚠ A LATE PRICE SAYS IT IS ONE, AND NAMES THE ORDINARY ONE.
+          //
+          // The figure came through alone: €10.00 on a picker under a price card
+          // reading €7, with nothing anywhere explaining that a different rate
+          // had been applied. A number that disagrees with the published price
+          // and does not account for itself reads as a mistake — and the family
+          // cannot tell which of the two figures is the error. `priceBasis` has
+          // been in this payload since late pricing was built and nothing read
+          // it; the standard figure travels beside it now, because "late" on its
+          // own is a label and "usually €7.00" is an explanation.
+          var late = !off && s.priceBasis === 'late' && s.standardPriceCents != null;
           dates.appendChild(el('label', { class: 'acc-date' + (off ? ' is-off' : '') }, [
             box,
             el('span', { class: 'acc-date-when', text: longDate(s.date) }),
-            el('span', { class: 'acc-date-what', text: why })
+            el('span', { class: 'acc-date-what' }, [
+              el('span', { text: why }),
+              late ? el('span', { class: 'acc-date-why',
+                text: T.lateWhy.replace('{price}', money(s.standardPriceCents)) }) : null
+            ])
           ]));
           if (!off) { rows.push({ date: s.date, price: s.priceCents || 0, box: box }); if (!firstFree) firstFree = box; }
         });
@@ -2103,7 +2173,8 @@
       if (!act) body.appendChild(el('p', { class: 'acc-notice is-warn', text: T.activityGone }));
       else body.appendChild(factsBlock(act));
 
-      body.appendChild(costBlock(r, act, res.data.balanceCents, renderActivity));
+      body.appendChild(costBlock(r, act, res.data.balanceCents, renderActivity,
+                                 res.data.perSession));
 
       // The sessions. A course lists the dates it meets on, which is the same
       // table the published page carries. A drop-in lists the evenings with what
@@ -2202,8 +2273,24 @@
   // term price: the fee is charged once a year and the course once a semester,
   // so their sum is a figure nobody is ever billed. The figures come from
   // priceRows() on the server, the same builder the public page uses.
-  function costBlock(r, act, balance, onDone) {
-    var rows = (act && act.priceRows) || [];
+  function costBlock(r, act, balance, onDone, perSession) {
+    // ⚠ A DROP-IN'S COST CARD IS ABOUT ITS EVENINGS, NOT ABOUT A TERM.
+    //
+    // owedCentsFor() bills the yearly fee and, for a COURSE, the term price — so
+    // a drop-in registration owes nothing, correctly. The card then drew the
+    // activity's price rows and the registration's own figures, and the result
+    // read "Cost per session €7 · Paid €0.00 · Still to pay €0.00" while an
+    // unpaid evening sat in the table directly below it. Every number was true
+    // and the card was answering a question this activity does not have,
+    // arriving at "you owe nothing" for a family who owed €7. Reported as "I see
+    // 7 EUR and also that I don't need to pay anything — very confusing."
+    //
+    // It also put two currency formats on one card: the price rows are the
+    // published page's builder and print "€ 7", the money lines print "€0.00".
+    // Dropping the rate row here fixes that as a side effect and removes a
+    // duplicate — the rate is already on the facts card above, from the same
+    // builder that puts it on the public page.
+    var rows = r.type === 'dropin' ? [] : ((act && act.priceRows) || []);
     var kids = rows.map(function (row) {
       return el('div', { class: 'acc-money' }, [
         el('span', {}, [
@@ -2228,19 +2315,53 @@
     if (r.feeCharged === false && r.registrationFee) {
       kids.push(el('p', { class: 'acc-meta', text: T.feeAlready }));
     }
-    kids.push(el('div', { class: 'acc-money is-sum' }, [
-      el('span', { text: T.paid }), el('b', { text: money(r.paidCents) })
-    ]));
-    if (r.creditedCents) {
-      kids.push(el('div', { class: 'acc-money' }, [
-        el('span', { text: T.credited }), el('b', { text: money(r.creditedCents) })
-      ]));
-    }
+    // The figures. On a drop-in they come from the EVENINGS — summed on the
+    // server, in sessionsPayload(), because a screen adding up money is a second
+    // implementation and the one that drifts is the one a family reads out to an
+    // admin. With nothing booked the card says so rather than printing three
+    // zeroes that look like a settled bill.
+    var t = r.type === 'dropin' ? ((perSession || {}).totals || null) : null;
+    // ⚠ TWO FIGURES WITH TWO JOBS, DECLARED APART ON PURPOSE. `left` is what
+    // THIS REGISTRATION owes, and it is what the pay button below acts on — zero
+    // on a drop-in, because the money lives on the evenings and is settled from
+    // the table under this card. The evenings' outstanding total is DISPLAY
+    // only: opening Checkout for it here would charge a registration that owes
+    // nothing. Before this they were one variable and the drop-in case worked by
+    // `undefined > 0` being false, which is an accident rather than a rule.
     var left = r.owedCents == null ? null
       : Math.max(0, r.owedCents - (r.paidCents || 0) - (r.creditedCents || 0));
-    kids.push(el('div', { class: 'acc-money is-sum' }, [
-      el('span', { text: T.stillToPay }), el('b', { text: money(left) })
-    ]));
+    if (r.type === 'dropin') {
+      if (!t || !t.booked) {
+        kids.push(el('p', { class: 'acc-meta', text: T.noEveningsYet }));
+      } else {
+        kids.push(el('div', { class: 'acc-money' }, [
+          el('span', { text: T.eveningsBooked }), el('b', { text: String(t.booked) })
+        ]));
+        kids.push(el('div', { class: 'acc-money is-sum' }, [
+          el('span', { text: T.paid }), el('b', { text: money(t.paidCents) })
+        ]));
+        if (t.creditedCents) {
+          kids.push(el('div', { class: 'acc-money' }, [
+            el('span', { text: T.credited }), el('b', { text: money(t.creditedCents) })
+          ]));
+        }
+        kids.push(el('div', { class: 'acc-money is-sum' }, [
+          el('span', { text: T.stillToPay }), el('b', { text: money(t.outstandingCents) })
+        ]));
+      }
+    } else {
+      kids.push(el('div', { class: 'acc-money is-sum' }, [
+        el('span', { text: T.paid }), el('b', { text: money(r.paidCents) })
+      ]));
+      if (r.creditedCents) {
+        kids.push(el('div', { class: 'acc-money' }, [
+          el('span', { text: T.credited }), el('b', { text: money(r.creditedCents) })
+        ]));
+      }
+      kids.push(el('div', { class: 'acc-money is-sum' }, [
+        el('span', { text: T.stillToPay }), el('b', { text: money(left) })
+      ]));
+    }
 
     // THE PAY BUTTON, and what decides whether it is drawn.
     //
@@ -2329,10 +2450,17 @@
       // "awaiting approval", no "your request" — the family registered, and
       // being told a decision is pending reads as a decision that might go
       // either way over something they consider settled.
+      // ⚠ AND WHY, when the reason is one the family could not have guessed.
+      // An activity with Approve automatically ON that did not auto-approve is
+      // the case this exists for: auto-approve stands aside when a stated age
+      // range is not positively satisfied, and "we are confirming a few details"
+      // over that reads as a setting nobody honoured.
+      var why = waitWhy(r.pendingReason, r.participantName);
       kids.push(el('div', { class: 'acc-waiting' }, [
         el('p', { class: 'acc-waiting-lead' }, [lucide(CHECK, '15'), el('span', { text: T.waitLead })]),
         el('p', { class: 'acc-waiting-body',
-                  text: T.waitBody.replace('{name}', r.participantName || '') })
+                  text: T.waitBody.replace('{name}', r.participantName || '') }),
+        why ? el('p', { class: 'acc-waiting-body', text: why }) : null
       ]));
     }
     // ADDRESSABLE, because every message about money links straight to it. The

@@ -1116,7 +1116,19 @@ html[lang="he"] .thankyou h1{ font-family: var(--font-he); font-weight:700; }
 .acc-meta{ display:block; font-size:14px; color:var(--camel); }
 
 .acc-field{ margin-bottom:14px; }
-.acc-field label{ display:block; font-size:14px; font-weight:500; margin-bottom:5px; }
+/* ⚠ `> label`, AND THE CHILD COMBINATOR IS THE WHOLE FIX.
+   `.acc-field label` is (0,1,1) and `.acc-date` is (0,1,0), so this rule won
+   against the flex row inside it — every evening in the drop-in date picker was
+   `display:block` rather than a flex row, which dropped the 11px gap AND the
+   `flex:1 1 auto` that pushes the price to the far end. The live Hebrew page
+   read `יום חמישי, 24 בספטמבר€10.00`, the date and the price with nothing at
+   all between them.
+   Neither rule was wrong and neither mentions the other, which is why it
+   survived: one says "the label above a field is a block", the other says "a
+   date row is a flex row", and the first happened to also match the second. The
+   field's own label is a DIRECT child and the date rows are grandchildren, so
+   the combinator says what was meant all along. */
+.acc-field > label{ display:block; font-size:14px; font-weight:500; margin-bottom:5px; }
 .acc-field input, .acc-field select{
   width:100%; font:inherit; font-size:16px; padding:11px 13px;
   border:1px solid var(--stone); border-radius:8px; background:#fff; color:var(--ink);
@@ -1152,7 +1164,19 @@ html[lang="he"] .thankyou h1{ font-family: var(--font-he); font-weight:700; }
 .acc-date:last-child{ border-bottom:0; }
 .acc-date input{ flex:0 0 auto; width:18px; height:18px; margin:0; }
 .acc-date-when{ flex:1 1 auto; }
-.acc-date-what{ flex:0 0 auto; color:var(--camel); font-size:14px; font-variant-numeric:tabular-nums; }
+.acc-date-what{
+  flex:0 0 auto; display:flex; flex-direction:column; align-items:flex-end; gap:1px;
+  color:var(--camel); font-size:14px; font-variant-numeric:tabular-nums;
+}
+/* ⚠ WHY THIS EVENING COSTS MORE THAN THE CARD SAID. A late-booking price
+   appeared as a bare figure — €10.00 under a price card reading €7 — with
+   nothing anywhere saying a different rate had been applied. A number that
+   disagrees with the published price and does not explain itself reads as a
+   mistake, and the family cannot tell which of the two is the error.
+   --navy at 10.8:1 on paper rather than --camel, which is 2.3:1: the warm
+   tokens are backgrounds chosen to sit under white text and fail as
+   foregrounds, the same trap the listing card's tag labels were fixed out of. */
+.acc-date-why{ font-size:12px; color:var(--navy); font-weight:600; white-space:nowrap; }
 /* A date that cannot be taken is dimmed and not pressable, and still says why —
    "full" and "already booked" are different answers and a family should not
    have to work out which one applies. */

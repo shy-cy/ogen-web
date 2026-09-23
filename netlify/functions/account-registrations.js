@@ -281,6 +281,14 @@ async function sessionsPayload(activity, participantId, now) {
           ? (own.payment.owedCents || 0)
           : Math.max(0, Math.round(Number(frozen.perSessionPrice || 0) * 100)),
         priceBasis: frozen.priceBasis || null,
+        // ⚠ AND WHAT IT USUALLY COSTS, so a late price can say why it is not the
+        // figure on the price card. €10.00 under a card reading €7 with nothing
+        // explaining it reads as a mistake, and a family cannot tell which of
+        // the two is the error. The standard figure is the explanation, so it
+        // travels beside the one being charged rather than being looked up by a
+        // screen that would have to know the shape of facts.price.
+        standardPriceCents: Math.max(0, Math.round(
+          Number(((activity.facts || {}).price || {}).perSessionPrice || 0) * 100)),
         startsAt: frozen.startsAt || null,
         // Booking a date that has gone is not a thing to offer. It is a flag
         // rather than a filter because the registration page lists the whole
@@ -296,6 +304,32 @@ async function sessionsPayload(activity, participantId, now) {
         cancellation: own ? cancellationView(credit.creditForSession(own, now)) : null
       };
     })
+    ,
+    // ⚠ WHAT THIS FAMILY OWES ACROSS THEIR EVENINGS, which is the only money a
+    // drop-in registration has.
+    //
+    // owedCentsFor() bills the yearly fee and, for a COURSE, the term price — so
+    // a drop-in registration owes nothing, correctly, and the cost card drew
+    // "still to pay €0.00" under a row reading "cost per session €7" while an
+    // unpaid evening sat in the table below it. Every figure on it was true and
+    // the card was about a term this activity does not have.
+    //
+    // Summed here rather than in the browser for the reason every other figure
+    // is: a screen adding up money is a second implementation, and the one that
+    // drifts is the one a family reads out to an admin.
+    totals: (function () {
+      const held = Object.keys(mine).map((d) => mine[d])
+        .filter((a) => a.status === 'booked' || a.status === 'attended');
+      const sum = (f) => held.reduce((n, a) => n + (Number(a.payment[f]) || 0), 0);
+      const owed = sum('owedCents');
+      const paid = sum('paidCents');
+      const credited = sum('creditedCents');
+      return {
+        booked: held.length,
+        owedCents: owed, paidCents: paid, creditedCents: credited,
+        outstandingCents: Math.max(0, owed - paid - credited)
+      };
+    })()
   };
 }
 
@@ -520,6 +554,35 @@ async function commitEntries(spend, accountId, note) {
   return seen;
 }
 
+// ⚠ WHY A REGISTRATION IS WAITING, WHICH THE FAMILY WAS NEVER TOLD.
+//
+// A family registered for an activity whose Approve automatically is ON and was
+// answered "we will confirm the place before sessions can be booked". Nothing
+// was broken: autoApproves() stands aside when a STATED age range is not
+// positively satisfied, and the participant was 64 on an activity pitched at
+// children. That rule is deliberate and is not a rejection — the request waits
+// for a person, and the person may well say yes.
+//
+// But the screen said only that it was waiting. To somebody who had just set
+// auto-approve and watched it not happen, that reads as a setting being ignored,
+// which is exactly how a correct rule comes to be reported as a bug.
+//
+// So the reason travels. It is derived from what is already on the record —
+// `ageFlag` is stored at submission and nothing else branches on it — rather
+// than being a second decision that could disagree with autoApproves().
+function pendingReason(reg) {
+  if (!reg || reg.status !== 'pending') return null;
+  const flag = reg.ageFlag || {};
+  const stated = flag.min != null || flag.max != null;
+  if (!stated) return 'manual-approval';
+  // The two halves of "a stated range must be positively satisfied", kept apart
+  // because they are different things to be told: an age we checked and one we
+  // could not check at all.
+  if (flag.inRange === false) return 'age-outside-range';
+  if (flag.inRange !== true) return 'age-unknown';
+  return 'manual-approval';
+}
+
 // ONE ROW SHAPE, built once. The list and the single-registration view are two
 // views of the same record, and two builders would drift — the one the family
 // reads on a dashboard would stop agreeing with the one they read on the page
@@ -537,6 +600,10 @@ function regRow(reg, participant, lang, activity) {
     groupId: reg.groupId,
     groupName: reg.frozen.groupName,
     status: reg.status,
+    // Null unless it IS waiting, so a screen cannot print a reason for a
+    // registration that has already been decided.
+    pendingReason: pendingReason(reg),
+    ageFlag: reg.status === 'pending' ? reg.ageFlag : null,
     // The DERIVED answer, not the stored status. A pending registration whose
     // deadline passed an hour ago is already not holding a place, whether or not
     // the nightly sweep has run.
@@ -785,6 +852,7 @@ exports.handler = async (event) => {
           if (opened.created) await mail.sendReceived(reg, me, (activity.registration || {}).sessionCancelHours);
           return json(200, {
             ok: true, awaitingApproval: true, status: reg.status,
+            pendingReason: pendingReason(reg),
             registration: regRow(reg, participant, lang)
           });
         }
@@ -947,7 +1015,8 @@ exports.handler = async (event) => {
         const reg = opened.reg;
         if (reg.status !== 'approved') {
           if (opened.created) await mail.sendReceived(reg, me, (activity.registration || {}).sessionCancelHours);
-          return json(200, { ok: true, awaitingApproval: true, status: reg.status });
+          return json(200, { ok: true, awaitingApproval: true, status: reg.status,
+                             pendingReason: pendingReason(reg) });
         }
 
         // ⚠ THE OFFER IS RE-DECIDED HERE, from the activity, at this instant,

@@ -3588,6 +3588,95 @@ builds both payloads from real records, executes `creditNote()` on them, and
 then **cancels and reads the ledger**, because a dialog agreeing with a payload
 proves only that two readers of one bug agree.
 
+### ⚠ Four figures that did not explain themselves
+
+All four reported from one drop-in session, all the same shape: a number or a
+sentence that was **true**, and that said nothing about why it was what it was.
+Reported together as *"very very confusing"*, which is the right description —
+no single figure was wrong and the screen as a whole could not be believed.
+
+**1. A late price arrived as a bare figure.** €10.00 on the date picker, under a
+price card reading €7, with nothing anywhere saying a different rate had been
+applied. `priceBasis` has been in that payload since late pricing was built and
+**nothing ever read it**. A figure that disagrees with the published price and
+does not account for itself reads as a mistake, and the family cannot tell which
+of the two is the error. The row says `late booking · usually €7.00` now, and
+the standard figure travels **beside** the one being charged rather than being
+looked up by a screen that would have to know the shape of `facts.price` — "late"
+on its own is a label, "usually €7.00" is an explanation. It appears only on a
+late row: a note on every row is a note nobody reads.
+
+**2. The date and the price were printed with nothing between them** —
+`יום חמישי, 24 בספטמבר€10.00` on the live Hebrew page. A **cascade collision**,
+and the instructive kind: `.acc-field label` is (0,1,1) and `.acc-date` is
+(0,1,0), so the rule saying *the label above a field is a block* beat the rule
+saying *a date row is a flex row*, and the row lost `display:flex`, its 11px gap
+and the `flex:1 1 auto` that pushes the price to the far end — all at once.
+Neither rule is wrong and neither mentions the other, which is why it survived.
+The field's own label is a **direct child** and the date rows are grandchildren,
+so `.acc-field > label` says what was always meant. ⚠ The test checks this **by
+specificity**, not by looking for the fix: it parses the stylesheet and asserts
+every rule that reaches a bare `label` from `.acc-field` uses the child
+combinator — "the fix is present" would pass with the broken rule sitting beside
+it and would say nothing about the next rule somebody adds.
+
+**3. An activity set to approve automatically did not, and said only that it was
+waiting.** `autoApproves()` stands aside when a **stated** age range is not
+positively satisfied — deliberate, documented, and not a rejection; the request
+waits for a person and the person may well say yes. But to somebody who had just
+set auto-approve and watched it not happen, silence reads as a setting being
+ignored, which is how a correct rule gets reported as a bug.
+
+`pendingReason()` derives the answer from `ageFlag`, which is already on the
+record and which nothing else branches on — rather than being a second decision
+that could disagree with `autoApproves()`. Three values, and the third is the
+interesting one:
+
+| | |
+|---|---|
+| `age-outside-range` | the age was checked and is outside what the activity states |
+| `age-unknown` | a range is stated and there was no date of birth to check it against |
+| `manual-approval` | auto-approve is genuinely off — **and this renders nothing** |
+
+The block around it already says a person will confirm, and *"a person will
+confirm because a person confirms these"* is not an explanation. What was missing
+is only the case where the admin switched auto-approve **on** and it stood aside
+anyway. Both sentences say **it is not a refusal**, in all three languages,
+because that is exactly the case a person may well approve — and a test asserts
+each language says so rather than trusting a translation to have carried it.
+
+One helper on the client, `waitWhy()`, because the same question is asked on two
+screens: the notice after registering for a drop-in, and the waiting block on a
+pending registration's cost card.
+
+**4. The cost card said "Cost per session €7 · Paid €0.00 · Still to pay €0.00"
+while an unpaid evening sat in the table below it.** `owedCentsFor()` bills the
+yearly fee and, for a **course**, the term price — so a drop-in registration owes
+nothing, correctly. Every figure on that card was true, and the card was
+answering a question this activity does not have, arriving at *you owe nothing*
+for a family who owed €7.
+
+A drop-in's cost card is about its **evenings** now: how many are booked, what is
+paid, what is outstanding — summed in `sessionsPayload()` rather than in the
+browser, because a screen adding up money is a second implementation and the one
+that drifts is the one a family reads out to an admin. With nothing booked it
+says so rather than printing three zeroes that look like a settled bill.
+
+⚠ **`left` and the evenings' outstanding are two variables on purpose.** `left`
+is what **this registration** owes and is what the pay button acts on — zero on a
+drop-in, because the money lives on the evenings and is settled from the table
+under the card. The evenings' total is **display only**: opening Checkout for it
+here would charge a registration that owes nothing. They used to be one variable,
+and the drop-in case worked because `undefined > 0` is false, which is an
+accident rather than a rule.
+
+It also removed a duplicate and a mismatch in passing: the rate row is already on
+the facts card above, from the same builder that puts it on the public page — and
+it was the reason one card carried two currency formats, `€ 7` from `priceRows()`
+beside `€0.00` from the client's `money()`. ⚠ **That mismatch still exists
+wherever both appear on one screen**; `priceRows()` is the published page's
+format and is not changed here.
+
 ### ⚠ A deadline nobody was told about
 
 Every rule was there. `freezeCancellation()` writes the cutoffs onto the record
