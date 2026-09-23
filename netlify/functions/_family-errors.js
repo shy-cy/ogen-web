@@ -146,12 +146,17 @@ const MESSAGES = {
     en: 'That reset link has expired or has already been used. Ask for a new one.',
     ru: 'Ссылка для сброса пароля истекла или уже была использована. Запросите новую.'
   },
-  // The password rule, plus what to do about it — the token is already spent by
-  // the time this is reached, so "try again" alone would be wrong advice.
+  // ⚠ "TRY AGAIN" IS NOW THE RIGHT ADVICE, and it was not before. This message
+  // used to end "ask for a new reset link", because the token was spent before
+  // the password was looked at — so a typo under the minimum killed the link and
+  // the sentence had to send somebody back to their inbox. account-auth.js checks
+  // the length first now, so the link is still good and the only thing needed is
+  // a longer password. The two must move together: leave this wording behind and
+  // it sends a family to request a mail they do not need.
   'reset-password-short': {
-    he: (p) => `הסיסמה צריכה להיות באורך ${p.min} תווים לפחות. בקשו קישור חדש לאיפוס ונסו שוב.`,
-    en: (p) => `Password must be at least ${p.min} characters. Ask for a new reset link and try again.`,
-    ru: (p) => `Пароль должен содержать не менее ${p.min} символов. Запросите новую ссылку и попробуйте ещё раз.`
+    he: (p) => `הסיסמה צריכה להיות באורך ${p.min} תווים לפחות. הקישור עדיין תקף — בחרו סיסמה ארוכה יותר ונסו שוב.`,
+    en: (p) => `Password must be at least ${p.min} characters. This link still works — choose a longer password and try again.`,
+    ru: (p) => `Пароль должен содержать не менее ${p.min} символов. Ссылка ещё действует — выберите более длинный пароль и попробуйте ещё раз.`
   },
   'verify-link-dead': {
     he: 'הקישור הזה פג או שכבר נעשה בו שימוש.',

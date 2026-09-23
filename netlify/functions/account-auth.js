@@ -158,6 +158,26 @@ exports.handler = async (event) => {
       }
 
       case 'resetPassword': {
+        // ⚠ THE PASSWORD IS CHECKED BEFORE THE TOKEN IS SPENT, and that ordering
+        // is the whole of this block. It ran the other way round, on the argument
+        // that a token surviving a failed attempt was the more dangerous shape.
+        // That argument does not hold: whoever holds a reset link already has
+        // everything the link grants, so letting them type a second password
+        // costs nothing — and a password too short is not an attack, it is the
+        // form failing to say what the minimum was.
+        //
+        // What the old order cost was real, and QA found it. A password under the
+        // minimum spent the link, and every retry — including the tabs already
+        // open — answered "that link has expired or has already been used". The
+        // reported symptom was three tabs, three dead links, and no password
+        // accepted, on an account that could then only be recovered by asking for
+        // another mail from a screen that still would not say what was wrong.
+        //
+        // The form states the minimum now as well, and this is the other half:
+        // the client is hostile by assumption, so the rule cannot live only there.
+        if (!body.password || String(body.password).length < accounts.MIN_PASSWORD) {
+          return no(400, 'reset-password-short', null, { min: accounts.MIN_PASSWORD });
+        }
         const record = await sessions.consumeToken(body.token, 'reset');
         if (!record) {
           return no(400, 'reset-link-dead');
@@ -165,12 +185,9 @@ exports.handler = async (event) => {
         try {
           await accounts.setPassword(record.accountId, body.password);
         } catch (err) {
-          // The token is already consumed at this point, which is deliberate —
-          // see consumeToken. A weak password means asking for a new link, and
-          // that is the safe direction: the alternative is a token that survives
-          // repeated attempts.
-          return no(400, err.code === 'password-short' ? 'reset-password-short' : codeOf(err),
-                    null, { min: accounts.MIN_PASSWORD });
+          // Nothing reaching here is about the password's length any more — that
+          // was settled above, while the link was still good.
+          return no(400, codeOf(err), null, { min: accounts.MIN_PASSWORD });
         }
 
         // EVERY OTHER SESSION GOES. A reset exists because somebody may have

@@ -1835,6 +1835,34 @@ owner and leave whoever took it signed in. `changePassword` spares only the
 session doing it. One-time tokens are **deleted before the handler returns**, so
 a link followed twice — by a person and then by a mail scanner — works once.
 
+⚠ **But the PASSWORD is checked before the token is spent, and that ordering is
+the fix for a real lockout.** `resetPassword` consumed the one-time token first
+and validated second, on the argument that a token surviving a failed attempt
+was the more dangerous shape. It is not: whoever holds a reset link already has
+everything the link grants, so a second try costs nothing — and a password under
+the minimum is not an attack, it is the form failing to say what the minimum was.
+
+What the old order cost was a family's only way back in. QA typed a short
+password; the link was spent; the refusal said to request a new one; and the two
+tabs already open answered *“that link has expired or has already been used”* —
+the sentence for a link **somebody else** has used. Reported as three tabs, three
+dead links, and no password accepted.
+
+The message moved with the code, and the two have to: `reset-password-short` used
+to end “ask for a new reset link”, which is now wrong advice. It says the link
+still works.
+
+⚠ **AND NOTHING ANYWHERE SAID THE MINIMUM WAS EIGHT.** Five password inputs in
+the family area and not one `minlength` between them, so the rule existed only as
+a refusal — the shape that guarantees somebody breaks it, and on the reset screen
+breaking it also cost the link. `field()` takes a hint now, wired with
+`aria-describedby` rather than as a second label, and the three fields that take
+a **new** password carry it. Sign-in deliberately does not: that box wants the
+password you already have, and a rule printed under it reads as a demand to
+change it. `MIN_PASSWORD` is written twice — a browser cannot `require` a Netlify
+function — so a test pins the two against each other, the same way the activities
+menu's duplicated status groups are pinned.
+
 **An account cannot exist without accepting the terms**, and `termsAcceptedAt` is
 stored. That is the tie to the legal pages: they are final, published and linked
 from the footer, so there is a document to point at.
@@ -2946,6 +2974,34 @@ that is you** — you would be handing your own attendance to somebody else and
 losing sight of it. And the guardian **invitation email** still says "second
 guardian for &lt;name&gt;", which reads oddly adult-to-adult; it is trilingual
 copy whose Russian is already awaiting review, so it belongs in that pass.
+
+### ⚠ A button labelled with a description hid the invite flow
+
+The guardian invitation has worked since Phase 3 — bound to the address it was
+sent to, re-sendable, revocable, offered only to the primary guardian and only
+below the maximum. QA could not find it, and said so four times in a row: *“I
+cannot find where to invite the other guardian.”*
+
+The panel holding it opens from one button on a participant's row, and that
+button was labelled **“Who can see and manage this record”** — the panel's own
+heading, six words, sitting next to “Edit” in a row of one-word controls. It
+never used the word *invite* or the word *guardian*. A label that describes a
+container is a caption; a reader scanning for an action does not press it.
+
+The button names what it opens now — `Guardians` / `אפוטרופוסים` / `Опекуны` —
+and the sentence stays as the heading **inside** the panel, which is where a
+description belongs. Same lesson as the nav chip that said “Sign in” to somebody
+who had no account yet, and as the family area that said “my children” over a
+model that never cared about age: a capability nobody can find is a capability
+nobody has.
+
+⚠ **AND THE TEST WAS CLICKING IT THE WHOLE TIME.**
+`the-three-family-screens-render.js` found that button by its text and pressed
+it happily, so the invite flow was covered, passing, and unreachable in practice.
+Finding a control by its label proves it exists; it can never prove anybody would
+read it as a control. The suite now pins **both halves** — the short label on the
+button and the sentence as the panel's heading — so the next tidy-up cannot put
+the description back on the control.
 
 ### The credit card stays, and renders nothing
 

@@ -137,8 +137,17 @@ process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
   const resetToken = await grabResetToken(blobs);
   H.ok(!!resetToken, 'the reset token was stored');
 
+  // ⚠ A PASSWORD TOO SHORT MUST NOT SPEND THE LINK, and it used to. The token
+  // was consumed before the password was looked at, so a typo under the minimum
+  // killed the only way back into the account — and every retry, including the
+  // tabs somebody already had open, answered that the link was dead. QA reported
+  // exactly that: three tabs, three dead links, no password accepted.
+  const tooShort = await call({ action: 'resetPassword', token: resetToken, password: 'short' });
+  H.eq(tooShort.status, 400, 'a password under the minimum is refused');
+  H.eq(tooShort.body.code, 'reset-password-short', 'naming the rule rather than the link');
+
   const done = await call({ action: 'resetPassword', token: resetToken, password: 'a-brand-new-one' });
-  H.eq(done.status, 200, 'the reset succeeds');
+  H.eq(done.status, 200, 'and the SAME link still works, which is the whole point');
   // A reset exists because somebody may have LOST CONTROL of the account.
   // Leaving other sessions alive would lock out the owner and leave whoever
   // took it signed in — the exact opposite of what a reset is for.
@@ -146,7 +155,9 @@ process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
   H.eq(await member.getSession(s2), null, 'all of them');
   H.ok(!!(await member.getSession(done.body.token)), 'except the new one it just issued');
 
-  const reused = await call({ action: 'resetPassword', token: resetToken, password: 'again' });
+  // Long enough to clear the length check, or this would be testing that rule
+  // over again rather than testing that a spent link stays spent.
+  const reused = await call({ action: 'resetPassword', token: resetToken, password: 'another-good-one' });
   H.eq(reused.status, 400, 'the link cannot be used twice');
   H.eq(reused.body.code, 'reset-link-dead', 'and says so plainly');
 

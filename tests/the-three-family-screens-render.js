@@ -299,8 +299,22 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
   console.log('\n[who can see and manage a record]');
   dom = await screen({ view: 'details', lang: 'en', search: '?tab=family' });
   const noaRow = D.byClass(dom.mount, 'acc-row').filter((r) => r.textContent.indexOf('Noa') === 0)[0];
-  D.byClass(noaRow, 'acc-link').filter((b) => b.textContent === 'Who can see and manage this record')[0].click();
+  // ⚠ THE BUTTON NAMES WHAT IS BEHIND IT. This is the only door to inviting a
+  // second guardian, and it used to carry the panel's own heading — "Who can see
+  // and manage this record", six words sitting next to "Edit" in a row of
+  // one-word controls. The flow behind it was built, reachable and covered, and
+  // THIS SUITE CLICKED IT HAPPILY — which is exactly how QA came to report "I
+  // cannot find where to invite the other guardian" four times in a row against
+  // a passing test. Finding a button by its text proves it exists; it can never
+  // prove anybody would read it as a control.
+  const opener = D.byClass(noaRow, 'acc-link').filter((b) => b.textContent === 'Guardians')[0];
+  H.ok(!!opener, 'the guardian panel opens from a button that names what it opens');
+  opener.click();
   await settle();
+  // And the sentence is not lost — it is the panel's heading, which is where a
+  // description belongs. Both halves, or the next tidy-up moves it back.
+  H.ok(noaRow.textContent.indexOf('Who can see and manage this record') !== -1,
+    'the description survives as the heading inside the panel');
   H.ok(noaRow.textContent.indexOf('Primary') !== -1, 'the primary guardian is named');
   H.ok(noaRow.textContent.indexOf('Invitation pending') !== -1, 'a pending invitation is shown');
   H.ok(noaRow.textContent.indexOf('Invite a second guardian') !== -1,
@@ -308,7 +322,7 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
   // ⚠ Never on your own record. You would be handing your own attendance to
   // somebody else and losing sight of it.
   const meRow = D.byClass(dom.mount, 'acc-row').filter((r) => r.textContent.indexOf('Michal') === 0)[0];
-  D.byClass(meRow, 'acc-link').filter((b) => b.textContent === 'Who can see and manage this record')[0].click();
+  D.byClass(meRow, 'acc-link').filter((b) => b.textContent === 'Guardians')[0].click();
   await settle();
   H.ok(meRow.textContent.indexOf('Remove myself from this record') === -1,
     '"remove myself" is not offered on the record that IS you');

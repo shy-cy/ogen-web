@@ -36,6 +36,14 @@
   var FAMILY = '/api/account-family';
   var REGS = '/api/account-registrations';
 
+  // ⚠ THE MINIMUM IS STATED ON THE FORM, not discovered from a refusal. It is
+  // MIN_PASSWORD in _account-store.js, repeated here because a browser cannot
+  // require a Netlify function — the same duplication the activities menu makes,
+  // and pinned by a test for the same reason. A form that does not say the rule
+  // is a form somebody breaks, and on the reset screen breaking it used to cost
+  // the link as well.
+  var MIN_PASSWORD = 8;
+
   var lang = (document.documentElement.lang || 'he').slice(0, 2);
   if (['he', 'en', 'ru'].indexOf(lang) === -1) lang = 'he';
   var base = lang === 'he' ? '' : '/' + lang;
@@ -59,6 +67,7 @@
       forgotSend: 'שליחת קישור',
       forgotSent: 'אם קיים חשבון בכתובת הזו, הקישור נשלח. בדקו את תיבת הדואר.',
       resetTitle: 'בחירת סיסמה חדשה', newPassword: 'סיסמה חדשה', resetSave: 'שמירה',
+      passwordHint: 'לפחות {n} תווים.',
       resetDone: 'הסיסמה עודכנה. אפשר להיכנס.',
       linkDead: 'הקישור פג או כבר נוצל. אפשר לבקש חדש.',
       verifyOk: 'כתובת הדוא״ל אומתה. תודה.',
@@ -77,6 +86,7 @@
       me: 'אני', edit: 'עריכה',
       dob: 'תאריך לידה', notes: 'הערות (אלרגיות, מידע רפואי)',
       save: 'שמירה', cancel: 'ביטול', age: 'גיל',
+      guardians: 'אפוטרופוסים',
       manages: 'מי רואה ומנהל/ת את הרשומה', primary: 'ראשי/ת',
       inviteGuardian: 'הזמנת אפוטרופוס שני', inviteEmail: 'כתובת דוא״ל',
       inviteSend: 'שליחת הזמנה', invitePending: 'הזמנה ממתינה',
@@ -175,6 +185,7 @@
       forgotSend: 'Send the link',
       forgotSent: 'If there is an account at that address, the link is on its way. Check your inbox.',
       resetTitle: 'Choose a new password', newPassword: 'New password', resetSave: 'Save',
+      passwordHint: 'At least {n} characters.',
       resetDone: 'Your password has been changed. You can sign in.',
       linkDead: 'That link has expired or has already been used. You can ask for a new one.',
       verifyOk: 'Your email address is confirmed. Thank you.',
@@ -193,6 +204,7 @@
       me: 'me', edit: 'Edit',
       dob: 'Date of birth', notes: 'Notes (allergies, medical information)',
       save: 'Save', cancel: 'Cancel', age: 'Age',
+      guardians: 'Guardians',
       manages: 'Who can see and manage this record', primary: 'Primary',
       inviteGuardian: 'Invite a second guardian', inviteEmail: 'Email address',
       inviteSend: 'Send invitation', invitePending: 'Invitation pending',
@@ -293,6 +305,7 @@
       forgotSend: 'Отправить ссылку',
       forgotSent: 'Если учётная запись с таким адресом существует, ссылка отправлена. Проверьте почту.',
       resetTitle: 'Новый пароль', newPassword: 'Новый пароль', resetSave: 'Сохранить',
+      passwordHint: 'Не менее {n} символов.',
       resetDone: 'Пароль изменён. Можно войти.',
       linkDead: 'Ссылка истекла или уже была использована. Можно запросить новую.',
       verifyOk: 'Адрес электронной почты подтверждён. Спасибо.',
@@ -311,6 +324,7 @@
       me: 'я', edit: 'Изменить',
       dob: 'Дата рождения', notes: 'Примечания (аллергии, медицинская информация)',
       save: 'Сохранить', cancel: 'Отмена', age: 'Возраст',
+      guardians: 'Опекуны',
       manages: 'Кто видит эту запись и управляет ею', primary: 'Основной',
       inviteGuardian: 'Пригласить второго опекуна', inviteEmail: 'Адрес электронной почты',
       inviteSend: 'Отправить приглашение', invitePending: 'Приглашение отправлено',
@@ -790,11 +804,23 @@
     return (res.data && res.data.error) || T.problem;
   }
 
-  function field(label, attrs) {
+  // The rule, in the reader's own language, with the number from the one
+  // constant. Said in three places, so it is built in one.
+  function pwHint() { return T.passwordHint.replace('{n}', MIN_PASSWORD); }
+
+  // The optional third argument is a HINT: the rule a field expects, said before
+  // it is broken rather than as a refusal afterwards. It is `aria-describedby`
+  // and not a second label, so a screen reader reads it after the label rather
+  // than in place of it.
+  function field(label, attrs, hint) {
     var id = 'f-' + label.replace(/\W+/g, '') + Math.random().toString(36).slice(2, 7);
-    var input = el('input', Object.assign({ id: id, type: 'text' }, attrs || {}));
+    var tipId = hint ? id + '-h' : null;
+    var input = el('input', Object.assign({ id: id, type: 'text' },
+                                          tipId ? { 'aria-describedby': tipId } : {},
+                                          attrs || {}));
     return { row: el('div', { class: 'acc-field' }, [
-      el('label', { for: id, text: label }), input
+      el('label', { for: id, text: label }), input,
+      hint ? el('p', { class: 'acc-hint', id: tipId, text: hint }) : null
     ]), input: input };
   }
 
@@ -929,7 +955,8 @@
     var l = field(T.lastName, { autocomplete: 'family-name' });
     var ph = field(T.phone, { type: 'tel', autocomplete: 'tel' });
     var e1 = field(T.email, { type: 'email', required: 'required', autocomplete: 'email' });
-    var p1 = field(T.password, { type: 'password', required: 'required', autocomplete: 'new-password' });
+    var p1 = field(T.password, { type: 'password', required: 'required',
+                                 minlength: MIN_PASSWORD, autocomplete: 'new-password' }, pwHint());
     if (opts.email) { e1.input.value = opts.email; e1.input.readOnly = true; }
 
     var langSel = el('select', {});
@@ -1521,7 +1548,20 @@
       el('div', { class: 'acc-actions' }, [
         el('button', { type: 'button', class: 'acc-link', text: T.edit,
           onclick: function () { personForm(where, p, !!p.isSelf); } }),
-        el('button', { type: 'button', class: 'acc-link', text: T.manages,
+        // ⚠ THIS BUTTON IS THE ONLY DOOR TO INVITING A SECOND GUARDIAN, and it
+        // was labelled with the panel's own heading — "Who can see and manage
+        // this record". A six-word description, sitting next to "Edit" in a row
+        // of one-word controls, reads as a caption rather than as a control, and
+        // it never says the word anybody is looking for. QA reported it four
+        // times in a row as "I cannot find where to invite the other guardian",
+        // against a flow that was built, tested and reachable the whole time.
+        //
+        // The button names the thing it opens; the sentence stays as the panel's
+        // heading, which is where a description belongs. Same lesson as the nav
+        // chip that said "Sign in" to somebody who had no account yet: a label
+        // that does not name what is behind it hides a feature as effectively as
+        // not building it.
+        el('button', { type: 'button', class: 'acc-link', text: T.guardians,
           onclick: function () { guardiansFor(box, p); } })
       ])
     ]);
@@ -1670,7 +1710,8 @@
     em.row.appendChild(el('span', { class: 'acc-meta', text: T.emailFixed }));
 
     var cur = field(T.currentPassword, { type: 'password', autocomplete: 'current-password' });
-    var nw = field(T.newPassword, { type: 'password', autocomplete: 'new-password' });
+    var nw = field(T.newPassword, { type: 'password', minlength: MIN_PASSWORD,
+                                   autocomplete: 'new-password' }, pwHint());
     var pgo = el('button', { type: 'submit', class: 'btn-primary', text: T.changePassword });
 
     where.appendChild(section(T.profileTitle, [
@@ -2267,7 +2308,8 @@
     mount.appendChild(notice);
     var token = param('token');
     if (!token) return mount.appendChild(section(null, [el('p', { class: 'acc-notice is-err', text: T.linkDead })]));
-    var p1 = field(T.newPassword, { type: 'password', required: 'required', autocomplete: 'new-password' });
+    var p1 = field(T.newPassword, { type: 'password', required: 'required',
+                                   minlength: MIN_PASSWORD, autocomplete: 'new-password' }, pwHint());
     var go = el('button', { type: 'submit', class: 'btn-primary', text: T.resetSave });
     mount.appendChild(section(T.resetTitle, [
       el('form', { onsubmit: function (e) {

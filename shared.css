@@ -1040,6 +1040,12 @@ html[lang="he"] .thankyou h1{ font-family: var(--font-he); font-weight:700; }
   outline:2px solid var(--terracotta); outline-offset:1px; border-color:var(--terracotta);
 }
 
+/* The rule a field expects, said UNDER the input rather than as a refusal after
+   it. --navy at 10.8:1 on paper, never --muted-warm or --camel: those are
+   backgrounds chosen to sit under white text and fail as foregrounds, which is
+   the same trap the listing card's tag labels were fixed out of. */
+.acc-hint{ margin:5px 0 0; font-size:13px; color:var(--navy); }
+
 .acc-check{ display:flex; gap:10px; align-items:flex-start; margin:4px 0 18px; }
 
 /* THE DATES OF A DROP-IN, chosen where the registration is made.
