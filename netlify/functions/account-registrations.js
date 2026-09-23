@@ -301,7 +301,8 @@ async function sessionsPayload(activity, participantId, now) {
         paidCents: own ? own.payment.paidCents : null,
         // What cancelling would do, from the SAME function the server will
         // apply — so what is shown is what happens.
-        cancellation: own ? cancellationView(credit.creditForSession(own, now)) : null
+        cancellation: own ? cancellationView(credit.creditForSession(own, now),
+                                            own.payment.paidCents) : null
       };
     })
     ,
@@ -362,8 +363,42 @@ async function sessionsPayload(activity, participantId, now) {
 // the two callers is being refused. This is the boundary where a rule module
 // becomes a payload, which is the same place plainLabel() decodes an entity for
 // the same reason: JSON is not the thing that produced it.
-function cancellationView(c) {
+// ⚠ AND WHY A ZERO IS A ZERO, because the dialog said "no credit" and stopped.
+//
+// A family was asked to confirm something that cannot be undone, told they would
+// get nothing back, and given no account of it — so the sentence read as a
+// penalty whatever the actual reason, and the commonest reason by far is the
+// gentlest one: nothing has been paid yet, so there is nothing to give back.
+// Reported as "we need to explain also in the popup why no credit will be
+// returned".
+//
+// The reason is already computed. _credit.js has returned one on every answer
+// since it was written, and cancellationView() passed it through to a client
+// that never read it — the same shape as `priceBasis` sitting unread in the
+// sessions payload while a late price explained nothing.
+//
+// ⚠ "NOTHING PAID" COMES FIRST, BEFORE ANY DEADLINE. Both can be true at once —
+// an unpaid evening cancelled after its window — and "the window has closed"
+// then implies money was lost when none ever moved. The kinder sentence is also
+// the more accurate one, so it wins.
+function whyNoCredit(c, credit, paidCents) {
+  if (credit > 0) return null;
+  if (!(paidCents > 0)) return 'nothing-paid';
+  // A drop-in registration credits nothing by design: there was no upfront
+  // commitment to unwind, and what money there is sits on the evenings.
+  if (c.reason === 'per-session') return 'per-session';
+  if (c.reason === 'too-late') return 'too-late';
+  if (c.reason === 'started') return 'started';
+  if (c.reason === 'cancellation-closed') return 'closed';
+  // Paid, inside the cancellation window, and still nothing back: everything
+  // paid so far was the registration fee, and the fee answers to its OWN date,
+  // which has passed. The one case where the two thresholds come apart.
+  return 'past-cutoff';
+}
+
+function cancellationView(c, paidCents) {
   if (!c) return null;
+  const credit = c.credit !== undefined ? c.credit : c.total;
   return {
     // A guardian's own button. creditForSession() never refuses one — an evening
     // is always cancellable and past the deadline simply earns nothing — so the
@@ -375,8 +410,11 @@ function cancellationView(c) {
     mayCancel: c.mayCancel !== undefined ? c.mayCancel : c.guardianMayCancel !== false,
     // THE ONE FIGURE A FAMILY IS SHOWN. A term's is the sum of its two parts; an
     // evening's is the whole of it.
-    credit: c.credit !== undefined ? c.credit : c.total,
+    credit: credit,
     reason: c.reason || null,
+    // Null whenever there IS credit — the figure is its own explanation, and a
+    // sentence under it would be explaining something nobody asked about.
+    whyNothing: whyNoCredit(c, credit, paidCents),
     // Only one of these is ever set, and each is named by what it is: the
     // instant one evening stops being creditable, and the date a whole term did.
     deadline: c.deadline == null ? null : c.deadline,
@@ -559,6 +597,22 @@ async function commitEntries(spend, accountId, note) {
 // reads on a dashboard would stop agreeing with the one they read on the page
 // they opened from it.
 function regRow(reg, participant, lang, activity) {
+  // ⚠ THE CLOCK IS THE CALLER'S TO SUPPLY, AND EVERY CALLER HAD FORGOTTEN.
+  //
+  // _credit.js never asks what time it is — that is its whole contract, and it
+  // is what makes the same record and the same instant give the same figure a
+  // year later. The cost is that `creditFor(reg)` with no second argument does
+  // not mean "now": `past(date, undefined)` is FALSE and `hasStarted(starts,
+  // undefined)` is FALSE, so every threshold reads as not yet reached.
+  //
+  // So this row was built from the most generous answer the function can give,
+  // always: the hard cutoff never passed, the fee cutoff never passed, the
+  // course never started. A family past every deadline was shown a cancel button
+  // and promised the whole of what they had paid — and cancelAndCredit(), which
+  // DOES pass a timestamp, then wrote nothing to the ledger. The screen and the
+  // record disagreed by the entire amount, in the one place this file promises
+  // they cannot: "what is offered is what happens".
+  const now = Date.now();
   return {
     participantId: reg.participantId,
     participantName: participant
@@ -605,7 +659,7 @@ function regRow(reg, participant, lang, activity) {
     // What cancelling would do, computed from the terms frozen onto this
     // registration — so the answer shown is the answer that will be applied, and
     // both come from the same function.
-    cancellation: cancellationView(credit.creditFor(reg)),
+    cancellation: cancellationView(credit.creditFor(reg, now), reg.payment.paidCents),
     // ⚠ THE TERMS AS FROZEN, NOT AS THE ACTIVITY NOW READS THEM. The whole
     // reason freezeCancellation() runs at submission is that an admin switching
     // a course from flat to prorated in March must not change what a January
@@ -627,7 +681,7 @@ function regRow(reg, participant, lang, activity) {
       // Decided here rather than in a clockless module: creditFor() has already
       // said whether the window is shut, and the sentence has to agree with the
       // button it sits under.
-      closed: credit.creditFor(reg).reason === 'cancellation-closed',
+      closed: credit.creditFor(reg, now).reason === 'cancellation-closed',
       sessionCancelHours: ((activity || {}).registration || {}).sessionCancelHours,
       // Here the waiver IS decided: the fee was billed on this registration or
       // it was not, and `feeCharged` says which. Absent reads as charged, the
@@ -1429,7 +1483,11 @@ exports.handler = async (event) => {
           return no(409, 'already-in-status', null, { status: reg.status });
         }
 
-        const owed = credit.creditFor(reg);
+        // ⚠ WITH THE CLOCK. Omitted, `past()` is false and this refusal could
+        // never fire — the gate below was dead, and a family past the cutoff
+        // cancelled successfully while being promised a figure the ledger then
+        // did not write.
+        const owed = credit.creditFor(reg, Date.now());
 
         // THE HARD CUTOFF GOVERNS ENTITLEMENT, and here it also closes the
         // guardian's own button — with the date, so the refusal can name it. An

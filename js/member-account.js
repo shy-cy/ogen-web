@@ -167,6 +167,18 @@
       confirmTitle: 'לאשר?', confirmYes: 'כן, לבטל', confirmNo: 'חזרה',
       confirmCredit: 'הסכום ששולם יוחזר כזיכוי לחשבון:',
       confirmNoCredit: 'לא יוחזר זיכוי על הביטול הזה.',
+      // ⚠ WHY there is nothing to get back. The dialog said only that there was
+      // not, which reads as a penalty whatever the actual reason — and the
+      // commonest reason is the gentlest one, that nothing has been paid yet.
+      whyNothing: {
+        'nothing-paid': 'עדיין לא שולם דבר על המפגש הזה, ולכן אין מה לזכות.',
+        'too-late': 'חלון הביטול המזכה על המפגש הזה נסגר.',
+        'started': 'המפגש כבר התחיל.',
+        'per-session': 'בפעילות הזו התשלום הוא לכל מפגש בנפרד, ולכן אין תשלום מראש להחזיר. '
+                     + 'מפגשים שכבר נקבעו מתבטלים אחד־אחד.',
+        'past-cutoff': 'המועד האחרון לקבלת זיכוי על הסכום ששולם כבר עבר.',
+        'closed': 'תקופת הביטול של ההרשמה הזו נסגרה.'
+      },
       useCredit: 'שימוש בזיכוי',
       creditUsed: 'הזיכוי נוצל.', creditHave: 'יש לכם זיכוי:',
       creditAll: '{used} יקוזזו מהסכום הזה, ולא יישאר מה לשלם.',
@@ -304,6 +316,15 @@
       confirmTitle: 'Are you sure?', confirmYes: 'Yes, cancel it', confirmNo: 'Go back',
       confirmCredit: 'What you paid comes back as credit on your account:',
       confirmNoCredit: 'This cancellation earns no credit back.',
+      whyNothing: {
+        'nothing-paid': 'Nothing has been paid for this session yet, so there is nothing to credit back.',
+        'too-late': 'The window for cancelling this session with credit has closed.',
+        'started': 'The session has already started.',
+        'per-session': 'This activity is paid for one session at a time, so there is no payment '
+                     + 'up front to give back. Sessions you have booked are cancelled one by one.',
+        'past-cutoff': 'The date for getting back what has been paid has passed.',
+        'closed': 'The cancellation period for this registration has closed.'
+      },
       useCredit: 'Use credit',
       creditUsed: 'Your credit has been used.', creditHave: 'You have credit:',
       creditAll: '{used} comes off this, and nothing is left to pay.',
@@ -435,6 +456,15 @@
       confirmTitle: 'Вы уверены?', confirmYes: 'Да, отменить', confirmNo: 'Назад',
       confirmCredit: 'Оплаченная сумма вернётся на счёт как зачёт:',
       confirmNoCredit: 'За эту отмену зачёт не начисляется.',
+      whyNothing: {
+        'nothing-paid': 'За это занятие пока ничего не оплачено, поэтому возвращать нечего.',
+        'too-late': 'Срок отмены этого занятия с возвратом на счёт уже истёк.',
+        'started': 'Занятие уже началось.',
+        'per-session': 'Это занятие оплачивается по одному разу, поэтому предоплаты, которую можно '
+                     + 'вернуть, нет. Уже записанные занятия отменяются по одному.',
+        'past-cutoff': 'Срок возврата уплаченной суммы на счёт уже прошёл.',
+        'closed': 'Период отмены этой записи закрыт.'
+      },
       useCredit: 'Использовать зачёт',
       creditUsed: 'Зачёт использован.', creditHave: 'На счету есть зачёт:',
       creditAll: '{used} будет вычтено из этой суммы, доплачивать не придётся.',
@@ -700,8 +730,12 @@
     var box = el('div', { class: 'acc-modal-box', role: 'dialog', 'aria-modal': 'true' }, [
       el('h2', { text: T.confirmTitle }),
       el('p', { text: opts.question }),
-      opts.note ? el('p', { class: 'acc-note', text: opts.note }) : null
-    ]);
+    ].concat((opts.note || []).map(function (line, i) {
+      // The first line is the figure or its absence; anything after it is why.
+      // Quieter, because a reason is context for the sentence above rather than
+      // a second claim of equal weight.
+      return el('p', { class: i ? 'acc-modal-why' : 'acc-note', text: line });
+    })));
     var modal = el('div', { class: 'acc-modal' }, [box]);
     function close() { if (modal.parentNode) modal.parentNode.removeChild(modal); }
     box.appendChild(el('div', { class: 'acc-modal-acts' }, [
@@ -726,11 +760,19 @@
   // whatever was actually owed back: the last sentence somebody reads before an
   // action that cannot be undone, about money, and confidently backwards.
   // cancellationView() in account-registrations.js is what makes the two agree.
+  // ⚠ IT RETURNS THE LINES, NOT A LINE. "No credit back" with no account of
+  // itself reads as a penalty, whatever the actual reason — and the commonest
+  // reason is that nothing has been paid yet, which is the opposite of a
+  // penalty. The server decided which reason applies, from the same object the
+  // figure came out of; this only renders it.
+  //
+  // Nothing is added when there IS credit: the figure explains itself, and a
+  // sentence under it would be answering a question nobody asked.
   function creditNote(cancellation) {
     if (!cancellation) return null;
-    return cancellation.credit > 0
-      ? T.confirmCredit + ' ' + money(cancellation.credit)
-      : T.confirmNoCredit;
+    if (cancellation.credit > 0) return [T.confirmCredit + ' ' + money(cancellation.credit)];
+    var why = T.whyNothing[cancellation.whyNothing];
+    return why ? [T.confirmNoCredit, why] : [T.confirmNoCredit];
   }
 
   // ⚠ WHAT IS COMING, DRAWN AT ITS OWN SHAPE.

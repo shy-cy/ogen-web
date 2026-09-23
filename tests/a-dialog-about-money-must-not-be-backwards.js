@@ -58,7 +58,10 @@ function noteMaker(strings) {
   vm.runInContext(ui.slice(from, to) + '\nthis.creditNote = creditNote;', ctx);
   return ctx.creditNote;
 }
-const T = { confirmCredit: 'CREDITED', confirmNoCredit: 'NOTHING BACK' };
+const T = { confirmCredit: 'CREDITED', confirmNoCredit: 'NOTHING BACK',
+            whyNothing: { 'nothing-paid': 'NOTHING PAID', 'too-late': 'TOO LATE',
+                          'started': 'STARTED', 'per-session': 'PER SESSION',
+                          'past-cutoff': 'PAST CUTOFF', 'closed': 'CLOSED' } };
 const creditNote = noteMaker(T);
 
 (async () => {
@@ -103,7 +106,7 @@ const creditNote = noteMaker(T);
 
   let reg = await row();
   H.ok(reg.cancellation, 'the payload carries what cancelling would do');
-  H.eq(creditNote(reg.cancellation), 'NOTHING BACK',
+  H.eq(creditNote(reg.cancellation).join(' | '), 'NOTHING BACK | NOTHING PAID',
     'with nothing paid there is nothing to credit, and the sentence says so');
 
   // -------------------------------------------------------------------------
@@ -118,7 +121,7 @@ const creditNote = noteMaker(T);
   reg = await row();
   H.ok(reg.cancellation.credit > 0,
     '⚠ the payload carries a figure under the key the client reads — ' + reg.cancellation.credit);
-  const said = creditNote(reg.cancellation);
+  const said = creditNote(reg.cancellation).join(' | ');
   H.ok(/CREDITED/.test(said), 'so the dialog offers a credit rather than denying one: ' + said);
   H.ok(!/NOTHING BACK/.test(said), 'and does NOT say nothing comes back, which is what it said');
   H.ok(/330\.00/.test(said), 'naming the amount: ' + said);
@@ -135,14 +138,158 @@ const creditNote = noteMaker(T);
     'and the ledger moved by EXACTLY what the dialog promised — ' + moved);
 
   // -------------------------------------------------------------------------
+  console.log('\n[⚠ every caller of creditFor() supplies the clock]');
+  //
+  // _credit.js NEVER ASKS WHAT TIME IT IS. That is its contract and it is what
+  // makes the same record and the same instant give the same figure a year
+  // later — a test in another suite asserts the file contains no Date.now().
+  //
+  // The cost is that the second argument is not optional in meaning, only in
+  // syntax: `past(date, undefined)` is FALSE and `hasStarted(starts, undefined)`
+  // is FALSE, so `creditFor(reg)` reads every threshold as not yet reached and
+  // returns the most generous answer the function can give.
+  //
+  // FIVE CALL SITES HAD OMITTED IT — the family's dialog and cancel button, the
+  // cancellation-terms footnote, the family's own cancel gate, and both of the
+  // admin's. Only cancelAndCredit() passed a timestamp, and it is the only one
+  // that writes. So a family past every deadline was shown a cancel button,
+  // promised the whole of what they had paid, and credited nothing; and an
+  // admin's cancellation email named a figure the ledger never wrote, while the
+  // 409 guard meant to catch exactly that compared two copies of the same wrong
+  // number and agreed with itself.
+  //
+  // Greppable, so it is grepped.
+  const FN = path.join(__dirname, '..', 'netlify', 'functions');
+  const callers = fs.readdirSync(FN).filter((f) => /\.js$/.test(f) && f !== '_credit.js');
+  let sites = 0;
+  callers.forEach((f) => {
+    const code = fs.readFileSync(path.join(FN, f), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    const calls = code.match(/\bcreditFor(Session)?\s*\([^)]*\)/g) || [];
+    calls.forEach((call) => {
+      // `function creditFor(account)` in _registration-email.js is a different
+      // function entirely — it reads a ledger balance — and is matched by name
+      // alone. Declarations are not call sites.
+      if (/^creditFor\s*\(account\)/.test(call)) return;
+      sites++;
+      H.ok(/,/.test(call),
+        f + ': ' + call.trim() + ' passes a timestamp');
+    });
+  });
+  H.ok(sites >= 5, 'and there were real call sites to check (' + sites + ')');
+
+  // The one that always did, and the reason the others were invisible: it is the
+  // only caller that WRITES, so the money was right and only the screens lied.
+  const cancelSrc = fs.readFileSync(H.fnPath('_registration-cancel'), 'utf8');
+  H.ok(/const at = now == null \? Date\.now\(\) : now;/.test(cancelSrc),
+    'cancelAndCredit() resolves its own clock, and always did');
+
+  console.log('\n[and a zero says WHY it is a zero]');
+  //
+  // ⚠ "NO CREDIT BACK" WITH NO ACCOUNT OF ITSELF READS AS A PENALTY, whatever
+  // the reason — and the commonest reason by far is the gentlest one: nothing
+  // has been paid yet, so there is nothing to give back. Reported as "we need to
+  // explain also in the popup why no credit will be returned".
+  //
+  // The reason was already computed. _credit.js has returned one on every answer
+  // since it was written and cancellationView() passed it straight through to a
+  // client that never read it — the same shape as `priceBasis` sitting unread in
+  // the sessions payload while a late price explained nothing.
+
+  // 1. NOTHING PAID — the case in the report, and the one that must win over any
+  //    deadline, because both can be true at once and "the window has closed"
+  //    then implies money was lost when none ever moved.
+  const fresh = await store.getRegistration(noa, course.activityId);
+  fresh.payment = Object.assign({}, fresh.payment,
+                                { paidCents: 0, creditedCents: 0, owedCents: 35000 });
+  fresh.status = 'approved';
+  await store.saveRegistration(fresh);
+  let now = await row();
+  H.eq(now.cancellation.credit, 0, 'nothing paid, nothing to credit');
+  H.eq(now.cancellation.whyNothing, 'nothing-paid',
+    '⚠ and the reason is that nothing was paid — not a deadline, not a policy');
+  H.eq(creditNote(now.cancellation).join(' | '), 'NOTHING BACK | NOTHING PAID',
+    'so the dialog says both: there is nothing back, and why');
+
+  // 2. CREDIT — no reason at all. The figure is its own explanation, and a
+  //    sentence under it would answer a question nobody asked.
+  fresh.payment = Object.assign({}, fresh.payment, { paidCents: 33000 });
+  await store.saveRegistration(fresh);
+  now = await row();
+  H.ok(now.cancellation.credit > 0, 'with money on the record there is credit');
+  H.eq(now.cancellation.whyNothing, null, 'and no reason is sent');
+  H.eq(creditNote(now.cancellation).length, 1, 'so the dialog is one line again');
+
+  // 3. THE FEE'S OWN DATE. Paid, inside the cancellation window, and still
+  //    nothing back: everything paid so far was the registration fee, and the
+  //    fee answers to its own cutoff. The one case where the two thresholds come
+  //    apart, and the one a "too late" sentence would describe wrongly.
+  fresh.payment = Object.assign({}, fresh.payment, { paidCents: 5000 });
+  fresh.frozen = JSON.parse(JSON.stringify(fresh.frozen));
+  fresh.frozen.price.registrationFee = 50;
+  fresh.frozen.price.feeCharged = true;
+  fresh.frozen.cancellation.registrationFeeCutoffDate = '2020-01-01';
+  fresh.frozen.cancellation.cancellationCutoffDate = null;
+  fresh.frozen.cancellation.sessionStartsAt = [];
+  await store.saveRegistration(fresh);
+  now = await row();
+  H.eq(now.cancellation.credit, 0, 'the whole fee was paid and its date has passed');
+  H.eq(now.cancellation.whyNothing, 'past-cutoff',
+    'so it says the date has passed rather than blaming a session deadline');
+
+  // 4. A DROP-IN REGISTRATION credits nothing by design — there was no upfront
+  //    commitment to unwind. Saying "too late" there would be plainly untrue.
+  fresh.frozen.type = 'dropin';
+  await store.saveRegistration(fresh);
+  now = await row();
+  H.eq(now.cancellation.credit, 0, 'a drop-in registration credits nothing');
+  H.eq(now.cancellation.whyNothing, 'per-session',
+    'and says the money is per evening rather than implying a lost deadline');
+
+  console.log('\n[every reason has a sentence, in every language]');
+  const REASONS = ['nothing-paid', 'too-late', 'started', 'per-session', 'past-cutoff', 'closed'];
+  const tableSrc = ui.slice(ui.indexOf('var T = {'),
+                            ui.indexOf('}[lang];', ui.indexOf('var T = {')) + '}[lang];'.length);
+  ['he', 'en', 'ru'].forEach((l) => {
+    const ctx = { lang: l };
+    vm.runInNewContext(tableSrc + '\nresult = T;', ctx);
+    const w = ctx.result.whyNothing;
+    H.ok(w, l + ' has the table');
+    REASONS.forEach((r) => {
+      H.ok(typeof w[r] === 'string' && w[r].length > 10, l + ': "' + r + '" has a sentence');
+    });
+    H.eq(Object.keys(w).length, REASONS.length,
+      l + ': and no orphan — a key with no producer is dead copy three languages carry');
+    if (l === 'he') H.ok(/[\u0590-\u05FF]/.test(w['nothing-paid']), 'the Hebrew is in Hebrew');
+    if (l === 'ru') H.ok(/[\u0400-\u04FF]/.test(w['nothing-paid']), 'the Russian is in Cyrillic');
+  });
+
+  // ⚠ AND EVERY VALUE THE SERVER CAN SEND IS ONE THE CLIENT HAS A SENTENCE FOR.
+  // A code with no key renders as nothing, which is this bug wearing a different
+  // costume: the dialog would say "no credit back" and stop again.
+  const apiSrc = fs.readFileSync(H.fnPath('account-registrations'), 'utf8');
+  const emitted = (apiSrc.slice(apiSrc.indexOf('function whyNoCredit'),
+                                apiSrc.indexOf('function cancellationView'))
+    .match(/return '([a-z-]+)'/g) || []).map((m) => m.slice(8, -1));
+  H.ok(emitted.length >= 5, 'the server emits a real set of reasons (' + emitted.join(', ') + ')');
+  emitted.forEach((r) => {
+    H.ok(REASONS.indexOf(r) !== -1, 'the client has a sentence for "' + r + '"');
+  });
+
   console.log('[one shape, both kinds of thing]');
 
   // A registration's answer and an evening's answer are different questions
   // with different internals; what they must not be is different KEY NAMES on
   // the one screen that renders both.
   const api = fs.readFileSync(H.fnPath('account-registrations'), 'utf8');
-  H.ok(/function cancellationView\(c\)/.test(api), 'there is one adapter');
-  H.eq((api.match(/cancellationView\(/g) || []).length, 3,
+  H.ok(/function cancellationView\(c, paidCents\)/.test(api), 'there is one adapter');
+  // ⚠ COUNTED ON CODE, NOT ON PROSE. This counted the raw file, so the paragraph
+  // ABOVE the function explaining what it is for pushed the count to four and
+  // failed a test about call sites — the same trap the stylesheet check was
+  // fixed out of, where a comment naming `height:auto` made a naive search pass
+  // whether or not the declaration was still there.
+  const apiCode = api.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  H.eq((apiCode.match(/cancellationView\(/g) || []).length, 3,
     'declared once and used at both payload builders, and nowhere else');
   H.ok(!/cancellation: own \? credit\.creditForSession\(own, now\) : null/.test(api),
     'the session payload no longer emits the raw shape');

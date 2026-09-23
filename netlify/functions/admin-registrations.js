@@ -370,8 +370,13 @@ exports.handler = async (event) => {
         const account = await accounts.getAccount(reg.accountId);
         if (!account) return json(404, { error: 'That registration has no account behind it.' });
         // What the cancellation WOULD credit, from the same pure function the
-        // cancellation itself will use a moment later.
-        const owed = credit.creditFor(reg);
+        // cancellation itself will use a moment later — and ⚠ WITH THE CLOCK,
+        // which this omitted. _credit.js never asks the time, so `creditFor(reg)`
+        // reads every threshold as not yet reached: the draft named the whole of
+        // what was paid, and cancelAndCredit() — which does pass a timestamp —
+        // wrote the real figure. The family was told a number nobody credited
+        // them, which is the exact thing the guard below exists to prevent.
+        const owed = credit.creditFor(reg, Date.now());
         const entitled = owed.guardianMayCancel !== false;
         return json(200, Object.assign(
           { ok: true, to: account.email },
@@ -396,7 +401,11 @@ exports.handler = async (event) => {
         // So creditFor()'s `guardianMayCancel: false` becomes `entitled: false`
         // here — the cancellation goes through and credits nothing — rather than
         // a refusal.
-        const owed = credit.creditFor(reg);
+        // ⚠ WITH THE CLOCK, for the reason cancelPreview carries above: without
+        // it `entitled` is always true and `owed.total` is always the most
+        // generous figure — so the check below compared two copies of one wrong
+        // number and agreed with itself.
+        const owed = credit.creditFor(reg, Date.now());
         const entitled = owed.guardianMayCancel !== false;
 
         // ⚠ THE DRAFT'S FIGURE MUST STILL BE THE TRUE FIGURE.

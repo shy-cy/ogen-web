@@ -3588,6 +3588,47 @@ builds both payloads from real records, executes `creditNote()` on them, and
 then **cancels and reads the ledger**, because a dialog agreeing with a payload
 proves only that two readers of one bug agree.
 
+### ⚠ Every caller of `creditFor()` had forgotten the clock
+
+`_credit.js` never asks what time it is. That is its contract, a test asserts the
+file contains no `Date.now()`, and it is what makes the same record and the same
+instant give the same figure a year later.
+
+The cost is that **the second argument is not optional in meaning, only in
+syntax.** `past(date, undefined)` is `false` and `hasStarted(starts, undefined)`
+is `false`, so `creditFor(reg)` reads every threshold as not yet reached and
+returns the most generous answer the function can give — the hard cutoff never
+passed, the fee cutoff never passed, the course never started.
+
+**Five call sites had omitted it**, and they were every one that displays or
+gates:
+
+| | |
+|---|---|
+| `regRow()` | the family's cancel button **and** the figure in the dialog |
+| the terms footnote | `closed`, so a shut window was never announced |
+| the family's `cancel` | the hard-cutoff refusal, which could therefore never fire |
+| the admin's `cancelPreview` | the figure written into the cancellation email |
+| the admin's `cancel` | `entitled`, and the figure the 409 guard compares |
+
+`cancelAndCredit()` always passed one, and **it is the only caller that writes**.
+So the money in the ledger was right the whole time and only the screens lied —
+which is exactly why nobody found it. A family past every deadline was shown a
+cancel button, promised the whole of what they had paid, and credited nothing.
+An admin's cancellation email named a figure the ledger never wrote, and the 409
+guard written to catch precisely that compared two copies of one wrong number and
+agreed with itself.
+
+It breaks the promise this file makes twice over — *"the cancel button is shown
+from the same `creditFor()` the server will apply, so what is offered is what
+happens"*. Same function, different arguments, is not the same answer.
+
+The clock stays the **caller's** to supply, because the alternative is a default
+inside `_credit.js` and that is the one thing it may not have. What changed is
+that the omission is now greppable and is grepped: a test scans every function
+file for a `creditFor` / `creditForSession` call and asserts each passes a second
+argument. Nine call sites today.
+
 ### ⚠ A class nobody styled is a layout nobody designed
 
 The evenings table wrapped its three controls — pay, use credit, cancel — in a
@@ -3827,6 +3868,48 @@ and a panel of that shape under a form nobody has filled in yet reads as a
 warning about registering. In the email it sits **after** the call to action, for
 the same reason — set at body size above one, the terms of getting out of a thing
 are read before the news that you have a place.
+
+### ⚠ A zero has to say why it is a zero
+
+The cancellation dialog said *"this cancellation earns no credit back"* and
+stopped. Reported as *"we need to explain also in the popup why no credit will be
+returned"*, and the reason it matters is that the sentence reads as a **penalty**
+whatever the actual cause — while the commonest cause by far is the gentlest one:
+nothing has been paid yet, so there is nothing to give back.
+
+The reason was already computed. `_credit.js` has returned one on every answer
+since it was written, and `cancellationView()` passed it straight through to a
+client that never read it — the same shape as `priceBasis` sitting unread in the
+sessions payload while a late price explained nothing.
+
+`whyNoCredit()` turns it into one of six, and the **ordering is the load-bearing
+part**:
+
+| | |
+|---|---|
+| `nothing-paid` | **asked first** — see below |
+| `per-session` | a drop-in registration credits nothing by design; the money is on the evenings |
+| `too-late` / `started` | one evening, past its window or already begun |
+| `closed` | past the registration's hard cutoff |
+| `past-cutoff` | paid, inside the window, and still nothing: everything paid was the **fee**, and the fee answers to its own date |
+
+⚠ **"NOTHING PAID" WINS OVER ANY DEADLINE**, because both can be true at once —
+an unpaid evening cancelled after its window — and *"the window has closed"* then
+implies money was lost when none ever moved. The kinder sentence is also the more
+accurate one. `past-cutoff` is the case that would otherwise be described wrongly
+by a deadline sentence: it is the one place the fee's threshold and the course's
+come apart.
+
+Nothing is added when there **is** credit: the figure explains itself, and a
+sentence under it answers a question nobody asked. The reason line is quieter
+than the one above it and deliberately **not** italic — the note already carries
+the emphasis, and two italic lines in a row is a paragraph nobody reads.
+
+Two tests, in the suite named for the dialog that once said the opposite of what
+happened: every reason is built from a **real record** and read out of the
+rendered dialog, and every value the server can emit must be a key the client has
+a sentence for — a code with no key renders as nothing, which is this same bug
+wearing a different costume.
 
 ### ⚠ Two solid terracotta pills side by side are not a choice
 

@@ -157,8 +157,16 @@ H.ok(!/window\.confirm/.test(ui.replace(/^\s*\/\/.*$/gm, '')),
 H.ok(/function confirmAction\(opts, onYes\)/.test(ui), 'there is one dialog');
 H.ok(/function creditNote\(cancellation\)/.test(ui),
   'and the question carries what cancelling is worth');
-H.ok(/cancellation\.credit > 0[\s\S]{0,120}T\.confirmNoCredit/.test(ui),
+// ⚠ READ, NOT EXECUTED, AND THAT IS WHY IT IS ONE LINE. An earlier version of
+// this assertion checked both halves of creditNote() against the source
+// separately and passed while the dialog said "no credit back" on every
+// registration. The suite that EXECUTES it against real payloads is
+// a-dialog-about-money-must-not-be-backwards.js; this only pins that the figure
+// comes from the server's object rather than from anything the screen computed.
+H.ok(/cancellation\.credit > 0/.test(ui),
   'from the same figure the server will apply, so the question and the outcome agree');
+H.ok(/T\.whyNothing\[cancellation\.whyNothing\]/.test(ui),
+  'and when there is nothing to get back, the reason comes from the server too');
 // Rule 5 in reverse: the action here is the one that changes nothing.
 H.ok(/class: 'btn-primary', text: T\.confirmNo/.test(ui),
   '⚠ STAYING is the terracotta — a cancellation cannot be undone, so the easy ' +

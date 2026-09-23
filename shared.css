@@ -1492,6 +1492,17 @@ td .acc-actions{ gap:14px; }
 .acc-modal-box h2{ margin:0 0 10px; font-size:19px; }
 .acc-modal-box p{ margin:0 0 6px; font-size:15px; line-height:1.55; }
 .acc-modal-box .acc-note{ margin-bottom:0; }
+/* ⚠ WHY THERE IS NOTHING TO GET BACK. "No credit back" on its own reads as a
+   penalty whatever the reason, and the commonest reason is the gentlest one —
+   nothing has been paid yet. The line is quieter than the one above it because
+   a reason is context for that sentence rather than a second claim of equal
+   weight, and NOT italic: the note above already carries the emphasis, and two
+   italic lines in a row is a paragraph nobody reads.
+   --navy at 10.8:1 on paper, never --camel, which is 2.3:1 and is a background
+   token — the same trap the listing card's tag labels were fixed out of. */
+.acc-modal-box .acc-modal-why{
+  margin:6px 0 0; font-size:13.5px; color:var(--navy);
+}
 /* The actions run along the reading direction and wrap on a narrow screen. The
    destructive one is NOT the primary button: it is the quiet one, and staying
    is the terracotta. A cancellation cannot be undone, so the easy press is the
