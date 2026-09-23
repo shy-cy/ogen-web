@@ -132,6 +132,27 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/activities/bnei-mitzvah-2027"/>
   </url>
   <url>
+    <loc>https://www.ogen.cy/activities/folk-dance</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/activities/folk-dance"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/activities/folk-dance"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru/activities/folk-dance"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/activities/folk-dance"/>
+  </url>
+  <url>
+    <loc>https://www.ogen.cy/en/activities/folk-dance</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/activities/folk-dance"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/activities/folk-dance"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru/activities/folk-dance"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/activities/folk-dance"/>
+  </url>
+  <url>
+    <loc>https://www.ogen.cy/ru/activities/folk-dance</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/activities/folk-dance"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/activities/folk-dance"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru/activities/folk-dance"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/activities/folk-dance"/>
+  </url>
+  <url>
     <loc>https://www.ogen.cy/activities/hebrew4kids</loc>
     <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/activities/hebrew4kids"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/activities/hebrew4kids"/>
@@ -172,26 +193,5 @@
     <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/activities/test3"/>
     <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru/activities/test3"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/activities/test3"/>
-  </url>
-  <url>
-    <loc>https://www.ogen.cy/activities/folk-dance</loc>
-    <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/activities/folk-dance"/>
-    <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/activities/folk-dance"/>
-    <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru/activities/folk-dance"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/activities/folk-dance"/>
-  </url>
-  <url>
-    <loc>https://www.ogen.cy/en/activities/folk-dance</loc>
-    <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/activities/folk-dance"/>
-    <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/activities/folk-dance"/>
-    <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru/activities/folk-dance"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/activities/folk-dance"/>
-  </url>
-  <url>
-    <loc>https://www.ogen.cy/ru/activities/folk-dance</loc>
-    <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/activities/folk-dance"/>
-    <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/activities/folk-dance"/>
-    <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru/activities/folk-dance"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/activities/folk-dance"/>
   </url>
 </urlset>
