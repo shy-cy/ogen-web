@@ -45,85 +45,11 @@
     "ru": "Бейт-Мидраш в Лимассоле с Ифат Халад. Изучаем Библию по-новому, обсуждаем знакомые истории и ищем неожиданные смыслы. Центр OGEN."
   },
   "facts": {
-    "ages": {
-      "min": 14,
-      "max": 120
-    },
-    "schedule": {
-      "frequency": "custom",
-      "sessions": [
-        {
-          "day": 0,
-          "time": "18:00"
-        }
-      ]
-    },
-    "duration": {
-      "startDate": "",
-      "endDate": "",
-      "sessionCount": 6,
-      "sessionMinutes": 90,
-      "sessionDates": []
-    },
     "groupSize": {
-      "groups": 2,
-      "maxPerGroup": null,
       "overrideText": {
         "he": "תאריכים יפורסמו בהמשך",
         "en": "Dates will be announced soon",
         "ru": "Даты будут объявлены позже"
-      },
-      "named": [
-        {
-          "groupId": "g-mu9hqxm1klzk",
-          "name": {
-            "he": "קבוצת נוער",
-            "en": "Youth Group",
-            "ru": "Молодёжная группа"
-          },
-          "capacity": 20
-        },
-        {
-          "groupId": "g-mu9hrcjt42rt",
-          "name": {
-            "he": "קבוצת בוגרים",
-            "en": "Adult Group",
-            "ru": "Группа для взрослых"
-          },
-          "capacity": 30
-        }
-      ]
-    },
-    "instructionLanguage": {
-      "codes": [
-        "he"
-      ],
-      "text": {
-        "he": "",
-        "en": "",
-        "ru": ""
-      }
-    },
-    "prerequisites": {
-      "level": "beginner",
-      "text": {
-        "he": "",
-        "en": "",
-        "ru": ""
-      }
-    },
-    "location": {
-      "text": {
-        "he": "לימסול",
-        "en": "Limassol",
-        "ru": "Лимассол"
-      }
-    },
-    "address": {
-      "text": {
-        "he": "",
-        "en": "",
-        "ru": ""
       }
     },
     "price": {
@@ -171,10 +97,140 @@
     }
   ],
   "sponsors": [],
-  "isoUpdated": "2026-09-22T08:50:35.202Z",
+  "isoUpdated": "2026-09-23T13:27:12.769Z",
   "isoCreated": "2026-09-20T07:57:58.547Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
   "activityId": "act-32b1222460c4f004",
-  "lastPublishedAt": "2026-09-22T08:50:35.202Z"
+  "lastPublishedAt": "2026-09-23T13:27:12.769Z",
+  "groups": [
+    {
+      "groupId": "g-mu9hqxm1klzk",
+      "name": {
+        "he": "קבוצת נוער",
+        "en": "Youth Group",
+        "ru": "Молодёжная группа"
+      },
+      "capacity": 20,
+      "teacherIds": [],
+      "facts": {
+        "ages": {
+          "min": 14,
+          "max": 24
+        },
+        "schedule": {
+          "frequency": "custom",
+          "sessions": [
+            {
+              "day": 0,
+              "time": "18:00"
+            }
+          ]
+        },
+        "duration": {
+          "startDate": "",
+          "endDate": "",
+          "sessionCount": 6,
+          "sessionMinutes": 90,
+          "sessionDates": []
+        },
+        "instructionLanguage": {
+          "codes": [
+            "he"
+          ],
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "prerequisites": {
+          "level": "beginner",
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "location": {
+          "text": {
+            "he": "לימסול",
+            "en": "Limassol",
+            "ru": "Лимассол"
+          }
+        },
+        "address": {
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        }
+      }
+    },
+    {
+      "groupId": "g-mu9hrcjt42rt",
+      "name": {
+        "he": "קבוצת בוגרים",
+        "en": "Adult Group",
+        "ru": "Группа для взрослых"
+      },
+      "capacity": 30,
+      "teacherIds": [],
+      "facts": {
+        "ages": {
+          "min": 25,
+          "max": 120
+        },
+        "schedule": {
+          "frequency": "custom",
+          "sessions": [
+            {
+              "day": 0,
+              "time": "18:00"
+            }
+          ]
+        },
+        "duration": {
+          "startDate": "",
+          "endDate": "",
+          "sessionCount": 6,
+          "sessionMinutes": 90,
+          "sessionDates": []
+        },
+        "instructionLanguage": {
+          "codes": [
+            "he"
+          ],
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "prerequisites": {
+          "level": "beginner",
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "location": {
+          "text": {
+            "he": "לימסול",
+            "en": "Limassol",
+            "ru": "Лимассол"
+          }
+        },
+        "address": {
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        }
+      }
+    }
+  ]
 }
