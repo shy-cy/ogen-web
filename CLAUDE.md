@@ -3588,6 +3588,41 @@ builds both payloads from real records, executes `creditNote()` on them, and
 then **cancels and reads the ledger**, because a dialog agreeing with a payload
 proves only that two readers of one bug agree.
 
+### ⚠ A class nobody styled is a layout nobody designed
+
+The evenings table wrapped its three controls — pay, use credit, cancel — in a
+`<div class="acc-evening-acts">`, and **`shared.css` has never had a rule for that
+name**. Nothing in the family area is built from HTML source, it is all
+`createElement`, so adjacent siblings have no whitespace text node between them:
+the three rendered flush, and the live Hebrew page read
+`תשלום על המפגשביטול מפגש` — pay and cancel run together into one word.
+
+It is invisible in review precisely because the markup looks deliberate. There
+is a wrapper, it has a name, and the name describes what it holds. Only the
+stylesheet knows.
+
+It uses `actions()` now — the row-controls idiom the rest of the file already
+has, flex plus a gap so the order follows the page direction and there is nothing
+directional to get wrong. `td .acc-actions` drops the top margin, as
+`.acc-row .acc-actions` already did and for the same reason, and tightens the gap
+because a cell is narrower than a card.
+
+⚠ **AND THE TEST FOR EXACTLY THIS BUG PASSED WHILE IT SHIPPED.** *"Two buttons
+side by side have a gap between them"* asserts that the helper exists and that
+several places call it — and it can never see the place that does **not**. So the
+check is now structural: **every class the client puts on an element must have a
+rule in `shared.css`**, with a `HOOKS` list for names that are deliberately
+behaviour-only, empty today, and adding to it a decision somebody has to write
+down. Same shape as `UNREACHED` in the queue's parity test, and as the admin's id
+check where every literal id the client looks up must be answered by a mount or
+by a control the client itself builds.
+
+The same sweep found `class: 'ghost'` on the admin's modal Cancel button, which
+`admin.css` has no rule for either — `.modal-acts button` **is** the quiet
+treatment and `.no` is the loud one, so the name claimed a variant that does not
+exist. A label claiming a style is worse than no label, because the next reader
+trusts it. It is gone rather than given a rule.
+
 ### ⚠ Four figures that did not explain themselves
 
 All four reported from one drop-in session, all the same shape: a number or a

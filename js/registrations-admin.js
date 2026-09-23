@@ -732,7 +732,11 @@
       el('label', { class: 'modal-label', text: 'Message' }),
       window.Quill ? host : area,
       el('div', { class: 'modal-acts' }, [
-        el('button', { class: 'ghost', onclick: close, text: 'Cancel' }), go
+        // No class: `.modal-acts button` IS the quiet treatment, and `.no` is the
+        // loud one. `ghost` was a name for a variant that does not exist and that
+        // admin.css has never had a rule for — a label claiming a style is worse
+        // than no label, because the next reader trusts it.
+        el('button', { onclick: close, text: 'Cancel' }), go
       ])
     ]);
     back.appendChild(panel);

@@ -1223,8 +1223,13 @@ html[lang="he"] .thankyou h1{ font-family: var(--font-he); font-weight:700; }
 }
 /* Inside a row it is not a footer, it is the row's own controls — and .acc-row
    aligns on the baseline, so the margin above would drop the buttons out of line
-   with the text they belong to. */
-.acc-row .acc-actions{ margin-block-start:0; }
+   with the text they belong to. The same is true in a table cell, where the
+   evenings list keeps pay / use credit / cancel for one date. */
+.acc-row .acc-actions, td .acc-actions{ margin-block-start:0; }
+/* A cell is narrower than a card, so the controls sit closer and are allowed to
+   wrap rather than widening the table — the row is already inside .acc-scroll
+   and a fourth control must not push the date off the side. */
+td .acc-actions{ gap:14px; }
 
 .acc-link{
   font:inherit; font-size:15px; font-weight:500; color:var(--terracotta);

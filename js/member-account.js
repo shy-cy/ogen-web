@@ -2691,7 +2691,20 @@
           });
           });
         } }));
-      return el('div', { class: 'acc-evening-acts' }, acts);
+      // ⚠ `actions()`, NOT A CLASS OF ITS OWN. This was a div carrying
+      // `acc-evening-acts`, and shared.css has never had a rule for that name —
+      // so three controls in one cell rendered with nothing between them and the
+      // live Hebrew page read "תשלום על המפגשביטול מפגש", pay and cancel run
+      // together into one word. A class nobody styled is a layout nobody
+      // designed, and it is invisible in review precisely because the markup
+      // looks deliberate.
+      //
+      // `.acc-actions` is the row-controls idiom the rest of this file uses —
+      // flex and a gap, so the order follows the page direction and there is
+      // nothing directional to get wrong. Same reason the admin's evening
+      // register reuses `.acts` rather than inventing a second set of row
+      // buttons.
+      return actions(acts);
     }
     if (s.status === 'attended' || s.status === 'no-show') return null;
     if (!data.mayBook || s.full) return null;

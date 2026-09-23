@@ -267,8 +267,8 @@ H.ok(/\.acc-actions\{[^}]*display:flex/.test(block.replace(/\s+/g, ' ')),
   '.acc-actions is a flex row');
 H.ok(/\.acc-actions\{[^}]*gap:\s*\d+px/.test(block.replace(/\s+/g, ' ')),
   'with a real gap — flex + gap so the order follows the page direction');
-H.ok(/\.acc-row \.acc-actions\{ margin-block-start:0; \}/.test(block.replace(/\s+/g, ' ')),
-  'and no top margin inside a row, which aligns on the baseline');
+H.ok(/\.acc-row \.acc-actions, td \.acc-actions\{ margin-block-start:0; \}/.test(block.replace(/\s+/g, ' ')),
+  'and no top margin inside a row or a cell, both of which align on the baseline');
 const acct = read('js/member-account.js');
 H.ok(/function actions\(kids\)/.test(acct), 'there is one helper rather than a margin per button');
 H.ok((acct.match(/actions\(\[/g) || []).length >= 2,
@@ -277,5 +277,41 @@ H.ok((acct.match(/actions\(\[/g) || []).length >= 2,
 // The failure mode is a button appended straight into a form beside another.
 H.ok(!/\[f\.row, l\.row, d\.row, n\.row, go,/.test(acct),
   'the participant form no longer appends Cancel as a bare sibling of Save');
+
+console.log('\n[and no class is invented and never styled]');
+// ⚠ THE CHECK ABOVE PASSED WHILE THIS SHIPPED, which is the reason for this one.
+//
+// It asserts that the helper exists and that several places use it — and it can
+// never see the place that does NOT. The evenings table wrapped pay / use credit
+// / cancel in a div carrying `acc-evening-acts`, a class shared.css has never had
+// a rule for, so three controls rendered flush against each other and the live
+// Hebrew page read "תשלום על המפגשביטול מפגש" — two links run together into one
+// word.
+//
+// A class nobody styled is a layout nobody designed, and it is invisible in
+// review precisely because the markup looks deliberate: there is a wrapper, it
+// has a name, and the name describes what it holds. Only the stylesheet knows.
+//
+// Same shape as the admin's id check, which asserts every literal id the client
+// looks up is answered by a mount or by a control the client itself builds.
+const CSS = read('shared.css');
+const HOOKS = [
+  // Classes that are deliberately behaviour-only, with the reason. Empty today.
+  // Adding a name here is a decision somebody has to write down, exactly like
+  // UNREACHED in the queue's parity test.
+];
+const onElements = new Set();
+(acct.match(/class: '[a-z0-9 -]+'/g) || []).forEach((m) => {
+  m.replace(/^class: '|'$/g, '').split(/\s+/).filter(Boolean).forEach((c) => onElements.add(c));
+});
+H.ok(onElements.size > 30, 'the family area uses a real set of classes (' + onElements.size + ')');
+const unstyled = Array.from(onElements)
+  .filter((c) => /^acc-/.test(c))
+  .filter((c) => HOOKS.indexOf(c) === -1)
+  .filter((c) => CSS.indexOf('.' + c) === -1)
+  .sort();
+H.eq(unstyled.join(', '), '',
+  'every class the client puts on an element has a rule in shared.css' +
+  (unstyled.length ? ' — found: ' + unstyled.join(', ') : ''));
 
 H.done();
