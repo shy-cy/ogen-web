@@ -148,4 +148,83 @@ H.ok(/if \(incoming\.registration !== undefined\) \{\s*\n\s*out\.registration = 
   .test(serverJs.replace(/\/\/[^\n]*\n/g, '')),
   'and it is merged inside the full-access branch, with the rest of the structure');
 
+// ⚠ AND THE SAME BUG WAS ONE LAYER UP, IN THE CLIENT'S OWN MODEL.
+//
+// Everything above is the SERVER half, and it was right the whole time. The
+// values were destroyed before the server ever saw them.
+//
+// The type select's handler read the form into S.record before redrawing —
+// correct on its own, and there for a real reason: a redraw that has not
+// captured what the admin just typed eats it. But it ASSIGNED the read-back:
+//
+//     S.record.facts = readFacts();
+//
+// readFacts() returns ONLY WHAT IS DRAWN, by design and for the same reason the
+// server has keepUndrawnFactKeys. So the instant the select moved to Drop-in,
+// the term price, the bundles and both cutoffs vanished from the model. The form
+// then drew empty boxes for them on the way back to Course — and saving an empty
+// box that the form DID draw is an admin clearing it, which the server honours,
+// correctly.
+//
+// So nothing was broken at either end and the values were lost in between.
+// Reported from QA as "the registration fee was kept, but the rest of the
+// information was lost (course price and cutoff dates)" — the fee survived
+// because it is the one price field BOTH types draw.
+console.log('\n[the client keeps what its own form did not draw]');
+const vm = require('vm');
+const sliceFn = (name) => {
+  const a = adminJs.indexOf('  function ' + name + '(');
+  H.ok(a !== -1, 'found ' + name);
+  return adminJs.slice(a, adminJs.indexOf('\n  function ', a + 1));
+};
+const clientCtx = { out: null };
+vm.createContext(clientCtx);
+vm.runInContext([sliceFn('keepUndrawnFacts'), sliceFn('keepUndrawnRegistration'),
+                 'out = { facts: keepUndrawnFacts, reg: keepUndrawnRegistration };'].join('\n'),
+                clientCtx);
+const keep = clientCtx.out;
+
+// A configured course, and what a DROP-IN form reads back off the screen: no
+// fullPrice input exists, so no fullPrice key is sent.
+const storedFacts = { price: { registrationFee: 50, fullPrice: 300, showPerLesson: false },
+                      groupSize: { overrideText: { he: '', en: '', ru: '' } } };
+const drawnAsDropin = { price: { registrationFee: 50, showPerLesson: false,
+                                 perSessionPrice: 12, bundles: [{ id: 'b1', entries: 5 }] },
+                        groupSize: { overrideText: { he: '', en: '', ru: '' } } };
+const afterSwitch = keep.facts(storedFacts, drawnAsDropin);
+H.eq(afterSwitch.price.fullPrice, 300,
+  'the term price survives the select moving to Drop-in');
+H.eq(afterSwitch.price.perSessionPrice, 12, 'and what WAS drawn is taken');
+
+// And back again: a COURSE form draws neither the per-session price nor the
+// bundles. The bundles matter more than the number — a family's purchase points
+// at a bundle id, so losing the list strands live entries.
+const drawnAsCourse = { price: { registrationFee: 50, showPerLesson: false, fullPrice: 300 },
+                        groupSize: { overrideText: { he: '', en: '', ru: '' } } };
+const roundTrip = keep.facts(afterSwitch, drawnAsCourse);
+H.eq(roundTrip.price.perSessionPrice, 12, 'the per-session price survives the trip back');
+H.eq(roundTrip.price.bundles.length, 1,
+  'and so does the bundle list, which is products a purchase points at rather than a number');
+
+// The cutoffs live one level down, at cancellationPolicy.<key>, so a form that
+// does not draw them sends the PARENT without that key in it.
+const storedReg = { autoApprove: false, registrationFeeCutoffDate: '2026-09-30',
+                    cancellationPolicy: { mode: 'flat', cancellationCutoffDate: '2026-10-28' } };
+const drawnReg = { autoApprove: false, sessionCancelHours: 24,
+                   cancellationPolicy: { mode: 'flat' } };
+const afterReg = keep.reg(storedReg, drawnReg);
+H.eq(afterReg.registrationFeeCutoffDate, '2026-09-30', 'the fee cutoff survives');
+H.eq(afterReg.cancellationPolicy.cancellationCutoffDate, '2026-10-28',
+  'and the one nested inside cancellationPolicy, which a shallow merge would have lost');
+H.eq(afterReg.sessionCancelHours, 24, 'while what the drop-in form drew is taken');
+
+// The handler must USE them, or the helpers are two functions nothing calls.
+const stripped = adminJs.replace(/\/\/[^\n]*\n/g, '');
+H.ok(/S\.record\.facts = keepUndrawnFacts\(S\.record\.facts, read\.facts\)/.test(stripped),
+  'the type handler merges the facts rather than assigning them');
+H.ok(/S\.record\.registration = keepUndrawnRegistration\(/.test(stripped),
+  'and the registration too');
+H.ok(!/S\.record\.facts = read\.facts/.test(stripped),
+  'and the bare assignment that caused it is gone, not left beside the fix');
+
 H.done();

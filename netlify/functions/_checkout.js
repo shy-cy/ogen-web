@@ -73,6 +73,29 @@ function returnUrl(reg, lang) {
     + '&a=' + encodeURIComponent(reg.activityId) + '#pay';
 }
 
+// ⚠ BEFORE THE FRAGMENT, NOT AFTER IT. returnUrl() ends in `#pay`, and this
+// used to append `&paid=…` to the whole string — which put the parameter inside
+// the HASH:
+//
+//     /account/activity?p=…&a=…#pay&paid=registration
+//
+// `param('paid')` reads location.search, so it found nothing, paidWatch() bailed
+// on its first line, and the family came back from a completed Checkout to a
+// page that acknowledged nothing. The marker then sat in the address bar for
+// good, because the only thing that removes it is the acknowledgement that never
+// ran. Reported from QA as the address bar still carrying it.
+//
+// Nothing about it looked broken: the figures were usually right by then, so the
+// screen was merely silent about a payment somebody had just made — which is the
+// exact failure the parameter was added to fix in the first place.
+function withPaid(back, kind) {
+  const at = back.indexOf('#');
+  const url = at === -1 ? back : back.slice(0, at);
+  const frag = at === -1 ? '' : back.slice(at);
+  return url + (url.indexOf('?') === -1 ? '?' : '&')
+             + 'paid=' + encodeURIComponent(kind) + frag;
+}
+
 // email is what Stripe prefills. It is the address the registration's account
 // holds, never anything from a request — on the emailed path there is no
 // request body to take it from, and on the signed-in path taking it from one
@@ -110,8 +133,7 @@ async function build({ lang, email, lines, back, meta }) {
     // The kind is already decided — it is the discriminator the webhook
     // dispatches on — so it travels rather than being guessed at the other end.
     // See paidWatch() in js/member-account.js.
-    success_url: back + (back.indexOf('?') === -1 ? '?' : '&')
-               + 'paid=' + encodeURIComponent((meta && meta.ogen_kind) || '1'),
+    success_url: withPaid(back, (meta && meta.ogen_kind) || '1'),
     cancel_url: back,
     // Tagged on the SESSION and mirrored onto the PaymentIntent. The account is
     // shared with another organisation, so an untagged object is

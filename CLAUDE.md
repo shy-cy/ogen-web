@@ -2651,6 +2651,30 @@ Note the deliberate limit: when a type **does** draw a field and sends it empty,
 that is the admin clearing it, and it clears. Absent means "this type did not
 send it"; empty from a form that drew it means empty.
 
+⚠ **AND THE SAME BUG WAS ONE LAYER UP, IN THE CLIENT'S OWN MODEL.** Everything
+above is the server half, and it was right the whole time — the values were
+destroyed before the server ever saw them. The type select's handler read the
+form into `S.record` before redrawing, which is correct on its own and there for
+a real reason: a redraw that has not captured what the admin just typed eats it.
+But it **assigned** the read-back:
+
+```js
+S.record.facts = readFacts();          // ← only what is DRAWN
+```
+
+`readFacts()` returns only what is drawn, by design and for the same reason the
+server has `keepUndrawnFactKeys`. So the instant the select moved to Drop-in, the
+term price, the bundles and both cutoffs vanished from the model; the form drew
+empty boxes for them on the way back to Course; and saving an empty box the form
+**did** draw is an admin clearing it, which the server honours. Nothing was broken
+at either end and the values were lost in between. Reported from QA as *"the
+registration fee was kept, but the rest of the information was lost"* — the fee
+survived because it is the one price field **both** types draw.
+
+`keepUndrawnFacts()` and `keepUndrawnRegistration()` merge instead. The second
+goes one level down, because a cutoff lives at `cancellationPolicy.<key>` and a
+form that does not draw it sends the parent object without that key in it.
+
 ## The account chip
 
 Ported from the sister project's nav (`js/nav.js` there, lines 238-318), which
@@ -3418,6 +3442,22 @@ checks the property behind the list: nothing on the cached side saves a record o
 opens a Checkout.
 
 ### ⚠ Coming back from a completed Checkout
+
+⚠ **AND IT HAS TO LAND IN THE QUERY, NOT THE FRAGMENT.** `returnUrl()` ends in
+`#pay`, and the marker was appended to the whole string — which put it inside the
+**hash**: `/account/activity?p=…&a=…#pay&paid=registration`. `param()` reads
+`location.search`, so it found nothing, `paidWatch()` bailed on its first line,
+and a family came back from a completed Checkout to a page that acknowledged
+nothing at all. The marker then sat in the address bar for good, because the only
+thing that removes it is the acknowledgement that never ran.
+
+Nothing about it read wrong — every string involved is correct on its own, and
+the figures were usually right by the time anybody looked, so the screen was
+merely *silent* about a payment just made, which is the exact failure this
+parameter exists to prevent. `withPaid()` inserts before the fragment and keeps
+it; a test executes it rather than reading it, because reading is what missed it.
+Giving up on the wait drops the marker too: the message has been delivered, and
+leaving it means a reload re-runs the whole six-try wait.
 
 `?paid=<kind>` is set on Stripe's `success_url`, and it means one thing and not
 the other: **somebody has just come back from Checkout**. It is not proof of

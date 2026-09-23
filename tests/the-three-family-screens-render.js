@@ -454,8 +454,42 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
   // The kind travels because the three settle in three different places, and a
   // page that guessed would watch the wrong one.
   const checkout = read('netlify/functions/_checkout.js');
-  H.ok(/'paid=' \+ encodeURIComponent\(\(meta && meta\.ogen_kind\) \|\| '1'\)/.test(checkout),
+  H.ok(/withPaid\(back, \(meta && meta\.ogen_kind\) \|\| '1'\)/.test(checkout),
     'the success URL names what was paid for, from the webhook\'s own discriminator');
+
+  // ⚠ AND IT LANDS IN THE QUERY, NOT THE FRAGMENT.
+  //
+  // returnUrl() ends in `#pay`, and the marker used to be appended to the whole
+  // string — which put it INSIDE THE HASH:
+  //
+  //     /account/activity?p=…&a=…#pay&paid=registration
+  //
+  // param() reads location.search, so it found nothing, paidWatch() bailed on
+  // its first line, and a family came back from a completed Checkout to a page
+  // that acknowledged nothing at all. The marker then sat in the address bar for
+  // good, because the only thing that removes it is the acknowledgement that
+  // never ran — which is how QA found it.
+  //
+  // Nothing about it read wrong: every string involved is correct on its own,
+  // and the figures were usually right by the time anybody looked, so the screen
+  // was merely silent about a payment just made. That is the exact failure the
+  // parameter exists to prevent. EXECUTED, because reading cannot catch it.
+  const withPaid = (() => {
+    const a = checkout.indexOf('function withPaid(');
+    const b = checkout.indexOf('\n}', a) + 2;
+    const ctx = { out: null };
+    vm.createContext(ctx);
+    vm.runInContext(checkout.slice(a, b) + '\nout = withPaid;', ctx);
+    return ctx.out;
+  })();
+  [['https://www.ogen.cy/account/activity?p=1&a=2#pay', 'registration'],
+   ['https://www.ogen.cy/en/account/activity?p=1&a=2', 'session'],
+   ['https://www.ogen.cy/ru/account/activity', 'bundle']].forEach(([back, kind]) => {
+    H.eq(new URL(withPaid(back, kind)).searchParams.get('paid'), kind,
+      kind + ': the marker is in the query, which is the only place param() looks');
+  });
+  H.eq(new URL(withPaid('https://www.ogen.cy/account/activity?p=1&a=2#pay', 'registration')).hash,
+    '#pay', 'and the fragment it used to hide in is still there');
   H.ok(/registration: \{ read: owedOnReg, falls: true \}/.test(memberAccount),
     'a registration debt is watched by the figure falling');
   H.ok(/bundle: \{ read: bundleCount, falls: false \}/.test(memberAccount),

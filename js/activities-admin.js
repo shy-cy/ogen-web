@@ -275,9 +275,25 @@
       rec.type || 'course', { course: 'Course (paid per term)', dropin: 'Drop-in (paid per session)' });
     typeSel.querySelector('select').addEventListener('change', function (e) {
       var read = readFacts();
-      S.record.facts = read.facts;
+      // ⚠ MERGED, NEVER ASSIGNED — the undrawn-field trap, in the one place it
+      // had not been closed.
+      //
+      // readFacts() and readRegistration() return ONLY WHAT IS DRAWN, on purpose:
+      // a drop-in form has no "Full course price" box and no cutoff dates, so the
+      // read-back carries no such keys, and the SERVER restores them from the
+      // stored record (keepUndrawnFactKeys, mergeRegistration). The client did
+      // not. This handler assigned the read-back straight over S.record, so the
+      // instant the type select moved, the term price, the bundles and both
+      // cutoffs were gone from the model. Switching back to Course then drew
+      // empty boxes — and saving an empty box that the form DID draw is an admin
+      // clearing it, which the server honours, correctly.
+      //
+      // So nothing was wrong on the server, nothing looked wrong on the screen,
+      // and the values were destroyed in between the two. Reported from QA as
+      // "the registration fee was kept, but the rest of the information was lost".
+      S.record.facts = keepUndrawnFacts(S.record.facts, read.facts);
       S.record.factVisibility = read.factVisibility;
-      S.record.registration = readRegistration();
+      S.record.registration = keepUndrawnRegistration(S.record.registration, readRegistration());
       S.record.type = e.target.value;
       S.dirty = true;
       renderFacts();
@@ -512,6 +528,31 @@
   // Read back ONLY what was drawn. A field this type does not draw is left out
   // of the object entirely, and the server keeps the stored value for it — so
   // switching a course to a drop-in does not clear its cutoff dates.
+  // A fact the form drew keeps whatever it sent AND whatever it did not send;
+  // a fact it did not draw at all is untouched. `price` is the one that matters
+  // — fullPrice on a drop-in form, perSessionPrice / lateDropIn / bundles on a
+  // course form — and bundles matters most of the three, because a family's
+  // purchase points at a bundle id rather than at a number an admin can retype.
+  function keepUndrawnFacts(stored, drawn) {
+    var out = {};
+    Object.keys(drawn || {}).forEach(function (k) {
+      out[k] = Object.assign({}, (stored || {})[k], drawn[k]);
+    });
+    Object.keys(stored || {}).forEach(function (k) { if (!(k in out)) out[k] = stored[k]; });
+    return out;
+  }
+
+  // The same, one level deeper: a cutoff lives at cancellationPolicy.<key>, so a
+  // form that does not draw it sends the parent object without that key in it.
+  function keepUndrawnRegistration(stored, drawn) {
+    var out = Object.assign({}, stored || {}, drawn || {});
+    if ((stored || {}).cancellationPolicy || (drawn || {}).cancellationPolicy) {
+      out.cancellationPolicy = Object.assign({}, (stored || {}).cancellationPolicy,
+                                             (drawn || {}).cancellationPolicy);
+    }
+    return out;
+  }
+
   function readRegistration() {
     var type = currentType();
     var out = {};

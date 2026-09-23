@@ -790,7 +790,11 @@
     if (watch.falls && !(now > 0)) { paidSettled(); return; }
 
     if (paidTries === 0) say('ok', T.paidSettling, true);
-    if (paidTries >= PAID_TRIES) { say('ok', T.paidSlow, true); return; }
+    // Giving up still drops the marker. The message has been delivered, and
+    // leaving it in the URL means a reload re-runs the whole six-try wait and
+    // says the same thing again — on figures that have almost certainly caught
+    // up by then, since the webhook is what we were waiting for.
+    if (paidTries >= PAID_TRIES) { say('ok', T.paidSlow, true); dropPaid(); return; }
     paidTries++;
 
     window.setTimeout(function () {
@@ -813,6 +817,12 @@
   // announce the same payment again.
   function paidSettled() {
     say('ok', T.paidThanks);
+    dropPaid();
+  }
+
+  // The p/a pair is what addresses this page, so it stays; `paid` is the only
+  // thing being taken out.
+  function dropPaid() {
     rewriteQuery('p=' + encodeURIComponent(param('p') || '') +
                  '&a=' + encodeURIComponent(param('a') || ''));
   }

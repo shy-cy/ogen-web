@@ -372,14 +372,17 @@ const FIELDS = [
             'always beats it. Leave blank for the site default (' + DEFAULT_EXPIRY_DAYS + ' days).' },
     { key: 'registrationFeeCutoffDate', kind: 'cutoff', types: ['course'],
       label: 'Registration fee stops being creditable on',
-      hint: 'One date, the same for every family however late they registered. Pre-filled to ' +
-            FEE_CUTOFF_DAYS + ' days before the start date.' },
+      hint: 'One date, the same for every family however late they registered. Leave it blank ' +
+            'and it is filled in WHEN YOU SAVE, ' + FEE_CUTOFF_DAYS + ' days before the start ' +
+            'date \u2014 so it stays empty until then, and needs a start date to compute from.' },
     { key: 'cancellationPolicy.mode', kind: 'mode', types: ['course'],
       label: 'How a cancellation is credited',
       hint: 'Flat credits a fixed share. Prorated divides the sessions remaining by the sessions total, and needs a session calendar.' },
     { key: 'cancellationPolicy.cancellationCutoffDate', kind: 'cutoff', types: ['course'],
       label: 'Nothing is creditable after',
-      hint: 'Pre-filled to the date of session ' + Math.round(CANCEL_FRACTION * 100) + '% of the way through.' },
+      hint: 'Leave it blank and it is filled in WHEN YOU SAVE, to the date of session ' +
+            Math.round(CANCEL_FRACTION * 100) + '% of the way through \u2014 so it stays empty ' +
+            'until then, and needs a session calendar to count.' },
     { key: 'sessionCancelHours', kind: 'days', types: ['dropin'], unit: 'hours',
       label: 'A session can be cancelled up to',
       hint: 'Before it starts. Leave blank to allow cancelling right up to the start time.' }
