@@ -47,9 +47,9 @@
   "facts": {
     "groupSize": {
       "overrideText": {
-        "he": "תאריכים יפורסמו בהמשך",
-        "en": "Dates will be announced soon",
-        "ru": "Даты будут объявлены позже"
+        "he": "",
+        "en": "",
+        "ru": ""
       }
     },
     "price": {
@@ -97,12 +97,12 @@
     }
   ],
   "sponsors": [],
-  "isoUpdated": "2026-09-23T13:27:12.769Z",
+  "isoUpdated": "2026-09-23T16:37:06.012Z",
   "isoCreated": "2026-09-20T07:57:58.547Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
   "activityId": "act-32b1222460c4f004",
-  "lastPublishedAt": "2026-09-23T13:27:12.769Z",
+  "lastPublishedAt": "2026-09-23T16:37:06.012Z",
   "groups": [
     {
       "groupId": "g-mu9hqxm1klzk",
