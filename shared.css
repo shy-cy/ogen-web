@@ -1222,6 +1222,36 @@ html[lang="he"] .thankyou h1{ font-family: var(--font-he); font-weight:700; }
 .acc-waiting-lead svg{ flex:none; }
 .acc-waiting-body{ margin:0; font-size:15px; color:var(--ink); }
 
+/* THE CREDIT BLOCK ON A COST CARD.
+   -------------------------------------------------------------------------
+   It was one grey sentence and a text link between the figures and the pay
+   button, and it was reported as not good enough — money about to move, drawn
+   as a footnote. It borrows .acc-waiting's idiom (tinted ground, 8px radius, a
+   leading rule) because that is already this area's shape for "here is
+   something about your registration", and because that shape is deliberately
+   NOT the solid full pill this site reserves for things you press: the
+   pressable thing is the button inside it.
+
+   Olive, like the waiting block, and not gold — gold is the advisory colour
+   that reads as "look at this", and a balance a family is holding is good news.
+   Olive on the 10% tint is 5.45:1 and ink on it 9.45:1, both computed. */
+.acc-credit{
+  margin-block-start:16px; padding:13px 16px; border-radius:8px;
+  background:#EBEBE5; border-inline-start:3px solid var(--olive);
+}
+.acc-credit-lead{
+  display:flex; align-items:center; gap:8px;
+  margin:0 0 5px; font-size:15px; font-weight:700; color:var(--olive);
+  font-variant-numeric:tabular-nums;
+}
+/* The glyph must not squash when the figure wraps to a second line. */
+.acc-credit-lead svg{ flex:none; }
+.acc-credit-body{ margin:0 0 12px; font-size:15px; color:var(--ink); }
+/* Not full width: it settles part of a bill rather than being the page's one
+   action, and a full-bleed primary here would outweigh the pay button under
+   it. */
+.acc-credit-go{ display:inline-block; }
+
 .acc-balance{ font-size:30px; font-weight:700; margin:0 0 10px; font-variant-numeric:tabular-nums; }
 
 .acc-notice{

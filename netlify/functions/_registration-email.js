@@ -125,7 +125,8 @@ const APPROVED = {
     next: 'מועדי המפגשים והתשלום נמצאים בעמוד ההרשמה. אם משהו לא מתאים, כתבו לנו.',
     button: 'לתשלום ולפרטים',
     pay: 'אפשר לשלם כאן, בלי להתחבר. מועדי המפגשים נמצאים בעמוד ההרשמה.',
-    payButton: 'לתשלום'
+    payButton: 'לתשלום',
+    credit: (amount, href) => `בחשבון שלכם יש זיכוי של ${amount}. כפתור התשלום כאן גובה את מלוא הסכום — כדי לנצל קודם את הזיכוי, <a href="${href}">היכנסו לעמוד ההרשמה</a>.`
   },
   en: {
     subject: (child, act) => `${child}'s place in ${act} is confirmed`,
@@ -134,7 +135,8 @@ const APPROVED = {
     next: 'The session dates and the payment are on your registration page. If anything does not fit, write to us.',
     button: 'Pay and see the details',
     pay: 'You can pay here, without signing in. The session dates are on your registration page.',
-    payButton: 'Pay now'
+    payButton: 'Pay now',
+    credit: (amount, href) => `Your account is holding ${amount} in credit. The button here charges the full amount — to put the credit towards it first, <a href="${href}">open your registration page</a>.`
   },
   ru: {
     subject: (child, act) => `Запись ${child} подтверждена · ${act}`,
@@ -143,7 +145,8 @@ const APPROVED = {
     next: 'Даты занятий и оплата — на странице записи. Если что-то не подходит, напишите нам.',
     button: 'Оплата и подробности',
     pay: 'Оплатить можно здесь, без входа в учётную запись. Даты занятий — на странице записи.',
-    payButton: 'Оплатить'
+    payButton: 'Оплатить',
+    credit: (amount, href) => `На вашем счету есть зачёт ${amount}. Кнопка здесь спишет всю сумму — чтобы сначала использовать зачёт, <a href="${href}">откройте страницу записи</a>.`
   }
 };
 
@@ -288,12 +291,33 @@ function receivedMessage(reg, account) {
 // That absence is also the failure mode. Minting is best effort inside
 // settle(), so a Blobs outage costs a family one password rather than the
 // email itself.
-function approvedMessage(reg, account, payUrl) {
+// ⚠ AND A BALANCE THE FAMILY IS HOLDING HAS TO BE NAMED HERE.
+//
+// The emailed pay button opens Checkout for the whole amount with no sign-in,
+// which is the whole point of it — and a family holding credit followed that
+// link and was never offered the chance to spend it. Reported as: "I like the
+// direct link, but in this case, when I can use the credit and click on the
+// direct link, I don't get the chance to use it."
+//
+// The link is NOT withheld and the credit is NOT spent for them. Both would be
+// wrong: the link exists for the household that wants to pay in one press, and
+// credit is the family's to put where they choose — spending it unasked is the
+// same mistake as an admin doing it for them, which is the gap _spend-credit.js
+// was written to close. So the message says the balance is there and where to
+// go, and the button stays exactly where it was.
+//
+// `creditCents` is a parameter for the same reason `payUrl` is: this builder
+// opens no store, so the whole table stays runnable in three languages with no
+// infrastructure.
+function approvedMessage(reg, account, payUrl, creditCents) {
   const l = lang(((account || {}).profile || {}).preferredLanguage);
   const T = APPROVED[l];
   const child = childOf(reg), act = titleOf(reg, l);
-  const html = shell(l, T.heading,
-    [esc(T.body(child, act)), esc(payUrl ? T.pay : T.next)],
+  const lines = [esc(T.body(child, act)), esc(payUrl ? T.pay : T.next)];
+  if (payUrl && creditCents > 0) {
+    lines.push(T.credit(money(creditCents), esc(registrationHref(reg, l))));
+  }
+  const html = shell(l, T.heading, lines,
     payUrl ? { href: payUrl, label: T.payButton }
            : { href: registrationHref(reg, l), label: T.button });
   return { to: account.email, subject: T.subject(child, act), html: html, text: strip(html) };
@@ -482,9 +506,22 @@ async function payUrlFor(reg, account) {
   }
 }
 
+// The balance is read by the SENDER, like the pay link and for the same reason:
+// the builder opens no store. Best effort in the same way too — a ledger that
+// will not answer costs this message one sentence rather than costing the
+// family the message.
+async function creditFor(account) {
+  try { return await require('./_credit-ledger').balanceFor(account.accountId); }
+  catch (err) {
+    console.warn('[registration-email] balance not read: ' + (err && err.message));
+    return 0;
+  }
+}
+
 const sendApproved = (reg, account) =>
   email.settle('registration-approved', account.email, async () =>
-    email.send(approvedMessage(reg, account, await payUrlFor(reg, account)),
+    email.send(approvedMessage(reg, account, await payUrlFor(reg, account),
+                               await creditFor(account)),
       { template: 'registration-approved', lang: langOf(account) }));
 
 const sendRejected = (reg, account, override) =>

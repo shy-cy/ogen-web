@@ -89,6 +89,14 @@
   var canEdit = function (lang) { return S.editLangs.indexOf(lang) !== -1; };
 
   // ---------- messages ----------
+  // The warning list below interpolates validate()'s messages, and several of
+  // those echo a value that came from the form — a status, a motif, a type. A
+  // message box that sets innerHTML is not a place to put unescaped input.
+  function esc(v) {
+    return String(v == null ? '' : v)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
   function message(kind, html) {
     var box = $('messages');
     box.innerHTML = '';
@@ -346,7 +354,16 @@
     sel.addEventListener('change', function () { S.dirty = true; });
     return el('div', {}, [
       el('label', { for: 'f-series', text: 'Part of' }), sel,
-      el('div', { class: 'hint', text: 'Link an autumn and a spring term of the same course. It changes nothing on the page — it is what stops a returning child being charged the yearly registration fee twice.' })
+      // ⚠ IT SAYS HOW, NOT ONLY WHAT. QA read this hint and asked "how do I
+      // create a second term? Is this a new activity that I connect to another
+      // activity?" — which is exactly the question it left open. A picker that
+      // explains the consequence and not the procedure is a picker nobody
+      // reaches, because the thing it acts on has to be made first.
+      el('div', { class: 'hint', text:
+        'A second term is a NEW activity with its own slug, dates and page — create it here as usual, ' +
+        'then set this to the first term. That is the only field saying two records are the same course, ' +
+        'and it is what stops a returning child being charged the yearly registration fee twice. ' +
+        'It changes nothing on either page.' })
     ]);
   }
 
@@ -2633,7 +2650,23 @@
         S.slug = res.data.slug;
         S.record = res.data.activity;
         S.dirty = false;
-        message('ok', 'Draft saved. It is not on the site — there is no page for it until you publish.');
+        // ⚠ SAVED, AND TOLD WHAT WOULD STOP IT BEING PUBLISHED.
+        //
+        // A draft is never refused — it is work in progress, and a save that
+        // fights back over a panel further down is a save people learn to
+        // dread. But silence made the publish-time rules invisible: prorated
+        // cancellation with no session calendar saved cleanly and was reported
+        // as working, with the refusal waiting several screens and one decision
+        // later. The server runs the same validate() and hands back what it
+        // found, so a warning here and the refusal there cannot become two
+        // different accounts of one rule.
+        var warn = (res.data.warnings || []);
+        if (warn.length) {
+          message('warn', 'Draft saved — but it cannot be published yet:<ul>' +
+            warn.map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>');
+        } else {
+          message('ok', 'Draft saved. It is not on the site — there is no page for it until you publish.');
+        }
         refreshList(S.slug);
       });
   }

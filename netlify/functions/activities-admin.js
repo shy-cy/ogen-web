@@ -983,7 +983,26 @@ exports.handler = async (event) => {
         merged.status = 'draft';
         await putDraft(merged);
         await recordAudit(session, 'save-draft', slug, body.overwrite ? 'overwrite' : 'ok');
-        return json(200, { ok: true, slug, baseUpdatedAt: merged.isoUpdated, activity: merged });
+        // ⚠ A DRAFT IS SAVED WHATEVER IS IN IT, AND IS TOLD WHAT WOULD STOP IT.
+        //
+        // validate() ran on preview and on publish and never here, which is the
+        // right call — a draft is work in progress, and a form that refuses a
+        // save because a panel further down is half-filled is a form people
+        // fight. But saying NOTHING made the same rule invisible: QA set
+        // prorated cancellation on an activity with no session calendar, saved,
+        // and reported that it went through with no issue. It had. The refusal
+        // was waiting at publish, which is the wrong moment to meet a
+        // configuration problem and the wrong screen to be looking at.
+        //
+        // So the answer is neither accept-in-silence nor refuse: the draft is
+        // saved and the same messages come back as `warnings`. One validate(),
+        // so what a warning says here and what the refusal says at publish
+        // cannot drift into two different accounts of one rule.
+        let warnings = [];
+        try { validate(JSON.parse(JSON.stringify(merged))); }
+        catch (err) { warnings = err.validation || [err.message]; }
+        return json(200, { ok: true, slug, baseUpdatedAt: merged.isoUpdated,
+                           activity: merged, warnings: warnings });
       }
 
       case 'publish': {

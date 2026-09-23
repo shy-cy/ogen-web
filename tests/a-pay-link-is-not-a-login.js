@@ -182,6 +182,40 @@ process.env.STRIPE_SECRET_KEY = 'sk_test_not_used_the_client_is_stubbed';
       l + ': a SETTLED receipt does not — asking for money that is not owed');
     H.ok(mail.receivedMessage(reg, acct(l)).html.indexOf('/pay?t=') === -1,
       l + ': and a registration still awaiting approval has nothing to pay yet');
+
+    // ⚠ AND A BALANCE THE FAMILY IS HOLDING IS NAMED, or the link quietly
+    // costs them money they had already been given back.
+    //
+    // The emailed button opens Checkout for the WHOLE amount with no sign-in,
+    // which is the whole point of it. A family holding credit followed it and
+    // was never offered the chance to spend the credit first, and said so:
+    // "I like the direct link, but in this case, when I can use the credit and
+    // click on the direct link, I don't get the chance to use it."
+    //
+    // The link is not withheld and the credit is not spent for them — both
+    // would be wrong, one for the household that wants to pay in a single
+    // press and the other because credit is the family's to place. The message
+    // says the balance is there and where to go.
+    const withCredit = mail.approvedMessage(reg, acct(l), url, 5000);
+    H.ok(withCredit.html.indexOf('50.00') !== -1, l + ': the balance is stated as a figure');
+    H.ok(withCredit.html.indexOf('/account/activity') !== -1,
+      l + ': with a link to the page where it can actually be spent');
+    H.ok(withCredit.html.indexOf(href) !== -1,
+      l + ': and the pay button is still there — nothing is taken away');
+
+    // No balance, no sentence. A line reading "you have €0.00 in credit" on
+    // every approval is the same mistake as the fee note that was printed under
+    // every cost card whether or not a fee existed.
+    const none = mail.approvedMessage(reg, acct(l), url, 0);
+    H.ok(none.html.indexOf('0.00') === -1, l + ': and an empty balance says nothing at all');
+    H.eq(none.html, mail.approvedMessage(reg, acct(l), url).html,
+      l + ': byte-identical to the message before any of this existed');
+
+    // ⚠ AND NOT ON THE FALLBACK. With no pay link the button already points at
+    // the registration page, so a sentence saying "go to your registration
+    // page" would be pointing at the button directly beneath it.
+    H.ok(mail.approvedMessage(reg, acct(l), null, 5000).html.indexOf('50.00') === -1,
+      l + ': nor when the button already leads to the page that spends it');
   });
 
   console.log('\n[nothing may cache the redirect]');

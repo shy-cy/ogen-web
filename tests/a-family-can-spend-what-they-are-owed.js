@@ -92,15 +92,48 @@ console.log('\n[and the page that shows a debt also shows the wallet]');
 const ui = read('js/member-account.js');
 H.ok(/balanceCents: await ledger\.balanceFor\(me\.accountId\)/.test(api),
   'the activity page is told the balance');
-H.ok(/function useCreditButton\(owing, balance, body, onDone\)/.test(ui), 'and draws a button for it');
-H.ok(/text: T\.useCredit \+ ' · ' \+ money\(amount\)/.test(ui),
+H.ok(/function creditButton\(owing, balance, body, onDone, cls\)/.test(ui), 'and draws a control for it');
+H.ok(/text: T\.useCredit \+ ' · ' \+ money\(Math\.min\(owing, balance\)\)/.test(ui),
   'carrying the FIGURE — "use credit" beside a €7 debt with €20 on the account ' +
   'raises the question the label should answer');
 H.ok(/if \(!\(owing > 0\) \|\| !\(balance > 0\)\) return null;/.test(ui),
   'and absent when there is nothing to spend or nothing to spend it on');
-// Both places money is owed.
-H.ok(/useCreditButton\(left, balance/.test(ui), 'offered on the term cost card');
-H.ok(/useCreditButton\(owing, balance/.test(ui), 'and on a single evening');
+// Both places money is owed. One handler either way, so the two cannot come to
+// send different things: the cost card wraps the button in a block, and a row
+// of per-evening actions wants a link beside the others.
+H.ok(/function creditBlock\(owing, balance, body, onDone\)/.test(ui) &&
+     /creditButton\(owing, balance, body, onDone, 'btn-primary acc-credit-go'\)/.test(ui),
+  'the block on the cost card is that same button in a wrapper, not a second one');
+H.ok(/creditBlock\(left, balance/.test(ui), 'offered on the term cost card');
+H.ok(/creditButton\(owing, balance, \{\n\s*participantId/.test(ui), 'and on a single evening');
+
+// ⚠ AND THE WALLET IS BEHIND THE SAME TWO GATES AS THE PAY BUTTON.
+//
+// It was drawn ABOVE that button with no conditions at all, so on a card where
+// paying was correctly withheld — a registration still waiting for an admin, or
+// an address never confirmed — a "Use credit" button sat in its place settling
+// the very same debt. Reported from one QA session, both ways round.
+//
+// Spending credit is paying: same figure, same record, same payment status. The
+// only difference is which pocket it comes out of, and neither gate is about
+// the pocket.
+H.ok(/var useIt = \(left > 0 && payable && !needsVerify\)/.test(ui),
+  'the cost card offers credit only where it would offer a card');
+H.ok(!/kids\.push\(useIt\);[\s\S]{0,200}var needsVerify/.test(ui),
+  'and not above the block that decides it, which is where it used to sit');
+
+// The server half, which is the one that decides. A client is hostile by
+// assumption, so the cosmetic check above proves only that a family is not
+// offered something about to be refused.
+const useCreditGates = api.slice(api.indexOf("case 'useCredit'"), api.indexOf("case 'cancelSession'"));
+H.ok(/verificationRefusal\(me, \(record\.frozen && record\.frozen\.type\) \|\| 'course'\)/.test(useCreditGates),
+  'the server asks for a confirmed address on a term, from the FROZEN type');
+H.ok(/checkout\.isPayable\(record\)/.test(useCreditGates),
+  'and reads the same isPayable() both other doors read — a pending place is not ' +
+  'payable with credit either');
+H.ok(/if \(!body\.sessionDate\) \{/.test(useCreditGates),
+  'and skips both for a single evening, which is a drop-in booking rather than a ' +
+  'request somebody may refuse');
 
 console.log('\n[the fee line stopped saying something untrue]');
 // It was printed under EVERY cost card: it restated a row already on the card,

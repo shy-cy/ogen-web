@@ -971,6 +971,35 @@ exports.handler = async (event) => {
           ? await attendance.getAttendance(participant.participantId, body.activityId, body.sessionDate)
           : await store.getRegistration(participant.participantId, body.activityId);
         if (!record) return no(404, 'no-such-registration');
+
+        // ⚠ SPENDING CREDIT IS PAYING, SO IT ASKS WHAT PAYING ASKS.
+        //
+        // This branch had neither gate, and both holes were reported from one
+        // session: an account whose address was never confirmed settled a term
+        // with credit, and a registration still WAITING FOR AN ADMIN was settled
+        // with credit — on a card where the pay button was correctly withheld
+        // for exactly those two reasons, with the credit button sitting directly
+        // above it.
+        //
+        // That is this codebase's own "two doors, one payment" lesson arriving
+        // by a third door. _checkout.js exists because the button and the
+        // emailed link must charge the same thing on the same terms; credit
+        // settles the same debt on the same record and writes the same
+        // `payment.status`, so it is a payment whatever it is called — the only
+        // difference is which pocket it comes out of.
+        //
+        // Both gates are the registration's, so a per-SESSION spend skips them
+        // deliberately: an attendance record exists only for a drop-in, which
+        // never asks for a confirmed address, and a booked evening is already a
+        // booking rather than a request somebody may refuse.
+        if (!body.sessionDate) {
+          const refusal = verificationRefusal(me, (record.frozen && record.frozen.type) || 'course');
+          if (refusal) return no(403, refusal, { reason: 'email-unverified' });
+          if (!checkout.isPayable(record)) {
+            return no(409, 'not-approved-for-payment',
+                      { reason: 'not-approved', status: record.status }, { status: record.status });
+          }
+        }
         // The account that OWES is the one credited, and it need not be this
         // one: a second guardian can book an evening on a participant somebody
         // else registered. Spending another account's credit is not something a

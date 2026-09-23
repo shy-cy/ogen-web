@@ -165,6 +165,8 @@
       confirmNoCredit: 'לא יוחזר זיכוי על הביטול הזה.',
       useCredit: 'שימוש בזיכוי',
       creditUsed: 'הזיכוי נוצל.', creditHave: 'יש לכם זיכוי:',
+      creditAll: '{used} יקוזזו מהסכום הזה, ולא יישאר מה לשלם.',
+      creditPart: '{used} יקוזזו מהסכום הזה. יישאר לתשלום {left}.',
       registerTitle: 'הרשמה לפעילות', registerWho: 'מי נרשם/ת?',
       registerGroup: 'קבוצה', registerGo: 'הרשמה',
       registerFull: 'הפעילות מלאה.',
@@ -290,6 +292,8 @@
       confirmNoCredit: 'This cancellation earns no credit back.',
       useCredit: 'Use credit',
       creditUsed: 'Your credit has been used.', creditHave: 'You have credit:',
+      creditAll: '{used} comes off this, and nothing is left to pay.',
+      creditPart: '{used} comes off this. {left} would still be payable.',
       registerTitle: 'Register for an activity', registerWho: 'Who is registering?',
       registerGroup: 'Group', registerGo: 'Register',
       registerFull: 'This activity is full.',
@@ -415,6 +419,8 @@
       confirmNoCredit: 'За эту отмену зачёт не начисляется.',
       useCredit: 'Использовать зачёт',
       creditUsed: 'Зачёт использован.', creditHave: 'На счету есть зачёт:',
+      creditAll: '{used} будет вычтено из этой суммы, доплачивать не придётся.',
+      creditPart: '{used} будет вычтено из этой суммы. Останется к оплате {left}.',
       registerTitle: 'Запись на занятие', registerWho: 'Кто записывается?',
       registerGroup: 'Группа', registerGo: 'Записаться',
       registerFull: 'Свободных мест нет.',
@@ -591,11 +597,32 @@
   // the account raises the one question the label should answer. The amount is
   // decided server-side — the smaller of what is owed and what is held — and the
   // client shows the same arithmetic rather than sending a number of its own.
-  function useCreditButton(owing, balance, body, onDone) {
+  // ⚠ A BALANCE IS NOT AN OFFER UNTIL IT SAYS WHAT PRESSING IT DOES.
+  //
+  // This was one grey sentence — "You have €50.00 in credit" — with a text link
+  // under it, sitting between the figures and the pay button, and it was
+  // reported as not good enough. It was: money about to move, drawn as a
+  // footnote, and it did not say the two things somebody actually needs before
+  // pressing — how much of the balance this takes, and what is left to pay
+  // afterwards.
+  //
+  // So it is a block, built from .acc-waiting's idiom (tinted ground, 8px
+  // radius, a leading rule, a bold lead over a plain body) because that is
+  // already this area's shape for "here is something about your registration".
+  // It is NOT a solid full pill: this codebase's oldest rule is that solid fill
+  // plus a full pill means pressable, and the pressable thing here is the button
+  // inside it.
+  //
+  // Olive rather than gold: gold is the advisory colour that reads as LOOK AT
+  // THIS, and a credit balance is good news rather than a warning — the same
+  // choice the waiting block and the nav chip's signed-in initial make.
+  // The control itself. A row of per-evening actions wants a link beside the
+  // others; the cost card wants the block below. One handler either way, so the
+  // two cannot come to send different things.
+  function creditButton(owing, balance, body, onDone, cls) {
     if (!(owing > 0) || !(balance > 0)) return null;
-    var amount = Math.min(owing, balance);
-    var btn = el('button', { type: 'button', class: 'acc-link',
-      text: T.useCredit + ' · ' + money(amount),
+    var btn = el('button', { type: 'button', class: cls || 'acc-link',
+      text: T.useCredit + ' · ' + money(Math.min(owing, balance)),
       onclick: function () {
         var done = busy(btn);
         post(REGS, Object.assign({ action: 'useCredit' }, body)).then(function (res) {
@@ -606,6 +633,26 @@
         });
       } });
     return btn;
+  }
+
+  function creditBlock(owing, balance, body, onDone) {
+    var btn = creditButton(owing, balance, body, onDone, 'btn-primary acc-credit-go');
+    if (!btn) return null;
+    var amount = Math.min(owing, balance);
+    var after = owing - amount;
+    return el('div', { class: 'acc-credit' }, [
+      el('p', { class: 'acc-credit-lead' }, [
+        lucide(WALLET, '15'), el('span', { text: T.creditHave + ' ' + money(balance) })
+      ]),
+      // The arithmetic, said rather than left to be done. "It covers all of it"
+      // and "€250 would still be payable" are different decisions, and which one
+      // this is cannot be read off a balance and a total.
+      el('p', { class: 'acc-credit-body',
+                text: after > 0 ? T.creditPart.replace('{used}', money(amount))
+                                          .replace('{left}', money(after))
+                                : T.creditAll.replace('{used}', money(amount)) }),
+      btn
+    ]);
   }
 
   // ⚠ ASKING BEFORE SOMETHING IS UNDONE, IN OUR OWN WORDS.
@@ -1480,9 +1527,13 @@
      ['stroke', 'currentColor'], ['stroke-width', '2.5'], ['stroke-linecap', 'round'],
      ['stroke-linejoin', 'round'], ['aria-hidden', 'true'], ['focusable', 'false']
     ].forEach(function (a) { svg.setAttribute(a[0], a[1]); });
-    var path = window.document.createElementNS(SVG_NS, 'path');
-    path.setAttribute('d', d);
-    svg.appendChild(path);
+    // One string or several. Most Lucide glyphs are one path; a few — the wallet
+    // below — are two, and drawing half of one is worse than drawing none.
+    (typeof d === 'string' ? [d] : d).forEach(function (one) {
+      var path = window.document.createElementNS(SVG_NS, 'path');
+      path.setAttribute('d', one);
+      svg.appendChild(path);
+    });
     return svg;
   }
   // ⚠ A CHECK, NOT A CLOCK, and the difference is the whole job of this icon.
@@ -1496,6 +1547,12 @@
   // text is larger than the thing it labels, the same argument that took the
   // fact-group icons to 34px.
   var CHECK = 'M20 6 9 17l-5-5';
+  // Lucide `wallet-minimal`, two paths. A wallet rather than a coin or a card:
+  // what the block is about is the balance this account is holding, not a
+  // payment instrument, and a card glyph beside a button that takes NO card
+  // would say the wrong thing about which pocket the money comes from.
+  var WALLET = ['M17 14h.01',
+                'M7 7h10a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2'];
 
   function browseLink() {
     return el('p', { class: 'acc-browse' },
@@ -2048,16 +2105,6 @@
       el('span', { text: T.stillToPay }), el('b', { text: money(left) })
     ]));
 
-    // The wallet, on the page where it can be spent rather than only on the
-    // dashboard — which is not where anybody is standing when they owe
-    // something.
-    var useIt = useCreditButton(left, balance, { participantId: r.participantId,
-                                                 activityId: r.activityId }, onDone);
-    if (useIt) {
-      kids.push(el('p', { class: 'acc-note', text: T.creditHave + ' ' + money(balance) }));
-      kids.push(useIt);
-    }
-
     // THE PAY BUTTON, and what decides whether it is drawn.
     //
     // Cosmetic, like every permission check on this side: the server re-decides
@@ -2084,6 +2131,32 @@
     // server would have honoured.
     var needsVerify = r.type !== 'dropin' && !(S.account && S.account.emailVerifiedAt);
     var payable = r.status === 'approved';
+
+    // ⚠ THE WALLET SITS BEHIND THE SAME TWO GATES, and it did not.
+    //
+    // It was drawn ABOVE this block with no conditions at all, so on a card
+    // where the pay button was correctly withheld — a registration still
+    // waiting for an admin, or an address never confirmed — a "Use credit"
+    // button sat in its place settling the very same debt. Reported from one
+    // session, both ways round.
+    //
+    // Spending credit is paying: it settles the same figure on the same record
+    // and writes the same payment status. The only difference is which pocket
+    // it comes out of, and no gate here is about the pocket. The server refuses
+    // it now whatever this draws — see useCredit in account-registrations.js —
+    // and this is the cosmetic half, so a family is not offered an action that
+    // is about to be refused.
+    //
+    // It is drawn BEFORE the pay button rather than after, because a family
+    // holding credit should see what they already have before what they have to
+    // find; and a full settlement removes the pay button on its own, since
+    // `left` falls to zero on the redraw.
+    var useIt = (left > 0 && payable && !needsVerify)
+      ? creditBlock(left, balance, { participantId: r.participantId,
+                                     activityId: r.activityId }, onDone)
+      : null;
+    if (useIt) kids.push(useIt);
+
     if (left > 0 && payable && !needsVerify) {
       var go = el('button', { type: 'submit', class: 'btn-primary', text: T.payNow });
       var payForm = el('form', { class: 'acc-pay', onsubmit: function (e) {
@@ -2369,7 +2442,7 @@
       // Credit first, because it is the cheaper of the two ways to settle the
       // same evening and a family holding a balance should not be sent to a card
       // to spend it.
-      var useIt = useCreditButton(owing, balance, {
+      var useIt = creditButton(owing, balance, {
         participantId: r.participantId, activityId: r.activityId, sessionDate: s.date
       }, redraw);
       if (useIt) acts.unshift(useIt);

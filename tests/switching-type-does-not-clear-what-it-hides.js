@@ -227,4 +227,104 @@ H.ok(/S\.record\.registration = keepUndrawnRegistration\(/.test(stripped),
 H.ok(!/S\.record\.facts = read\.facts/.test(stripped),
   'and the bare assignment that caused it is gone, not left beside the fix');
 
-H.done();
+// ---------------------------------------------------------------------------
+// ⚠ AND THE WHOLE ROUND TRIP, THROUGH REAL SAVES.
+//
+// Everything above tests the two halves apart: the server's merge with hand-made
+// records, and the client's merge in a VM. QA reported it a third way — "I
+// switched and saved as draft, then switched back to Course and saved as draft,
+// and lost the term price and both cutoff dates" — which is neither half on its
+// own but the sequence: merge, SAVE, reload what came back, merge again, SAVE.
+//
+// The save is what makes it a different test. saveDraft goes through
+// mergeByPermission and hands the merged record back, and the client then adopts
+// that record wholesale (`S.record = res.data.activity`). A merge that is right
+// in isolation and a response that drops a key would look exactly like the bug
+// that was fixed, and neither half above would notice.
+(async () => {
+  const blobs = H.makeBlobs();
+  const mods = H.loadWithStubs({ blobs, github: H.makeGithub(), modules: ['activities-admin'] });
+  const admin = mods['activities-admin'];
+  const s = await H.installSession(blobs, H.superAdminSession());
+  const save = (activity, base) => H.call(admin.handler,
+    { token: s.token, action: 'saveDraft', activity: activity, baseUpdatedAt: base });
+  const figures = (rec) => ({
+    fullPrice: ((rec.facts || {}).price || {}).fullPrice,
+    fee: (rec.registration || {}).registrationFeeCutoffDate,
+    cancel: ((rec.registration || {}).cancellationPolicy || {}).cancellationCutoffDate
+  });
+
+  console.log('\n[the whole trip: configure, save as drop-in, save back as course]');
+
+  let rec = (await save({
+    slug: 'roundtrip', status: 'draft', type: 'course',
+    title: { he: '\u05d1\u05d3\u05d9\u05e7\u05d4', en: 'Roundtrip', ru: '\u0422\u0435\u0441\u0442' },
+    about: { he: 'x', en: 'x', ru: 'x' },
+    groups: [{ groupId: 'g1', name: { he: '', en: '', ru: '' }, capacity: 10,
+               teacherIds: [], facts: {} }],
+    facts: { price: { registrationFee: 50, fullPrice: 300, showPerLesson: false } },
+    registration: { autoApprove: true, registrationFeeCutoffDate: '2026-09-30',
+                    cancellationPolicy: { mode: 'flat', cancellationCutoffDate: '2026-10-28' } }
+  })).body.activity;
+  H.eq(JSON.stringify(figures(rec)),
+    JSON.stringify({ fullPrice: 300, fee: '2026-09-30', cancel: '2026-10-28' }),
+    '1. a configured course');
+
+  // What a DROP-IN form sends: no term-price box, no cutoff boxes, so neither
+  // key is in the request at all. This is the shape the client produces AFTER
+  // its own keepUndrawnFacts has run, which is why the merge is being asked the
+  // question twice — once on each side of the wire.
+  rec = (await save(Object.assign({}, rec, {
+    type: 'dropin',
+    facts: { price: { registrationFee: 50, perSessionPrice: 12, showPerLesson: false, bundles: [] } },
+    registration: { autoApprove: true, sessionCancelHours: 24, cancellationPolicy: { mode: 'flat' } }
+  }), rec.isoUpdated)).body.activity;
+  H.eq(JSON.stringify(figures(rec)),
+    JSON.stringify({ fullPrice: 300, fee: '2026-09-30', cancel: '2026-10-28' }),
+    '2. saved as a drop-in, and the course fields are still on the record');
+  H.eq(((rec.facts || {}).price || {}).perSessionPrice, 12, '   with what the drop-in form DID draw');
+
+  rec = (await save(Object.assign({}, rec, {
+    type: 'course',
+    facts: { price: { registrationFee: 50, fullPrice: figures(rec).fullPrice, showPerLesson: false } },
+    registration: { autoApprove: true, registrationFeeCutoffDate: figures(rec).fee,
+                    cancellationPolicy: { mode: 'flat', cancellationCutoffDate: figures(rec).cancel } }
+  }), rec.isoUpdated)).body.activity;
+  H.eq(JSON.stringify(figures(rec)),
+    JSON.stringify({ fullPrice: 300, fee: '2026-09-30', cancel: '2026-10-28' }),
+    '3. and saved back as a course, unchanged — which is the report');
+  H.eq(((rec.facts || {}).price || {}).perSessionPrice, 12,
+    '   and the per-session price survived the trip out and back too');
+
+  // ⚠ AND A DRAFT SAYS WHAT WOULD STOP IT BEING PUBLISHED.
+  //
+  // validate() runs on preview and on publish and deliberately not here — a
+  // draft is work in progress, and a save that fights back over a panel further
+  // down is a save people learn to dread. But saying NOTHING made the rule
+  // invisible: QA set prorated cancellation on an activity with no session
+  // calendar, saved, and reported that it went through with no issue. It had.
+  // The refusal was several screens and one decision later.
+  console.log('\n[a draft is saved whatever is in it, and told what would stop it]');
+  const clean = await save(Object.assign({}, rec, { slug: 'roundtrip' }), rec.isoUpdated);
+  H.eq(JSON.stringify(clean.body.warnings || []), '[]', 'a sound draft warns about nothing');
+
+  const bad = await save(Object.assign({}, clean.body.activity, {
+    registration: Object.assign({}, clean.body.activity.registration, {
+      cancellationPolicy: { mode: 'prorated' } })
+  }), clean.body.activity.isoUpdated);
+  H.eq(bad.status, 200, 'prorated with no session calendar still SAVES — a draft is never refused');
+  H.eq((bad.body.warnings || []).length, 1, 'and comes back with exactly what would stop it');
+  H.ok(/session calendar/.test(bad.body.warnings[0]),
+    'naming the missing calendar: ' + bad.body.warnings[0]);
+
+  // ONE validate(), so the warning here and the refusal at publish cannot become
+  // two different accounts of one rule.
+  const published = await H.call(admin.handler, { token: s.token, action: 'publish',
+    activity: Object.assign({}, bad.body.activity, { status: 'open' }),
+    baseUpdatedAt: bad.body.activity.isoUpdated });
+  H.ok(published.status >= 400, 'and publishing it is refused, as it always was');
+  H.eq(published.body.error, bad.body.warnings[0],
+    'in the very same words, because it is the same validate()');
+
+  H.done();
+})();

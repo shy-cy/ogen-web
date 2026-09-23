@@ -1614,6 +1614,24 @@ read back.
 
 ### The rules that hold this together
 
+⚠ **A DRAFT IS SAVED WHATEVER IS IN IT, AND IS TOLD WHAT WOULD STOP IT.**
+
+`validate()` runs on preview and on publish and deliberately **not** on
+`saveDraft`, which is right: a draft is work in progress, and a save that fights
+back over a panel further down is a save people learn to dread — the same
+argument that makes `SUMMARY_CHARS` a recommendation rather than a refusal.
+
+Saying **nothing**, though, made the publish-time rules invisible. QA set
+prorated cancellation on an activity with no session calendar, saved, and
+reported that it went through with no issue. It had; the refusal was waiting
+several screens and one decision later, which is the wrong moment to meet a
+configuration problem and the wrong screen to be looking at.
+
+So the draft saves and the same messages come back as `warnings`. **One
+`validate()`**, so what a warning says here and what the refusal says at publish
+cannot drift into two accounts of one rule — a test asserts the warning and the
+publish refusal are the same string.
+
 **1. A draft has no files.** `draft` is not a display state that hides a page —
 it is the absence of the page. A draft activity lives only in the
 `ogen-activity-drafts` Blobs store; nothing is committed, so there is no URL that
@@ -3331,6 +3349,53 @@ rule. A gap in a record beats a person staring at a dead button.
 current screen owns, and signing up *replaces* that screen — so the one thing a
 new account needs to know ("we have emailed you to confirm the address") was
 being written into a node discarded in the same repaint.
+
+### ⚠ AND SPENDING CREDIT IS PAYING, SO IT ASKS WHAT PAYING ASKS
+
+`useCredit` had **neither** gate the pay button has, and both holes were
+reported from one QA session: an account whose address was never confirmed
+settled a **term** with credit, and a registration still `pending` — waiting for
+an admin to say yes — was settled with credit. Both on a card where the pay
+button had been correctly withheld for exactly those reasons.
+
+It settles the same debt on the same record and writes the same
+`payment.status`. The only difference is which pocket the money comes out of,
+and neither gate is about the pocket. It was written as a wallet feature rather
+than as a payment, which is why nobody asked — the same shape as the six files
+that claimed to arm the legal gate and were invisible to it.
+
+`verificationRefusal()` now has **three** call sites and the count is pinned, so
+a fourth door cannot be added without one. `isPayable()` is read here too, which
+is the same list `pay` and the emailed `/pay` link read. The per-**session**
+spend is exempt on purpose and says so in one explicit condition: an attendance
+record exists only for a drop-in, which never asks for a confirmed address, and
+a booked evening is a booking rather than a request somebody may refuse.
+
+⚠ **And the client made it worse rather than hiding it.** The credit button was
+drawn **above** the block that decides whether to draw the pay button, so a
+screen that had just declined to take a card offered to take the balance two
+lines higher. It is inside the same `left > 0 && payable && !needsVerify` now.
+
+⚠ **The block itself was one grey sentence**, and was reported as not good
+enough: money about to move, drawn as a footnote, saying neither how much of the
+balance it takes nor what is left afterwards. `.acc-credit` borrows
+`.acc-waiting`'s idiom — tinted ground, 8px radius, a leading rule, olive
+because a balance is good news rather than an advisory — which is deliberately
+**not** the solid full pill this site reserves for things you press. The
+pressable thing is the button inside it, and the sentence does the arithmetic:
+*"€50.00 comes off this. €250.00 would still be payable."*
+
+⚠ **And the emailed pay link names the balance.** That link opens Checkout for
+the whole amount with no sign-in, which is the point of it — and a family
+holding credit followed it and was never offered the chance to spend the credit
+first. The link is **not** withheld and the credit is **not** spent for them:
+one would cost the household that wants to pay in a single press, and the other
+is the same mistake as an admin spending it for them, which `_spend-credit.js`
+exists to have stopped. The message says the balance is there and links to the
+page that spends it, and the button stays. `creditCents` is a parameter like
+`payUrl`, so the builders still open no store; the sender reads the ledger, best
+effort, and a ledger that will not answer costs one sentence rather than the
+email.
 
 ### ⚠ A family could see their credit and not spend it
 

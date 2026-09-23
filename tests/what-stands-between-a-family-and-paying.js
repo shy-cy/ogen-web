@@ -72,8 +72,15 @@ H.ok(/if \(me\.emailVerifiedAt\) return null;/.test(helper), 'and a confirmed ad
 // has no language of its own, so the caller renders it — in the language of the
 // page, like every other string this file puts on a screen.
 H.ok(/return 'email-unverified';/.test(helper), 'the refusal names itself');
-H.eq((bare2.match(/no\(403, refusal, \{ reason: 'email-unverified' \}\)/g) || []).length, 2,
-  'and both call sites answer 403 with the reason the client acts on — ' +
+// ⚠ THREE CALL SITES, AND THE THIRD IS WHY THIS COUNT IS PINNED AT ALL.
+//
+// `useCredit` settles the same debt on the same record and writes the same
+// payment status, and it asked NEITHER of the two questions `pay` asks — so an
+// account whose address was never confirmed settled a term with credit, on a
+// card where the pay button had been correctly withheld for exactly that
+// reason. Spending credit is paying; the only difference is which pocket.
+H.eq((bare2.match(/no\(403, refusal, \{ reason: 'email-unverified' \}\)/g) || []).length, 3,
+  'and every call site answers 403 with the reason the client acts on — ' +
   'a permission, not a missing thing');
 // ONE function, or the condition is written at three call sites and the third
 // one is added later without it.
