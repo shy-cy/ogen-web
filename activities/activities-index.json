@@ -142,5 +142,29 @@
     },
     "cardImage": "/images/activities/test2-card-c8031266.jpg",
     "isoUpdated": "2026-09-23T14:48:53.166Z"
+  },
+  {
+    "slug": "test3",
+    "activityId": "act-e0dad0626a168f9b",
+    "seriesId": "act-e0dad0626a168f9b",
+    "type": "course",
+    "status": "open",
+    "langs": [
+      "he",
+      "en",
+      "ru"
+    ],
+    "title": {
+      "he": "טסט ",
+      "en": "Test ",
+      "ru": "Test "
+    },
+    "summary": {
+      "he": "לורם איפסום דולור סיט אמט, קונסקטורר אדיפיסינג אלית נולום ארווס סאפיאן - פוסיליס קוויס, אקווזמן קוואזי במר מודוף. אודיפו בלאסטיק מונופץ קליר, בנפת נפקט למסון בלרק - וענוף קולורס מונפרד אדנדום סילקוף",
+      "en": "Test",
+      "ru": "Test"
+    },
+    "cardImage": "/images/activities/test3-card-c8031266.jpg",
+    "isoUpdated": "2026-09-23T18:37:58.792Z"
   }
 ]

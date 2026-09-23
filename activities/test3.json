@@ -1,0 +1,174 @@
+{
+  "slug": "test3",
+  "status": "open",
+  "motif": "ring",
+  "corner": "tl",
+  "cardImage": "/images/activities/test3-card-c8031266.jpg",
+  "shareImage": null,
+  "robots": "index",
+  "type": "course",
+  "registration": {
+    "autoApprove": false,
+    "pendingExpiryDays": null,
+    "registrationFeeCutoffDate": "2026-09-09",
+    "cancellationPolicy": {
+      "mode": "flat",
+      "cancellationCutoffDate": "2026-10-04"
+    },
+    "defaultBasis": {
+      "startDate": "2026-09-23",
+      "sessionCount": 4
+    }
+  },
+  "seriesId": "act-e0dad0626a168f9b",
+  "title": {
+    "he": "טסט ",
+    "en": "Test ",
+    "ru": "Test "
+  },
+  "summary": {
+    "he": "לורם איפסום דולור סיט אמט, קונסקטורר אדיפיסינג אלית נולום ארווס סאפיאן - פוסיליס קוויס, אקווזמן קוואזי במר מודוף. אודיפו בלאסטיק מונופץ קליר, בנפת נפקט למסון בלרק - וענוף קולורס מונפרד אדנדום סילקוף",
+    "en": "Test",
+    "ru": "Test"
+  },
+  "about": {
+    "he": "לורם איפסום<p>לורם איפסום דולור סיט אמט, קונסקטורר אדיפיסינג אלית נולום ארווס סאפיאן - פוסיליס קוויס, אקווזמן קוואזי במר מודוף. אודיפו בלאסטיק מונופץ קליר, בנפת נפקט למסון בלרק - וענוף קולורס מונפרד אדנדום סילקוף, מרגשי ומרגשח. עמחליף קולורס מונפרד אדנדום סילקוף, מרגשי ומרגשח. עמחליף לפרומי בלוף קינץ תתיח לרעח. לת צשחמי צש בליא, מנסוטו צמלח לביקו ננבי, צמוקו בלוקריה שיצמה ברורק. הוגדוב היושגב שגוש שמצוית - שלוטגע ותלשצרו חמבלו שעוצסשך וחעית נוגש ערפשף. זותה מנק הבלאץ אפדח דלצסת יבץ, כאשזה ניצטקו נמרטש שהכמב תוק, הדמד שנטק התמבם הכלויר וג.</p><p><br></p><p>להאמית קרהשק סכעיט דז מא, מנכם למטכין נשואי מנורךגולר מונפרר סוברט לורם שבצק יהול, לכנוץ בעריר גק ליץ, ושבעגט. קולהע צופעט למרקוח איבן איף, ברומץ כלרשט מיחוצים. קלאצי קולורס מונפרד אדנדום סילקוף, מרגשי ומרגשח. עמחליף ליבם סולגק. בראיט ולחת צורק מונחף, בגורמי מגמש. תרבנך וסתעד לכנו סתשם השמה - לתכי מורגם בורק? לתיג ישבעס.</p><p><br></p><p>להאמית קרהשק סכעיט דז מא, מנכם למטכין נשואי מנורך. קונסקטורר אדיפיסינג אלית. סת אלמנקום ניסי נון ניבאה. דס איאקוליס וולופטה דיאם. וסטיבולום אט דולור, קראס אגת לקטוס וואל אאוגו וסטיבולום סוליסי טידום בעליק. קונדימנטום קורוס בליקרה, נונסטי קלובר בריקנה סטום, לפריקך תצטריק לרטי.</p><p><br></p><p>נולום ארווס סאפיאן - פוסיליס קוויס, אקווזמן צוזמק היוקסב שבורגש שנחוט - שלומק ותלפרו חשחס שעומקשך טבאית נובק ערמבף. זוצד מנק הבלמף נדראח דלנסת יונש, כצרנה ניבטסו נמשגי שהכמקם תיק, הנסר שקנשא התסים הכייר וק.</p><p><br></p><p>גולר מונפרר סוברט לורם שבצק יהול, לכנוץ בעריר גק ליץ, לורם איפסום דולור סיט אמט, קונסקטורר אדיפיסינג אלית. סת אלמנקום ניסי נון ניבאה. דס איאקוליס וולופטה דיאם. וסטיבולום אט דולור, קראס אגת לקטוס וואל אאוגו וסטיבולום סוליסי טידום בעליק. קונדימנטום קורוס בליקרה, נונסטי קלובר בריקנה סטום, לפריקך תצטריק לרטי.</p><p><br></p>",
+    "en": "<p>sdfgsrdfg</p>",
+    "ru": "<p>agadfg</p>"
+  },
+  "metaTitle": {
+    "he": "",
+    "en": "",
+    "ru": ""
+  },
+  "metaDescription": {
+    "he": "",
+    "en": "",
+    "ru": ""
+  },
+  "facts": {
+    "groupSize": {
+      "overrideText": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      }
+    },
+    "price": {
+      "registrationFee": 50,
+      "fullPrice": 300,
+      "perHourOverride": null,
+      "perSessionPrice": null,
+      "showPerLesson": false,
+      "lateDropIn": {
+        "enabled": false,
+        "hoursBefore": null,
+        "price": null
+      },
+      "bundles": []
+    }
+  },
+  "groups": [
+    {
+      "groupId": "g-muefsffcf919",
+      "name": {
+        "he": "טסט ",
+        "en": "Test ",
+        "ru": "Test "
+      },
+      "capacity": 3,
+      "teacherIds": [],
+      "facts": {
+        "ages": {
+          "min": 3,
+          "max": 5
+        },
+        "schedule": {
+          "frequency": "weekly",
+          "sessions": [
+            {
+              "day": 0,
+              "time": "15:00"
+            }
+          ]
+        },
+        "duration": {
+          "startDate": "2026-09-23",
+          "endDate": "2026-11-23",
+          "sessionCount": 4,
+          "sessionMinutes": 45,
+          "sessionDates": [
+            {
+              "date": "2026-09-27",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-10-04",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-10-11",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-10-18",
+              "status": "scheduled"
+            }
+          ]
+        },
+        "instructionLanguage": {
+          "codes": [
+            "he"
+          ],
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "prerequisites": {
+          "level": "beginner",
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "location": {
+          "text": {
+            "he": "לימסול",
+            "en": "Limassol",
+            "ru": "Лимассол"
+          }
+        },
+        "address": {
+          "text": {
+            "he": "PASIDI",
+            "en": "PASIDI",
+            "ru": "PASIDI"
+          }
+        }
+      }
+    }
+  ],
+  "factVisibility": {
+    "ages": "public",
+    "schedule": "public",
+    "duration": "public",
+    "groupSize": "public",
+    "instructionLanguage": "public",
+    "prerequisites": "public",
+    "location": "public",
+    "address": "members",
+    "price": "public"
+  },
+  "faq": [],
+  "teachers": [],
+  "sponsors": [],
+  "isoUpdated": "2026-09-23T18:37:58.792Z",
+  "isoCreated": "2026-09-23T18:37:58.792Z",
+  "lastEditedBy": "michal@ogen.cy",
+  "lastEditedByName": "Michal",
+  "activityId": "act-e0dad0626a168f9b",
+  "lastPublishedAt": "2026-09-23T18:37:58.792Z"
+}
