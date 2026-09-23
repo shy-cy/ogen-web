@@ -108,10 +108,15 @@ const justBefore = (iso) => Date.parse(iso + 'T06:00:00Z');
                                cancellation: reg.frozen.cancellation }, 'en');
   H.ok(line[0].indexOf('28 October 2026') !== -1,
     'the screen says cancellation runs up to 28 October: "' + line[0] + '"');
-  H.eq(credit.creditFor(reg, justBefore(CUT)).guardianMayCancel, true,
-    'and on that day creditFor() still lets a guardian cancel');
-  H.eq(credit.creditFor(reg, justAfter(CUT)).guardianMayCancel, false,
-    'and the day after, it does not — the printed date IS the boundary');
+  // ⚠ THE PRINTED DATE IS THE BOUNDARY OF THE CREDIT, NOT OF THE BUTTON. The
+  // sentence says cancelling stays possible and stops earning anything, and the
+  // arithmetic has to do exactly that at the instant either side of it.
+  H.ok(credit.creditFor(reg, justBefore(CUT)).total > 0,
+    'on that day, cancelling still earns something back');
+  H.eq(credit.creditFor(reg, justAfter(CUT)).total, 0,
+    'and the day after it earns nothing — the printed date IS the boundary');
+  H.eq(credit.creditFor(reg, justAfter(CUT)).guardianMayCancel, true,
+    'while cancelling itself stays open, which is what the same sentence promises');
 
   H.ok(line.some((s) => /registration fee comes back as credit if you cancel by 30 September 2026/.test(s)),
     'the screen names the fee\'s own date, which is not the same date');

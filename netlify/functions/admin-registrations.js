@@ -377,10 +377,9 @@ exports.handler = async (event) => {
         // wrote the real figure. The family was told a number nobody credited
         // them, which is the exact thing the guard below exists to prevent.
         const owed = credit.creditFor(reg, Date.now());
-        const entitled = owed.guardianMayCancel !== false;
         return json(200, Object.assign(
           { ok: true, to: account.email },
-          mail.cancelledDraft(reg, account, entitled ? owed.total : 0)));
+          mail.cancelledDraft(reg, account, owed.total)));
       }
 
       case 'cancel': {
@@ -394,19 +393,20 @@ exports.handler = async (event) => {
           return json(409, { error: 'This registration is ' + reg.status + '.' });
         }
 
-        // AN ADMIN CANCELLATION IS NOT SUBJECT TO THE HARD CUTOFF, and that is
-        // deliberate. The cutoff decides what a family is OWED, not whether a
-        // child can be removed: something can come to light in week nine, and a
-        // policy about money must not be the thing that prevents acting on it.
-        // So creditFor()'s `guardianMayCancel: false` becomes `entitled: false`
-        // here — the cancellation goes through and credits nothing — rather than
-        // a refusal.
+        // NEITHER SIDE IS SUBJECT TO THE HARD CUTOFF ANY MORE, and there used to
+        // be an `entitled` flag here saying so.
+        //
+        // It existed because the cutoff refused a GUARDIAN outright while an
+        // admin went through and credited nothing, so the two paths genuinely
+        // differed and the caller had to say which it was. The cutoff now ends
+        // the credit for both — creditFor() returns zero past it, whoever is
+        // asking — so the flag had exactly one possible value and a parameter
+        // that can only be true is a rule nobody can read. The zero comes from
+        // the arithmetic, which is where it was always coming from.
         // ⚠ WITH THE CLOCK, for the reason cancelPreview carries above: without
-        // it `entitled` is always true and `owed.total` is always the most
-        // generous figure — so the check below compared two copies of one wrong
-        // number and agreed with itself.
+        // it `owed.total` is always the most generous figure, so the check below
+        // compared two copies of one wrong number and agreed with itself.
         const owed = credit.creditFor(reg, Date.now());
-        const entitled = owed.guardianMayCancel !== false;
 
         // ⚠ THE DRAFT'S FIGURE MUST STILL BE THE TRUE FIGURE.
         //
@@ -423,7 +423,7 @@ exports.handler = async (event) => {
         // the new figure, and nothing touched.
         let override = null;
         if (body.message) {
-          const want = entitled ? owed.total : 0;
+          const want = owed.total;
           if (Number(body.message.basedOnCreditCents) !== want) {
             return json(409, {
               error: 'What this cancellation credits has changed since the message was drafted. ' +
@@ -445,8 +445,7 @@ exports.handler = async (event) => {
 
         const done = await cancelAndCredit(reg, {
           by: session.email, source: 'admin',
-          note: body.note ? String(body.note).slice(0, 500) : null,
-          entitled: entitled
+          note: body.note ? String(body.note).slice(0, 500) : null
         });
 
         // After the ledger, never before, and with the figure the ENTRY

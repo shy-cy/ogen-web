@@ -532,6 +532,15 @@ function mergeByPermission(current, incoming, session) {
     if (incoming.robots !== undefined) {
       out.robots = ROBOTS.indexOf(incoming.robots) !== -1 ? incoming.robots : 'index';
     }
+    // ⚠ A TEST ACTIVITY: published for real, reachable only by its own URL.
+    //
+    // Structure for the same reason robots is — whether an activity is on the
+    // listing is one answer for all three trees, and a Russian-only role must
+    // not be able to take the Hebrew page off it. It is deliberately NOT a
+    // status: a test activity has to behave exactly like an open one, because
+    // what it exists for is rehearsing registration and payment on the live
+    // site. Only the ways of FINDING it are removed.
+    if (incoming.testActivity !== undefined) out.testActivity = !!incoming.testActivity;
     // Which kind of activity this is, and everything the registration system
     // will read off it. Structure, so a restricted role keeps the stored values
     // below rather than sending them.
@@ -546,6 +555,7 @@ function mergeByPermission(current, incoming, session) {
     out.cardImage = (base && base.cardImage) || null;
     out.shareImage = (base && base.shareImage) || null;
     out.robots = (base && base.robots) || 'index';
+    out.testActivity = !!(base && base.testActivity);
     out.type = REG.normaliseType(base && base.type);
     out.registration = REG.normaliseRegistration(base && base.registration, out.type);
   }
@@ -904,6 +914,10 @@ exports.handler = async (event) => {
             // third one.
             activityId: a.activityId || null, seriesId: a.seriesId || a.activityId || null,
             title: a.title, langs: langsPresent(a),
+            // So the picker can mark it. A test activity is invisible everywhere
+            // it is supposed to be invisible, which makes the admin's own list
+            // the only place anybody can see that it exists at all.
+            testActivity: !!a.testActivity,
             isoUpdated: a.isoUpdated || null,
             lastEditedByName: a.lastEditedByName || null,
             urls: langsPresent(a).map((l) => pathFor(a.slug, l))
@@ -914,6 +928,7 @@ exports.handler = async (event) => {
             slug: a.slug, status: a.status, where: 'draft',
             activityId: a.activityId || null, seriesId: a.seriesId || a.activityId || null,
             title: a.title, langs: langsPresent(a),
+            testActivity: !!a.testActivity,
             isoUpdated: a.isoUpdated || null,
             lastEditedByName: a.lastEditedByName || null,
             urls: []

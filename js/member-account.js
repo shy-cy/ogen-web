@@ -177,7 +177,7 @@
         'per-session': 'בפעילות הזו התשלום הוא לכל מפגש בנפרד, ולכן אין תשלום מראש להחזיר. '
                      + 'מפגשים שכבר נקבעו מתבטלים אחד־אחד.',
         'past-cutoff': 'המועד האחרון לקבלת זיכוי על הסכום ששולם כבר עבר.',
-        'closed': 'תקופת הביטול של ההרשמה הזו נסגרה.'
+        'closed': 'המועד האחרון לקבלת זיכוי על ההרשמה הזו כבר עבר. אפשר עדיין לבטל, אך ללא זיכוי.'
       },
       useCredit: 'שימוש בזיכוי',
       creditUsed: 'הזיכוי נוצל.', creditHave: 'יש לכם זיכוי:',
@@ -323,7 +323,7 @@
         'per-session': 'This activity is paid for one session at a time, so there is no payment '
                      + 'up front to give back. Sessions you have booked are cancelled one by one.',
         'past-cutoff': 'The date for getting back what has been paid has passed.',
-        'closed': 'The cancellation period for this registration has closed.'
+        'closed': 'The period for getting credit back on this registration has closed. It can still be cancelled, with nothing credited.'
       },
       useCredit: 'Use credit',
       creditUsed: 'Your credit has been used.', creditHave: 'You have credit:',
@@ -463,7 +463,7 @@
         'per-session': 'Это занятие оплачивается по одному разу, поэтому предоплаты, которую можно '
                      + 'вернуть, нет. Уже записанные занятия отменяются по одному.',
         'past-cutoff': 'Срок возврата уплаченной суммы на счёт уже прошёл.',
-        'closed': 'Период отмены этой записи закрыт.'
+        'closed': 'Срок возврата средств по этой записи истёк. Отменить запись можно, но без зачёта.'
       },
       useCredit: 'Использовать зачёт',
       creditUsed: 'Зачёт использован.', creditHave: 'На счету есть зачёт:',

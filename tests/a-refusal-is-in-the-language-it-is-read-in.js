@@ -81,7 +81,6 @@ console.log('\n[a parameter reaches all three grammars]');
 [['password-short', { min: 8 }, '8'],
  ['max-guardians', { max: 2 }, '2'],
  ['too-many-dates', { max: 12 }, '12'],
- ['cancellation-closed', { closedOn: '2026-11-04' }, '2026-11-04'],
  ['already-in-status', { status: 'cancelled' }, 'cancelled']].forEach(([key, params, needle]) => {
   E.LANGS.forEach((l) => {
     H.ok(E.text(key, l, params).indexOf(needle) !== -1,

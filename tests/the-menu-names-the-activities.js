@@ -160,7 +160,15 @@ const INDEX = [
   { slug: 'done-one', status: 'completed', langs: ['he', 'en', 'ru'],
     title: { he: 'הסתיים', en: 'Finished one', ru: 'Завершённое' } },
   { slug: 'he-only', status: 'open', langs: ['he'],
-    title: { he: 'רק בעברית' } }
+    title: { he: 'רק בעברית' } },
+  // ⚠ IN THE INDEX AND NOT IN THE MENU. A test activity is published for real —
+  // the page serves, registration and payment run on it — and every route to it
+  // is removed. The index keeps the row because it is the lookup that turns a
+  // slug into an activityId; the menu is a way of FINDING things, which is the
+  // one thing a test activity must not offer. See
+  // a-test-activity-is-reachable-only-by-its-link.js.
+  { slug: 'test4', status: 'open', langs: ['he', 'en', 'ru'], testActivity: true,
+    title: { he: 'בדיקה', en: 'Test four', ru: 'Тест' } }
 ];
 
 // The nav wants a #page to inject into and a fetch to read the index with.
@@ -261,6 +269,8 @@ function findById(root, id) {
     'a closed or completed activity is NOT — the menu is a way in, and there is nothing to enter');
   H.eq(texts.filter((t) => t.indexOf('רק בעברית') !== -1).length, 0,
     'nor one with no page in this language — `langs` is checked, or the link would 404');
+  H.eq(texts.filter((t) => /Test four/.test(t)).length, 0,
+    'nor a TEST activity, which is in this very index and is reachable only by its own URL');
   H.eq(texts[0], 'Singing', 'open comes first, because it is the one you can act on now');
   H.ok(texts.indexOf('See all activities') !== -1, 'the way through to the full list is always there');
   H.ok(texts.indexOf('Currently Running') !== -1, 'and Currently Running, because a closed activity is in this index');

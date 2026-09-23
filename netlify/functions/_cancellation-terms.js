@@ -62,9 +62,9 @@ const HOURS = {
 
 const T = {
   he: {
-    closes: (d) => `אפשר לבטל את ההרשמה עד ${d}.`,
-    closesNever: 'אפשר לבטל את ההרשמה בכל שלב.',
-    closed: (d) => `חלון הביטול נסגר ב-${d}.`,
+    closes: (d) => `אפשר לבטל את ההרשמה בכל שלב. ביטול עד ${d} מזכה בזיכוי; לאחר מכן הביטול אינו מזכה בזיכוי.`,
+    closesNever: 'אפשר לבטל את ההרשמה בכל שלב, ואין מועד שאחריו הביטול אינו מזכה בזיכוי.',
+    closed: (d) => `חלון הזיכוי נסגר ב-${d}. עדיין אפשר לבטל את ההרשמה, אך היא אינה מזכה בזיכוי.`,
     beforeStart: 'ביטול לפני המפגש הראשון מזכה בזיכוי מלא על עלות הפעילות.',
     flat: 'ביטול אחרי שהפעילות התחילה מזכה בזיכוי של מחצית מעלות הפעילות.',
     prorated: 'ביטול אחרי שהפעילות התחילה מזכה בזיכוי יחסי למפגשים שטרם התקיימו.',
@@ -76,9 +76,9 @@ const T = {
     title: 'תנאי ביטול'
   },
   en: {
-    closes: (d) => `You can cancel this registration up to ${d}.`,
-    closesNever: 'You can cancel this registration at any time.',
-    closed: (d) => `Cancellation closed on ${d}.`,
+    closes: (d) => `You can cancel this registration at any time. Up to ${d} it earns credit back; after that it earns nothing.`,
+    closesNever: 'You can cancel this registration at any time, and there is no date after which it stops earning credit back.',
+    closed: (d) => `The credit window closed on ${d}. You can still cancel this registration, and nothing comes back.`,
     beforeStart: 'Cancel before the first session and the whole activity fee comes back as credit.',
     flat: 'Cancel after it has started and half of the activity fee comes back as credit.',
     prorated: 'Cancel after it has started and the sessions you have not had come back as credit.',
@@ -90,9 +90,9 @@ const T = {
     title: 'Cancellation terms'
   },
   ru: {
-    closes: (d) => `Отменить запись можно до ${d}.`,
-    closesNever: 'Отменить запись можно в любой момент.',
-    closed: (d) => `Окно отмены закрылось ${d}.`,
+    closes: (d) => `Отменить запись можно в любой момент. При отмене до ${d} средства возвращаются на счёт, позже — нет.`,
+    closesNever: 'Отменить запись можно в любой момент, и нет даты, после которой средства перестают возвращаться.',
+    closed: (d) => `Окно возврата закрылось ${d}. Отменить запись всё ещё можно, но средства не возвращаются.`,
     beforeStart: 'При отмене до первого занятия вся стоимость возвращается на счёт в виде кредита.',
     flat: 'При отмене после начала занятий на счёт возвращается половина стоимости.',
     prorated: 'При отмене после начала занятий на счёт возвращается стоимость занятий, которые ещё не прошли.',
@@ -142,17 +142,24 @@ function termsFor(spec, lang) {
   // ⚠ THE TENSE IS THE CALLER'S TO DECIDE, not this module's. Whether the window
   // has passed is a question about the clock, and this file asks the clock for
   // the same reason _credit.js does not: the same spec has to produce the same
-  // sentence a year later. creditFor() has already answered it — `mayCancel`
-  // false with reason 'cancellation-closed' — so the caller passes the answer
-  // in. Printing "you can cancel up to 16 December" to somebody it is already
+  // sentence a year later. creditFor() has already answered it — reason
+  // 'cancellation-closed' — so the caller passes the answer in. Printing "you can cancel up to 16 December" to somebody it is already
   // too late for is a screen contradicting the button it is under.
   const closes = dateOr(C.cancellationCutoffDate);
 
   // Once the window is shut there is one thing left to say. The three rules
   // under it describe what cancelling would have earned, in a tense that no
   // longer applies — and a family reading "cancel before the first session and
-  // the whole fee comes back" under a page with no cancel button on it is being
-  // offered something twice over that is not available at all.
+  // the whole fee comes back" on a registration that can now earn nothing is
+  // being offered something that is not available.
+  //
+  // ⚠ THE CUTOFF ENDS THE CREDIT, NOT THE CANCELLATION, and these sentences say
+  // so because the code does. It used to refuse the guardian's cancel button
+  // outright, which QA read — correctly — as the wrong rule: "I don't understand
+  // why a family should be rejected to cancel their course. They can cancel, but
+  // not get a refund." A family who is not coming back has to be able to say so,
+  // and per-EVENING cancellation has always worked exactly that way. One split
+  // between entitlement and the ability to act, in both places.
   if (s.closed && closes) return [t.closed(fullDate(closes, l))];
 
   lines.push(closes ? t.closes(fullDate(closes, l)) : t.closesNever);

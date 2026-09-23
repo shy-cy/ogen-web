@@ -567,7 +567,16 @@ ${tables.map(oneTable).join('\n')}
     // is kept out of search results, but the links on it are still worth
     // crawling. A noindex activity is also left out of sitemap.xml — listing a
     // page you have asked not to be indexed is a contradiction.
-    robots: activity.robots === 'noindex' ? 'noindex, follow' : 'index, follow'
+    // ⚠ A TEST ACTIVITY IS 'noindex, nofollow', WHICH IS STRICTER THAN THE FLAG
+    // ABOVE ON PURPOSE. `noindex, follow` keeps a real page out of results while
+    // still offering its links, which is right for /about. A test activity is
+    // not a page anybody outside this office should arrive at by any route, so
+    // the links are not worth crawling either. It is also absent from the
+    // sitemap, from the listing pages and from the menu — see _activity-index.js
+    // and js/nav.js. The page itself is real and registration works on it, which
+    // is the whole point: the only thing it lacks is a way to be found.
+    robots: activity.testActivity ? 'noindex, nofollow'
+          : activity.robots === 'noindex' ? 'noindex, follow' : 'index, follow'
   })}
 <body>
 <div id="page" dir="${L.dir}">

@@ -1489,17 +1489,17 @@ exports.handler = async (event) => {
         // did not write.
         const owed = credit.creditFor(reg, Date.now());
 
-        // THE HARD CUTOFF GOVERNS ENTITLEMENT, and here it also closes the
-        // guardian's own button — with the date, so the refusal can name it. An
-        // ADMIN cancelling after this date still goes through and credits
-        // nothing: a child has to be removable in week nine for a reason that is
-        // not about money.
-        if (owed.guardianMayCancel === false) {
-          return no(409, 'cancellation-closed',
-                    { reason: owed.reason, closedOn: owed.closedOn },
-                    { closedOn: owed.closedOn });
-        }
-
+        // ⚠ THE HARD CUTOFF GOVERNS ENTITLEMENT AND NOTHING ELSE, and a 409
+        // refusing the family stood here.
+        //
+        // It read as a punishment for being late rather than as a rule about
+        // money: a family who has decided not to come back was told they could
+        // not say so, on a screen whose only other option is to keep a place
+        // they do not want — which also keeps it from the next family. The
+        // per-evening path has always allowed it and simply credited nothing,
+        // and the two halves of one policy must not disagree. `whyNoCredit()`
+        // sends `closed` so the dialog says, before anything is confirmed, that
+        // the window shut and nothing comes back.
         // Nothing to release. The place is free the moment the cancellation is
         // written, because capacity is counted and holdsASpot() is already false
         // for a cancelled record — there is no hold to give back and no counter

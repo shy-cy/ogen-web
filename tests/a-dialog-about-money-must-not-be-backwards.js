@@ -246,6 +246,44 @@ const creditNote = noteMaker(T);
   H.eq(now.cancellation.whyNothing, 'per-session',
     'and says the money is per evening rather than implying a lost deadline');
 
+  // 5. ⚠ PAST THE HARD CUTOFF, AND THE BUTTON IS STILL THERE.
+  //
+  // It was not. creditFor() returned `guardianMayCancel: false` and the handler
+  // turned that into a 409, so a family who had decided not to come back was
+  // told they could not say so — on a screen whose only other option is to keep
+  // a place they do not want, which also keeps it from the next family. Reported
+  // as "I don't understand why a family should be rejected to cancel their
+  // course. They can cancel, but not get a refund."
+  //
+  // And the two halves of one policy disagreed: creditForSession() has always
+  // returned `mayCancel: true` past its own deadline and simply credited
+  // nothing, under a comment claiming to match what the course cutoff did.
+  fresh.frozen.type = 'course';
+  fresh.payment = Object.assign({}, fresh.payment, { paidCents: 33000, creditedCents: 0 });
+  fresh.frozen.cancellation.cancellationCutoffDate = '2020-01-01';
+  fresh.frozen.cancellation.registrationFeeCutoffDate = null;
+  fresh.status = 'approved';
+  await store.saveRegistration(fresh);
+  now = await row();
+  H.eq(now.cancellation.mayCancel, true,
+    'the cancel button is still offered after the cutoff');
+  H.eq(now.cancellation.credit, 0, 'and it earns nothing');
+  H.eq(now.cancellation.whyNothing, 'closed',
+    'and the dialog says the window closed BEFORE anything is confirmed');
+  H.eq(creditNote(now.cancellation).join(' | '), 'NOTHING BACK | CLOSED',
+    'both lines, so nobody presses it expecting money');
+
+  // Executed, not read: the client's own check is cosmetic, and what decides is
+  // the handler.
+  const shutBefore = await ledger.balanceFor(dana.accountId);
+  const shut = await H.call(regs.handler, { action: 'cancel', token: dana.token,
+    participantId: noa, activityId: course.activityId });
+  H.eq(shut.status, 200, '⚠ and the SERVER lets it through — it answered 409 before');
+  H.eq(await ledger.balanceFor(dana.accountId), shutBefore,
+    'writing nothing to the ledger, which is the half the cutoff does decide');
+  H.eq((await store.getRegistration(noa, course.activityId)).status, 'cancelled',
+    'and the place is genuinely given back');
+
   console.log('\n[every reason has a sentence, in every language]');
   const REASONS = ['nothing-paid', 'too-late', 'started', 'per-session', 'past-cutoff', 'closed'];
   const tableSrc = ui.slice(ui.indexOf('var T = {'),

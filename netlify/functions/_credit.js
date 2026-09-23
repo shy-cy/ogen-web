@@ -264,14 +264,28 @@ function creditFor(reg, now) {
 
   // 1. The hard cutoff answers for everything, and comes first.
   //
-  // It governs ENTITLEMENT, not the ability to end a registration. An admin
-  // cancellation still goes through after this date and credits nothing: a child
-  // has to be removable for a safety or eligibility reason in week nine, and a
-  // policy about money must not be the thing that prevents it. What is refused
-  // here is the guardian's own cancel button.
+  // ⚠ IT GOVERNS ENTITLEMENT AND NOT THE ABILITY TO END A REGISTRATION — and for
+  // one release it did both, which was the bug.
+  //
+  // `guardianMayCancel` was false here, and account-registrations.js turned that
+  // into a 409: past this date a family could not cancel at all. Reported from
+  // QA as "I don't understand why a family should be rejected to cancel their
+  // course. They can cancel, but not get a refund." That is the right rule, and
+  // it is the rule the per-EVENING path has always applied — creditForSession()
+  // returns `mayCancel: true` past its deadline with nothing credited, under a
+  // comment claiming to match "the same split the course cutoff makes". It did
+  // not. The two halves of one policy disagreed, and the course half was the
+  // one that took something away from a family: somebody who has decided not to
+  // come back has to be able to say so, and holding a place open for them is
+  // worse for everybody, including the next family waiting for it.
+  //
+  // So it is always true, and it stays as a field rather than being deleted
+  // because it is what the client reads to draw the button — a constant `true`
+  // is the rule written down, where an absent field would be a rule nobody
+  // states. An admin cancelling here was never refused and is unchanged.
   if (past(C.cancellationCutoffDate, now)) {
     return {
-      guardianMayCancel: false,
+      guardianMayCancel: true,
       feeCredit: 0, courseCredit: 0, total: 0,
       reason: 'cancellation-closed',
       closedOn: C.cancellationCutoffDate

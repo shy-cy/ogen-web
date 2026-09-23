@@ -61,6 +61,20 @@ function indexEntry(a) {
     title: a.title,
     summary: a.summary || null,
     cardImage: a.cardImage || null,
+    // ⚠ UNLISTED, AND STILL IN THIS FILE — which looks like a contradiction and
+    // is the whole design. A test activity is left out of the listing pages, the
+    // sitemap and the menu, and it must NOT be left out of here: this index is
+    // how a slug becomes an activityId, which is how the family area opens a
+    // registration panel at all. Dropping the row would make the one thing a
+    // test activity exists for — registering against it by direct link —
+    // impossible.
+    //
+    // Publishing the flag costs nothing it protects. The file is public, the row
+    // names an activity whose page is already served to anyone who asks for the
+    // URL, and the flag is the instruction every reader of this file needs in
+    // order to leave it out. What keeps a test activity out of sight is the
+    // absence of a link to it, not the absence of a fact about it.
+    testActivity: !!a.testActivity,
     isoUpdated: a.isoUpdated || null
   };
 }
@@ -94,7 +108,11 @@ function buildSitemap(activities) {
   // be advertised in the sitemap: the meta tag and the sitemap have to agree, or
   // the sitemap invites a crawler to a page that turns it away. /about already
   // pairs them the same way.
-  const published = (activities || []).filter(isPublic).filter((a) => a.robots !== 'noindex');
+  const published = (activities || []).filter(isPublic)
+    .filter((a) => a.robots !== 'noindex')
+    // A test activity is never advertised anywhere. noindex and the sitemap have
+    // to agree; here the page says 'noindex, nofollow' and there is no entry.
+    .filter((a) => !a.testActivity);
   if (published.length) {
     blocks.push('  <!-- Activity pages. A draft activity has no files and never appears here. -->');
     published.forEach((a) => {
@@ -127,10 +145,18 @@ function buildDerivedFiles(activities) {
     { path: 'sitemap.xml', content: buildSitemap(activities), encoding: 'utf-8' }
   ];
   const published = (activities || []).filter(isPublic);
+  // ⚠ THE LISTING IS THE NARROWER LIST, AND THE INDEX IS NOT.
+  //
+  // buildIndex() above keeps every published activity, test ones included,
+  // because that file is a lookup rather than a shop window. These three pages
+  // ARE the shop window, and the menu is built from the index by a client that
+  // applies the same filter — see js/nav.js. Two readers, one flag, and the one
+  // that resolves ids must not be the one that hides rows.
+  const listed = published.filter((a) => !a.testActivity);
   LANGS.forEach((lang) => {
     files.push({
       path: indexFilePathFor(lang),
-      content: renderActivitiesIndexPage(published, lang),
+      content: renderActivitiesIndexPage(listed, lang),
       encoding: 'utf-8'
     });
   });

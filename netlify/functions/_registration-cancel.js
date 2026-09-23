@@ -33,10 +33,16 @@ const REASON = {
   admin: 'registration-cancelled-by-admin'
 };
 
-// `entitled` is the caller's decision, not this function's. A guardian past the
-// hard cutoff cannot cancel at all; an ADMIN past it still can, and credits
-// nothing — a child has to be removable in week nine for a reason that is not
-// about money. Passing it in keeps that policy where the two paths differ.
+// ⚠ THERE IS NO `entitled` PARAMETER ANY MORE, and its removal is the rule.
+//
+// It let the caller zero a credit, and existed because the two paths genuinely
+// differed: past the hard cutoff a guardian could not cancel AT ALL, while an
+// admin could and credited nothing. The cutoff now ends the credit for both and
+// stops neither — a family who is not coming back has to be able to say so, and
+// the per-evening path has always worked that way. So `entitled` had one
+// possible value, and a parameter that can only be true is a policy nobody can
+// read. The zero comes from creditFor(), which is the only thing that should
+// ever have been deciding it.
 // Cancelling a DROP-IN registration credits nothing and instead releases the
 // evenings that have not happened yet, each judged on its own deadline.
 //
@@ -83,11 +89,11 @@ async function releaseFutureSessions(reg, { by, source, at, note }) {
   return out;
 }
 
-async function cancelAndCredit(reg, { by, source, note, now, entitled }) {
+async function cancelAndCredit(reg, { by, source, note, now }) {
   const at = now == null ? Date.now() : now;
   const owed = credit.creditFor(reg, at);
   const basis = credit.basisFor(reg, at);
-  const total = entitled === false ? 0 : owed.total;
+  const total = owed.total;
 
   // THE DROP-IN PATH, and it is a branch here rather than a second function so
   // that "one function both cancel paths call" stays true — the guardian's
@@ -125,8 +131,7 @@ async function cancelAndCredit(reg, { by, source, note, now, entitled }) {
     creditedCents: ((next.payment || {}).creditedCents || 0) + total,
     // The FEE portion, kept apart because the waiver reads it: a family refunded
     // the fee and registering again for the same activity is paying it again.
-    feeCreditedCents: ((next.payment || {}).feeCreditedCents || 0) +
-      (entitled === false ? 0 : owed.feeCredit),
+    feeCreditedCents: ((next.payment || {}).feeCreditedCents || 0) + owed.feeCredit,
     creditedToAccountId: total > 0 ? reg.accountId : ((next.payment || {}).creditedToAccountId || null),
     status: total > 0 ? 'credited' : (next.payment || {}).status
   });

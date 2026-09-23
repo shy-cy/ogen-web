@@ -899,6 +899,59 @@ disagreeing. For hebrew4kids that is 28 Oct rather than the calendar's 4 Nov.
 recomputes on its own: an activity postponed by a month keeps the dates it was
 given, because a formula re-evaluating would rewrite terms already agreed.
 
+### ⚠ A test activity: published for real, reachable only by its link
+
+There was **no way to rehearse a registration on the live site**. Everything that
+moves money only really runs deployed — Blobs is unreliable locally and Stripe
+redirects to a real URL — so testing it meant publishing an activity, which meant
+publishing it **to the public**: on the listing page, in the hamburger menu, in
+`sitemap.xml`, and offered to a crawler. A family could register for `test4` and
+be charged for a class that does not exist.
+
+The two things that already existed were both the wrong shape for it:
+
+- **`draft` has no files at all.** There is no page, so there is nothing to
+  register against. That is the whole point of a draft and must not change.
+- **`robots: noindex` keeps a page out of SEARCH and deliberately leaves it on
+  the site** — that flag is an instruction to a crawler, not to a visitor, and
+  the listing and the menu still carry it.
+
+`testActivity` is the third answer. It is a **tickbox in Settings, beside
+Status**, and deliberately **not a status**: a rehearsal has to run through the
+same open-activity code every family meets, or it rehearses something else. What
+it removes is every *route to* the page and nothing else.
+
+| Reader | A test activity |
+|---|---|
+| `activities/<slug>.html` ×3 | rendered and committed exactly as usual, with `noindex, nofollow` |
+| `sitemap.xml` | absent |
+| the three listing pages | absent |
+| the hamburger's Activities group | absent — `js/nav.js` filters it |
+| `activities-index.json` | **present**, carrying `testActivity: true` |
+| the admin's activity picker | present, marked with a dashed `test` pill |
+
+`noindex, nofollow` rather than the `noindex, follow` an ordinary noindex
+activity gets: `/about`'s links are still worth crawling and nothing here is.
+Ticking the box is enough — it wins over the robots select rather than being a
+second thing to remember beside it.
+
+⚠ **AND ONE READER OF THE INDEX MUST NOT FILTER.** `activities-index.json` is not
+a shop window, it is the lookup that turns a slug into an `activityId` — which is
+how `/account/activity?register=<slug>` finds an activity at all, in the family
+area and in both registration handlers. Drop the row and the one thing a test
+activity exists for becomes impossible, silently, with the page still serving.
+So the row stays and carries the flag, and the readers that **are** shop windows
+each leave it out. Publishing the flag costs nothing it protects: the file is
+public, the row names an activity whose page is already served to anyone holding
+the URL, and what keeps a test activity out of sight is the absence of a link to
+it rather than the absence of a fact about it.
+
+It is **structure**, like `robots` — whether an activity is listed is one answer
+for all three trees, so a Russian-only role cannot take the Hebrew page off it.
+And the client's read-back keeps the stored value when the box is not drawn,
+which is the undrawn-field trap in the one direction that would publish a test
+activity to the world.
+
 ### Conditional panels, and the trap they bring
 
 **A group the form did not draw is not read back and is not merged.** Switch a
@@ -1378,11 +1431,43 @@ decided money. The record agrees with itself today — eleven sessions ending on
 thing somebody remembers to check: the disagreement was invisible for months,
 and nothing stops the next one appearing the same way.
 
-The hard cutoff governs **entitlement, not the ability to end a registration**.
-It refuses the guardian's own cancel button (`reason: 'cancellation-closed'`,
-carrying the date so a 409 can name it); an admin cancelling in week nine for a
-safety reason still goes through and credits nothing. `creditFor()` therefore
-says nothing at all about admin cancellation.
+⚠ **The hard cutoff governs entitlement and NOTHING ELSE**, and for a release it
+also refused the guardian's own cancel button with a 409.
+
+Reported from QA as *"I don't understand why a family should be rejected to
+cancel their course. They can cancel, but not get a refund."* That is the right
+rule, and it is the rule the **per-evening** path had always applied —
+`creditForSession()` returns `mayCancel: true` past its own deadline and simply
+credits nothing, under a comment claiming to match "the same split the course
+cutoff makes". It did not. Two halves of one policy disagreed, and the half that
+took something away from a family was the one that was wrong: somebody who has
+decided not to come back has to be able to say so, and holding a place open for
+them is worse for everybody, including the next family waiting for it.
+
+So `guardianMayCancel` is **always true**. It stays as a field rather than being
+deleted because it is what the client reads to draw the button — a constant
+`true` is the rule written down, where an absent field would be a rule nobody
+states. `reason: 'cancellation-closed'` and `closedOn` still travel, and the
+dialog turns them into *"this cancellation earns no credit back — the period for
+getting credit back has closed"* **before** anything is confirmed. The
+`cancellation-closed` message is deleted from `_family-errors.js` rather than
+left as an orphan, because there is no longer a refusal to word.
+
+Three things followed from the same edit:
+
+- **`cancelAndCredit()` lost its `entitled` parameter.** It existed because the
+  two paths genuinely differed — a guardian was refused, an admin went through
+  and credited nothing — and with the cutoff ending the credit for both it had
+  exactly one possible value. A parameter that can only be true is a policy
+  nobody can read; the zero comes from `creditFor()`, which is the only thing
+  that should ever have been deciding it.
+- **The terms footnote changed tense rather than gaining a line.** "You can
+  cancel this registration up to 28 October" was a promise about the *button*;
+  it now says cancelling stays open at any time and names the date credit stops.
+  A test takes the printed date, hands it to `creditFor()`, and asserts the
+  credit is positive the instant before and zero the instant after — while
+  `guardianMayCancel` stays true on both sides.
+- An admin cancelling was never refused and is unchanged.
 
 ## Legal pages, and the two gates on them
 

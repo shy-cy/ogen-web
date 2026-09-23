@@ -287,7 +287,13 @@
         // what the listing page filters on too; without it the Russian menu
         // would link to a Russian page that was never generated.
         var mine = list.filter(function (a) {
-          return a && a.langs && a.langs.indexOf(lang) !== -1;
+          // ⚠ A TEST ACTIVITY IS IN THIS FILE AND NOT IN THIS MENU. The index is
+          // a lookup — it is how a slug becomes an activityId for the family
+          // area — so the row has to be there; the menu is a way of finding
+          // things, which is the one thing a test activity must not offer. The
+          // listing pages apply the same filter server-side.
+          if (!a || a.testActivity) return false;
+          return a.langs && a.langs.indexOf(lang) !== -1;
         });
         var open = mine.filter(function (a) { return OPEN.indexOf(a.status) !== -1; });
         if (!open.length) return;              // nothing to open an accordion onto

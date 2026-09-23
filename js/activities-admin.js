@@ -309,6 +309,27 @@
     });
     box.appendChild(typeSel);
     box.appendChild(select('f-status', 'Status', S.schema.statuses, rec.status || 'draft', STATUS_SELECT));
+
+    // ⚠ A TEST ACTIVITY IS PUBLISHED FOR REAL AND SIMPLY CANNOT BE FOUND.
+    //
+    // It sits beside Status rather than under Search & sharing, and beside it
+    // rather than inside it, because it is NOT a status: a rehearsal of
+    // registration and payment has to run through the same open-activity code
+    // every family meets, or it rehearses something else. What it removes is
+    // every route TO the page — the listing, the menu, the sitemap, the
+    // crawler — and nothing else. Draft remains the way to have no page at all.
+    var testBox = el('input', { type: 'checkbox', id: 'f-test' });
+    testBox.checked = rec.testActivity === true;
+    testBox.addEventListener('change', function () { S.dirty = true; });
+    box.appendChild(el('div', {}, [
+      el('label', { for: 'f-test', class: 'check-row' },
+        [testBox, el('span', { text: 'Test activity \u2014 reachable only by its own link' })]),
+      el('div', { class: 'hint', text:
+        'Publish it as usual and it behaves exactly like any other activity: the page is live, ' +
+        'registration and payment work. It is left off the activities listing, out of the menu ' +
+        'and out of sitemap.xml, and the page tells search engines not to index it or follow ' +
+        'its links. The only way to it is the URL, so keep that to yourself.' })
+    ]));
     box.appendChild(select('f-motif', 'Header motif', S.schema.motifs, rec.motif || 'ring'));
     box.appendChild(select('f-corner', 'Motif corner', S.schema.corners, rec.corner || 'tl', {
       tl: 'Top / start', tr: 'Top / end', bl: 'Bottom / start', br: 'Bottom / end'
@@ -2401,6 +2422,10 @@
     rec.cardImage = S.cardImage !== undefined ? S.cardImage : (S.record.cardImage || null);
     rec.shareImage = S.shareImage !== undefined ? S.shareImage : (S.record.shareImage || null);
     rec.robots = ($('f-robots') && $('f-robots').value) || S.record.robots || 'index';
+    // Structure, like robots. Read from the box rather than carried over from
+    // the record, because unticking it is exactly how an activity stops being a
+    // test one — the same reason the status select is read rather than kept.
+    rec.testActivity = $('f-test') ? $('f-test').checked : !!S.record.testActivity;
     // Blank means "its own activity", and the server turns that into this
     // record's own id. Sent as null rather than omitted, so "the admin unlinked
     // it" and "this form did not draw it" stay different requests.
@@ -2526,6 +2551,8 @@
           onclick: function () { load(a.slug); }
         }, [
           el('span', { class: 'slug', text: title }),
+          // The one screen a test activity is visible on, so it says so here.
+          a.testActivity ? el('span', { class: 'pill test', text: 'test' }) : null,
           el('span', { class: 'pill ' + a.status, text: statusPill(a.status) })
         ]));
       });

@@ -71,6 +71,10 @@ a{color:var(--terracotta);}
 .pill.closed{background:#c8c2b4;color:#5a5646;}
 .pill.cancelled{background:var(--danger);color:#fff;}
 .pill.completed{background:var(--camel);color:#fff;}
+/* A test activity is unlisted everywhere else, so the admin picker is the only
+   screen that can say it exists. Outlined rather than filled: it sits beside a
+   status pill and is not one, and a solid pill on this site means a state. */
+.pill.test{background:transparent;color:var(--navy);border:1px dashed var(--navy);}
 
 /* ---------- forms ---------- */
 label{display:block;font-size:11.5px;font-weight:700;color:var(--olive);

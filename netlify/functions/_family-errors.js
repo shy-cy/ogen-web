@@ -355,11 +355,15 @@ const MESSAGES = {
     en: (p) => `This registration is already ${p.status}.`,
     ru: (p) => `Эта запись уже ${p.status}.`
   },
-  'cancellation-closed': {
-    he: (p) => `הביטול לפעילות הזו נסגר ב-${p.closedOn}. אנא צרו איתנו קשר.`,
-    en: (p) => `Cancellation for this activity closed on ${p.closedOn}. Please contact us.`,
-    ru: (p) => `Отмена для этого занятия закрылась ${p.closedOn}. Пожалуйста, свяжитесь с нами.`
-  },
+  // ⚠ 'cancellation-closed' WAS HERE AND IS DELETED RATHER THAN LEFT UNUSED.
+  //
+  // It refused a family's own cancellation past the hard cutoff. That cutoff
+  // governs how much comes back and not whether somebody may stop attending —
+  // see _credit.js — so there is no longer a refusal to word. Kept as an orphan
+  // it would be three languages of dead copy, and indistinguishable from a key
+  // whose only caller was renamed; the code still travels on the cancellation
+  // view, where the dialog turns it into "the window closed, nothing comes
+  // back" BEFORE anything is confirmed.
   'not-approved-for-payment': {
     he: (p) => `ההרשמה הזו ${p.status}. אפשר לשלם רק על מקום מאושר.`,
     en: (p) => `This registration is ${p.status}. Only an approved place can be paid for.`,

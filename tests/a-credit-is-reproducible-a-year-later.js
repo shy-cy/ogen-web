@@ -83,14 +83,23 @@ H.eq(C.creditFor(reg(), at('2026-11-25T12:00:00Z')).courseCredit -
      C.creditFor(reg({ cancellation: { mode: 'prorated' } }), at('2026-11-25T12:00:00Z')).courseCredit,
   3000, 'flat and prorated part company by exactly 30 EUR on 25 November, and nowhere else');
 
-console.log('\n[after the hard cutoff: nothing, and the guardian is refused]');
+console.log('\n[after the hard cutoff: nothing comes back, and cancelling still works]');
 const shut = C.creditFor(reg(), at('2027-01-10T12:00:00Z'));
 H.eq(shut.total, 0, 'nothing is creditable');
 H.eq(shut.feeCredit, 0, 'not the fee');
 H.eq(shut.courseCredit, 0, 'not the course');
-H.eq(shut.guardianMayCancel, false, 'and the guardian cannot cancel at all');
-H.eq(shut.reason, 'cancellation-closed', 'the refusal names itself');
-H.eq(shut.closedOn, '2026-12-23', 'and carries the date, so the 409 can say which one');
+// ⚠ THIS USED TO BE false, AND IT WAS THE WRONG HALF OF THE RULE.
+//
+// The cutoff decides how much money comes back. It was also deciding whether a
+// family could stop attending at all, which is not a question about money — and
+// creditForSession() has never read it that way: past its own deadline an
+// evening is still cancellable and simply earns nothing. Reported from QA as "I
+// don't understand why a family should be rejected to cancel their course. They
+// can cancel, but not get a refund."
+H.eq(shut.guardianMayCancel, true,
+  'the guardian may still cancel — the cutoff ends the CREDIT, not the registration');
+H.eq(shut.reason, 'cancellation-closed', 'and the zero says why it is a zero');
+H.eq(shut.closedOn, '2026-12-23', 'carrying the date, so the dialog can name it before anybody confirms');
 // The cutoff governs ENTITLEMENT, not the ability to end a registration. An
 // admin cancelling in week nine for a safety reason still goes through and
 // credits nothing — a policy about money must not be what prevents it.
