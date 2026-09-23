@@ -31,84 +31,7 @@
     "ru": "Уроки иврита для детей 6–10 лет в центре «Оген». Чтение, письмо и разговорный иврит, а также знакомство с Израилем, еврейскими праздниками и культурой."
   },
   "facts": {
-    "ages": {
-      "min": 6,
-      "max": 10
-    },
-    "schedule": {
-      "frequency": "weekly",
-      "sessions": [
-        {
-          "day": 3,
-          "time": "16:00"
-        }
-      ],
-      "legacyText": {
-        "he": "ימי רביעי, 16:30",
-        "en": "",
-        "ru": ""
-      }
-    },
-    "duration": {
-      "startDate": "2026-10-14",
-      "endDate": "2026-12-23",
-      "sessionCount": 11,
-      "sessionMinutes": 90,
-      "sessionDates": [
-        {
-          "date": "2026-10-14",
-          "status": "scheduled"
-        },
-        {
-          "date": "2026-10-21",
-          "status": "scheduled"
-        },
-        {
-          "date": "2026-10-28",
-          "status": "scheduled"
-        },
-        {
-          "date": "2026-11-04",
-          "status": "scheduled"
-        },
-        {
-          "date": "2026-11-11",
-          "status": "scheduled"
-        },
-        {
-          "date": "2026-11-18",
-          "status": "scheduled"
-        },
-        {
-          "date": "2026-11-25",
-          "status": "scheduled"
-        },
-        {
-          "date": "2026-12-02",
-          "status": "scheduled"
-        },
-        {
-          "date": "2026-12-09",
-          "status": "scheduled"
-        },
-        {
-          "date": "2026-12-16",
-          "status": "scheduled"
-        },
-        {
-          "date": "2026-12-23",
-          "status": "scheduled"
-        }
-      ],
-      "legacyText": {
-        "he": "90 דקות, עם הפסקה באמצע.",
-        "en": "",
-        "ru": ""
-      }
-    },
     "groupSize": {
-      "groups": 2,
-      "maxPerGroup": 10,
       "overrideText": {
         "he": "קבוצות קטנות ",
         "en": "Small groups",
@@ -120,36 +43,18 @@
         "ru": ""
       }
     },
-    "instructionLanguage": {
-      "he": "עברית ואנגלית",
-      "en": "Hebrew and English",
-      "ru": "Hebrew and English"
-    },
-    "prerequisites": {
-      "he": "מתחילים",
-      "en": "Beginners",
-      "ru": "Beginners"
-    },
-    "location": {
-      "text": {
-        "he": "לימסול",
-        "en": "Limassol",
-        "ru": "Limassol"
-      }
-    },
-    "address": {
-      "text": {
-        "he": "",
-        "en": "",
-        "ru": ""
-      }
-    },
     "price": {
       "registrationFee": 50,
       "fullPrice": 330,
       "perHourOverride": null,
       "perSessionPrice": null,
       "showPerLesson": false,
+      "lateDropIn": {
+        "enabled": false,
+        "hoursBefore": null,
+        "price": null
+      },
+      "bundles": [],
       "legacyText": {
         "he": "דמי הרשמה של 50 אירו + 360 אירו ל-12 שיעורים",
         "en": "",
@@ -189,11 +94,11 @@
       "logo": "/images/activities/hebrew4kids-sponsors-spo-mtd1o2lk-3-a52febae.png"
     }
   ],
-  "isoUpdated": "2026-09-17T16:05:25.887Z",
+  "isoUpdated": "2026-09-23T13:15:40.457Z",
   "isoCreated": "2026-08-28T14:55:38.930Z",
-  "lastEditedBy": "system",
+  "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
-  "lastPublishedAt": "2026-09-17T15:50:32.990Z",
+  "lastPublishedAt": "2026-09-23T13:15:40.457Z",
   "factVisibility": {
     "ages": "public",
     "schedule": "public",
@@ -222,9 +127,121 @@
     }
   },
   "seriesId": "act-ac164520eacd1b92",
-  "retiredImages": [
-    "images/activities/hebrew4kids-teachers-tea-mtcyrd47-1-c380c5da.jpg",
-    "images/activities/hebrew4kids-teachers-tea-mtd1nrnl-2-ebfa50f0.jpg",
-    "images/activities/hebrew4kids-sponsors-spo-mtd1o2lk-3.png"
+  "groups": [
+    {
+      "groupId": "g-default",
+      "name": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      },
+      "capacity": 20,
+      "teacherIds": [],
+      "facts": {
+        "ages": {
+          "min": 6,
+          "max": 10
+        },
+        "schedule": {
+          "frequency": "weekly",
+          "sessions": [
+            {
+              "day": 3,
+              "time": "16:00"
+            }
+          ]
+        },
+        "duration": {
+          "startDate": "2026-10-14",
+          "endDate": "2026-12-23",
+          "sessionCount": 11,
+          "sessionMinutes": 90,
+          "sessionDates": [
+            {
+              "date": "2026-10-14",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-10-21",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-10-28",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-11-04",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-11-11",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-11-18",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-11-25",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-12-02",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-12-09",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-12-16",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-12-23",
+              "status": "scheduled"
+            }
+          ],
+          "legacyText": {
+            "he": "90 דקות, עם הפסקה באמצע.",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "instructionLanguage": {
+          "codes": [
+            "he",
+            "en"
+          ],
+          "text": {
+            "he": "עברית ואנגלית",
+            "en": "Hebrew and English",
+            "ru": "Hebrew and English"
+          }
+        },
+        "prerequisites": {
+          "level": "beginner",
+          "text": {
+            "he": "מתחילים",
+            "en": "Beginners",
+            "ru": "Beginners"
+          }
+        },
+        "location": {
+          "text": {
+            "he": "לימסול",
+            "en": "Limassol",
+            "ru": "Limassol"
+          }
+        },
+        "address": {
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        }
+      }
+    }
   ]
 }
