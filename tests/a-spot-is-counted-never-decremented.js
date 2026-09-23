@@ -167,25 +167,75 @@ const REG_DEFAULT_DAYS = require(H.fnPath('_activity-registration')).DEFAULT_EXP
   H.eq(over.left, -1, 'and the shortfall is a real number an admin can act on');
 
   console.log('\n[named groups bucket the same count, and the pool does not]');
-  [['named course', namedCourse], ['named drop-in', namedDropin]].forEach(([label, activity]) => {
-    const held = [
-      make(activity, 1, { groupId: 'g-beginners' }),
-      make(activity, 2, { groupId: 'g-beginners' }),
-      make(activity, 3, { groupId: 'g-advanced' })
-    ];
-    const r = R.capacityReport(activity, held, NOW);
-    H.eq(r.capacity, 17, label + ': capacity is the SUM of the named capacities, not a product');
-    H.eq(r.named.length, 2, label + ': one row per group');
-    H.eq(r.named[0].taken, 2, label + ': beginners has two');
-    H.eq(r.named[0].left, 5, label + ': and five left');
-    H.eq(r.named[1].taken, 1, label + ': advanced has one');
-    // Bucketing is not one extra read: the registrations were already fetched.
-    const full = held.concat([4, 5, 6, 7, 8].map((n) => make(activity, n, { groupId: 'g-beginners' })));
-    const rf = R.capacityReport(activity, full, NOW);
-    H.eq(R.hasRoom(rf, 'g-beginners'), false, label + ': beginners is full');
-    H.eq(R.hasRoom(rf, 'g-advanced'), true, label + ': while the activity still has room overall');
-    H.eq(rf.left, 9, label + ': which is the whole reason capacity has to be per group');
+  const heldIn = (activity) => [
+    make(activity, 1, { groupId: 'g-beginners' }),
+    make(activity, 2, { groupId: 'g-beginners' }),
+    make(activity, 3, { groupId: 'g-advanced' })
+  ];
+  const cHeld = heldIn(namedCourse);
+  const r = R.capacityReport(namedCourse, cHeld, NOW);
+  H.eq(r.capacity, 17, 'capacity is the SUM of the named capacities, not a product');
+  H.eq(r.named.length, 2, 'one row per group');
+  H.eq(r.named[0].taken, 2, 'beginners has two');
+  H.eq(r.named[0].left, 5, 'and five left');
+  H.eq(r.named[1].taken, 1, 'advanced has one');
+  // Bucketing is not one extra read: the registrations were already fetched.
+  const full = cHeld.concat([4, 5, 6, 7, 8].map((n) => make(namedCourse, n, { groupId: 'g-beginners' })));
+  const rf = R.capacityReport(namedCourse, full, NOW);
+  H.eq(R.hasRoom(rf, 'g-beginners'), false, 'beginners is full');
+  H.eq(R.hasRoom(rf, 'g-advanced'), true, 'while the activity still has room overall');
+  H.eq(rf.left, 9, 'which is the whole reason capacity has to be per group');
+
+  // ⚠ AND A DROP-IN REPORTS NO ACTIVITY-LEVEL CAPACITY AT ALL, which this block
+  // used to assert the opposite of — it ran the two types through one loop and
+  // required identical answers.
+  //
+  // They are not the same question. `submit` guards on `type !== 'dropin'`
+  // before it asks hasRoom(), because counting registrations against the room
+  // once refused the twenty-first family on an activity that was never more than
+  // half full on the night. So the number in facts.groupSize governs
+  // capacityForDate() and nothing else, and reporting it here produced "4 of 3
+  // places — Over capacity" on the admin roster: a screen asking a course's
+  // question, on an activity where nothing was over anything.
+  console.log('\n[a drop-in is not capped by the room, and the report says so]');
+  const dHeld = heldIn(namedDropin);
+  const dr = R.capacityReport(namedDropin, dHeld, NOW);
+  H.eq(dr.perSession, true, 'the report says which question it is answering');
+  H.eq(dr.capacity, null, 'a drop-in has no activity-level capacity');
+  H.eq(dr.left, null, 'so nothing is "left" to run out');
+  H.eq(dr.over, false, 'and it can never be over capacity');
+  H.eq(dr.taken, 3, 'the COUNT is real — three hold a registration');
+  H.eq(dr.named.length, 2, 'the rows are still there, and still bucket');
+  H.eq(dr.named[0].taken, 2, 'beginners has two of them');
+  H.eq(dr.named[0].capacity, null, 'against no limit');
+  H.eq(dr.named[0].over, false, 'so a row cannot be over either');
+  const dFull = dHeld.concat([4, 5, 6, 7, 8].map((n) => make(namedDropin, n, { groupId: 'g-beginners' })));
+  H.eq(R.hasRoom(R.capacityReport(namedDropin, dFull, NOW), 'g-beginners'), true,
+    'seven in a two-place group is not full — forty can be registered and eight turn up');
+  // The course keeps saying what it always said, in the same call.
+  H.eq(R.capacityReport(namedCourse, dHeld, NOW).perSession, false,
+    'and a course is untouched by any of this');
+
+  console.log('\n[the room is real, and it is counted per evening]');
+  // Where the number DOES bite. `booked` and `attended` occupy a place;
+  // cancelled and no-show do not, because the question is "is there room" and
+  // somebody who did not come is not in the room.
+  const seat = (n, date, status) => ({
+    participantId: 'p-' + n, activityId: namedDropin.activityId,
+    sessionDate: date, status: status, groupId: 'g-beginners'
   });
+  const evenings = [
+    seat(1, '2026-10-06', 'booked'), seat(2, '2026-10-06', 'attended'),
+    seat(3, '2026-10-06', 'cancelled'), seat(4, '2026-10-06', 'no-show'),
+    seat(5, '2026-10-13', 'booked')
+  ];
+  const six = R.capacityForDate(namedDropin, evenings, '2026-10-06');
+  H.eq(six.capacity, 17, 'the evening IS capped, by the same groupSize figure');
+  H.eq(six.taken, 2, 'booked and attended hold a seat; cancelled and no-show do not');
+  H.eq(R.capacityForDate(namedDropin, evenings, '2026-10-13').taken, 1,
+    'and another evening counts its own, independently');
+  H.eq(R.capacityForDate(namedDropin, evenings, '2026-10-20').taken, 0,
+    'an evening nobody booked is empty rather than missing');
 
   console.log('\n[a place taken while the activity was pooled is counted, and belongs to no group]');
   // Real, and the honest reading: the place IS occupied, and nobody knows by

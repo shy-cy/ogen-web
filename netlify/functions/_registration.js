@@ -105,10 +105,31 @@ function countSpots(regs, now) {
 // number to zero would silently refuse every registration for an activity
 // nobody had finished filling in. Same direction as every other blank in this
 // codebase, which resolves towards the family.
+// ⚠ AND A DROP-IN HAS NO ACTIVITY-LEVEL CAPACITY AT ALL, which is a rule about
+// the ROOM rather than a rule about the screen.
+//
+// Registering for a drop-in is deliberately uncapped — `submit` guards on
+// `activity.type !== 'dropin'` before it asks hasRoom(), because counting
+// registrations against the room once refused the twenty-first family on an
+// activity that was never more than half full on the night, with a refusal
+// reading "this activity is full" that was untrue of every actual evening.
+// Forty can be registered and eight turn up.
+//
+// So the number stored in facts.groupSize governs capacityForDate() and nothing
+// else here. Reporting it beside a count that is deliberately uncapped produced
+// "4 of 3 places — Over capacity" on the admin roster: the count was right, the
+// limit was right, and putting them in one sentence was wrong. It looked like a
+// policy being ignored and was a screen asking a course's question.
+//
+// Answered in the module that owns the rule rather than by each reader, for the
+// same reason offersAChoice() is: activityView() was already writing
+// `type === 'dropin' ? null : report.capacity` at its own call site, and one
+// copy of a rule is how the other copy comes to disagree.
 function capacityReport(activity, regs, now) {
   const named = groups.groupList(activity);
   const counts = countSpots(regs, now);
-  const capacity = groups.totalCapacity(activity);
+  const perSession = (activity && activity.type) === 'dropin';
+  const capacity = perSession ? null : groups.totalCapacity(activity);
 
   // ⚠ WITH ONE GROUP, A REGISTRATION THAT NAMES NO GROUP BELONGS TO IT.
   //
@@ -127,7 +148,7 @@ function capacityReport(activity, regs, now) {
   const unassigned = counts.byGroup[''] || 0;
 
   const rows = named.map((g) => {
-    const cap = g.capacity == null || g.capacity === '' ? null : Number(g.capacity);
+    const cap = perSession || g.capacity == null || g.capacity === '' ? null : Number(g.capacity);
     const has = cap != null && isFinite(cap) && cap > 0 ? cap : null;
     const taken = (counts.byGroup[g.groupId] || 0) +
                   (sole && sole.groupId === g.groupId ? unassigned : 0);
@@ -145,6 +166,11 @@ function capacityReport(activity, regs, now) {
     capacity: capacity,
     taken: counts.taken,
     left: capacity == null ? null : capacity - counts.taken,
+    // Which question this report is answering, said out loud rather than left
+    // for a reader to infer from a null. A screen showing a drop-in has to say
+    // something different from "no limit set", which on a course means somebody
+    // never finished filling the activity in — here it is the design.
+    perSession: perSession,
     // Stated plainly rather than pretended impossible. Two submissions arriving
     // together both read "one spot left" and both write; the window is a few
     // hundred milliseconds and there is no atomic increment to close it. The

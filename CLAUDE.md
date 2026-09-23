@@ -2684,6 +2684,83 @@ Counting registrations against the room refused the twenty-first family from eve
 registering, on an activity that was never more than half full on the night, and
 the refusal read *"this activity is full"* — untrue of every actual evening.
 
+⚠ **AND THE ROSTER WENT ON PRINTING THE ROOM'S NUMBER BESIDE THAT COUNT.** It
+read **`4 of 3 places · Over capacity`** on an activity where nothing was over
+anything and no rule had been broken. Reported as *"as each session is on its
+own, the count shouldn't be for the activity but per session"*, and separately as
+*"why should we enter capacity if this is ignored"* — which is the question the
+screen was provoking: a limit shown, breached, and nothing happening reads as a
+setting nobody honours.
+
+Neither number was wrong. **Putting them in one sentence was.** `capacityReport()`
+now answers for the drop-in itself — `capacity`, `left` and every group row are
+`null`, `over` is always false, and `taken` stays real — with a `perSession` flag
+so a screen says *"a registration holds no place on any evening"* rather than
+*"no limit set"*, which on a course means somebody never finished filling the
+activity in. Decided **in the module that owns the rule** rather than by each
+reader: `activityView()` was already writing `type === 'dropin' ? null :
+report.capacity` at its own call site, and one copy of a rule is how the other
+copy comes to disagree.
+
+### ⚠ An evening is the unit, and the admin had no screen for one
+
+The room is real and is enforced by `capacityForDate()`, per date. The **family's
+own picker has shown that figure since Phase 7** — it dims a full evening and
+says *why*. The admin never got it: the `register` action returned it to nobody,
+because there was no screen, and it sat in `UNREACHED` for releases. The bug
+above is what that gap looks like from the other end — with no per-evening
+screen, the only capacity an admin could be shown was the wrong one.
+
+`/admin/registrations.html` draws a **date strip** above the table, from the
+`register` action: one chip per evening with `booked / room`, marked when full,
+plus an `All` chip carrying the registration count. Picking one **swaps what the
+single table is about** rather than adding a second — a second table would put a
+count of registrations above a count of a room, which is the pairing that made
+this wrong in the first place. A tab was the alternative and was rejected: the
+two questions an admin opens this for on the night — *is tonight full*, and *who
+is coming* — are one glance apart with counts on the chips and two clicks apart
+behind a tab.
+
+Four details carry it:
+
+- ⚠ **The strip counts EVERY evening, not the one asked for.** `forActivity()`
+  narrows by date as a prefix optimisation, so building the strip from the
+  narrowed read showed every other chip at nought the instant an admin clicked
+  one. Counting them in the browser was the other option and is a second
+  implementation of `capacityForDate()` in a place that cannot see the calendar —
+  the rule stays server-side, exactly as the family's picker gets its list.
+- **Past evenings are in the strip.** `bookableDates()` is the whole calendar
+  rather than what is still to come, and last Tuesday's register is what somebody
+  reconciling attendance wants. It opens on the **next** evening on or after
+  today, falling back to the last one when the activity is over.
+- **`full` is grey, not red.** A full evening is the activity working. The only
+  red on that screen belongs to over capacity — which is still possible per
+  evening, for the same race the course has, and is still said plainly — and to
+  cancelling.
+- **The line branches on the report, never on the activity type.** `perSession`
+  travels with the count, so a screen cannot decide this differently from the
+  function that did the counting.
+
+⚠ **AND `markAttendance` FINALLY HAS A DOOR.** It had existed since Phase 7 with
+nothing calling it, so the QR page was the only thing that wrote attendance and a
+teacher with no signal could not take the register at all. Present / No-show sit
+on each row of the evening register, behind `canApprove`, writing into the same
+`att-` blob through the same `transition()` — so the money, the ledger and the
+family's own page see one thing. What differs is `by`, which is the admin's
+address rather than `self`. A **cancelled** booking is not markable: the evening
+was given back, and marking somebody present for a place they do not hold would
+put them in a room they are not counted in.
+
+**A no-show frees the place and still owes for it.** Those are two questions and
+`capacityForDate()` answers only the first — somebody who did not come is not in
+the room, and whether they are billed for it lives on their own record. A test
+marks one and checks both halves move independently.
+
+`recordSessionPayment` is what is left in `UNREACHED`: cash at the desk for one
+evening. It is now a **control on a screen that exists** rather than a screen
+that does not, and it belongs behind the `cancel` axis rather than `approve`,
+because it moves money.
+
 ### Cancelling one evening is all or nothing
 
 `registration.sessionCancelHours`, a single number, no modes and no proration —
@@ -4664,10 +4741,15 @@ endpoint is not: nobody presses it, nothing 400s, and the capability is simply
 absent from the product while its code sits in the repository passing its tests.
 An unreachable action is allowed and has to be **named** in `UNREACHED` with its
 reason, so writing an endpoint is no longer enough to consider a thing built. It
-prints the remaining three on every run: `register`, `markAttendance` and
-`recordSessionPayment` &mdash; **there is no admin screen for an evening**, so
-attendance is written by the QR check-in page and nothing else, and a teacher
-with no signal cannot take the register.
+prints what is left on every run &mdash; **`recordSessionPayment`**, cash at the
+desk for one evening.
+
+⚠ **`register` AND `markAttendance` CAME OFF THAT LIST, and how is the point.**
+The gap they named &mdash; no admin screen for an evening &mdash; was found from
+the *other* end, by somebody reading `4 of 3 places · Over capacity` on a drop-in
+roster. The list is not an excuse column: every line on it is a capability
+sitting in the repository, passing its tests, that nobody using the product can
+reach. See **An evening is the unit**.
 
 **Every money control lives in one panel, not on the row.** Money is its own
 permission axis, and the ledger is the context all three controls need: what a

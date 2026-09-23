@@ -383,6 +383,37 @@ input:disabled,textarea:disabled,select:disabled{background:#f2f0ea;color:#8b8b8
 .queue .acts button.go{background:var(--olive);border-color:var(--olive);color:#fff;}
 .queue .acts button.no{border-color:#e0cfc8;color:var(--danger);}
 
+/* ---- the evenings on a drop-in --------------------------------------------
+   ⚠ AN EVENING IS THE UNIT HERE, the way a group is the unit on a course, and
+   this screen used to count registrations against the size of the room and call
+   the result "over capacity" — two numbers answering different questions,
+   printed as one sentence.
+
+   The strip carries the count that means something: booked out of the room, per
+   date, from capacityForDate(). Picking one swaps what the table under it is
+   about, which is why these are buttons with aria-pressed rather than links.
+
+   `full` is a plain grey state and NOT a warning colour. A full evening is the
+   activity working, and the only red on this screen belongs to over capacity and
+   to cancelling. */
+.date-strip{
+  display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;
+}
+.date-chip{
+  font-family:inherit;display:flex;flex-direction:column;gap:1px;align-items:flex-start;
+  padding:7px 12px;border-radius:8px;border:1px solid #d7cfbb;background:#fff;
+  cursor:pointer;text-align:start;
+}
+.date-chip b{font-size:13px;font-weight:800;white-space:nowrap;}
+.date-chip span{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;}
+.date-chip:hover{background:var(--stone);}
+.date-chip:focus-visible{outline:2px solid var(--olive);outline-offset:2px;}
+.date-chip.full{background:#f2efe6;}
+.date-chip.full span{color:#6a6658;}
+.date-chip.on{background:var(--navy);border-color:var(--navy);}
+.date-chip.on b{color:#fff;}
+.date-chip.on span{color:#cfdae2;}
+
 /* The age flag is ADVISORY and the styling has to say so: an out-of-range age
    is a row to look at, never a row that was refused. Amber, not red. */
 .flag{

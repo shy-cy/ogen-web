@@ -522,7 +522,14 @@ exports.handler = async (event) => {
           return json(400, { error: 'This activity runs by the term, so it has a queue rather than a register.' });
         }
         const date = body.sessionDate;
-        const all = await attendance.forActivity(activity.activityId, date || undefined);
+        // ⚠ EVERY EVENING, NOT JUST THE ONE ASKED FOR, because the date strip
+        // above the table has to say how full each one is — and `forActivity`
+        // narrowed by date would count only the date already chosen, so every
+        // other chip would read nought taken. Counting them in the browser was
+        // the alternative and is a second implementation of capacityForDate() in
+        // a place that cannot see the calendar; the rule stays server-side, the
+        // same way the family's own picker gets its list.
+        const all = await attendance.forActivity(activity.activityId);
         const rows = [];
         for (const att of all.filter((a) => !date || a.sessionDate === date)) {
           const account = await accounts.getAccount(att.accountId);
@@ -538,9 +545,24 @@ exports.handler = async (event) => {
         return json(200, {
           ok: true,
           activity: { activityId: activity.activityId, slug: activity.slug, title: activity.title },
-          dates: attendance.bookableDates(activity, groups.ANY),
+          // ⚠ EACH DATE WITH ITS OWN ROOM. This was a list of date strings, which
+          // is what the check-in codes need and not what a register needs: the
+          // question an admin opens this screen with is "is tonight full", and a
+          // bare date cannot answer it. capacityForDate() counts `booked` and
+          // `attended` only — a no-show is not in the room, whatever they still
+          // owe for the evening.
+          //
+          // Past evenings are included deliberately. bookableDates() is the
+          // whole calendar rather than what is still to come, and last Tuesday's
+          // register is exactly what somebody reconciling attendance wants.
+          dates: attendance.bookableDates(activity, groups.ANY)
+            .map((d) => R.capacityForDate(activity, all, d)),
           sessionDate: date || null,
           capacity: date ? R.capacityForDate(activity, all, date) : null,
+          // How many hold a REGISTRATION, which is a different question from how
+          // many are in the room on any evening and is deliberately uncapped.
+          registered: (await store.forActivity(activity.activityId))
+            .filter((r) => R.holdsASpot(r)).length,
           register: rows
         });
       }

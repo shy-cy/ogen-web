@@ -77,12 +77,19 @@ console.log('\n[and every action the server handles, something can reach]');
 const UNREACHED = {
   // Not a queue action at all — the shape of the reply to an unknown one.
   auth: 'the session handshake, called on load rather than from a control',
-  // The drop-in register and its money. There IS no admin screen for an evening
-  // yet: attendance is written by the QR check-in page and nothing else, so a
-  // teacher with no signal cannot take the register. A real gap, not a decision.
-  register: 'NO SCREEN YET — the evening register an admin would open on the night',
-  markAttendance: 'NO SCREEN YET — today only the QR check-in page marks anybody present',
-  recordSessionPayment: 'NO SCREEN YET — cash for one evening cannot be recorded'
+  // ⚠ `register` AND `markAttendance` CAME OFF THIS LIST, and what took them off
+  // is worth keeping: the gap they named was found from the OTHER end. The
+  // Roster counted registrations against the size of the room and called the
+  // result "over capacity", because an evening — which is the unit on a drop-in
+  // — had no screen at all. The count that means something had existed in
+  // capacityForDate() since Phase 7 and was returned to nobody.
+  //
+  // That is what this list is for. It is not an excuse column; it is a standing
+  // question, and every line on it is a capability sitting in the repository,
+  // passing its tests, that nobody using the product can reach.
+  recordSessionPayment: 'NO SCREEN YET — cash at the desk for one evening cannot be recorded. ' +
+    'The evening register now exists, so this is a control on it rather than a screen; ' +
+    'it is behind the CANCEL axis, not approve, because it moves money'
 };
 // ⚠ NAMED, not only sent as `action: '…'`. Three of them travel differently:
 // approve goes through act('approve', …) as a bare argument, and the two

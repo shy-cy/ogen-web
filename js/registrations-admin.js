@@ -17,7 +17,8 @@
 // every action and assumes this client is hostile.
 (function () {
   var API = '/api/admin-registrations';
-  var S = { activities: [], slug: null, queue: null, canApprove: false, canCancel: false };
+  var S = { activities: [], slug: null, queue: null, register: null, date: null,
+            canApprove: false, canCancel: false };
   // Written out rather than shown as a code: "ru" beside a draft is something an
   // admin has to decode, and this line is the whole warning.
   var LANG_NAME = { he: 'Hebrew', en: 'English', ru: 'Russian' };
@@ -67,9 +68,29 @@
   // both write; there is no atomic increment to close that window, and an extra
   // visible record an admin can reject is a smaller problem than a counter that
   // silently lost an update.
+  // ⚠ AND ON A DROP-IN IT SAYS SOMETHING ELSE, because it is answering a
+  // different question. Registering for a drop-in is uncapped on purpose —
+  // forty families can hold a registration and eight turn up — so pairing that
+  // count with the size of the room produced "4 of 3 places · Over capacity" on
+  // an activity where nothing was over anything and no rule had been broken.
+  //
+  // The room is real and is enforced per evening, in capacityForDate(). So the
+  // line says the count with no limit beside it and points at where the limit
+  // lives, and the strip under it carries the actual numbers.
+  //
+  // `perSession` comes from the report rather than from the activity type, so a
+  // screen cannot decide this differently from the function that counted.
   function renderCapacity(cap) {
     var box = $('capacity');
     box.innerHTML = '';
+    if (cap.perSession) {
+      box.appendChild(el('span', {}, [
+        el('b', { text: String(cap.taken) }),
+        el('span', { text: ' registered · a registration holds no place on any evening' })
+      ]));
+      box.appendChild(el('span', { class: 'group', text: 'The room is counted per evening, below' }));
+      return;
+    }
     var taken = el('span', {}, [
       el('b', { class: cap.over ? 'over' : '', text: String(cap.taken) }),
       el('span', { text: cap.capacity == null ? ' registered · no limit set'
@@ -273,10 +294,18 @@
     if (q.activity.type !== 'dropin') {
       $('codes-panel').hidden = true;
       $('bundles-panel').hidden = true;
+      $('dates').hidden = true;
     }
 
     var box = $('queue');
     box.innerHTML = '';
+
+    // ⚠ ONE TABLE, TWO SUBJECTS. With an evening picked the table is that
+    // evening's register; with "All" it is the registrations. A second table
+    // below the first would put a count of registrations above a count of a
+    // room, which is the pairing that made this screen wrong in the first place.
+    if (q.activity.type === 'dropin' && S.date) return renderEvening(box);
+
     if (!q.registrations.length) {
       box.appendChild(el('p', { class: 'hint', text: 'Nobody has registered for this activity yet.' }));
       return;
@@ -305,6 +334,193 @@
     box.appendChild(el('table', { class: 'queue' }, [
       el('thead', {}, [head]), el('tbody', {}, rows)
     ]));
+  }
+
+  // ---------- the evenings ----------
+  //
+  // ⚠ AN EVENING IS THE UNIT ON A DROP-IN, the way a group is the unit on a
+  // course, and this screen did not know it. The Roster counted REGISTRATIONS
+  // against the size of the room and called the result "over capacity" — two
+  // numbers that answer different questions, printed as one sentence. Reported
+  // as: "as each session is on its own, the count shouldn't be for the activity
+  // but per session."
+  //
+  // The count that matters is per date, and it has existed the whole time:
+  // capacityForDate() counts `booked` and `attended` on one evening, the family's
+  // own picker has shown it since Phase 7, and the `register` action returned it
+  // to nobody, because there was no screen. That gap was named in UNREACHED and
+  // closed here.
+  //
+  // ⚠ A STRIP RATHER THAN A SECOND TAB. The two questions an admin opens this
+  // for on the night — is tonight full, and who is coming — are one glance apart
+  // if the dates carry their own counts, and two clicks apart behind a tab. It
+  // keeps ONE table: picking an evening swaps what the table is about, and the
+  // "All" chip is the registrations list with an honest uncapped line.
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function shortDate(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+    if (!m) return String(iso || '');
+    return String(+m[3]) + ' ' + MONTHS[+m[2] - 1];
+  }
+
+  // The next evening on or after today, because that is the register somebody
+  // standing in the room wants. Falls back to the LAST one when the activity is
+  // over — an empty strip selection would draw a table about nothing.
+  function defaultDate(dates) {
+    if (!dates || !dates.length) return null;
+    var today = new Date().toISOString().slice(0, 10);
+    for (var i = 0; i < dates.length; i++) {
+      if (dates[i].sessionDate >= today) return dates[i].sessionDate;
+    }
+    return dates[dates.length - 1].sessionDate;
+  }
+
+  function renderStrip() {
+    var box = $('dates');
+    box.innerHTML = '';
+    var d = S.register;
+    if (!d || !(d.dates || []).length) { box.hidden = true; return; }
+    box.hidden = false;
+
+    box.appendChild(el('button', {
+      type: 'button',
+      class: 'date-chip' + (S.date == null ? ' on' : ''),
+      'aria-pressed': S.date == null ? 'true' : 'false',
+      onclick: function () { S.date = null; renderStrip(); renderQueue(); }
+    }, [
+      el('b', { text: 'All' }),
+      el('span', { text: d.registered + ' registered' })
+    ]));
+
+    d.dates.forEach(function (c) {
+      // Uncapped is not "full" and must not be styled as a warning: a blank
+      // group size means nobody finished filling the activity in, and reading it
+      // as zero would make every evening look shut.
+      var full = c.capacity != null && c.left <= 0;
+      box.appendChild(el('button', {
+        type: 'button',
+        class: 'date-chip' + (S.date === c.sessionDate ? ' on' : '') + (full ? ' full' : ''),
+        'aria-pressed': S.date === c.sessionDate ? 'true' : 'false',
+        onclick: function () { loadRegister(c.sessionDate); }
+      }, [
+        el('b', { text: shortDate(c.sessionDate) }),
+        el('span', { text: c.capacity == null
+          ? c.taken + ' booked'
+          : c.taken + ' / ' + c.capacity + (full ? ' · full' : '') })
+      ]));
+    });
+  }
+
+  var SEAT = { booked: 'Booked', attended: 'Attended', 'no-show': 'No-show',
+               cancelled: 'Cancelled' };
+
+  function renderEvening(box) {
+    var d = S.register;
+    var cap = d.capacity;
+    var rows = (d.register || []).slice().sort(function (a, b) {
+      return String(a.name).localeCompare(String(b.name));
+    });
+
+    // The room, on THIS evening. Over capacity is possible here for the reason
+    // it is possible on a course — two bookings arriving together both read one
+    // place left — and it is said plainly rather than pretended impossible.
+    box.appendChild(el('div', { class: 'capacity-line' }, [
+      el('span', {}, [
+        el('b', { class: cap && cap.over ? 'over' : '', text: String(cap ? cap.taken : 0) }),
+        el('span', { text: cap && cap.capacity != null
+          ? ' of ' + cap.capacity + ' places · ' + shortDate(d.sessionDate)
+          : ' booked · no room size set · ' + shortDate(d.sessionDate) })
+      ]),
+      cap && cap.over ? el('span', { class: 'over', text: 'Over capacity' }) : null
+    ]));
+
+    if (!rows.length) {
+      box.appendChild(el('p', { class: 'hint',
+        text: 'Nobody has booked this evening yet. A registration holds no place on a date — '
+            + 'a family books each evening they are coming.' }));
+      return;
+    }
+
+    var head = el('tr', {}, ['Participant', 'Status', 'Paid / owed', '']
+      .map(function (h) { return el('th', { text: h }); }));
+    box.appendChild(el('table', { class: 'queue' }, [
+      el('thead', {}, [head]),
+      el('tbody', {}, rows.map(function (r) {
+        return el('tr', {}, [
+          el('td', { class: 'who' }, [
+            el('b', { text: r.name }),
+            el('span', { text: r.accountEmail || r.accountId })
+          ]),
+          el('td', {}, [el('span', { class: 'pill ' + r.status, text: SEAT[r.status] || r.status })]),
+          el('td', {}, [moneyCell(r)]),
+          el('td', {}, [markCell(r)])
+        ]);
+      }))
+    ]));
+  }
+
+  // ⚠ MARKING THE REGISTER, WHICH UNTIL NOW ONLY A QR CODE COULD DO.
+  //
+  // markAttendance has existed server-side since Phase 7 with nothing calling
+  // it, so the QR page was the only thing that wrote attendance — and a teacher
+  // with no signal in the room could not take the register at all. It writes
+  // into the same att- blob through the same transition(), so the money, the
+  // ledger and the family's own page see one thing; what differs is `by`, which
+  // is this admin's address rather than 'self'.
+  //
+  // A cancelled booking is not markable: the evening was given back, and marking
+  // somebody present for a place they do not hold would put them in a room they
+  // are not counted in.
+  function markCell(r) {
+    if (r.status === 'cancelled') return el('span', { class: 'why', text: '\u2014' });
+    if (!S.canApprove) {
+      return el('span', { class: 'why', title: 'Your role may open the register but not mark it',
+                          text: '\u2014' });
+    }
+    // The same `.acts` idiom the queue rows use, rather than a second set of
+    // row buttons with their own styling — one table, one shape for the controls
+    // in it.
+    return el('div', { class: 'acts' }, [
+      mark(r, 'attended', 'Present'),
+      mark(r, 'no-show', 'No-show')
+    ]);
+  }
+
+  function mark(r, status, label) {
+    return el('button', {
+      type: 'button',
+      class: status === 'attended' ? 'go' : '',
+      // Pressing the state it is already in is a no-op rather than a round trip
+      // that changes nothing and rewrites a history entry saying so.
+      disabled: r.status === status || null,
+      onclick: function () {
+        send({ action: 'markAttendance', participantId: r.participantId,
+               activityId: S.queue.activity.activityId, sessionDate: r.sessionDate,
+               status: status }).then(function (res) {
+          if (!res.ok) return message('err', (res.data && res.data.error) || 'That did not work');
+          message('ok', label + ' \u00b7 ' + r.name);
+          // The strip follows, because a no-show frees a place on that evening
+          // and the chip above the table says how many are in the room.
+          loadRegister(S.date);
+        });
+      }
+    }, [document.createTextNode(label)]);
+  }
+
+  function loadRegister(date) {
+    if (!S.slug) return Promise.resolve();
+    return send({ action: 'register', slug: S.slug, sessionDate: date || undefined })
+      .then(function (res) {
+        if (!res.ok) return message('err', (res.data && res.data.error) || 'Could not open the register');
+        S.register = res.data;
+        S.date = res.data.sessionDate || (date === null ? null : defaultDate(res.data.dates));
+        // First load asks with no date, so the default has to be fetched once it
+        // is known. Asking for every date up front would be one call per evening.
+        if (!res.data.sessionDate && S.date) return loadRegister(S.date);
+        renderStrip();
+        renderQueue();
+      });
   }
 
   // ---------- acting on a row ----------
@@ -691,12 +907,24 @@
   }
 
   function loadQueue(slug) {
+    // Switching activity forgets which evening was open — the dates belong to
+    // the activity, so carrying one across would ask for a date the new one does
+    // not meet on.
+    if (slug !== S.slug) { S.date = null; S.register = null; }
     S.slug = slug;
     renderPicker();
     return send({ action: 'queue', slug: slug }).then(function (res) {
       if (!res.ok) return message('err', (res.data && res.data.error) || 'Could not load the queue');
       S.queue = res.data;
       renderQueue();
+      // The strip is a second call and deliberately after the first paint: the
+      // registrations table is the thing that is already in hand, and a screen
+      // that waits for both to draw either is a screen that looks slower than it
+      // is. On a course there are no evenings and nothing is asked for.
+      // `undefined` the first time, so it lands on the next evening; S.date
+      // afterwards, so a refresh keeps whichever chip is open — including
+      // "All", which is a real choice and not an absent one.
+      if (res.data.activity.type === 'dropin') return loadRegister(S.register ? S.date : undefined);
     });
   }
 
