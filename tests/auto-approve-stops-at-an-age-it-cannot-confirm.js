@@ -175,8 +175,13 @@ const NOW = Date.parse('2026-08-01T09:00:00Z');
   github._files.set('activities/auto-named.json', JSON.stringify(
     F.setGroupFacts(Object.assign(JSON.parse(JSON.stringify(namedAuto)), {
       facts: Object.assign({}, namedAuto.facts, { price: { registrationFee: 90, fullPrice: 600 } }),
+      // ⚠ BOTH GROUPS STAY. Only the first is being renamed; dropping the second
+      // would leave a ONE-group activity, and one group is not a choice — the
+      // payload then carries no `groups` at all and the assertion below is
+      // reading a list the family is deliberately never shown.
       groups: [Object.assign({}, namedAuto.groups[0],
         { name: F.lang('רמה 1', 'Level 1', 'Уровень 1'), capacity: 7 })]
+        .concat(namedAuto.groups.slice(1))
     }), { ages: { min: 11, max: 14 } })));
   const after = (await store.getRegistration(noa, 'act-00000000000a0003')).frozen;
   H.eq(after.price.fullPrice, 300, 'the price the family agreed to is still 300');
@@ -185,6 +190,20 @@ const NOW = Date.parse('2026-08-01T09:00:00Z');
   // The live record moved, which is the whole point of checking.
   const live = await H.call(regs.handler, { action: 'activity', token: dana.token, slug: 'auto-named' });
   H.eq(live.body.activity.groups[0].name.en, 'Level 1', 'while the activity itself has genuinely changed');
+
+  // ⚠ AND ONE GROUP IS NOT A CHOICE. auto-course has a single group, so the
+  // payload carries no `groups` at all — the register panel draws no picker and
+  // the family is asked who is registering and nothing else.
+  //
+  // It came back as a select with ONE BLANK OPTION in it for a release. The
+  // payload keyed off `report.named`, which was the opt-in list of named groups
+  // and was null unless somebody had made one — so "are there named groups" and
+  // "is a choice being offered" were the same question until the day every
+  // activity got at least one group, and then they silently were not. The same
+  // line also made `full` permanently false on a one-group activity.
+  const sole = await H.call(regs.handler, { action: 'activity', token: dana.token, slug: 'auto-course' });
+  H.eq(sole.body.activity.groups, null,
+    'a one-group activity offers no group to choose between');
 
   H.done();
 })();

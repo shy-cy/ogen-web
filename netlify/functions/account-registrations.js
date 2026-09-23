@@ -147,8 +147,23 @@ function activityView(activity, report, lang) {
     // answer. A three-date preview lived here for a day and was a second,
     // poorer source for the same question.
     perSession: activity.type === 'dropin',
-    full: activity.type !== 'dropin' && !R.hasRoom(report, null) && !report.named,
-    groups: report.named
+    // ⚠ ONE GROUP IS NOT A CHOICE, AND THIS ASKS THE COUNT. Both of these keyed
+    // off `report.named`, which was the opt-in list of named groups and was null
+    // unless somebody had made one — so "are there named groups" and "is a
+    // choice being offered" were the same question. They stopped being the same
+    // the day every activity got at least one group, and both answers went
+    // wrong at once, silently:
+    //
+    //   · the register panel drew a Group select with ONE blank option on it,
+    //     asking a family to choose between one unnamed thing;
+    //   · `full` became permanently false, because a one-group activity always
+    //     has a `named` row — so a full course never said so.
+    //
+    // `offersAChoice()` is the rule written down once, in the module that owns
+    // it. The same mistake is why submissionErrors() asks the count rather than
+    // whether anybody typed a name.
+    full: activity.type !== 'dropin' && !R.hasRoom(report, null) && !groups.offersAChoice(activity),
+    groups: groups.offersAChoice(activity) && report.named
       ? report.named.map((g) => ({
           groupId: g.groupId,
           name: g.name,

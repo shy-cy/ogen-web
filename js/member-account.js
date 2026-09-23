@@ -44,6 +44,37 @@
   // the link as well.
   var MIN_PASSWORD = 8;
 
+  // ⚠ THE ATTEMPT COUNT IS THE BROWSER'S OWN, AND THAT IS THE WHOLE DESIGN.
+  //
+  // A person failing to sign in was told the same sentence eight times and then
+  // a ninth, with nothing saying they were running out of tries or that the
+  // door had shut — reported as "it doesn't lock", against a lock that was
+  // working the whole time.
+  //
+  // The server cannot be the one to say it. A wrong password and an address
+  // nobody has used answer identically ON PURPOSE: an attacker who learns
+  // dana@example.com has an Ogen account has learned she has children attending
+  // and roughly where they are on a Wednesday afternoon. "You have 3 tries left"
+  // can only be true of an account that exists, so sending it would make the
+  // refusal tell them apart — which is the one thing sign-in must never do.
+  //
+  // So the COUNTING moves to the browser, which is counting its own user's
+  // keystrokes rather than reporting anything about our records. The same words
+  // appear for an address with an account and one without, because the browser
+  // cannot tell and never asks. Nothing here is enforcement: the lock is still
+  // _account-store.js's, server-side, and unchanged.
+  //
+  // What it costs: a reload resets the display, and for an address with no
+  // account the advice to wait is unnecessary rather than wrong. Both are worth
+  // it against a refusal that reveals who has children at this centre.
+  //
+  // These two must match MAX_FAILED and LOCK_MS in _account-store.js — a browser
+  // cannot require a Netlify function, the same duplication MIN_PASSWORD has,
+  // pinned by the same test.
+  var MAX_SIGNIN_ATTEMPTS = 8;
+  var SIGNIN_LOCK_MINUTES = 15;
+  var signinFails = {};
+
   var lang = (document.documentElement.lang || 'he').slice(0, 2);
   if (['he', 'en', 'ru'].indexOf(lang) === -1) lang = 'he';
   var base = lang === 'he' ? '' : '/' + lang;
@@ -53,6 +84,8 @@
     he: {
       signInTitle: 'כניסה לאזור המשפחה', email: 'דוא״ל', password: 'סיסמה',
       signIn: 'כניסה', forgot: 'שכחתי סיסמה', noAccount: 'אין לכם חשבון עדיין?',
+      signinAttempt: 'ניסיון {n} מתוך {max}.',
+      signinLocked: 'יותר מדי ניסיונות — הכניסה חסומה ל־{min} דקות.',
       createAccount: 'פתיחת חשבון', haveAccount: 'כבר יש לכם חשבון?',
       signUpTitle: 'פתיחת חשבון', firstName: 'שם פרטי', lastName: 'שם משפחה',
       phone: 'טלפון', prefLang: 'שפה מועדפת',
@@ -171,6 +204,8 @@
     en: {
       signInTitle: 'Sign in', email: 'Email', password: 'Password',
       signIn: 'Sign in', forgot: 'Forgotten your password?', noAccount: 'No account yet?',
+      signinAttempt: 'Attempt {n} of {max}.',
+      signinLocked: 'Too many attempts — signing in is blocked for {min} minutes.',
       createAccount: 'Create an account', haveAccount: 'Already have an account?',
       signUpTitle: 'Create an account', firstName: 'First name', lastName: 'Last name',
       phone: 'Phone', prefLang: 'Preferred language',
@@ -291,6 +326,8 @@
     ru: {
       signInTitle: 'Вход', email: 'Эл. почта', password: 'Пароль',
       signIn: 'Войти', forgot: 'Забыли пароль?', noAccount: 'Ещё нет учётной записи?',
+      signinAttempt: 'Попытка {n} из {max}.',
+      signinLocked: 'Слишком много попыток — вход заблокирован на {min} минут.',
       createAccount: 'Создать учётную запись', haveAccount: 'Уже есть учётная запись?',
       signUpTitle: 'Создание учётной записи', firstName: 'Имя', lastName: 'Фамилия',
       phone: 'Телефон', prefLang: 'Предпочитаемый язык',
@@ -925,10 +962,26 @@
     var form = el('form', { onsubmit: function (e) {
       e.preventDefault();
       var done = busy(go);
+      var who = (e1.input.value || '').trim().toLowerCase();
       post(AUTH, { action: 'signin', email: e1.input.value, password: p1.input.value })
         .then(function (res) {
           done();
-          if (!res.ok) return say('err', failure(res));
+          if (!res.ok) {
+            // Counted per address, so trying a second address does not arrive
+            // already half way to the limit — and 401 only, because a network
+            // failure is not a wrong password and must not spend a try.
+            var n = res.status === 401
+              ? (signinFails[who] = (signinFails[who] || 0) + 1)
+              : (signinFails[who] || 0);
+            var tail = !n ? ''
+              : n >= MAX_SIGNIN_ATTEMPTS
+                ? ' ' + T.signinLocked.replace('{min}', SIGNIN_LOCK_MINUTES)
+                : ' ' + T.signinAttempt.replace('{n}', n).replace('{max}', MAX_SIGNIN_ATTEMPTS);
+            return say('err', failure(res) + tail);
+          }
+          // Getting in clears the count, or a person who signs in, signs out and
+          // mistypes once is told they are on their fourth try.
+          delete signinFails[who];
           window.MemberSession.set(sessionFor(res.data));
           if (opts.onSignedIn) return opts.onSignedIn(res.data.account);
           boot();

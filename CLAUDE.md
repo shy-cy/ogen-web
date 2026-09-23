@@ -1040,6 +1040,21 @@ one-option picker in front of every family on the site and refuse every
 submission that did not answer it. A name is required on save once there are
 two, because that is the thing a family picks by.
 
+⚠ **AND THE FAMILY WAS ASKED TO CHOOSE ANYWAY, FROM A LIST OF ONE.** The
+register panel drew a Group select with a single blank option on it, on
+hebrew4kids, which has exactly one unnamed group. `activityView()` in
+`account-registrations.js` keyed the payload off `report.named` — the opt-in
+list of named groups, which was null unless somebody had made one. So *“are
+there named groups”* and *“is a choice being offered”* were the same question,
+right up until every activity got at least one group, and then they silently
+were not.
+
+The same line carried a second answer: `full` was `… && !report.named`, so a
+one-group activity always had a `named` row and **a full course never reported
+as full**. Both read `offersAChoice()` now — the rule written down once, in the
+module that owns it, which is the same reason `submissionErrors()` asks the
+count rather than whether anybody typed a name.
+
 ⚠ **AND A FULL CLASS WOULD HAVE REPORTED AS EMPTY.** Every registration taken
 while an activity was pooled carries `groupId: null`. The moment `migrate()`
 gives that activity its one group, bucketing strictly by id files all of them
@@ -1920,6 +1935,30 @@ pasted across would still be refused server-side, which is what the cross-feed
 test proves. `tests/an-admin-session-outlives-the-tab.js` asserts the admin's
 idle window **and its cap** are both shorter than a guardian's ordinary window,
 so the numbers cannot be quietly unified.
+
+⚠ **THE LOCK IS COUNTED DOWN ON SCREEN, AND THE BROWSER IS WHAT COUNTS.** Eight
+failures set a fifteen-minute lock and the ninth attempt is refused even with
+the right password — that has always worked, and was reported as *“it doesn't
+lock”*, because every attempt answered with the same sentence and nothing ever
+said a limit was being approached or reached. **A rule nobody can observe is,
+from outside, a rule that is not there.**
+
+The server cannot be the one to say it. “You have three tries left” can only be
+true of an account that exists, so sending it would make the refusal tell a real
+address from an invented one — see the rule directly below, which is the whole
+reason the two answer identically. So the counting is the **browser's**, of its
+own user's keystrokes: *Attempt 3 of 8*, and at the ceiling *signing in is
+blocked for 15 minutes*. The same words appear for an address with an account
+and one without, because the browser cannot tell and never asks. Nothing about
+it is enforcement — the lock is still `_account-store.js`'s and unchanged, and a
+test asserts the signin handler emits no count, no remaining tries and no unlock
+time.
+
+What it costs: a reload resets the display, and on an address with no account
+the advice to wait is unnecessary rather than wrong. Both are worth it against a
+refusal that reveals who has children at this centre. `MAX_SIGNIN_ATTEMPTS` and
+`SIGNIN_LOCK_MINUTES` are written twice, like `MIN_PASSWORD`, and pinned against
+`MAX_FAILED` and `LOCK_MS` by the same kind of test.
 
 **Nothing reveals whether an address has an account.** Sign-in answers
 identically for a wrong password and an address nobody has used — including the
