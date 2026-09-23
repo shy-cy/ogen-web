@@ -59,6 +59,11 @@ function groupIcon(key) {
 }
 
 const SITE = 'https://www.ogen.cy';
+
+// The recommended length of a listing card's summary. See the note above the
+// card builder: it is the figure the admin counts against AND the slice taken
+// off `about` when nobody wrote a summary, so the two cannot drift.
+const SUMMARY_CHARS = 140;
 const LANGS = ['he', 'en', 'ru'];
 const STATUSES = ['draft', 'announcement', 'open', 'waitlist', 'closed', 'cancelled', 'completed'];
 
@@ -685,11 +690,20 @@ function renderActivitiesIndexPage(activities, lang) {
   // card title is the page's h2, exactly as before this existed. With a past
   // group, the two group headings become the h2s and the card titles drop to h3
   // — the levels follow the outline rather than being fixed to a tag.
+  // ⚠ THE CARD SUMMARY IS CLAMPED TO THREE LINES IN CSS, and this is the number
+  // the admin counts against so a writer is told before publishing rather than
+  // finding an ellipsis afterwards. It is also the slice taken off `about` when
+  // no summary was written, so the two cannot drift: the recommended length and
+  // the generated fallback are one figure.
+  //
+  // It is a RECOMMENDATION, not a refusal. Summaries are words, and a form that
+  // refuses a save over one character is a form people fight; the clamp is what
+  // actually guarantees the layout, in every language, whatever is stored.
   const card = (a, level) => {
     const title = pick(a.title, lang);
     // Same reason as the meta description: the body is markup now, and a
     // listing card blurb is text.
-    const blurb = pick(a.summary, lang) || plainText(pick(a.about, lang)).slice(0, 140);
+    const blurb = pick(a.summary, lang) || plainText(pick(a.about, lang)).slice(0, SUMMARY_CHARS);
     // The activity's square picture when it has one, and the coloured band
     // when it does not — so a listing with a mix of both still reads as a
     // grid. Decorative either way: the card's own heading names the
@@ -777,7 +791,7 @@ ${cards}
 }
 
 module.exports = {
-  SITE, LANGS, STATUSES, OPEN_STATUSES, RUNNING_STATUSES, ARCHIVED_STATUSES, STATUS_GROUPS,
+  SUMMARY_CHARS, SITE, LANGS, STATUSES, OPEN_STATUSES, RUNNING_STATUSES, ARCHIVED_STATUSES, STATUS_GROUPS,
   MOTIFS, CORNERS, LABELS, FALLBACK,
   esc, pick, has, langsPresent,
   pathFor, filePathFor, indexPathFor, indexFilePathFor, homeFor,

@@ -786,6 +786,41 @@ matching three translations of it and would break silently the next time one is
 reworded; with a key, a drop-in's tag says "Cost per session" and a course's
 says "Cost per semester" without the card knowing which it got.
 
+⚠ **THE SUMMARY IS CLAMPED TO THREE LINES, AND THE MIN-HEIGHT IS THE HALF THAT
+MATTERS.** Folk dancing's ran to five lines and Hebrew-for-kids' to two, so the
+facts underneath started at a different height on every card and a row of them
+read as a mess. `-webkit-line-clamp` fixes only the **long** end: without the
+matching `min-height` a short summary still lifts its card's facts 40px above
+its neighbours'. The two travel together, exactly as `height:auto` and
+`aspect-ratio` do one rule above, and there is deliberately **one**
+`.activity-card p` rule so the pair cannot be split across a media query.
+
+`flex:1` used to sit on that paragraph to push the tags and the link down. It is
+on `.activity-card-more` now — with the paragraph a fixed height, the slack has
+to be absorbed **below** the facts, or the bands float at different heights again
+and the clamp buys nothing.
+
+The limit is a **recommendation, not a refusal**. `SUMMARY_CHARS` is 140, the
+admin counts against it per language and marks itself when it is past, and a
+longer summary still saves — summaries are words, and a form that refuses a save
+over one character is a form people fight. It is the same figure the template
+already sliced off `about` when nobody wrote a summary, so the count and the
+generated fallback cannot drift. The **clamp** is what actually guarantees the
+layout, in every language, whatever is stored: the same sentence is not the same
+length in three of them, so a character count could never have done it.
+
+⚠ **AND THE FACTS SIT IN A TINTED BAND, EDGE TO EDGE.** They ran straight on
+from the paragraph with nothing between them, so a card read as four paragraphs
+of decreasing length. The full bleed is the point — inset by the card's own 22px
+it is a fourth floating block, which is what it was. A hairline above it carries
+the edge where 55% `--stone` over `--paper` is too quiet on its own.
+
+This is **not** the tint the activity page's four fact cards rejected. That was
+four tinted panels side by side, which read as four states of one thing; this is
+one band inside one card, marking off the part a reader scans from the part they
+read. Nothing in it is coloured by **which** fact it is, which is the rule that
+was actually being kept.
+
 **Stacked rows, not pills.** Each tag is a label *and* a value, and a pill
 holding both is either too wide for a 320px card or drops the label — which is
 what makes a bare "7-10" or "€300" ambiguous in the first place. Nothing is
@@ -1463,8 +1498,40 @@ js/image-optimize.js   resizes + re-encodes every upload IN THE BROWSER
 The form is a **projection of `FIELD_SCHEMA`**, one panel per group, in the
 order an activity is actually filled in: **Settings** (kind, slug, status, motif,
 corner, card image), **Content** (title, summary, about), **Teachers**,
-**Sponsors**, **Activity facts** (the facts, then the registration button link),
-**Registration**, **FAQ**, then **Search & sharing** last.
+**Sponsors**, **Groups**, **Price**, **What is published**, **Registration**,
+**FAQ**, then **Search & sharing** last.
+
+⚠ **THE LAST THREE WERE ONE PANEL CALLED "ACTIVITY FACTS", AND IT WAS THREE
+JOBS.** It held the group list, a free-text override, four price fields, the
+late-booking block, a repeatable list of bundles and nine visibility
+checkboxes, under one heading in one scroll. Nothing in it was broken, which is
+why it survived; it was reported as unreadable, which is a different failure and
+a real one.
+
+The cost was already in the data. `beit-midrash`'s group-size override had been
+filled in with *“Dates will be announced soon”* — a note about **dates**, in the
+box that replaces the **group size** line — so the page published `Group size:
+Dates will be announced soon`. That box was labelled “Free-text override” under a
+heading reading “Group size” in a panel of unrelated things, and **a control with
+no context of its own collects whatever the person wanted to say next**. It is
+labelled *Instead of the group-size line* now, and it sits under the group list,
+because what it overrides is the line that list produces.
+
+The split is by the **question being answered**, not by which record the value
+lives on: who meets, what it costs, what of it is published. `What is published`
+is its own panel rather than folded into either neighbour because it governs
+facts from **both** of them and from every group's page — inside either one it
+would read as covering only that one.
+
+⚠ **AND NOTHING EXECUTED `renderFacts()`.** The mount ids changed from one
+`#facts` to three, and a mount the markup no longer carried would have thrown at
+the top of the first panel an admin opens, with every suite still green.
+`a-panel-is-one-job-and-a-card-is-one-height.js` closes it structurally: every
+literal id the client looks up must be answered by **something** — a mount in
+`admin/activities.html` or a control the client itself builds — and the three
+panel mounts must be the page's rather than conjured. The lookups are stripped
+from the source before the search, so an id that exists only inside its own
+`$()` call is answered by nothing and fails.
 
 **About is written in Quill** — the same editor and version the Shirat HaYam
 admin uses, loaded from a CDN because this project has no build step, with the

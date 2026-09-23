@@ -947,7 +947,24 @@ html[lang="he"] .fact-card-head h2{ text-transform:none; letter-spacing:0; font-
   background:linear-gradient(135deg, var(--stone), var(--camel));
 }
 .activity-card h2{ font-size:19px; font-weight:700; color: var(--navy); margin:18px 22px 8px; }
-.activity-card p{ font-size:14.5px; color:#5a5a54; line-height:1.6; margin:0 22px 16px; flex:1; }
+/* ⚠ CLAMPED TO THREE LINES, AND THE MIN-HEIGHT IS THE HALF THAT MATTERS.
+   Folk dancing ran to five lines and Hebrew-for-kids to two, so the fact blocks
+   underneath started at a different height on every card and a row of them read
+   as a mess. `-webkit-line-clamp` alone only fixes the LONG end; without the
+   matching min-height a short summary still lifts its card's facts 40px above
+   its neighbours'. The two together give every card the same three-line block
+   whatever anybody types, which is what lets the tinted bands below line up as
+   one stripe across the row.
+
+   `flex:1` used to sit here to push the tags and the link to the bottom. It is
+   on .activity-card-more now: with the paragraph a fixed height, the slack has
+   to be absorbed BELOW the facts, or the bands go back to floating at different
+   heights and the clamp buys nothing. */
+.activity-card p{
+  font-size:14.5px; color:#5a5a54; line-height:1.6; margin:0 22px 16px;
+  display:-webkit-box; -webkit-line-clamp:3; line-clamp:3; -webkit-box-orient:vertical;
+  overflow:hidden; min-height:calc(3 * 1.6em);
+}
 /* The four facts a card answers at a glance. Stacked rows rather than pills:
    each one is a label AND a value, and a pill holding both is either too wide
    for a 320px card or has to drop the label, which is what makes "7-10" or
@@ -962,14 +979,38 @@ html[lang="he"] .fact-card-head h2{ text-transform:none; letter-spacing:0; font-
    The label is --navy (10.8:1 on paper) and not --camel, which is 2.3:1: the
    warm tokens were chosen as BACKGROUNDS behind white text and fail as
    foregrounds. */
+/* ⚠ A TINTED BAND, EDGE TO EDGE, and the full bleed is the point: it is what
+   makes the facts read as a block of specification rather than as more of the
+   sentence above them. Inset by the card's own 22px it would be a fourth
+   floating paragraph, which is what it was.
+
+   This is NOT the tint the activity page's four fact cards rejected. That was
+   four tinted panels side by side, which read as four states of one thing; this
+   is one band inside one card, marking off the part a reader scans from the part
+   they read. The rule there was about telling cards apart by colour, and it
+   still holds — nothing here is coloured by WHICH fact it is.
+
+   --stone at 55% rather than flat: the card sits on --paper and the band has to
+   separate from it without becoming a second card. A hairline above it carries
+   the edge where the tint alone is too quiet to read as one. */
 .activity-card-tags{
-  list-style:none; margin:0 22px 16px; padding:0;
-  display:flex; flex-direction:column; gap:4px;
+  list-style:none; margin:0; padding:14px 22px;
+  /* The computed value first, for anything without color-mix: 55% --stone over
+     --paper is #F4F0E6. Both, so the token stays the source of truth and the
+     band still draws if one of them is not supported. */
+  background:#F4F0E6;
+  background:color-mix(in srgb, var(--stone) 55%, var(--paper));
+  border-block-start:1px solid var(--stone);
+  display:flex; flex-direction:column; gap:5px;
 }
 .activity-card-tags li{ font-size:13px; line-height:1.45; color:#5a5a54; }
 .activity-card-tags li span{ font-weight:700; color: var(--navy); }
+/* `margin-top:auto` absorbs whatever slack is left once the cards in a row have
+   been stretched to a common height — so the link sits on the bottom edge of
+   every card and the band above it keeps the height its own contents need. */
 .activity-card-more{
-  margin:0 22px; font-size:13.5px; font-weight:800; color: var(--terracotta);
+  margin:auto 22px 0; padding-block-start:16px;
+  font-size:13.5px; font-weight:800; color: var(--terracotta);
 }
 .activity-empty{ text-align:center; font-size:16px; color: var(--camel); padding:40px 0; }
 

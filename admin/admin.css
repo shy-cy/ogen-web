@@ -500,3 +500,13 @@ textarea.modal-editor{ padding:9px 11px; border:1px solid #E4DFD3; resize:vertic
 .fact-checks{ display:flex; flex-wrap:wrap; gap:10px 18px; margin-bottom:14px; }
 .fact-check{ display:flex; align-items:center; gap:7px; font-size:14px; cursor:pointer; }
 .fact-check input{ margin:0; }
+
+/* The recommended length under a field that has one. --navy at 10.8:1 on paper
+   while it is fine, the danger red once it is past — never --camel or --gold,
+   which are backgrounds chosen to sit under white text and fail as foregrounds.
+   `tabular-nums` so the figure does not jiggle as it is typed. */
+.char-count{
+  margin-block-start:4px; font-size:12px; color:var(--navy);
+  opacity:.65; font-variant-numeric:tabular-nums;
+}
+.char-count.is-over{ color:#8a3220; opacity:1; font-weight:700; }

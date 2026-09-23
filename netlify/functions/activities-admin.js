@@ -28,7 +28,8 @@ const { readJson, commitToBranch, mapConcurrent, CONCURRENCY } = require('./_git
 const { recordAudit } = require('./_audit');
 const {
   LANGS, STATUSES, MOTIFS, CORNERS, langsPresent, pick,
-  filePathFor, pathFor, renderActivityPage
+  filePathFor, pathFor, renderActivityPage,
+  SUMMARY_CHARS: TEMPLATE_SUMMARY_CHARS
 } = require('./_activity-template');
 const { buildDerivedFiles, isPublic } = require('./_activity-index');
 const FACTS = require('./_activity-facts');
@@ -107,7 +108,10 @@ const ROBOTS = ['index', 'noindex'];
 const FIELD_SCHEMA = {
   simple: [
     { key: 'title', label: 'Title', required: true },
-    { key: 'summary', label: 'Card summary', hint: 'One line, shown on the activities listing' },
+    { key: 'summary', label: 'Card summary', counter: TEMPLATE_SUMMARY_CHARS,
+      hint: 'Shown on the activities listing. The card gives it three lines and trims anything ' +
+            'longer with an ellipsis, so keep it near the count under each box — that is a ' +
+            'recommendation, not a limit, and a longer one still saves.' },
     { key: 'about', label: 'About this activity', textarea: true, rich: true, required: true }
   ],
   // There is no `optional` group any more. It held exactly one field, "What to

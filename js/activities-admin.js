@@ -108,9 +108,30 @@
         : el('input', { type: 'text', id: id, dir: lang === 'he' ? 'rtl' : 'ltr', disabled: !editable || null });
       input.value = (values && values[lang]) || '';
       input.addEventListener('input', function () { S.dirty = true; });
+
+      // ⚠ A COUNT, NOT A CEILING. `descriptor.counter` is a recommended length,
+      // and the only field carrying one is the card summary, which CSS clamps to
+      // three lines. Without this a writer finds the ellipsis after publishing;
+      // with a refusal on save instead, they fight the form over one character.
+      // Per language, because the same sentence is not the same length in three
+      // of them — which is also why the clamp, not this, is what guarantees the
+      // cards line up.
+      var count = null;
+      if (descriptor.counter) {
+        count = el('div', { class: 'char-count' });
+        var tick = function () {
+          var n = input.value.length;
+          count.textContent = n + ' / ' + descriptor.counter;
+          count.className = 'char-count' + (n > descriptor.counter ? ' is-over' : '');
+        };
+        input.addEventListener('input', tick);
+        tick();
+      }
+
       return el('div', { class: 'lang-cell ' + lang, dir: lang === 'he' ? 'rtl' : 'ltr' }, [
         el('label', { for: id, text: LANG_NAME[lang] + (editable ? '' : ' (read-only for your role)') }),
-        input
+        input,
+        count
       ]);
     });
     return el('div', { class: 'field-row' }, [
@@ -1316,10 +1337,17 @@
       // list and "max per group" is a field on one of them, so typing either
       // here was typing a second answer to a question the list already answers —
       // and the two could disagree about the same activity.
+      // ⚠ THE LABEL NAMES THE LINE IT REPLACES. It read "Free-text override",
+      // under a heading reading "Group size", in a panel of unrelated things —
+      // and beit-midrash came back with "Dates will be announced soon" typed
+      // into it, which published as "Group size: Dates will be announced soon".
+      // A box whose label does not say what it overrides collects whatever the
+      // person wanted to say next.
       var override = fieldRow({
-        label: 'Free-text override',
-        hint: 'Leave blank to use the groups themselves. Filled in, it replaces the whole line ' +
-              'for that language \u2014 for a grouping that is not "N groups of up to M".'
+        label: 'Instead of the group-size line',
+        hint: 'Leave blank and the page describes the groups above. Filled in, it replaces that ' +
+              'one line for that language \u2014 for a grouping that is not "N groups of up to M". ' +
+              'It is not a general note: nothing else on the page changes.'
       }, langObj(fact.overrideText), p + '-groupSize-overrideText');
       Array.prototype.forEach.call(override.querySelectorAll('input, textarea'), function (n) {
         n.addEventListener('input', refreshLegacyNotes);
@@ -1367,12 +1395,16 @@
   // both: the "two places for one job" shape that gave this codebase a checkbox
   // meaning opposite things in two editors a release apart. It has one place
   // now, on the main panel — see visibilityBlock().
-  function factBlock(d, fact, p) {
+  // `bare` drops the block's own heading, for the one case where the editor
+  // underneath already carries a label that says the same thing — the group-size
+  // override under the group list, where "Group size" over "Instead of the
+  // group-size line" is the label twice.
+  function factBlock(d, fact, p, bare) {
     var body = factEditor(d, fact, p);
     if (!body) return null;
     return el('div', { class: 'fact-block' }, [
-      el('div', { class: 'fact-head' }, [el('div', { class: 'field-label', text: d.label })]),
-      d.hint ? el('div', { class: 'hint', text: d.hint }) : null,
+      bare ? null : el('div', { class: 'fact-head' }, [el('div', { class: 'field-label', text: d.label })]),
+      !bare && d.hint ? el('div', { class: 'hint', text: d.hint }) : null,
       body,
       legacyNote(d, fact || {})
     ]);
@@ -1383,13 +1415,14 @@
   // published page rather than about a value: "the exact address is not printed"
   // is true of the activity, not of one of its groups.
   function visibilityBlock() {
+    // No heading of its own any more — the panel is headed "What is published",
+    // and "Who can see these" underneath it was the same sentence twice.
     var box = el('div', { class: 'fact-block' });
-    box.appendChild(el('div', { class: 'fact-head' },
-      [el('div', { class: 'field-label', text: 'Who can see these' })]));
     box.appendChild(el('div', { class: 'hint', text:
-      'A members-only fact is left out of the published page ENTIRELY \u2014 never rendered ' +
-      'and hidden, because the file is static and anyone can read its source. It applies to ' +
-      'the whole activity, so a fact every group fills in is published, or none of them is.' }));
+      'Every fact is published unless it is ticked here. A members-only fact is left out of ' +
+      'the page ENTIRELY \u2014 never rendered and hidden, because the file is static and anyone ' +
+      'can read its source. It applies to the whole activity, so a fact every group fills in ' +
+      'is published, or none of them is.' }));
     var grid = el('div', { class: 'fact-checks' });
     S.schema.facts.forEach(function (d) { grid.appendChild(visibilityControl(d.key, d.label)); });
     box.appendChild(grid);
@@ -2161,29 +2194,43 @@
     S.ownerEdit = null;
   }
 
-  // ⚠ THE PANEL IS THE GROUPS, THEN THE TWO FACTS THAT ARE THE ACTIVITY'S, THEN
-  // WHO CAN SEE WHAT. Seven of the nine facts are a group's and are edited on
-  // its own page; drawing them here as well would be two screens answering one
-  // question, which is the shape that gave this codebase a checkbox meaning
-  // opposite things in two editors a release apart.
+  // ⚠ THREE PANELS, NOT ONE, and the split is by the question being answered
+  // rather than by which record the value lives on. "Activity facts" held the
+  // group list, the free-text override, four price fields, the late-booking
+  // block, the bundle list and nine visibility checkboxes under one heading —
+  // three unrelated jobs in one scroll.
+  //
+  // Seven of the nine facts are a GROUP's and are edited on its own page.
+  // Drawing them here as well would be two screens answering one question,
+  // which is the shape that gave this codebase a checkbox meaning opposite
+  // things in two editors a release apart.
+  //
+  // The mount points are three and the ids on the inputs are unchanged, so
+  // readFacts() is untouched: it reads by id, and an id does not care which
+  // panel its input ended up in.
   function renderFacts() {
     primeGroups();
-    var box = $('facts');
-    box.innerHTML = '';
+    var groupsBox = $('groups-fields');
+    var priceBox = $('price-fields');
+    var visBox = $('visibility-fields');
+    groupsBox.innerHTML = '';
+    priceBox.innerHTML = '';
+    visBox.innerHTML = '';
 
-    var groupsBlock = el('div', { class: 'fact-block' }, [
-      el('div', { class: 'fact-head' }, [el('div', { class: 'field-label', text: 'Groups' })]),
-      groupsEditor()
-    ]);
-    box.appendChild(groupsBlock);
+    groupsBox.appendChild(el('div', { class: 'fact-block' }, [groupsEditor()]));
 
+    // groupSize goes with the GROUPS, because what it overrides is the line the
+    // list above it produces — not with the price, which is the other activity
+    // fact and answers a different question entirely.
     (S.schema.activityFacts || []).forEach(function (key) {
       var d = factDescriptor(key);
-      var block = d && factBlock(d, (S.record.facts || {})[key], 'fact');
-      if (block) box.appendChild(block);
+      if (!d) return;
+      var bare = key === 'groupSize';
+      var block = factBlock(d, (S.record.facts || {})[key], 'fact', bare);
+      if (block) (key === 'groupSize' ? groupsBox : priceBox).appendChild(block);
     });
 
-    box.appendChild(visibilityBlock());
+    visBox.appendChild(visibilityBlock());
     refreshPerHour();
     refreshLegacyNotes();
   }

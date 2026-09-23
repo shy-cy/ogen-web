@@ -81,24 +81,46 @@
         <button type="button" class="add-btn" data-add="sponsors" style="margin-top:12px;">+ Add a sponsor</button>
       </div>
 
-      <div class="panel">
-        <!-- "Sidebar facts" until the facts stopped being a sidebar: two of
-             these cards now sit in a row above the article. Label only — the
-             group keys, the schema and the storage are untouched.
+      <!-- ⚠ ONE PANEL CALLED "ACTIVITY FACTS" HELD ALL THREE OF THESE, and it was
+           too much of a mixture to read: a list of groups, a free-text box, four
+           price fields, a late-booking block, a repeatable list of bundles and
+           nine visibility checkboxes, under one heading, in one scroll. Three
+           unrelated jobs sharing a panel is the shape somebody reported as "very
+           bad UX" — and the evidence was already in the data, where
+           beit-midrash's group-size override had been filled in with "Dates will
+           be announced soon", a note about dates typed into the box that
+           replaces the group-size line because that box had no context of its
+           own.
 
-             ⚠ AND MOST OF THEM ARE NOT HERE ANY MORE. Seven of the nine facts
-             belong to a GROUP — ages, schedule, dates, language, level, room,
-             exact address — and are edited on that group's own page, reached
-             from the list at the top of this panel. What is left here is what is
-             genuinely one answer whichever group a family joins: the price, the
-             free-text override for the grouping sentence, and which facts are
-             members-only. That last one is a policy about the published page
-             rather than a value, so it has ONE control here rather than the same
-             control on every group's page. -->
-        <h2>Activity facts</h2>
-        <div id="facts"></div>
-        <!-- Where the registration button goes. It sits with the facts because
-             the button is the last thing in that column, directly under them. -->
+           They are three panels now, in the order the questions are asked: who
+           meets, what it costs, and what of it is published. -->
+
+      <!-- Seven of the nine facts belong to a GROUP — ages, schedule, dates,
+           language, level, room, exact address — and are edited on that group's
+           own page, reached from this list. The free-text override sits here
+           rather than beside the price because what it overrides is the line
+           this list produces. -->
+      <div class="panel">
+        <h2>Groups</h2>
+        <div id="groups-fields"></div>
+      </div>
+
+      <!-- One price whichever group a family joins. That is the rule the
+           equal-total-hours validation exists to keep true. -->
+      <div class="panel">
+        <h2>Price</h2>
+        <div id="price-fields"></div>
+      </div>
+
+      <!-- ⚠ ITS OWN PANEL, because it governs facts from BOTH of the two above
+           and from every group's page. Folded into either one it would read as
+           covering only that one. It is a policy about the published page rather
+           than a value, which is also why there is ONE control here rather than
+           the same checkbox repeated on every group's page — the same setting
+           editable from two places is a trap this codebase has already met. -->
+      <div class="panel">
+        <h2>What is published</h2>
+        <div id="visibility-fields"></div>
       </div>
 
       <!-- What a registration system will read off this activity. None of it is
