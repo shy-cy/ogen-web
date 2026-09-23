@@ -94,5 +94,29 @@
     },
     "cardImage": "/images/activities/hebrew4kids-card-a1f8d75e.jpg",
     "isoUpdated": "2026-09-17T16:05:25.887Z"
+  },
+  {
+    "slug": "test1",
+    "activityId": "act-cb06dd7ab63bdaeb",
+    "seriesId": "act-cb06dd7ab63bdaeb",
+    "type": "course",
+    "status": "open",
+    "langs": [
+      "he",
+      "en",
+      "ru"
+    ],
+    "title": {
+      "he": "טסט 1",
+      "en": "Test 1",
+      "ru": "Test 1"
+    },
+    "summary": {
+      "he": "טסט 1",
+      "en": "Test 1",
+      "ru": "Test 1"
+    },
+    "cardImage": "/images/activities/test1-card-c8031266.jpg",
+    "isoUpdated": "2026-09-23T06:45:32.398Z"
   }
 ]
