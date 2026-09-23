@@ -15,7 +15,10 @@
       "mode": "flat",
       "cancellationCutoffDate": "2026-09-24"
     },
-    "defaultBasis": null
+    "defaultBasis": {
+      "startDate": "2025-09-23",
+      "sessionCount": 1
+    }
   },
   "seriesId": "act-ca412442b8698dcf",
   "title": {
@@ -56,13 +59,20 @@
       "fullPrice": 300,
       "perHourOverride": null,
       "perSessionPrice": null,
-      "showPerLesson": true,
+      "showPerLesson": false,
       "lateDropIn": {
         "enabled": false,
         "hoursBefore": null,
         "price": null
       },
-      "bundles": []
+      "bundles": [
+        {
+          "bundleId": "b-mu9iei9vwn55",
+          "entries": 6,
+          "pricePerEntry": 20,
+          "validityDays": 220
+        }
+      ]
     }
   },
   "groups": [
@@ -169,10 +179,10 @@
     }
   ],
   "sponsors": [],
-  "isoUpdated": "2026-09-23T14:41:49.374Z",
+  "isoUpdated": "2026-09-23T14:46:58.358Z",
   "isoCreated": "2026-09-23T14:41:49.374Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
   "activityId": "act-ca412442b8698dcf",
-  "lastPublishedAt": "2026-09-23T14:41:49.374Z"
+  "lastPublishedAt": "2026-09-23T14:46:58.358Z"
 }
