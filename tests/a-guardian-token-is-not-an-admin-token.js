@@ -137,6 +137,19 @@ process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
   const resetToken = await grabResetToken(blobs);
   H.ok(!!resetToken, 'the reset token was stored');
 
+  // ⚠ THE PAGE ASKS WHETHER THE LINK IS STILL GOOD, AND ASKING MUST NOT SPEND
+  // IT. A dead link used to draw the password form and refuse on submit, so
+  // somebody chose a password, typed it, and only then learned the link had
+  // already been used — reported from QA in exactly those words. `resetLive`
+  // answers before anything is typed; if it consumed, merely OPENING the page
+  // would kill the link, which is a worse bug than the one it fixes.
+  const live1 = await call({ action: 'resetLive', token: resetToken });
+  H.eq(live1.body.live, true, 'a good link reports itself live');
+  const live2 = await call({ action: 'resetLive', token: resetToken });
+  H.eq(live2.body.live, true, 'and asking twice does not spend it');
+  H.eq((await call({ action: 'resetLive', token: 'not-a-real-token' })).body.live, false,
+    'an invented token is not live, and the answer names no account either way');
+
   // ⚠ A PASSWORD TOO SHORT MUST NOT SPEND THE LINK, and it used to. The token
   // was consumed before the password was looked at, so a typo under the minimum
   // killed the only way back into the account — and every retry, including the
@@ -158,6 +171,8 @@ process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
   // Long enough to clear the length check, or this would be testing that rule
   // over again rather than testing that a spent link stays spent.
   const reused = await call({ action: 'resetPassword', token: resetToken, password: 'another-good-one' });
+  H.eq((await call({ action: 'resetLive', token: resetToken })).body.live, false,
+    'once spent it reports itself dead, so the page says so instead of drawing a form');
   H.eq(reused.status, 400, 'the link cannot be used twice');
   H.eq(reused.body.code, 'reset-link-dead', 'and says so plainly');
 

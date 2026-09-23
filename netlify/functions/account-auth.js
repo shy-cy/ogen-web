@@ -157,6 +157,22 @@ exports.handler = async (event) => {
         return json(200, { ok: true, message: RESET_SENT });
       }
 
+      // ⚠ IS THIS LINK STILL GOOD? Asked on LOAD, so a dead one says so instead
+      // of drawing a password form that refuses after it has been filled in.
+      // Reported from QA exactly that way: "I was able to access the page and
+      // only when entering a new pass, I got a message that this link cannot be
+      // used — maybe it's more correct that once we reuse the link, we get the
+      // error message."
+      //
+      // It reveals nothing. Whoever holds the token can learn the same thing by
+      // submitting; this only moves the answer to before the typing. It names no
+      // account and, crucially, does NOT consume — peekToken, never
+      // consumeToken, or opening the page would spend the link.
+      case 'resetLive': {
+        const record = await sessions.peekToken(body.token, 'reset');
+        return json(200, { ok: true, live: !!record });
+      }
+
       case 'resetPassword': {
         // ⚠ THE PASSWORD IS CHECKED BEFORE THE TOKEN IS SPENT, and that ordering
         // is the whole of this block. It ran the other way round, on the argument

@@ -2355,12 +2355,44 @@
     });
   }
 
+  // The dead-link answer, with the way out of it. A refusal that does not offer
+  // the next step sends somebody back to an inbox to hunt for a link that will
+  // not work either.
+  function dead() {
+    return el('div', {}, [
+      el('p', { class: 'acc-notice is-err', text: T.linkDead }),
+      el('p', { class: 'acc-alt' }, [
+        el('a', { href: url('/account'), text: T.forgot })
+      ])
+    ]);
+  }
+
   function renderReset() {
     clear(mount);
     notice = el('div', {});
     mount.appendChild(notice);
     var token = param('token');
-    if (!token) return mount.appendChild(section(null, [el('p', { class: 'acc-notice is-err', text: T.linkDead })]));
+    if (!token) return mount.appendChild(section(null, [dead()]));
+
+    // ⚠ A DEAD LINK SAYS SO BEFORE ANYTHING IS TYPED. It used to draw the form
+    // and refuse on submit, so somebody chose a password, entered it, and only
+    // then learned the link had already been used. Reported from QA as exactly
+    // that. `resetLive` peeks at the token without consuming it — opening the
+    // page must not spend the link — and reveals nothing the holder could not
+    // learn by submitting anyway.
+    //
+    // Drawn optimistically while the check is in flight: a working link is the
+    // ordinary case, and a skeleton before every reset would make the common
+    // path feel slower to save the rare one a wasted form.
+    post(AUTH, { action: 'resetLive', token: token }).then(function (res) {
+      if (res.ok && res.data && res.data.live === false) {
+        clear(mount);
+        notice = el('div', {});
+        mount.appendChild(notice);
+        mount.appendChild(section(null, [dead()]));
+      }
+    });
+
     var p1 = field(T.newPassword, { type: 'password', required: 'required',
                                    minlength: MIN_PASSWORD, autocomplete: 'new-password' }, pwHint());
     var go = el('button', { type: 'submit', class: 'btn-primary', text: T.resetSave });
