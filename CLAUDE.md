@@ -467,9 +467,9 @@ the admin keys those inputs by the **fact key, never the kind**; a hardcoded id
 gave both facts the same DOM ids and the read-back copied the location over the
 address. `netlify/functions/_activity-facts.js`
 is the one place a fact becomes display text, built per language — so
-`{groups:2, maxPerGroup:7}` renders as "2 קבוצות / עד 7 תלמידים בקבוצה" in
-Hebrew and "2 groups / up to 7 students per group" in English, and the three
-languages cannot drift.
+a group's `{capacity: 7}` renders as "עד 7 תלמידים" in Hebrew and "Up to 7
+students" in English, and the three languages cannot drift. Two groups render a
+named line each.
 
 **⚠ EVERY FACT IS STRUCTURED NOW — `TEXT_FACTS` IS EMPTY.** `instructionLanguage`
 and `prerequisites` were the last two free-text facts: a Hebrew box, an English
@@ -938,160 +938,270 @@ the rows, because the date range is already on the page as the duration fact;
 the exception is a term spanning two calendar
 years, where a bare "6 January" is ambiguous.
 
-### Named groups, and the second price
+### ⚠ A group is the unit
 
-Both **opt-in, absent by default**, and both add a branch that will sit
-unexercised — which is why `tests/_fixtures.js` builds every activity in pairs:
-course and drop-in, pooled and named.
+An activity **WAS** the thing that had an age range, a teacher, a room and a
+timetable. "Named groups" were an opt-in list inside a fact called `groupSize`
+that could differ only in size and, later, in when they met. Everything else was
+one answer for everybody — so an activity running a Hebrew-speaking group with
+Dorit on Thursdays and a Russian-speaking group with Anat on Sundays could not
+say so. It published one age range, one language, one teacher list and one room
+for two classes that shared none of them.
 
-`facts.groupSize.named[]` is `{groupId, name:{he,en,ru}, capacity}`. Absent means
-the pooled model, unchanged. Present, `groups` and the capacity become derived —
-the length of the list and the sum of the capacities — and `formatGroupSize()`
-builds a different sentence. It lives inside the fact rather than in
-`registration` because **a group name is words a family reads and a capacity is
-not**: putting it there draws the permission line by where the field sits rather
-than by a rule someone has to remember. `totalCapacity()` returns `null` for
-uncapped, deliberately not zero, since zero would silently refuse every
-registration for an activity nobody had finished setting up.
+So the list came first. **`activity.groups[]` is not optional, not a sub-field
+of a fact, and never empty.**
 
-`facts.price.perSessionPrice` is the drop-in counterpart of `fullPrice`, not an
-extra line beside it. It carries no "(N sessions × M lessons)" qualifier, because
-that hangs off `fullPrice` and disappears on its own. `pricePerHour()` gained one
-more source rather than a branch.
+```
+groups[] = { groupId, name{he,en,ru}, capacity, teacherIds[], facts{ … } }
+```
 
-### Two groups can meet on different days
+**Seven facts moved onto the group** — `ages`, `schedule`, `duration`,
+`instructionLanguage`, `prerequisites`, `location`, `address`. **Two stayed on
+the activity**, because they are genuinely one answer whichever group a family
+joins: `price` (with its bundles and late drop-in pricing) and what is left of
+`groupSize`, which is the free-text override alone. So did the words, the
+pictures, `type`, `seriesId`, the FAQ, the sponsors and the search metadata.
 
-⚠ **An activity had ONE calendar and groups that could only differ in size.**
-Beginners on Mondays and Advanced on Wednesdays is the ordinary shape of a
-community centre's term, and `facts.duration.sessionDates` was right for at most
-one of the two. The visible half was bad — a family read a session table of dates
-they do not attend. **The invisible half was money**: prorated credit is sessions
-remaining over sessions *total*, frozen at submission, and frozen off the wrong
-group's calendar it produces a figure that is wrong and entirely plausible.
+`GROUP_FACTS` and `ACTIVITY_FACTS` live in `_activity-groups.js` — the module
+that requires nothing — and `_activity-facts.js` throws at require time unless
+the two together are exactly `FACT_ORDER`. A fact in neither renders nowhere; a
+fact in both is asked of two records that can disagree.
 
-A named group may now carry its own `schedule` and its own `sessionDates`. Both
-live on `facts.groupSize.named[]` beside the name and the capacity, because **a
-group is one thing an admin sets up** — split across the schedule and duration
-panels, one of the three is what gets forgotten. Both are structure, and for a
-role without full access the whole structured fact comes from the stored record,
-so nothing a Russian-only session sends can reach a timetable.
+⚠ **ONE GROUP IS NOT A CHOICE.** The family is asked which group they want when,
+and only when, there are **two or more**. With one, the group is assigned, its
+name is not published and the page renders exactly as it did before any of this
+existed. `submissionErrors()` asks the **count**, not whether anybody typed a
+name — the old test ("does this activity name any groups") would now put a
+one-option picker in front of every family on the site and refuse every
+submission that did not answer it. A name is required on save once there are
+two, because that is the thing a family picks by.
 
-**`_activity-groups.js` is the one resolver**, and it requires nothing —
-deliberately, because the rendering side has to ask it and the other direction
-would be a cycle. Every reader that knows its group comes through it:
+⚠ **AND A FULL CLASS WOULD HAVE REPORTED AS EMPTY.** Every registration taken
+while an activity was pooled carries `groupId: null`. The moment `migrate()`
+gives that activity its one group, bucketing strictly by id files all of them
+under "unassigned" and shows the group row at nought taken — with nothing
+erroring, and nobody finding out until somebody arrived to a room with no chair.
+With exactly one group there is one honest answer, so they count into it;
+`hasRoom()` answers from the single row for the same reason. With two or more
+there is no such answer, so they stay unassigned exactly as before, and the rows
+deliberately do not sum to the total.
 
-| | |
+### ⚠ Equal total instructional hours
+
+Groups may meet a **different number of times for a different length** — six
+two-hour meetings and twelve one-hour ones are both twelve hours — and may not
+differ in **how much of it there is**. There is one `fullPrice` and it buys the
+same teaching whichever group a family picks. `validateGroups()` refuses a save
+naming both groups and both totals, in hours rather than minutes because 720 and
+540 are harder to compare at a glance than 12 and 9.
+
+This **replaces** the older rule that every group met the same *number* of
+times, which was strictly stronger and refused a shape Ogen actually runs.
+
+Four things follow from it:
+
+- **`sessionMinutes` is per group**, or the rule is not expressible.
+- **`durationFor(activity, groupId)` takes the group**, and throws on a
+  forgotten argument once there are two — the same discipline `calendarFor()`
+  has always had, for the same reason: a plausible wrong calendar is the shape
+  of bug that surfaces as two families comparing receipts.
+- **The "(N sessions × M lessons)" qualifier is suppressed when the groups
+  differ.** `pricingDuration()` sets `qualify: false`. The figure above it
+  survives, because the equal-hours rule means every group was sold the same
+  teaching; the sentence does not, because it describes one group's term and
+  there is no single true version of it.
+- **Both cutoff dates resolve per group at registration**, onto the frozen
+  block, from the calendar that family was actually sold —
+  `REG.resolveCutoffs(activity, groupId)`, called by `freezeCancellation()`. A
+  stored date always wins, including `"none"`, which is a value meaning switched
+  off. `defaultIfBlank()` still writes an activity-level default, but **only
+  when every group resolves to the same answer**: storing one group's would
+  quietly govern the other group's families.
+
+The age range and the start date are per group too, so `flagFor()`,
+`ageCheckMoment()` and `feeYearOf()` all take a `groupId`, and
+`newRegistration()` resolves it **once**, at the top, before anything is frozen
+against it.
+
+### The public page: an aggregate for the scanner, a breakdown for the chooser
+
+**Per fact, not per activity.** Ages might differ while language does not, so
+each row asks its own question. When the groups **agree** — every published page
+today, and every activity with one group — the answer is that value, rendered
+exactly as it was before groups existed. Nothing about the model change reaches
+a page until an admin makes two groups actually differ.
+
+When they differ, three facts have a true short answer and the rest do not:
+
+| Fact | Aggregate |
 |---|---|
-| `calendarFor(activity, groupId)` | the group's dates, or the activity's |
-| `scheduleFor(activity, groupId)` | the group's schedule line |
-| `sessionCountOf(activity)` | how many times a family meets — **one** group's, never the union |
-| `durationFor(activity)` | the duration fact carrying one group's list, for the half-dozen things that only want the count |
-| `unionDates(activity)` | every evening, for the two group-BLIND readers |
+| Ages | the **union range**, `6-13` — and only when *every* group states that bound, since one group with no upper limit makes the activity's unknown |
+| Location | the **distinct cities, joined** — `Limassol, Nicosia` |
+| Language of instruction | **every language anybody is taught in**, in written order |
 
-⚠ **A forgotten argument is loud, and only where it is ambiguous.**
-`calendarFor(activity)` with no group **throws** on a per-group activity and
-answers normally on every other — so the ordinary activity is untouched and the
-dangerous case cannot return a plausible wrong list. A caller that genuinely has
-no group passes `groups.ANY`, which is greppable and reads as a decision. `null`
-is its own case: a registration taken while the activity was still pooled carries
-no group, and reads the activity's list, because inventing one would put a family
-on dates nobody promised.
+Everything else falls through to a line per group, named. There is no union
+worth printing for a schedule, a date range or a level: "January to June and
+February to May" is not a date range, and "Beginners and Advanced" is not a
+level.
 
-**Two readers are group-blind on purpose and say so.** Autocompletion reads the
-**union** — an activity is over when the *last* group is over, and reading one
-calendar would archive the page while another group still meets. The check-in
-codes pass `ANY`: one code per evening, and the wall does not know which group is
-in the room. The bundle shortfall is the opposite case and is judged **per
-bundle**: asked of the activity, a Beginners bundle would be told the term is
-still running because Advanced meet next week, and a credit that family is owed
-would never be written.
+⚠ **The distinct cities are computed on the PICKED text**, not on the stored
+bag. `pick()` falls back across languages, so two groups sharing a Hebrew city
+name and differing in English would otherwise report one city on one page and
+two on another, about the same activity on the same day.
 
-⚠ **Every group meets the same NUMBER of times**, refused on save by
-`validateGroupCalendars()` with both counts named. It is not a limitation being
-worked around, it is the shape of the data: one `fullPrice`, one "(N sessions ×
-M lessons)" qualifier, one denominator. A model that cannot price two counts must
-not publish a page implying it can, and an admin who genuinely needs that has
-**two activities in one series**, which `seriesId` already links for the fee.
-Half a configuration — one group with a calendar beside one without — is refused
-for the same reason.
+**And the union says less than it looks like it says.** "6-13" across a 6-9
+group and a 10-13 one means a nine-year-old has somewhere to go, not that they
+may join either. That is what the groups section under it is for.
 
-**The group is frozen where money is.** `freezeCancellation(activity, groupId,
-…)` takes it second; `freezeSession` takes it on `opts`; a bundle stores
-`groupId` at purchase so `reconcile()` refills from the calendar it was sold
-against rather than another group's. `_credit.js` gained its first `require` for
-this, which broke the letter of a test asserting it had none — the rule that test
-existed for is that **`creditFor()` and `creditForSession()` reach nothing but
-the frozen record and a timestamp**, and it says that now, scoped to those two
-functions by name. The freezing half reads the activity; that is its job.
+`groupChoice()` is the **one builder both surfaces read** — the page's groups
+section and the listing card's leading tag. A card cannot advertise a choice the
+page does not offer, or a different number of them. It returns `null` with one
+group, so there is nothing to draw.
 
-**The page shows both.** The schedule fact renders a line per group, joined with
-a newline — `.sidebar-facts span` is already `white-space:pre-line`, so this
-needed no new markup. `sessionTables()` returns one table per group, each
-captioned with its name, and returns a single untitled table when there is one
-calendar, which is every published page today.
+The section lists **only what the groups disagree on**: repeating the agreed
+facts under every name makes two identical lists and buries the one line a
+reader is there to compare. It says `Choose your group when you register` out
+loud rather than leaving it to be inferred from a heading, and it sits in the
+**article** rather than in a new grid area — the areas and the row list have to
+move together or the 117px hole under the picture reopens, and this is prose a
+reader works through rather than a fact they scan. On a phone that puts it after
+About and before the price, which is the order the question is asked in.
 
-### ⚠ One schedule system: the list of who meets when
+On the listing card, `groups` **leads** the tags: "Ages 6-13" on an activity
+with two groups is a union, and read without knowing there is a choice it says a
+nine-year-old may join either one.
 
-There were **three placements for one job**. An activity's own frequency and
-day/time rows were inline in the Schedule panel; its calendar was inline in
-Duration, a panel away from the schedule it is generated from; a named group's
-were on a sub-page. Two of those were separate implementations, and they had
-drifted in every way two copies drift — different labels on the same checkbox,
-a reason box on one and not the other, and only the inline one ever grew the
-`date` field, so a **group on a custom schedule could not name its dates at
-all**. It is also how the inverted-checkbox bug came to be worded two ways.
+### Teachers by reference, not by copy
 
-There is one list now — **who meets when** — in the Schedule panel. Every row
-opens the same sub-page and the same editor: frequency, week-of-month, the
-day/time rows, and the calendar. A group's row also carries its **name and its
-places**, because a group is one thing an admin sets up and having half of it in
-Group size and half behind a different panel is how one of the three gets
-forgotten.
+The roster stays at the record root and a group holds **`teacherIds[]`**. An
+**empty list means the whole roster**, which is what every migrated group gets
+and what "this group is taught by whoever teaches this activity" is spelled as.
 
-⚠ **THE FIRST ROW IS NOT A GROUP.** It is "Everyone", and that is the whole
-reason this is a UI change rather than a data change. Naming groups is a promise
-to a **family** that there is a choice to make, and the record already treats it
-that way: `submissionErrors()` *requires* a `groupId` once an activity names
-groups and refuses one when it does not. So an auto-created "Group 1" would put
-a one-option picker on the registration form, the name on the public page, the
-roster and every receipt — and it would switch capacity from
-`groups × maxPerGroup` to **the sum of the named capacities**, so an activity
-holding 14 would start holding whatever that one group was given, with nothing
-erroring. The single-versus-multi branch would not even disappear: `sessionTables()`
-captions per group and `scheduleText()` prefixes each line the moment groups
-carry calendars, so the renderer would grow the special case the admin shed,
-somewhere harder to see and where being wrong is visible to families.
+The reason is the image pipeline: an uploaded photo is
+`<slug>-teachers-<id>-<hash8>.png`, and `imagePathsOf()`, `retiredImages` and the
+stale-image cleanup all key off that one list. Nesting the list inside each group
+multiplies every one of them, and a teacher taking both groups would upload their
+face twice and get two files under two names. An id pointing at a teacher since
+removed is filtered on read rather than rendering a blank credit.
 
-An activity with one class offers no choice, so it names no group. **Naming a
-row is what creates one**, and that is the single moment any of it changes.
+Writing the roster out on migration was rejected for the same reason the empty
+list means "all": it would freeze the list, so a teacher added next month would
+appear in the credits and in no group.
 
-With groups present, "Everyone" stays as row 0 and is the **default** any group
-that has not set its own timetable follows — which is what `calendarFor()`
-already does in one function. Making the fallback a visible row is what keeps it
-editable; it was only reachable through the Schedule panel that this list
-replaced.
+### The admin: a group is one screen
+
+The **Activity facts** panel draws the **group list**, then the two facts that
+are the activity's, then **who can see what**. Every row opens that group's own
+sub-page, which holds everything about it — name, places, teachers, the seven
+facts, the timetable and the calendar.
+
+⚠ **THE FIRST ROW IS A REAL GROUP NOW.** It was "Everyone", a visible row
+standing for the activity's own timetable that any unnamed group followed. That
+implicit default is gone: a group is a group from the start, renamable, and what
+decides whether a family is *asked* is the count. The argument the old row
+existed for — that auto-creating "Group 1" would put a one-option picker on the
+registration form and switch capacity to the sum of the named capacities — was
+answered by making the count the rule rather than by keeping a row that had to
+be explained.
+
+⚠ **ONE EDITOR PER FACT KIND, KEYED BY A PREFIX.** `factEditor(d, fact, p)` and
+`readFactEditor(d, p, previous)` are one pair, drawn under `'fact'` on the main
+form and `'grp'` on a group's page. Two copies of a fact editor is two places a
+checkbox can come to mean opposite things, which is exactly how the calendar's
+tick did.
+
+⚠ **THE MEMBERS-ONLY TOGGLES ARE IN ONE BLOCK, on the main panel.** Whether a
+fact is published is one policy for the whole activity — the exact address being
+private is not a per-group decision — and the fields it governs are edited once
+per group. Beside the field it would be the same setting on two groups' pages,
+where changing one silently changes both: the same shape that gave this codebase
+a checkbox meaning opposite things in two editors a release apart.
+
+**Copy comes in two sizes.** *Duplicate* on the list takes a whole group as a
+starting point — two groups of one activity usually differ in one or two things
+and agree about the rest, so starting from a copy and editing down is fewer
+fields, and fewer fields is fewer forgotten. ⚠ It mints a **fresh groupId**;
+reusing one would attach the original's registrations to a group nobody
+registered for. The name gains a `(copy)` suffix rather than being blanked,
+because an unnamed second group is refused on save and a silent blank would read
+as the copy having failed. It is a **deep** copy, or two groups would share one
+calendar object and excluding a date for one would take it off the other.
+
+*Copy from another group* on the sub-page takes one **section** — the teachers,
+the schedule, the ages — out of a group of this activity or of another. ⚠ **The
+dates never cross an activity.** A schedule is a pattern ("Wednesdays at 16:00")
+and copies anywhere; a calendar is absolute dates, and last year's term copied
+into this one is a page of dates nobody meets on, quietly and plausibly.
+Cross-activity copy offers the pattern, refuses the calendar, and says to
+regenerate. It reads the source through the ordinary `load` action, so there is
+nothing new on the server for it.
+
+⚠ **NOTHING ABOUT A GROUP IS READ BACK OFF THE MAIN FORM.** Not a name, a
+capacity, a teacher list, a fact, a schedule or a calendar — none of it has an
+input there, and the sub-page is hidden rather than detached. A save that walked
+the DOM would find nothing and clear all of it. The model is the record:
+`primeGroups()` loads `S.groups` **before the first panel draws** — it has to,
+because the panel draws the group list and the price preview inside it reads a
+group's session length — and `readForm()` sends `S.groups`. That is the
+undrawn-field trap this project keeps meeting, and the answer is the same every
+time.
 
 It is a **view swap** rather than a second HTML page: the record is already
 loaded and dirty-tracked, the save path and the optimistic lock are one, and a
-real second page would have to re-implement all three to edit a slice of the same
-record. The back button is also the commit and says so, and a sub-page left open
-is committed on save, so what is on screen is what is stored.
+real second page would have to re-implement all three to edit a slice of the
+same record. The back button is also the commit and says so, and a sub-page left
+open is committed on save, so what is on screen is what is stored.
 
-⚠ **NOTHING ABOUT AN OWNER IS READ BACK OFF THE MAIN FORM.** Not the schedule,
-not the calendar, not a group's name or its places — none of it has an input
-there any more, and the sub-page is hidden rather than detached. A save that
-walked the DOM would find nothing and clear all of it. The model is the record:
-`primeScheduleModel()` loads `S.schedule`, `S.sessionDates` and `S.namedGroups`
-from the record **before the first panel draws** — it has to run first, because
-the Schedule panel reads the named groups that Group size, rendered after it,
-used to be the thing that loaded — and `readFacts()` saves from those. That is
-the undrawn-field trap this project keeps meeting, and the answer is the same
-every time.
+A frequency that names a session count pads and trims to it for every group. The
+activity's old editor did and a group's did not, so a group could be set to
+"twice weekly" and given one day, which enumerates half a term with nothing
+erroring.
 
-One consequence worth having: a frequency that names a session count now pads
-and trims to it **for every owner**. The activity's editor did and a group's did
-not, so a group could be set to "twice weekly" and given one day, which
-enumerates half a term with nothing erroring.
+### Translation reaches a group's name
+
+`LANG_SUBKEYS` merges a scalar sub-key of a **fact**. A group's name lives at
+`groups[i].name` — per **item** — which it cannot reach, and that gap was
+written down in a test for a release: a role permitted to edit only Russian
+could not translate "Advanced".
+
+`mergeGroups()` is that per-item merge. Matched by **groupId, never by
+position**, so reordering the list cannot hand one group's capacity to another.
+With full access the membership and the order come from the request; a
+restricted role keeps the stored list exactly and may change only the words in
+it — the name, and the word half of each group's facts — which is the same rule
+`LIST_KEYS` already applies to teachers and sponsors.
+
+### The migration, and the trap in it
+
+`migrate()` builds `groups` when a record has none and leaves it alone when it
+has some, so a second pass finds what the first wrote — the same shape
+`activityId` already had, and the reason it is safe to run on every read.
+
+| Record | Becomes |
+|---|---|
+| a **pooled** activity | exactly **one** group, name blank, capacity `groups × maxPerGroup` |
+| an activity with **named groups** | one group per entry, **ids preserved**, each seeded with the activity's shared facts |
+
+⚠ **hebrew4kids is `2 × 10` and becomes one group of TWENTY**, not ten. Folding
+a pooled activity into "its one group" with the wrong half of that product would
+halve a class with nothing erroring. `beit-midrash` turned out to have two named
+groups as well, not one, and keeps both at 20 and 30.
+
+Seeding is deliberately a **copy rather than a guess**: two groups that differ in
+language and teacher still shared an age range and a room, and an admin adjusts
+from something true rather than from blank fields.
+
+⚠ **AND THE IDEMPOTENCE TRAP IS WORTH KEEPING.** `normaliseVisibility()` decided
+"this record predates the exact address field" from `facts.address` — which the
+migration itself removes. A second pass would have read that as a pre-changeover
+record, reset every members-only flag to `public`, and published an address on
+the next save. It asks both places now: the activity's facts *and* the groups'.
+
+A record created today has no facts to derive a group from, so the id has to be
+minted — which a pure function cannot do. It is minted in `mergeByPermission()`
+rather than in `stamp()`, because **preview does not stamp**: in `stamp()` a new
+activity would preview as a validation failure and publish fine, which is the
+one asymmetry `preview-matches-publish` exists to forbid.
 
 ### `creditFor()` — what a cancellation credits
 
@@ -1855,12 +1965,17 @@ Two consequences worth stating plainly:
   milliseconds and there is no atomic increment. The queue says "23 / 20 — over
   capacity" and an admin rejects the surplus.
 
-Capacity is `facts.groupSize` and no new field: the product when pooled, the sum
-of the named capacities when an activity names its groups, and **null means
-uncapped, deliberately not zero** — a blank must never read as a restriction.
-Named groups bucket the same count with no extra read. A place taken while the
-activity was still pooled carries `groupId: null`, so it counts towards the
-activity and belongs to no row; the rows deliberately do not sum to the total.
+Capacity is the **sum of the groups' capacities** and no new field, with **null
+meaning uncapped, deliberately not zero** — a blank must never read as a
+restriction, and one group with no capacity makes the whole activity uncapped,
+because a sum missing one of its terms is not a sum. The groups bucket the same
+count with no extra read.
+
+⚠ A place taken while the activity was still pooled carries `groupId: null`.
+With **one** group that is not ambiguous and it counts into it — see **A group is
+the unit** for why reading it any other way makes a full class report as empty.
+With two or more it belongs to no row and says so, and the rows deliberately do
+not sum to the total.
 
 **There is no waitlist.** The place is simply gone and the next submission takes
 it, first come. A waitlist has to choose who gets a freed place, tell them, and
@@ -4219,7 +4334,11 @@ share image, Formspree wiring, domain) is done. Open items:
   both deliberate, both described above.
   **Phase 1 is done** — the activity side: `activityId`, `type`, the
   registration settings block, the session calendar and its table on the page,
-  named groups and `perSessionPrice`. All of it ships to the live site.
+  groups and `perSessionPrice`. All of it ships to the live site.
+  **A group is the unit**: every activity has at least one, seven facts belong
+  to it, and one group is not a choice. See **A group is the unit** for the
+  whole of it, and ⚠ note the one visible change to a published page — a single
+  group prints its size and no longer prints "1 group".
   **`creditFor()` is called on every cancellation, from both sides**, and the
   ledger entry it produces is written before the registration is touched.
   **Phase 2 (accounts) is done**: sign up, sign in, sign out, password reset,

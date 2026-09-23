@@ -253,18 +253,16 @@ H.ok(!/' not meeting'/.test(bare), 'and the group editor\'s');
 //
 // There is one list now, WHO MEETS WHEN, and every row opens the same sub-page.
 //
-// ⚠ THE FIRST ROW IS NOT A GROUP. Naming groups is a promise to a family that
-// there is a choice to make: it puts a picker on the registration form, the
-// name on the public page, the roster and every receipt, and it switches
-// capacity from `groups × maxPerGroup` to the sum of the named capacities — so
-// an activity holding 14 would start holding whatever one auto-created group
-// was given. An activity with one class offers no choice, so it names no group.
-// That is why this is a UI change and not a data change, and it is the thing
-// most worth pinning here.
+// ⚠ AND THE FIRST ROW IS A REAL GROUP. It was "Everyone" — a visible row
+// standing for the activity's own timetable, which any unnamed group followed —
+// because naming a group used to be what put a picker on the registration form
+// and a name on the public page. That implicit default is gone: every activity
+// has at least one group, it is renamable, and what decides whether a family is
+// ASKED to choose is the COUNT. One group is not a choice however it is named.
 
-console.log('\n[the list of who meets when]');
-const listSrc = ['function ownerRows', 'function groupById', 'function groupLabel',
-                 'function ownerSchedule', 'function ownerDates', 'function ownerSummary']
+console.log('\n[the list of the groups]');
+const listSrc = ['function groupById', 'function groupLabel',
+                 'function liveDates', 'function groupSummary']
   .map((name) => {
     const a = src.indexOf('  ' + name);
     H.ok(a !== -1, 'found ' + name);
@@ -279,7 +277,7 @@ const listCtx = {
   out: null
 };
 vm.createContext(listCtx);
-vm.runInContext(listSrc + '\nout = { ownerRows, ownerSummary, groupLabel };', listCtx);
+vm.runInContext(listSrc + '\nout = { groupSummary, groupLabel };', listCtx);
 const L = listCtx.out;
 const setState = (st) => { listCtx.S = st; };
 
@@ -287,48 +285,44 @@ const WED = { frequency: 'weekly', sessions: [{ day: 3, time: '16:00' }] };
 const MON = { frequency: 'weekly', sessions: [{ day: 1, time: '16:00' }] };
 const DATES = (n) => Array.from({ length: n }, (_, i) => ({ date: '2026-10-' + (14 + i * 7), status: 'scheduled' }));
 
-console.log('  -- an activity with one class');
-setState({ schedule: WED, sessionDates: DATES(3), namedGroups: [] });
-let rows = L.ownerRows();
-H.eq(rows.length, 1, 'one row');
-H.eq(rows[0].label, 'Everyone', 'and it is Everyone, not "Group 1"');
-H.eq(rows[0].groupId, null, '⚠ with NO groupId — it is not a named group, so a family is asked to choose nothing');
-H.eq(L.ownerSummary(rows[0]), 'Wednesday 16:00 · 3 dates', 'summarised on the row');
-
-console.log('  -- and one that names two');
-setState({
-  schedule: WED, sessionDates: DATES(3),
-  namedGroups: [
-    { groupId: 'g1', name: { he: 'מתחילים', en: 'Beginners', ru: '' }, capacity: 7,
-      schedule: MON, sessionDates: DATES(3) },
-    { groupId: 'g2', name: { he: '', en: 'Advanced', ru: '' }, capacity: 7 }
-  ]
+const G = (over) => Object.assign({ groupId: 'g1', name: {}, capacity: null, facts: {} }, over);
+const facts = (sch, dates) => ({
+  schedule: sch, duration: { sessionDates: dates || [] }
 });
-rows = L.ownerRows();
-H.eq(rows.length, 3, 'Everyone plus the two groups');
-H.eq(rows.map((r) => r.label).join(', '), 'Everyone, Beginners, Advanced', 'in that order');
-H.eq(L.ownerSummary(rows[1]), 'Monday 16:00 · 3 dates', 'a group with its own timetable shows it');
-// ⚠ The inheritance, made visible. calendarFor() already falls back in one
-// function; the row is what makes the thing being fallen back TO editable.
-H.eq(L.ownerSummary(rows[2]), 'Follows Everyone',
-  'and one without says so rather than repeating the activity\'s as if it were its own');
+
+console.log('  -- an activity with one class');
+setState({ groups: [G({ facts: facts(WED, DATES(3)) })] });
+H.eq(L.groupSummary(listCtx.S.groups[0]), 'Wednesday 16:00 \u00b7 3 dates', 'summarised on its row');
+H.eq(L.groupLabel(listCtx.S.groups[0]), 'Unnamed group',
+  '\u26a0 and it needs no name: one group offers no choice, so nothing is published ' +
+  'and nobody is asked');
+
+console.log('  -- and one with two, each on its own days');
+setState({ groups: [
+  G({ groupId: 'g1', name: { he: 'מתחילים', en: 'Beginners', ru: '' }, capacity: 7,
+      facts: facts(MON, DATES(3)) }),
+  G({ groupId: 'g2', name: { he: '', en: 'Advanced', ru: '' }, capacity: 10,
+      facts: facts(WED, DATES(3)) })
+] });
+H.eq(listCtx.S.groups.map(L.groupLabel).join(', '), 'Beginners, Advanced', 'both are listed by name');
+H.eq(L.groupSummary(listCtx.S.groups[0]), 'Monday 16:00 \u00b7 3 dates \u00b7 up to 7',
+  'with its own timetable and its own places');
+H.eq(L.groupSummary(listCtx.S.groups[1]), 'Wednesday 16:00 \u00b7 3 dates \u00b7 up to 10',
+  '\u26a0 and the other its own \u2014 there is no shared default left for either to inherit');
 
 console.log('  -- a group half set up says which half');
-setState({ schedule: WED, sessionDates: [], namedGroups: [
-  { groupId: 'g1', name: { en: 'Beginners' }, capacity: 7, schedule: MON }
-] });
-H.eq(L.ownerSummary(L.ownerRows()[1]), 'Monday 16:00 · no dates',
+setState({ groups: [G({ facts: facts(MON, []) })] });
+H.eq(L.groupSummary(listCtx.S.groups[0]), 'Monday 16:00 \u00b7 no dates',
   'a schedule with no calendar generated yet');
-setState({ schedule: { sessions: [] }, sessionDates: [], namedGroups: [] });
-H.eq(L.ownerSummary(L.ownerRows()[0]), 'No schedule yet · no dates',
+setState({ groups: [G({ facts: facts({ sessions: [] }, []) })] });
+H.eq(L.groupSummary(listCtx.S.groups[0]), 'No schedule yet \u00b7 no dates',
   'and a brand-new activity says both');
 
-console.log('  -- an unnamed group is still listed, so it can be named or removed');
-setState({ schedule: WED, sessionDates: [], namedGroups: [
-  { groupId: 'g1', name: { he: '', en: '', ru: '' }, capacity: null }
-] });
-H.eq(L.ownerRows()[1].label, 'Unnamed group',
-  'a group added and not yet named is visible rather than a blank row');
+console.log('  -- an excluded date is not one they meet on');
+setState({ groups: [G({ facts: facts(WED, DATES(3).concat([{ date: '2026-11-11', status: 'excluded' }])) })] });
+H.eq(L.groupSummary(listCtx.S.groups[0]), 'Wednesday 16:00 \u00b7 3 dates',
+  'the count is the dates that happen, which is the same list the page prints');
+
 H.eq(L.groupLabel({ name: { he: 'מתחילים', en: '', ru: '' } }), 'מתחילים',
   'and a group named in one language is labelled by it');
 
@@ -338,19 +332,19 @@ console.log('\n[⚠ nothing about an owner is read back off the main form any mo
 // DOM would find nothing and clear the schedule, the calendar, every group name
 // and every capacity. This is the undrawn-field trap this project keeps meeting,
 // and the answer is the same every time: the model is the record.
-const reads = src.slice(src.indexOf('function readFacts'));
-H.ok(/var sch = S\.schedule \|\| \{\};/.test(reads), 'the schedule is saved from the model');
-H.ok(/sessionDates: S\.sessionDates/.test(reads), 'and the calendar');
-H.ok(/return S\.namedGroups \|\| \[\];/.test(src), 'and the groups');
+H.ok(/rec\.groups = S\.groups \|\| \[\];/.test(src), 'the groups are saved from the model');
+const reads = src.slice(src.indexOf('function readFacts'), src.indexOf('function listSpec'));
+H.ok(!/sessionDates|S\.schedule/.test(reads),
+  'and the main form\'s read-back mentions no calendar at all, because it draws none');
 H.ok(!/\$\('fact-schedule-frequency'\)/.test(src),
   'and the id the old inline frequency select carried is referenced nowhere');
-H.ok(!/grp-' \+ g\.groupId \+ '-cap/.test(src),
-  'nor the per-row capacity inputs the named list used to draw');
+H.ok(!/fact-duration-/.test(src),
+  'nor the activity-level duration ids, now that the dates belong to a group');
 
-// The model has to be loaded before the Schedule panel draws, because that
-// panel reads the named groups — which Group size, rendered after it, used to
-// be the thing that loaded.
-H.ok(/function renderFacts\(\) \{\s*\n\s*primeScheduleModel\(\);/.test(src),
+// The model has to be loaded before the facts panel draws, because that panel
+// draws the group list and the price preview inside it reads a group's session
+// length.
+H.ok(/function renderFacts\(\) \{\s*\n\s*primeGroups\(\);/.test(src),
   'and it is primed before the first panel is drawn');
 
 console.log('\n[a frequency that names a count gets exactly that many rows]');

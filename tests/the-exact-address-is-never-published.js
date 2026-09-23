@@ -106,10 +106,17 @@ console.log('\n[the admin draws two of them without collapsing them into one]');
 const adminJs = require('fs').readFileSync(require('path').join(__dirname, '..', 'js/activities-admin.js'), 'utf8');
 H.ok(adminJs.indexOf("'fact-location'") === -1,
      'no input id is hardcoded to the kind');
-H.ok(/body = fieldRow\(\{ label: 'Text' \}, langObj\(fact\.text\), 'fact-' \+ d\.key\)/.test(adminJs),
+// The prefix is a parameter now, because the same editor is drawn on the main
+// form for the activity's two facts and on a group's page for its seven — but
+// the KEY half of the id is what this is about, and it is still the fact's.
+H.ok(/body = fieldRow\(\{ label: 'Text' \}, langObj\(fact\.text\), p \+ '-' \+ d\.key\)/.test(adminJs),
      'the field is keyed by the fact key when it is drawn');
-H.ok(/d\.kind === 'location'\) out = \{ text: readLangField\('fact-' \+ d\.key\) \}/.test(adminJs),
+H.ok(/d\.kind === 'location'\) out = \{ text: readLangField\(p \+ '-' \+ d\.key\) \}/.test(adminJs),
      'and by the same key when it is read back');
+// And the two halves use the SAME prefix variable, which is what stops a group's
+// editor writing into the main form's ids or the other way round.
+H.ok(/function factEditor\(d, fact, p\)/.test(adminJs) && /function readFactEditor\(d, p, previous\)/.test(adminJs),
+     'one editor and one read-back, both taking the prefix they are drawn under');
 const locationKinds = require('../netlify/functions/activities-admin')._internal
   .FIELD_SCHEMA.facts.filter((f) => f.kind === 'location').map((f) => f.key);
 H.eq(JSON.stringify(locationKinds), '["location","address"]',

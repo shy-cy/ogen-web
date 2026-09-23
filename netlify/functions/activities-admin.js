@@ -167,6 +167,29 @@ const FIELD_SCHEMA = {
   defaultExpiryDays: REG.DEFAULT_EXPIRY_DAYS,
   // The two closed lists the form draws from, labelled in English because the
   // admin is. The page renders them in the reader's own language.
+  // ⚠ WHICH PANEL DRAWS WHICH FACT, from the one list that decides it. The
+  // descriptors above stay a single list — one label, one hint, one editor kind
+  // per fact, wherever it is drawn — and these two say where each one belongs.
+  // A third copy in the client is how a fact ends up rendered on both screens,
+  // or on neither.
+  activityFacts: FACTS.ACTIVITY_FACTS,
+  groupFacts: FACTS.GROUP_FACTS,
+  // Which sections of a group can be copied out of another group, and what each
+  // one carries. The client offers exactly this list, so a section added here
+  // is offered without the form being edited — and a section that is NOT here
+  // cannot be copied at all, which is the point for `duration`: its dates are
+  // absolute, and copying them out of another activity imports last year's term.
+  copySections: [
+    { key: 'teachers', label: 'Teachers', crossActivity: false },
+    { key: 'schedule', label: 'Schedule (how often, which days)', crossActivity: true },
+    { key: 'duration', label: 'Dates and length', crossActivity: false },
+    { key: 'ages', label: 'Ages', crossActivity: true },
+    { key: 'instructionLanguage', label: 'Language of instruction', crossActivity: true },
+    { key: 'prerequisites', label: 'Level', crossActivity: true },
+    { key: 'location', label: 'Location', crossActivity: true },
+    { key: 'address', label: 'Exact address', crossActivity: true },
+    { key: 'capacity', label: 'Places', crossActivity: true }
+  ],
   instructionLanguages: FACTS.INSTRUCTION_LANGUAGES.map((c) => ({ key: c, label: FACTS.LANGUAGE_NAMES.en[c] })),
   levels: FACTS.LEVELS.map((k) => ({ key: k, label: FACTS.LEVEL_NAMES.en[k] })),
   frequencies: FREQUENCIES,

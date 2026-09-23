@@ -359,10 +359,10 @@ ${faqItems}
         <h2>${L.gGroups}</h2>
         <p class="groups-choose">${esc(L.chooseGroup)}</p>
 ${choice.groups.map((g) => `        <div class="group-card">
-          <h3>${esc(g.name)}</h3>
+          <h3>${esc(g.name)}</h3>${g.facts.length ? `
           <ul class="sidebar-facts">
 ${g.facts.map((f) => `            <li data-fact="${esc(f.key)}"><strong>${LABELS[lang][f.key]}</strong><span>${esc(f.value)}</span></li>`).join('\n')}
-          </ul>
+          </ul>` : ''}
         </div>`).join('\n')}
       </div>
 `
