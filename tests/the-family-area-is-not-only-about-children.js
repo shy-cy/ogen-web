@@ -139,7 +139,7 @@ H.ok(!/activitySlugAtSubmission/.test(action),
   'never through the slug frozen onto the registration');
 
 console.log('\n[one row shape, so a list and a page cannot disagree]');
-H.ok(/^function regRow\(reg, participant\)/m.test(regs),
+H.ok(/^function regRow\(reg, participant, lang, activity\)/m.test(regs),
   'the server builds a registration row in one place');
 // ⚠ SCOPED TO THE ROW BUILDER. This counted the whole file once, which made it
 // a test about the string "participantName:" rather than about rows — and it
@@ -147,7 +147,7 @@ H.ok(/^function regRow\(reg, participant\)/m.test(regs),
 // line description on a bundle's Stripe session, so a family buying for two
 // children can tell the two receipts apart). The property worth pinning is that
 // there is ONE row builder, not that a word appears once.
-const rowFn = regs.slice(regs.indexOf('function regRow(reg, participant)'), regs.indexOf('exports.handler'));
+const rowFn = regs.slice(regs.indexOf('function regRow(reg, participant, lang, activity)'), regs.indexOf('exports.handler'));
 H.eq((rowFn.match(/participantName:/g) || []).length, 1,
   'and only one place names the participant INTO A ROW');
 H.eq((regs.match(/regRow\(/g) || []).length > 2, true,

@@ -49,7 +49,12 @@ const REGS = [
     title: { en: 'Hebrew for kids', he: 'עברית לילדים', ru: 'Иврит для детей' },
     type: 'course', groupId: null, groupName: { en: 'Beginners', he: 'מתחילים', ru: 'Начинающие' },
     status: 'approved', holdsASpot: true, owedCents: 35000, paidCents: 35000, creditedCents: 0,
-    feeCharged: true, cancellation: { guardianMayCancel: true, total: 0 } },
+    feeCharged: true, cancellation: { guardianMayCancel: true, total: 0 },
+    // ⚠ THE CUTOFFS WERE FROZEN ON EVERY REGISTRATION SINCE PHASE 5 AND SHOWN
+    // NOWHERE. A family found out there was a deadline by meeting it.
+    cancellationTermsTitle: 'Cancellation terms',
+    cancellationTerms: ['You can cancel this registration up to 28 October 2026.',
+                        'Credit stays on your account.'] },
   { participantId: 'p-1', participantName: 'Michal Shinitzky', activityId: 'act-2', slug: 'folk',
     title: { en: 'Folk dancing', he: 'ריקודי עם', ru: 'Народные танцы' },
     type: 'dropin', groupId: null, groupName: null,
@@ -111,7 +116,10 @@ const ANSWERS = {
       owedCents: null, paidCents: null, cancellation: null }
   ] }),
   activity: () => ({ ok: true, activity: { activityId: 'act-1', slug: 'hebrew', type: 'course',
-    title: { en: 'Hebrew for kids' }, left: 4, capacity: 14, taken: 10, groups: null, full: false } }),
+    title: { en: 'Hebrew for kids' }, left: 4, capacity: 14, taken: 10, groups: null, full: false,
+    cancellationTermsTitle: 'Cancellation terms',
+    cancellationTerms: ['You can cancel this registration up to 28 October 2026.',
+                        'Credit stays on your account.'] } }),
   submit: () => ({ ok: true, registration: REGS[0] })
 };
 
@@ -322,8 +330,23 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
   // ⚠ Never on your own record. You would be handing your own attendance to
   // somebody else and losing sight of it.
   const meRow = D.byClass(dom.mount, 'acc-row').filter((r) => r.textContent.indexOf('Michal') === 0)[0];
-  D.byClass(meRow, 'acc-link').filter((b) => b.textContent === 'Guardians')[0].click();
+  // ⚠ AND THE CONTROL IS NOT CALLED "GUARDIANS" HERE. The panel behind it is
+  // the same one and belongs on this row — inviting somebody to co-manage your
+  // own attendance is a state `isSelf`-on-the-link exists to hold — but an
+  // adult holding the account is nobody's ward, and the row had just stopped
+  // calling anybody a child one heading above.
+  H.eq(D.byClass(meRow, 'acc-link').filter((b) => b.textContent === 'Guardians').length, 0,
+    'your own row does not offer you "Guardians"');
+  const access = D.byClass(meRow, 'acc-link').filter((b) => b.textContent === 'Access')[0];
+  H.ok(access, 'it names what the panel is instead');
+  access.click();
   await settle();
+  H.ok(meRow.textContent.indexOf('Who can see and manage this record') !== -1,
+    'and the panel is the same one, with its description as its heading');
+  H.ok(meRow.textContent.indexOf('Invite a second guardian') === -1,
+    'the invite inside it does not call the account holder a ward either');
+  H.ok(meRow.textContent.indexOf('Invite someone to manage this record') !== -1,
+    'it asks for somebody to manage the record');
   H.ok(meRow.textContent.indexOf('Remove myself from this record') === -1,
     '"remove myself" is not offered on the record that IS you');
 
@@ -342,6 +365,13 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
     'and neither of them adds the yearly fee to the term price');
   H.ok(has(dom, 'Session 1') && has(dom, '14 October'),
     'the dates it meets on are the calendar, formatted once on the server');
+  // ⚠ AND UNTIL WHEN THEY CAN GET OUT OF IT. This is the page a family comes
+  // back to six weeks later, and the deadline was nowhere on it.
+  H.ok(has(dom, 'Cancellation terms'), 'the frozen cancellation terms are on the page');
+  H.ok(has(dom, 'up to 28 October 2026'), 'naming the date rather than implying one');
+  H.eq(D.byClass(dom.mount, 'acc-terms').length, 1, 'once, as small print');
+  H.eq(D.byClass(dom.mount, 'acc-notice').length, 0,
+    'and NOT as a notice — a tinted panel with a rule means something is wrong');
 
   console.log('\n[/account/activity — pay per session, where "attended" lives]');
   dom = await screen({ view: 'activity', lang: 'en', search: '?p=p-1&a=act-2' });
@@ -378,6 +408,9 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
   dom = await screen({ view: 'activity', lang: 'en', search: '?register=hebrew' });
   H.ok(has(dom, 'Register for an activity'), 'the panel is drawn from ?register=');
   H.ok(has(dom, '4 places left'), 'with a count, never a list of who');
+  // ⚠ SAID BEFORE THE BUTTON, not by the refusal that applies it.
+  H.ok(has(dom, 'Cancellation terms') && has(dom, 'up to 28 October 2026'),
+    'the register panel says what cancelling will be worth before anybody commits');
   H.ok(has(dom, 'Michal Shinitzky (me)'),
     'and you are in the who-is-registering list — folk dancing is not only for the kids');
   D.byTag(dom.mount, 'form')[0].submit();

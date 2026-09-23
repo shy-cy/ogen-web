@@ -22,6 +22,7 @@
 const email = require('./_email');
 const { lang, pathFor, esc, strip, shell, shellRaw, SITE } = require('./_email-shell');
 const { pick } = require('./_activity-facts');
+const terms = require('./_cancellation-terms');
 
 const titleOf = (reg, l) => pick(((reg && reg.frozen) || {}).activityTitle, l) || '';
 const childOf = (reg) => ((reg && reg.frozen) || {}).participantName || '';
@@ -270,13 +271,50 @@ const EXPIRED = {
   }
 };
 
-function receivedMessage(reg, account) {
+// ⚠ THE CANCELLATION TERMS TRAVEL WITH THE MESSAGE THAT CREATES THE COMMITMENT.
+//
+// A family read "you are registered" and had no way to find out until when they
+// could change their mind, or what changing it would be worth. The screen they
+// registered from says it now — and a screen is read once, at the moment of
+// deciding, by whoever was holding the laptop. The email is the copy the
+// household keeps, so it is the one that has to carry the deadline.
+//
+// The words come from _cancellation-terms.js, which is also what the family
+// area renders, so the inbox and the screen cannot come to describe two
+// different policies — the same reason there is one shell and one send path.
+//
+// It is SMALL and it is LAST, under the button. This is reference material a
+// family comes back to, not the news the message is delivering, and set at body
+// size above the call to action it would read as a warning about the thing they
+// have just done.
+//
+// `sessionCancelHours` is a parameter for exactly the reason `payUrl` and
+// `creditCents` are: a drop-in's per-evening window lives on the activity and is
+// frozen onto each evening when it is booked, never onto the registration, and
+// opening an activity here would stop this table being runnable in three
+// languages with no infrastructure at all.
+function termsBlock(reg, l, sessionCancelHours) {
+  const lines = terms.termsFor({
+    type: ((reg && reg.frozen) || {}).type || 'course',
+    cancellation: ((reg && reg.frozen) || {}).cancellation,
+    sessionCancelHours: sessionCancelHours,
+    hasFee: ((reg.frozen || {}).price || {}).feeCharged !== false &&
+            Number(((reg.frozen || {}).price || {}).registrationFee) > 0
+  }, l);
+  if (!lines.length) return '';
+  return '<span style="font-size:13px;color:#6B705C;">' +
+    '<b>' + esc(terms.titleFor(l)) + '</b><br>' +
+    lines.map(esc).join('<br>') + '</span>';
+}
+
+function receivedMessage(reg, account, sessionCancelHours) {
   const l = lang(((account || {}).profile || {}).preferredLanguage);
   const T = RECEIVED[l];
   const child = childOf(reg), act = titleOf(reg, l);
   const html = shell(l, T.heading,
     [esc(T.body(child, act)), esc(T.next)],
-    { href: registrationHref(reg, l), label: T.button });
+    { href: registrationHref(reg, l), label: T.button },
+    termsBlock(reg, l, sessionCancelHours));
   return { to: account.email, subject: T.subject(child, act), html: html, text: strip(html) };
 }
 
@@ -309,7 +347,7 @@ function receivedMessage(reg, account) {
 // `creditCents` is a parameter for the same reason `payUrl` is: this builder
 // opens no store, so the whole table stays runnable in three languages with no
 // infrastructure.
-function approvedMessage(reg, account, payUrl, creditCents) {
+function approvedMessage(reg, account, payUrl, creditCents, sessionCancelHours) {
   const l = lang(((account || {}).profile || {}).preferredLanguage);
   const T = APPROVED[l];
   const child = childOf(reg), act = titleOf(reg, l);
@@ -319,7 +357,8 @@ function approvedMessage(reg, account, payUrl, creditCents) {
   }
   const html = shell(l, T.heading, lines,
     payUrl ? { href: payUrl, label: T.payButton }
-           : { href: registrationHref(reg, l), label: T.button });
+           : { href: registrationHref(reg, l), label: T.button },
+    termsBlock(reg, l, sessionCancelHours));
   return { to: account.email, subject: T.subject(child, act), html: html, text: strip(html) };
 }
 
@@ -485,9 +524,13 @@ function paidMessage(reg, account, paidCents, outstandingCents, payUrl) {
 
 const langOf = (account) => lang(((account || {}).profile || {}).preferredLanguage);
 
-const sendReceived = (reg, account) =>
+// `sessionCancelHours` rides in from the caller for the reason termsBlock()
+// gives: a drop-in's per-evening window lives on the activity, and a message
+// builder that opened one would stop being runnable with no infrastructure. A
+// course sends nothing and needs to: its terms are frozen on the record.
+const sendReceived = (reg, account, sessionCancelHours) =>
   email.settle('registration-received', account.email, () =>
-    email.send(receivedMessage(reg, account),
+    email.send(receivedMessage(reg, account, sessionCancelHours),
       { template: 'registration-received', lang: langOf(account) }));
 
 // MINTED HERE, INSIDE settle(). The link is a row in a Blobs store and the
@@ -518,10 +561,10 @@ async function creditFor(account) {
   }
 }
 
-const sendApproved = (reg, account) =>
+const sendApproved = (reg, account, sessionCancelHours) =>
   email.settle('registration-approved', account.email, async () =>
     email.send(approvedMessage(reg, account, await payUrlFor(reg, account),
-                               await creditFor(account)),
+                               await creditFor(account), sessionCancelHours),
       { template: 'registration-approved', lang: langOf(account) }));
 
 const sendRejected = (reg, account, override) =>

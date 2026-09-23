@@ -90,15 +90,23 @@ function styleForEmail(html) {
 // ⚠ THE CALLER SANITISES. Nothing is escaped here, exactly as `paragraphs` is
 // not escaped here: shell() has always trusted its caller, and every caller does
 // it with esc(). The rich caller does it with sanitiseRich().
-function shellRaw(l, heading, bodyHtml, button) {
-  return render(l, heading, styleForEmail(bodyHtml), button);
+function shellRaw(l, heading, bodyHtml, button, footnote) {
+  return render(l, heading, styleForEmail(bodyHtml), button, footnote);
 }
 
-function shell(l, heading, paragraphs, button) {
-  return render(l, heading, paragraphs.map((p) => `<p style="margin:0 0 14px;">${p}</p>`).join('\n'), button);
+// `footnote` is small print AFTER the call to action and before the rule: the
+// cancellation terms, today, and whatever else is reference rather than news.
+// It sits below the button on purpose — set at body size above one, the terms
+// of getting out of a thing read as a warning about the thing the message is
+// delivering, and a family reads the deadline before they read that they have a
+// place. It is raw HTML like shellRaw's body, because the caller has already
+// escaped what it built.
+function shell(l, heading, paragraphs, button, footnote) {
+  return render(l, heading, paragraphs.map((p) => `<p style="margin:0 0 14px;">${p}</p>`).join('\n'),
+                button, footnote);
 }
 
-function render(l, heading, body, button) {
+function render(l, heading, body, button, footnote) {
   const cta = button
     ? `<p style="margin:24px 0;"><a href="${esc(button.href)}" style="background:#C8674A;color:#ffffff;` +
       `padding:12px 22px;border-radius:6px;text-decoration:none;display:inline-block;">${esc(button.label)}</a></p>`
@@ -108,6 +116,7 @@ function render(l, heading, body, button) {
 <h1 style="font-size:20px;margin:0 0 18px;">${esc(heading)}</h1>
 ${body}
 ${cta}
+${footnote ? `<p style="margin:0 0 14px;">${footnote}</p>` : ''}
 <hr style="border:0;border-top:1px solid #E4DFD3;margin:28px 0 14px;">
 <p style="font-size:12px;color:#6B705C;margin:0;">${esc(FOOT[l])}</p>
 </div>`;

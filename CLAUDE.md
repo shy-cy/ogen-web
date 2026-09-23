@@ -1503,6 +1503,9 @@ netlify/functions/
                          one timestamp, and nothing else; PURE
   _family-errors.js      every refusal a family can be shown, in three
                          languages; no store, no clock; PURE
+  _cancellation-terms.js  the frozen cancellation rules, in words, in three
+                         languages; reads the same block creditFor() reads;
+                         no store, no clock; PURE
   _activity-autocomplete.js  when a closed activity has finished, and nothing
                          else; no store, no clock, no GitHub; PURE
   _blobs.js              the only place a Blobs store is opened; ALL store names
@@ -3215,6 +3218,27 @@ losing sight of it. And the guardian **invitation email** still says "second
 guardian for &lt;name&gt;", which reads oddly adult-to-adult; it is trilingual
 copy whose Russian is already awaiting review, so it belongs in that pass.
 
+⚠ **AND THE ROW CALLED AN ADULT SOMEBODY'S WARD.** Your own record sat in the
+list as `Ogen Michal · me · Edit · Guardians` — one heading below a list that
+had just stopped calling anybody a child. Reported as *"why do we need Guardians
+next to an adult who is also an account holder"*.
+
+**The button is not what was wrong, and removing it would have been the worse
+fix.** The panel behind it is *who can see and manage this record*, and on your
+own record that is a real question with a real answer: `isSelf` lives on the
+**link** precisely so a couple who each manage the other's record can be "self"
+on one of their two links and not on the other. Inviting somebody to co-manage
+your own attendance is a state the model was built to hold, and this is its only
+door — taking it away is the invite button labelled with a description all over
+again, one step further on.
+
+So the **label** learned that this row is a person rather than a dependant:
+`Access` / `גישה` / `Доступ` on your own row, `Guardians` everywhere else, and
+the invite inside it asks for somebody to *manage the record* rather than for a
+second guardian. The panel's own heading was already neutral and is untouched.
+A test asserts your own row offers no control called "Guardians" and that the
+panel behind the renamed one is the same panel.
+
 ### ⚠ A button labelled with a description hid the invite flow
 
 The guardian invitation has worked since Phase 3 — bound to the address it was
@@ -3486,6 +3510,101 @@ can never prove they agree. `a-dialog-about-money-must-not-be-backwards.js`
 builds both payloads from real records, executes `creditNote()` on them, and
 then **cancels and reads the ledger**, because a dialog agreeing with a payload
 proves only that two readers of one bug agree.
+
+### ⚠ A deadline nobody was told about
+
+Every rule was there. `freezeCancellation()` writes the cutoffs onto the record
+at submission, resolved per group; `creditFor()` applies them and is reproducible
+a year later; both cancel paths call it; the ledger carries the `basis` so a
+figure can be explained to a family who asks. All of it correct, and **none of it
+ever said out loud**. A family learned there was a deadline by *meeting* it — the
+cancel button quietly stopped being offered, or the credit came back smaller than
+expected, and the first mention of a cutoff was the refusal that named it. From
+outside, a policy nobody is shown is a policy invented at the moment it is
+enforced.
+
+`_cancellation-terms.js` says the same rules in words. It is pure — no store, no
+clock, no activity lookup — and it reads the **same frozen block `creditFor()`
+reads**, which is the whole design: not a second statement of the rules, a
+rendering of the one that already decides. It appears in three places, and the
+placement of each is the argument for it:
+
+| Where | Built from |
+|---|---|
+| the register panel, under the form | `freezeCancellation()` — literally the function whose output `submit` is about to store |
+| the registration page, under the cost card | the block **frozen on that record** |
+| the confirmation and approval emails, under the button | the same, through the same module |
+
+**The panel quotes the function that will freeze, not the record that does not
+exist yet**, so what is promised before the button is byte-for-byte what is
+stored after it — a test registers and compares the two arrays.
+
+⚠ **AND IT IS ASKED PER GROUP, because the cutoffs are.** `resolveCutoffs()`
+answers from the calendar the group was actually sold — two groups under the
+equal-hours rule can meet four times and six, so there is no single third session
+and no single default. The lines are hoisted to the panel only when **every**
+group says the same thing, which is every activity today; when they differ each
+option carries its own and the select swaps them. Quoting one group's deadline
+under a picker offering two is the same class of mistake as the schedule tag a
+listing card drops, and worse here, because the number is a deadline about money.
+
+⚠ **THE REGISTRATION READS THE FROZEN BLOCK AND NEVER THE ACTIVITY.** That is the
+whole reason the terms are frozen: an admin switching a course from flat to
+prorated in March must not change what a January family agreed to. A footnote
+rebuilt from the live activity would quietly re-quote the new policy at the old
+family — that rule broken by the one screen written to explain it. A test moves
+the activity's cutoffs afterwards and asserts the family still reads the date
+they agreed to while somebody registering today is quoted today's.
+
+Four details carry the rest:
+
+- **A switched-off cutoff is said out loud.** `"none"` is a value meaning *no
+  deadline*, and printing it as one would be the opposite of what it says, so it
+  becomes "you can cancel at any time" — the case the report named explicitly.
+  The same for a fee that is never forfeited.
+- **A fee nobody is billing is not described.** The waiver is decided on the
+  record (`feeCharged`), so a second term says nothing about a fee; on the panel,
+  where no participant has been picked, the line appears whenever the activity
+  charges one at all, which is the question a panel can honestly answer. Absent
+  reads as charged, the same tri-state `splitPaid()` reads.
+- **Once the window is shut there is one line left.** The three rules under it
+  describe what cancelling *would have* earned, and a family reading "cancel
+  before the first session and the whole fee comes back" on a page with no cancel
+  button is being offered something that is not available. ⚠ **Whether it is shut
+  is the CALLER'S answer**, passed in: `creditFor()` has already decided it, and a
+  terms module that asked the clock would be `_credit.js`'s contract broken one
+  file over. A test asserts the file never asks what time it is.
+- **A drop-in states the rule it actually has.** Cancelling a drop-in
+  *registration* credits nothing — `creditFor()` refuses at the top rather than
+  answering — so quoting a course's cutoffs there would be exactly the plausible
+  wrong number that guard exists to stop. It states the per-evening window
+  instead, and that number is **not frozen onto the registration**: it belongs to
+  each evening, frozen as `cancelHours` when that evening is booked, so the
+  registration-level sentence is about evenings not booked yet and reads from the
+  activity as it stands. It rides into the email as a parameter, like `payUrl`
+  and `creditCents`, so the message table stays runnable with no infrastructure.
+
+⚠ **THE TEST DOES NOT READ THE WORDS.** A footnote is copy, and copy is exactly
+what stays behind when a rule moves. `a-deadline-nobody-was-told-about.js` takes
+the date the screen prints, hands it to `creditFor()`, and asserts the arithmetic
+does at that instant what the sentence promised — the guardian may still cancel
+on the printed day and may not the day after, the whole fee comes back before its
+own separate date and none of it after, flat credits half and prorated credits
+three of four at a moment where those differ. Reading the sentence would only
+ever have proved the sentence is self-consistent.
+
+**The words are the server's**, in one module, because the email needs them too
+and two copies of a policy is two policies — the same reason there is one send
+path, one shell and one checkout builder. A test asserts `_registration-email.js`
+holds no copy of them.
+
+**It is small print and deliberately not a notice.** `.acc-terms` is a hairline
+and quiet text: `.acc-notice` and `.acc-waiting` are tinted panels with a leading
+rule, which on this site means something has happened or is about to go wrong,
+and a panel of that shape under a form nobody has filled in yet reads as a
+warning about registering. In the email it sits **after** the call to action, for
+the same reason — set at body size above one, the terms of getting out of a thing
+are read before the news that you have a place.
 
 ### ⚠ Two solid terracotta pills side by side are not a choice
 

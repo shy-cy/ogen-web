@@ -1268,6 +1268,30 @@ html[lang="he"] .thankyou h1{ font-family: var(--font-he); font-weight:700; }
 .acc-waiting-lead svg{ flex:none; }
 .acc-waiting-body{ margin:0; font-size:15px; color:var(--ink); }
 
+/* ⚠ THE CANCELLATION TERMS, AS SMALL PRINT AND DELIBERATELY NOT AS A NOTICE.
+   The cutoffs were frozen onto every registration and shown nowhere, so a
+   family learned the deadline by meeting it. They are reference material now —
+   under the register form, and again on the registration page they come back to
+   — and reference is what small print IS.
+
+   It is NOT `.acc-notice` and NOT `.acc-waiting`: both are tinted panels with a
+   leading rule, which on this site means something has happened or is about to
+   go wrong. A panel of that shape under a form nobody has filled in yet reads as
+   a warning about registering. A hairline above and quiet text says "there is
+   more here if you want it", which is the correct volume for terms.
+
+   Stacked spans rather than one paragraph with separators, for the reason the
+   listing card's fact rows are stacked: nothing is pushed to an edge, so there
+   is not one directional override and it reads correctly in all three
+   languages. */
+.acc-terms{
+  display:flex; flex-direction:column; gap:3px;
+  margin-block-start:18px; padding-block-start:12px;
+  border-block-start:1px solid var(--stone);
+  font-size:13px; line-height:1.55; color:#6B705C;
+}
+.acc-terms b{ color:var(--navy); font-weight:700; }
+
 /* THE CREDIT BLOCK ON A COST CARD.
    -------------------------------------------------------------------------
    It was one grey sentence and a text link between the figures and the pay

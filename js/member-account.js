@@ -122,7 +122,8 @@
       me: 'אני', edit: 'עריכה',
       dob: 'תאריך לידה', notes: 'הערות (אלרגיות, מידע רפואי)',
       save: 'שמירה', cancel: 'ביטול', age: 'גיל',
-      guardians: 'אפוטרופוסים',
+      guardians: 'אפוטרופוסים', selfAccess: 'גישה',
+      inviteManager: 'הזמנת מישהו לנהל את הרשומה',
       manages: 'מי רואה ומנהל/ת את הרשומה', primary: 'ראשי/ת',
       inviteGuardian: 'הזמנת אפוטרופוס שני', inviteEmail: 'כתובת דוא״ל',
       inviteSend: 'שליחת הזמנה', invitePending: 'הזמנה ממתינה',
@@ -248,7 +249,8 @@
       me: 'me', edit: 'Edit',
       dob: 'Date of birth', notes: 'Notes (allergies, medical information)',
       save: 'Save', cancel: 'Cancel', age: 'Age',
-      guardians: 'Guardians',
+      guardians: 'Guardians', selfAccess: 'Access',
+      inviteManager: 'Invite someone to manage this record',
       manages: 'Who can see and manage this record', primary: 'Primary',
       inviteGuardian: 'Invite a second guardian', inviteEmail: 'Email address',
       inviteSend: 'Send invitation', invitePending: 'Invitation pending',
@@ -376,7 +378,8 @@
       me: 'я', edit: 'Изменить',
       dob: 'Дата рождения', notes: 'Примечания (аллергии, медицинская информация)',
       save: 'Сохранить', cancel: 'Отмена', age: 'Возраст',
-      guardians: 'Опекуны',
+      guardians: 'Опекуны', selfAccess: 'Доступ',
+      inviteManager: 'Пригласить кого-то управлять этой записью',
       manages: 'Кто видит эту запись и управляет ею', primary: 'Основной',
       inviteGuardian: 'Пригласить второго опекуна', inviteEmail: 'Адрес электронной почты',
       inviteSend: 'Отправить приглашение', invitePending: 'Приглашение отправлено',
@@ -1343,6 +1346,29 @@
     return who;
   }
 
+  // ⚠ WHAT CANCELLING WILL BE WORTH, SAID BEFORE THE BUTTON THAT COMMITS.
+  //
+  // The cutoffs have been frozen onto every registration since Phase 5 and the
+  // family was never told any of them. They found out by meeting one: the cancel
+  // button quietly stopped being offered, or the credit came back smaller than
+  // expected, and the first mention of a deadline was the refusal applying it.
+  //
+  // The words are the SERVER'S, from _cancellation-terms.js, for the same reason
+  // every refusal here is — the email carries the identical lines, and two copies
+  // of a policy is two policies. There is no key for any of this in T.
+  //
+  // It is deliberately SMALL and deliberately NOT a notice. `.acc-notice` is for
+  // something that has happened or is about to go wrong; this is reference, read
+  // once here and again in the inbox, and a tinted panel with a leading rule
+  // would put a warning under a form nobody has filled in yet.
+  function termsNote(lines, title) {
+    if (!lines || !lines.length) return null;
+    var box = el('div', { class: 'acc-terms' });
+    if (title) box.appendChild(el('b', { text: title }));
+    lines.forEach(function (line) { box.appendChild(el('span', { text: line })); });
+    return box;
+  }
+
   function registerTerm(where, a, people, slug, title) {
     // ⚠ A COURSE IS NOT REGISTERED FOR FROM AN UNCONFIRMED ADDRESS, and the
     // form is not drawn at all rather than drawn and refused.
@@ -1422,10 +1448,36 @@
       go
     ]);
 
+    // ⚠ THE TERMS FOLLOW THE GROUP, because the cutoffs do. Two groups under
+    // the equal-hours rule can meet four times and six, so resolveCutoffs()
+    // answers per group and there is no single third session to default from.
+    // The server hoists the lines to the activity only when every group says
+    // the same thing, which is every activity today; when they differ each
+    // option carries its own and this swaps them, rather than printing one
+    // group's deadline under a picker offering two.
+    var note = el('div', {});
+    var showTerms = function (lines) {
+      clear(note);
+      var box = termsNote(lines, a.cancellationTermsTitle);
+      if (box) note.appendChild(box);
+    };
+    var groupTerms = function () {
+      if (!groupSel || !a.groups) return null;
+      var g = a.groups.filter(function (x) { return x.groupId === groupSel.value; })[0];
+      return g ? g.cancellationTerms : null;
+    };
+    showTerms(a.cancellationTerms || groupTerms());
+    if (groupSel) {
+      groupSel.addEventListener('change', function () {
+        showTerms(a.cancellationTerms || groupTerms());
+      });
+    }
+
     where.appendChild(section(title, [
       el('p', { class: 'acc-intro',
                 text: a.left == null ? T.unlimited : a.left + ' ' + T.places }),
-      form
+      form,
+      note
     ]));
   }
 
@@ -1484,7 +1536,8 @@
 
     where.appendChild(section(title, [
       el('p', { class: 'acc-intro', text: T.perSessionIntro }),
-      form
+      form,
+      termsNote(a.cancellationTerms, a.cancellationTermsTitle)
     ]));
     load();
 
@@ -1782,7 +1835,24 @@
         // chip that said "Sign in" to somebody who had no account yet: a label
         // that does not name what is behind it hides a feature as effectively as
         // not building it.
-        el('button', { type: 'button', class: 'acc-link', text: T.guardians,
+        // ⚠ AND ON YOUR OWN RECORD IT IS NOT THE WORD "GUARDIANS".
+        //
+        // The panel behind it is the same one and belongs there: `isSelf` lives
+        // on the LINK precisely because a couple who each manage the other's
+        // record are "self" on one of their two links and not on the other, so
+        // inviting somebody to co-manage YOUR attendance is a state the model
+        // was built to hold, and this is its only door. Removing it would be the
+        // invite button labelled with a description all over again, one step
+        // further on.
+        //
+        // What is wrong is the label. An adult holding this account is nobody's
+        // ward, and a row reading "Ogen Michal · me · Edit · Guardians" says
+        // otherwise in the one place the area has just stopped calling people
+        // children. The panel's own heading — "who can see and manage this
+        // record" — was already neutral and stays; only the control naming it
+        // had to learn that this row is a person rather than a dependant.
+        el('button', { type: 'button', class: 'acc-link',
+          text: p.isSelf ? T.selfAccess : T.guardians,
           onclick: function () { guardiansFor(box, p); } })
       ])
     ]);
@@ -1882,7 +1952,7 @@
               say('ok', T.saved);
               box.removeChild(sub);
             });
-        } }, [el('h3', { text: T.inviteGuardian }), ie.row, ib]));
+        } }, [el('h3', { text: p.isSelf ? T.inviteManager : T.inviteGuardian }), ie.row, ib]));
       }
 
       // A PARTICIPANT IS NEVER LEFT WITH NO GUARDIAN, so this is offered only
@@ -2074,6 +2144,21 @@
       // ordering rule the flash already follows. It does nothing at all unless
       // the reader has just come back from Checkout.
       paidWatch(res.data, renderActivity);
+
+      // ⚠ THE TERMS, ON THE PAGE THE FAMILY COMES BACK TO. The register panel
+      // said them once, to whoever was holding the laptop that evening; this is
+      // where somebody looks six weeks later to find out whether it is still
+      // possible and what it would be worth. They are the terms FROZEN on this
+      // registration, not the activity's current ones, so an admin changing the
+      // policy in March cannot re-quote it at a January family.
+      //
+      // Drawn for a live registration only. On one that is over the deadline is
+      // no longer a thing anybody can act on, and a list of rules under a
+      // cancelled row reads as an offer.
+      if (r.status === 'pending' || r.status === 'approved') {
+        var tn = termsNote(r.cancellationTerms, r.cancellationTermsTitle);
+        if (tn) body.appendChild(tn);
+      }
 
       // Offered only when the frozen terms allow it. The same creditFor() the
       // server will apply decided this, so what is shown is what happens.

@@ -35,6 +35,7 @@ const bundleStore = require('./_bundle-store');
 const checkout = require('./_checkout');
 const E = require('./_family-errors');
 const facts = require('./_activity-facts');
+const terms = require('./_cancellation-terms');
 const { LABELS } = require('./_activity-template');
 
 // LABELS is authored for an HTML TEMPLATE, so "When &amp; where" is correct
@@ -125,12 +126,63 @@ async function publishedForDisplay(slug, now) {
 // the first is visible in the source. A test drives the reader and counts.
 let reader = null;
 
+// ⚠ THE CANCELLATION TERMS, QUOTED FROM THE FUNCTION THAT WILL FREEZE THEM.
+//
+// A family was asked to commit — months of attendance and several hundred euros
+// — and told nothing at all about getting out of it. The cutoffs existed, were
+// frozen per group, and were first mentioned by the refusal that applied them.
+//
+// So the panel says them BEFORE the button, and it says them from
+// freezeCancellation(), which is literally the function whose output submit() is
+// about to store on the record. Not a second reading of the activity: the same
+// one, one moment early. Whatever this quotes is what gets frozen.
+//
+// ⚠ AND IT IS ASKED PER GROUP, because the cutoffs are. resolveCutoffs() answers
+// from the calendar the group is actually sold — two groups under the equal-hours
+// rule can meet four times and six, so there is no single third session and no
+// single default. Quoting one group's dates under a picker offering two is the
+// same class of mistake as the schedule tag a listing card drops when the groups
+// disagree, and it is worse here because the number is a deadline about money.
+// The lines are only hoisted to the panel when EVERY group says the same thing;
+// otherwise each option carries its own and the select swaps them.
+function termsForGroup(activity, groupId, lang) {
+  if ((activity.type || 'course') === 'dropin') {
+    return terms.termsFor({
+      type: 'dropin',
+      sessionCancelHours: ((activity.registration || {}).sessionCancelHours)
+    }, lang);
+  }
+  return terms.termsFor({
+    type: 'course',
+    cancellation: credit.freezeCancellation(activity, groupId),
+    // The panel cannot know whether THIS participant has already paid the
+    // yearly fee — the waiver is answered from that child's own registrations
+    // and nobody has been picked yet. So the line appears whenever the activity
+    // charges a fee at all, which is the question the panel can honestly ask.
+    hasFee: Number(((activity.facts || {}).price || {}).registrationFee) > 0
+  }, lang);
+}
+
+function termsAcross(activity, lang) {
+  const list = groups.groupList(activity);
+  const per = (list.length ? list : [{ groupId: null }])
+    .map((g) => ({ groupId: g.groupId, lines: termsForGroup(activity, g.groupId, lang) }));
+  const first = JSON.stringify(per[0].lines);
+  return { agreed: per.every((x) => JSON.stringify(x.lines) === first) ? per[0].lines : null, per: per };
+}
+
 // What the registration form needs, and nothing it does not. It is deliberately
 // a COUNT and never a list: how many places are left is public-ish information,
 // who is in them is not.
 function activityView(activity, report, lang) {
+  const t = termsAcross(activity, lang);
   return {
     activityId: activity.activityId,
+    // What cancelling this will be worth, said before the button rather than by
+    // the refusal that applies it. Null only when the groups disagree, in which
+    // case every option below carries its own.
+    cancellationTerms: t.agreed,
+    cancellationTermsTitle: terms.titleFor(lang),
     slug: activity.slug,
     type: activity.type || 'course',
     status: activity.status,
@@ -170,7 +222,8 @@ function activityView(activity, report, lang) {
           label: facts.namedGroupLine({ name: g.name, capacity: g.capacity }, lang || 'he'),
           capacity: g.capacity,
           left: g.left,
-          full: g.left != null && g.left <= 0
+          full: g.left != null && g.left <= 0,
+          cancellationTerms: (t.per.filter((x) => x.groupId === g.groupId)[0] || {}).lines || null
         }))
       : null
   };
@@ -471,7 +524,7 @@ async function commitEntries(spend, accountId, note) {
 // views of the same record, and two builders would drift — the one the family
 // reads on a dashboard would stop agreeing with the one they read on the page
 // they opened from it.
-function regRow(reg, participant) {
+function regRow(reg, participant, lang, activity) {
   return {
     participantId: reg.participantId,
     participantName: participant
@@ -504,7 +557,38 @@ function regRow(reg, participant) {
     // What cancelling would do, computed from the terms frozen onto this
     // registration — so the answer shown is the answer that will be applied, and
     // both come from the same function.
-    cancellation: cancellationView(credit.creditFor(reg))
+    cancellation: cancellationView(credit.creditFor(reg)),
+    // ⚠ THE TERMS AS FROZEN, NOT AS THE ACTIVITY NOW READS THEM. The whole
+    // reason freezeCancellation() runs at submission is that an admin switching
+    // a course from flat to prorated in March must not change what a January
+    // family agreed to — so a footnote rebuilt from the live activity would
+    // quietly re-quote the new policy at the old family, which is that rule
+    // broken by the one screen written to explain it.
+    // ⚠ A DROP-IN'S WINDOW IS NOT FROZEN HERE AND MUST NOT BE. The rule is
+    // hours before ONE evening's start, and it is frozen onto each attendance
+    // record as `cancelHours` at the moment that evening is booked — so the
+    // registration-level sentence is about evenings not booked yet, which will
+    // freeze from the activity as it stands then. Copying it onto the
+    // registration would be a second place the same number lives, and the two
+    // would disagree the first time an admin changed it. With no published
+    // activity to ask there is no honest figure, and null is the generous
+    // reading every blank in _credit.js takes.
+    cancellationTerms: terms.termsFor({
+      type: reg.frozen.type || 'course',
+      cancellation: reg.frozen.cancellation,
+      // Decided here rather than in a clockless module: creditFor() has already
+      // said whether the window is shut, and the sentence has to agree with the
+      // button it sits under.
+      closed: credit.creditFor(reg).reason === 'cancellation-closed',
+      sessionCancelHours: ((activity || {}).registration || {}).sessionCancelHours,
+      // Here the waiver IS decided: the fee was billed on this registration or
+      // it was not, and `feeCharged` says which. Absent reads as charged, the
+      // same tri-state splitPaid() reads, because every record written before
+      // the waiver existed was charged.
+      hasFee: reg.frozen.price.feeCharged !== false &&
+              Number(reg.frozen.price.registrationFee) > 0
+    }, lang),
+    cancellationTermsTitle: terms.titleFor(lang)
   };
 }
 
@@ -698,10 +782,10 @@ exports.handler = async (event) => {
         // booked, nothing is charged, and the message that explains the wait is
         // the one that already exists for exactly this case.
         if (reg.status !== 'approved') {
-          if (opened.created) await mail.sendReceived(reg, me);
+          if (opened.created) await mail.sendReceived(reg, me, (activity.registration || {}).sessionCancelHours);
           return json(200, {
             ok: true, awaitingApproval: true, status: reg.status,
-            registration: regRow(reg, participant)
+            registration: regRow(reg, participant, lang)
           });
         }
 
@@ -862,7 +946,7 @@ exports.handler = async (event) => {
         if (opened.status) return no(opened.status, opened.key, opened.extra);
         const reg = opened.reg;
         if (reg.status !== 'approved') {
-          if (opened.created) await mail.sendReceived(reg, me);
+          if (opened.created) await mail.sendReceived(reg, me, (activity.registration || {}).sessionCancelHours);
           return json(200, { ok: true, awaitingApproval: true, status: reg.status });
         }
 
@@ -1152,7 +1236,7 @@ exports.handler = async (event) => {
         const rows = [];
         for (const id of ids) {
           const p = await participants.getParticipant(id);
-          for (const reg of await store.forParticipant(id)) rows.push(regRow(reg, p));
+          for (const reg of await store.forParticipant(id)) rows.push(regRow(reg, p, lang));
         }
         const entries = await ledger.entriesFor(me.accountId);
         return json(200, {
@@ -1185,7 +1269,7 @@ exports.handler = async (event) => {
         const L = LABELS[lang] || LABELS.he;
         return json(200, {
           ok: true,
-          registration: regRow(reg, participant),
+          registration: regRow(reg, participant, lang, activity),
           activity: activity ? Object.assign(activityView(activity, report, lang), {
             // THE SAME ROWS THE PUBLIC PAGE SHOWS, from the one place a fact
             // becomes text. isPubliclyVisible() keeps its exact current meaning
@@ -1281,8 +1365,8 @@ exports.handler = async (event) => {
         const reg = opened.reg;
         // Best effort, and after the write. An email that fails must not undo a
         // registration that succeeded.
-        if (reg.status === 'approved') await mail.sendApproved(reg, me);
-        else await mail.sendReceived(reg, me);
+        if (reg.status === 'approved') await mail.sendApproved(reg, me, (activity.registration || {}).sessionCancelHours);
+        else await mail.sendReceived(reg, me, (activity.registration || {}).sessionCancelHours);
         return json(200, { ok: true, registration: reg });
       }
 

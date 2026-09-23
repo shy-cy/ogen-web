@@ -1032,7 +1032,7 @@ module.exports = {
   GROUP_FACTS, ACTIVITY_FACTS, aggregateText, groupChoice, groupCountText,
   FACT_ORDER, TEXT_FACTS, STRUCTURED_FACTS, DEFAULT_VISIBILITY,
   ACADEMIC_MINUTES, CURRENCY,
-  num, pick, ruPlural, monthYear, sessionTotal,
+  num, pick, ruPlural, monthYear, sessionTotal, dayAndMonth,
   formatAges, formatSchedule, scheduleText, formatDuration, sessionRows, sessionTables,
   weekOrdinal, showPerLesson,
   SESSION_TABLE, WEEK_ORDINALS, RU_DAY_GENDER, formatGroupSize, formatPrice,
