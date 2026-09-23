@@ -20,9 +20,19 @@
 //   3. An activity with Approve automatically ON did not auto-approve, and said
 //      only "we will confirm the place". autoApproves() stands aside when a
 //      STATED age range is not positively satisfied — deliberate, and not a
-//      rejection — but to somebody who had just set auto-approve and watched it
-//      not happen, silence reads as a setting being ignored. That is how a
-//      correct rule gets reported as a bug.
+//      rejection.
+//
+//      ⚠ AND THE FIX FOR THAT ONE WAS ON THE WRONG SCREEN. The family's waiting
+//      block was given the reason — "the age is outside the range this activity
+//      states" — and it was rejected on sight: too blunt, and it reads as a
+//      verdict on somebody's child at the moment they have just signed up, over
+//      a flag that is ADVISORY and a decision no person has taken yet. The
+//      confusion being answered was the ADMIN'S, and the answer belonged on the
+//      admin's screen, where it already was.
+//
+//      So this section pins the BOUNDARY rather than a sentence: the family is
+//      told the state and never the reason, the admin is told the reason with
+//      the numbers, and neither half can quietly become the other.
 //
 //   4. The cost card read "Cost per session €7 · Paid €0.00 · Still to pay
 //      €0.00" while an unpaid evening sat in the table below it. owedCentsFor()
@@ -48,6 +58,16 @@ const read = (p) => fs.readFileSync(path.join(R, p), 'utf8');
 const css = read('shared.css');
 
 (async () => {
+  // The client's own string table, per language, executed rather than parsed.
+  const ui = read('js/member-account.js');
+  const strings = (lang) => {
+    const from = ui.indexOf('var T = {');
+    const to = ui.indexOf('}[lang];', from) + '}[lang];'.length;
+    const ctx = { lang: lang };
+    vm.runInNewContext(ui.slice(from, to) + '\nresult = T;', ctx);
+    return ctx.result;
+  };
+
   // =========================================================================
   console.log('[2. the date and the price are not glued together]');
   //
@@ -182,15 +202,15 @@ const css = read('shared.css');
     'a cancelled evening drops out of the total, like every count here');
 
   // =========================================================================
-  console.log('\n[3. why a registration is waiting]');
+  console.log('\n[3. the family is told the state, never the reason]');
 
   // ⚠ THE ACTIVITY AUTO-APPROVES. That is the whole point of the case: the rule
-  // is right and the silence was wrong.
+  // is right, and what a family should be told about it is "nothing".
   const kids = F.dropin({
     slug: 'kids', activityId: 'act-000000000kids01',
     facts: Object.assign({}, F.rawDropin().facts, {
       price: { registrationFee: 0, perSessionPrice: 7 },
-      ages: { min: 7, max: 12 }
+      ages: { min: 6, max: 10 }
     }),
     registration: Object.assign({}, F.rawDropin().registration, { autoApprove: true })
   });
@@ -209,45 +229,88 @@ const css = read('shared.css');
     participantId: adult, sessionDates: [first], lang: 'en' });
   H.eq(sent.status, 200, 'the registration is taken');
   H.eq(sent.body.awaitingApproval, true, 'and it waits, which is autoApproves() standing aside');
-  H.eq(sent.body.pendingReason, 'age-outside-range',
-    '⚠ and the reply SAYS WHY, rather than only that it is waiting');
+  H.eq(sent.body.pendingReason, undefined,
+    '⚠ and the reply carries NO reason — the family is told the state and nothing else');
 
   const adultRow = (await H.call(api.handler, { action: 'registration', token: token,
     participantId: adult, activityId: kids.activityId, lang: 'en' })).body.registration;
   H.eq(adultRow.status, 'pending', 'the page sees it as waiting');
-  H.eq(adultRow.pendingReason, 'age-outside-range', 'and carries the same reason');
+  H.eq(adultRow.pendingReason, undefined, 'with no reason on the row either');
+  H.eq(adultRow.ageFlag, undefined,
+    '⚠ and no age flag, so a later screen cannot start rendering one from this payload');
+  // The flag IS on the stored record — it always has been — so this is a
+  // decision about what the family's screen is handed, not a loss of data.
+  const stored = await mods['_registration-store'].getRegistration(adult, kids.activityId);
+  H.eq(stored.ageFlag.inRange, false, 'the record still knows perfectly well');
+  H.eq(stored.ageFlag.age, 64, 'and how old they are');
 
-  // The other two branches, so "age" is not printed over every wait.
+  // And the ordinary case still works, so "no reason" is not "no rule".
   const inRange = await H.call(family.handler, { action: 'createParticipant', token: token,
-    participant: { firstName: 'Tal', lastName: 'Levi', dateOfBirth: '2016-04-02' } });
+    participant: { firstName: 'Tal', lastName: 'Levi', dateOfBirth: '2018-04-02' } });
   const child = inRange.body.participant.participantId;
   const okRes = await H.call(api.handler, { action: 'bookAndPay', token: token, slug: 'kids',
     participantId: child, sessionDates: [first], lang: 'en' });
   H.ok(!okRes.body.awaitingApproval, 'a child inside the range auto-approves, as it always did');
 
-  const manual = F.dropin({ slug: 'manual', activityId: 'act-00000000manual1',
-    facts: Object.assign({}, F.rawDropin().facts, { price: { registrationFee: 0, perSessionPrice: 7 } }),
-    registration: Object.assign({}, F.rawDropin().registration, { autoApprove: false }) });
-  github._files.set('activities/manual.json', JSON.stringify(manual));
-  github._files.set('activities/activities-index.json', JSON.stringify([
-    { slug: 'manual', activityId: manual.activityId, status: 'open', langs: ['he'], title: manual.title }
-  ]));
-  const held = await H.call(api.handler, { action: 'bookAndPay', token: token, slug: 'manual',
-    participantId: child, sessionDates: [first], lang: 'en' });
-  H.eq(held.body.pendingReason, 'manual-approval',
-    'auto-approve genuinely switched off is a different reason, and says nothing about age');
+  console.log('\n[and the ADMIN is told exactly what the family is not]');
+  const admin = H.loadWithStubs({ blobs, github, modules: ['admin-registrations'] })['admin-registrations'];
+  const session = await H.installSession(blobs, H.superAdminSession());
+  const queue = await H.call(admin.handler, { action: 'queue', token: session.token, slug: 'kids' });
+  const row = (queue.body.registrations || []).filter((r) => r.participantId === adult)[0];
+  H.ok(row, 'the registration is on the queue');
+  H.eq(row.ageFlagAtSubmission.age, 64, 'with the age');
+  H.eq(row.ageFlagAtSubmission.min, 6, 'and the stated minimum');
+  H.eq(row.ageFlagAtSubmission.max, 10, 'and the maximum');
+  H.eq(row.ageFlagAtSubmission.inRange, false, 'and the answer, which is why a person is looking');
+
+  // The admin SCREEN renders those numbers — reading them into the payload and
+  // never drawing them is the shape of gap this project keeps finding.
+  const adminUi = read('js/registrations-admin.js');
+  H.ok(/f\.age \+ ' \u00b7 outside ' \+/.test(adminUi),
+    'the queue prints "64 · outside 6-10" rather than a flag with no numbers');
+  H.ok(/class: 'flag'/.test(adminUi),
+    'amber and advisory — a row to look at, never a row that was refused');
+
+  console.log('\n[no family-facing string names a reason, in any language]');
+  // ⚠ CHECKED AS A CLASS, not as three strings. The sentences that were removed
+  // are gone; what has to stay gone is the KIND of sentence, and the next one
+  // added would be added to this same handful of keys.
+  const WAITING_KEYS = ['waitLead', 'waitBody', 'awaitingOk'];
+  const REASONS = [
+    /\bage\b/i, /eligib/i, /outside/i, /range/i, /too (old|young)/i,
+    /גיל/, /טווח/, /מתאים/,
+    /возраст/i, /диапазон/i, /подход/i
+  ];
+  ['he', 'en', 'ru'].forEach((l) => {
+    const T = strings(l);
+    WAITING_KEYS.forEach((k) => {
+      H.ok(typeof T[k] === 'string' && T[k].length > 0, l + ': ' + k + ' says something');
+      const bad = REASONS.filter((re) => re.test(T[k]));
+      H.eq(bad.length, 0,
+        l + ': ' + k + ' names no reason — "' + T[k].slice(0, 58) + '…"');
+    });
+    // It still has to read as an ordinary step rather than as a problem.
+    H.ok(/registered|נרשם|בוצעה|записан|оформлена/i.test(T.waitLead + ' ' + T.waitBody),
+      l + ': and it leads with what is TRUE — they are registered');
+    // ⚠ AND NOT AS A REQUEST. That word is the queue's framing and this table
+    // removed it everywhere — except the Russian drop-in confirmation, which
+    // still said "Заявка принята", your application has been received. A family
+    // signed a child up; being told a decision is pending reads as a decision
+    // that might go either way over something they consider settled.
+    WAITING_KEYS.forEach((k) => {
+      H.ok(!/\brequest\b|בקשה|заявк/i.test(T[k]),
+        l + ': ' + k + ' does not call it a request');
+    });
+  });
+
+  // The helper that rendered the reason is gone rather than left unused: a
+  // function nobody calls is indistinguishable from one whose caller was
+  // renamed, and this one would be re-wired by the first person who found it.
+  H.ok(!/waitWhy|waitAge|pendingReason/.test(ui),
+    '⚠ and the renderer is deleted, not orphaned');
 
   // =========================================================================
   console.log('\n[the screens: executed, not read]');
-
-  const ui = read('js/member-account.js');
-  const strings = (lang) => {
-    const from = ui.indexOf('var T = {');
-    const to = ui.indexOf('}[lang];', from) + '}[lang];'.length;
-    const ctx = { lang: lang };
-    vm.runInNewContext(ui.slice(from, to) + '\nresult = T;', ctx);
-    return ctx.result;
-  };
 
   // The picker row, drawn by the real code against a real payload.
   function pickerText(session, lang) {
@@ -288,32 +351,6 @@ const css = read('shared.css');
       l + ' has the note, with the figure interpolated rather than concatenated');
     H.ok(/€7\.00/.test(pickerText(late, l)), l + ' names the usual price too');
   });
-
-  // The two sentences that explain a wait, and the one that deliberately does not.
-  function why(reason, lang) {
-    const T = strings(lang);
-    const ctx = vm.createContext({ T: T });
-    vm.runInContext(ui.slice(ui.indexOf('  function waitWhy(reason, name) {'),
-                             ui.indexOf('  // The chosen person')) +
-                    '\nthis.waitWhy = waitWhy;', ctx);
-    return ctx.waitWhy(reason, 'Adi Levi');
-  }
-  ['he', 'en', 'ru'].forEach((l) => {
-    const said = why('age-outside-range', l);
-    H.ok(said && said.indexOf('Adi Levi') !== -1, l + ': it names the person: ' + said);
-    H.ok(why('age-unknown', l), l + ': and a missing date of birth is its own sentence');
-    // ⚠ NOTHING for the ordinary case. The block around it already says a person
-    // will confirm, and "a person will confirm because a person confirms these"
-    // is not an explanation.
-    H.eq(why('manual-approval', l), null, l + ': and an ordinary wait adds nothing');
-    H.eq(why(null, l), null, l + ': as does a registration that is not waiting at all');
-  });
-
-  // ⚠ IT IS NOT A REFUSAL, and every language has to say so — an out-of-range
-  // age is exactly the case a person may well approve.
-  H.ok(/not a refusal/.test(why('age-outside-range', 'en')), 'English says it is not a refusal');
-  H.ok(/לא דחייה/.test(why('age-outside-range', 'he')), 'Hebrew says it');
-  H.ok(/не отказ/.test(why('age-outside-range', 'ru')), 'Russian says it');
 
   H.done();
 })();

@@ -217,7 +217,10 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
   console.log('\n[the three answers that are not a redirect all say what happened]');
   const endings = [
     { api: { bookAndPay: () => ({ ok: true, url: null, awaitingApproval: true, booked: [] }) },
-      says: 'We will confirm the place', why: 'an activity that does not auto-approve stops before money moves' },
+      // ⚠ NO REASON IN IT, deliberately — see a-figure-that-does-not-explain-itself.js.
+      // The family is told the state; why a person is looking is the admin queue's,
+      // with the numbers on it.
+      says: 'We are confirming a few details', why: 'an activity that does not auto-approve stops before money moves' },
     { api: { bookAndPay: () => ({ ok: true, url: null, nothingDue: true, booked: [] }) },
       says: 'nothing to pay', why: 'a free evening is not sent to a payment page for €0.00' },
     { api: { bookAndPay: () => ({ ok: true, url: null, paymentFailed: true, booked: [] }) },

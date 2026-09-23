@@ -148,14 +148,6 @@
       paidSlow: 'התשלום התקבל. הרישום לוקח עוד קצת זמן — אם הסכומים כאן עדיין לא '
               + 'מתעדכנים, אפשר לרענן בעוד דקה, ואם גם אז לא, כתבו לנו.',
       waitLead: 'ההרשמה בוצעה — התשלום ייפתח בקרוב',
-      // ⚠ WHY IT IS WAITING, which the family was never told. See pendingReason()
-      // in account-registrations.js: auto-approve stands aside when a stated age
-      // range is not positively satisfied, and a screen saying only "we will
-      // confirm" reads as a setting being ignored.
-      waitAge: 'הגיל של {name} מחוץ לטווח שהפעילות מציינת, ולכן ההרשמה ממתינה לאישור אנושי. '
-             + 'זו לא דחייה — נחזור אליכם.',
-      waitAgeUnknown: 'חסר תאריך לידה ל{name}, ולכן לא יכולנו לבדוק את הגיל מול הטווח שהפעילות מציינת. '
-                    + 'ההרשמה ממתינה לאישור אנושי — זו לא דחייה.',
       lateWhy: 'הרשמה מאוחרת · רגיל {price}',
       eveningsBooked: 'מפגשים שנקבעו', noEveningsYet: 'עוד לא נקבעו מפגשים, ולכן אין מה לשלם עדיין.',
       waitBody: '{name} נרשם/ה. אנחנו משלימים כמה פרטים אחרונים, והתשלום ייפתח כאן. '
@@ -190,7 +182,13 @@
       bookedFree: 'נרשמתם. אין תשלום על המפגשים האלה.',
       bookedUnpaid: 'המפגשים נשמרו, אבל לא הצלחנו לפתוח את דף התשלום. אפשר לשלם מעמוד הפעילות.',
       datesGone: 'חלק מהמפגשים כבר אינם זמינים. אפשר לבחור שוב.',
-      awaitingOk: 'ההרשמה נקלטה. נאשר את המקום לפני בחירת מפגשים — לא בוצע חיוב.',
+      // ⚠ THE SAME WORDS THE WAITING BLOCK USES, AND NO REASON IN ANY OF THEM.
+      // "Заявка принята" — a REQUEST has been received — was still here, which
+      // is the queue's own framing and the one word this table removed
+      // everywhere else: a family signed a child up, and being told a decision
+      // is pending reads as a decision that might go either way over something
+      // they consider settled.
+      awaitingOk: 'ההרשמה בוצעה. אנחנו משלימים כמה פרטים לפני בחירת מפגשים — לא בוצע חיוב.',
       chooseSessions: 'מעבר לעמוד הפעילות',
       bundleTitle: 'כרטיסיות',
       bundleIntro: 'מפגשים שנרכשו מראש. מספר המפגשים הוא ההבטחה — אם ניאלץ לבטל מפגש שאי אפשר להחליף, הסכום יוחזר כזיכוי לפי המחיר ששולם.',
@@ -287,10 +285,6 @@
               + 'figures here have not caught up, reload in a minute, and write to us if '
               + 'they still have not.',
       waitLead: 'Registered — payment opens soon',
-      waitAge: '{name}\u2019s age is outside the range this activity states, so the registration '
-             + 'is waiting for a person to look at it. This is not a refusal — we will come back to you.',
-      waitAgeUnknown: 'We have no date of birth for {name}, so we could not check the age against '
-                    + 'the range this activity states. It is waiting for a person — not a refusal.',
       lateWhy: 'late booking \u00b7 usually {price}',
       eveningsBooked: 'Sessions booked', noEveningsYet: 'No sessions booked yet, so there is nothing to pay.',
       waitBody: '{name} is registered. We\u2019re confirming the last few details, and payment '
@@ -325,7 +319,7 @@
       bookedFree: 'Booked. There is nothing to pay for these sessions.',
       bookedUnpaid: 'The sessions are booked, but we could not open the payment page. You can pay from the activity page.',
       datesGone: 'Some of those sessions are no longer available. Please choose again.',
-      awaitingOk: 'Registered. We will confirm the place before sessions can be booked \u2014 nothing has been charged.',
+      awaitingOk: 'Registered. We are confirming a few details before sessions can be booked \u2014 nothing has been charged.',
       chooseSessions: 'Go to the activity page',
       bundleTitle: 'Bundles',
       bundleIntro: 'Sessions bought in advance. The number of sessions is the promise — if we have to cancel one we cannot replace, it comes back as credit at the rate you paid.',
@@ -422,10 +416,6 @@
               + 'не обновились, обновите страницу через минуту, а если и тогда нет, '
               + 'напишите нам.',
       waitLead: 'Запись оформлена — оплата откроется скоро',
-      waitAge: 'Возраст {name} вне диапазона, указанного для этого занятия, поэтому запись ждёт '
-             + 'решения человека. Это не отказ — мы с вами свяжемся.',
-      waitAgeUnknown: 'У {name} не указана дата рождения, поэтому мы не смогли сверить возраст с '
-                    + 'диапазоном занятия. Запись ждёт решения человека — это не отказ.',
       lateWhy: 'поздняя запись \u00b7 обычно {price}',
       eveningsBooked: 'Записанные занятия', noEveningsYet: 'Пока нет записанных занятий, поэтому платить нечего.',
       waitBody: '{name} записан(а). Мы уточняем последние детали, оплата откроется здесь. '
@@ -460,7 +450,7 @@
       bookedFree: 'Вы записаны. За эти занятия платить не нужно.',
       bookedUnpaid: 'Занятия забронированы, но страницу оплаты открыть не удалось. Оплатить можно на странице занятия.',
       datesGone: 'Некоторые даты уже недоступны. Пожалуйста, выберите снова.',
-      awaitingOk: 'Заявка принята. Мы подтвердим место до выбора дат \u2014 оплата не списана.',
+      awaitingOk: 'Запись оформлена. Мы уточняем несколько деталей до выбора занятий \u2014 оплата не списана.',
       chooseSessions: 'Перейти к занятию',
       bundleTitle: 'Абонементы',
       bundleIntro: 'Занятия, оплаченные заранее. Обещание — это количество занятий: если нам придётся отменить занятие и заменить его нечем, сумма вернётся на счёт по оплаченной цене.',
@@ -1368,32 +1358,6 @@
     return who;
   }
 
-  // ⚠ WHY A REGISTRATION IS WAITING, in the family's own words.
-  //
-  // One helper, because the same question is asked on two screens: the notice
-  // after registering for a drop-in, and the waiting block on the cost card of a
-  // registration that is still pending. Two copies would be two accounts of one
-  // rule, and the rule itself lives on the server — this only renders what
-  // pendingReason() concluded.
-  //
-  // `manual-approval` deliberately returns nothing: the surrounding message
-  // already says a person will confirm, and "a person will confirm because a
-  // person confirms these" is not an explanation. What was missing is the case
-  // where the admin switched auto-approve ON and it stood aside anyway.
-  function waitWhy(reason, name) {
-    if (reason === 'age-outside-range') return T.waitAge.replace('{name}', name || '');
-    if (reason === 'age-unknown') return T.waitAgeUnknown.replace('{name}', name || '');
-    return null;
-  }
-
-  // The chosen person's name, from the MODEL the panel was handed rather than
-  // out of the select's own DOM — the id is what the form sends, so resolving it
-  // against the same list keeps one source and needs nothing of the element.
-  function nameOf(people, participantId) {
-    var p = (people || []).filter(function (c) { return c.participantId === participantId; })[0];
-    return p ? full(p) : '';
-  }
-
   // ⚠ WHAT CANCELLING WILL BE WORTH, SAID BEFORE THE BUTTON THAT COMMITS.
   //
   // The cutoffs have been frozen onto every registration since Phase 5 and the
@@ -1572,16 +1536,9 @@
         var note = d.awaitingApproval ? T.awaitingOk
                  : d.paymentFailed ? T.bookedUnpaid
                  : T.bookedFree;
-        var body = [el('p', { class: 'acc-notice is-ok', text: note })];
-        // ⚠ AND WHY, WHEN IT IS WAITING. "We will confirm the place" on an
-        // activity whose Approve automatically is ON reads as a setting being
-        // ignored — see pendingReason() in account-registrations.js. The reason
-        // is the server's, from the ageFlag already on the record, so the screen
-        // cannot reach a different conclusion from autoApproves().
-        var whyWait = d.awaitingApproval ? waitWhy(d.pendingReason, nameOf(people, who.value)) : null;
-        if (whyWait) body.push(el('p', { class: 'acc-meta', text: whyWait }));
-        body.push(link);
-        where.appendChild(section(null, body));
+        where.appendChild(section(null, [
+          el('p', { class: 'acc-notice is-ok', text: note }), link
+        ]));
       });
     } }, [
       el('div', { class: 'acc-field' }, [el('label', { text: T.registerWho }), who]),
@@ -2450,17 +2407,29 @@
       // "awaiting approval", no "your request" — the family registered, and
       // being told a decision is pending reads as a decision that might go
       // either way over something they consider settled.
-      // ⚠ AND WHY, when the reason is one the family could not have guessed.
-      // An activity with Approve automatically ON that did not auto-approve is
-      // the case this exists for: auto-approve stands aside when a stated age
-      // range is not positively satisfied, and "we are confirming a few details"
-      // over that reads as a setting nobody honoured.
-      var why = waitWhy(r.pendingReason, r.participantName);
+      // ⚠ AND IT SAYS NOTHING ABOUT WHY, WHICH IS A DECISION RATHER THAN A GAP.
+      //
+      // A version of this named the reason — "the age is outside the range this
+      // activity states" — on the argument that an activity set to approve
+      // automatically and then not doing so reads as a setting being ignored.
+      // That argument is about the ADMIN's confusion, not the family's, and the
+      // sentence it produced lands on a parent as a verdict on their child: at
+      // best blunt, at worst insulting, and delivered by a screen at the moment
+      // they have just signed up.
+      //
+      // The flag is advisory and the decision is a person's, so the reason is
+      // not a fact about the family yet — it is a note about why somebody is
+      // going to look. It belongs on the admin queue, where it already is, with
+      // the numbers: "64 · outside 6-10", amber because it is a row to look at
+      // rather than a row that was refused.
+      //
+      // This is the same rule `pending` and `approved` sharing one pill already
+      // follows: our queue must not leak onto their screen. An unremarkable step
+      // said plainly beats an explanation nobody asked for.
       kids.push(el('div', { class: 'acc-waiting' }, [
         el('p', { class: 'acc-waiting-lead' }, [lucide(CHECK, '15'), el('span', { text: T.waitLead })]),
         el('p', { class: 'acc-waiting-body',
-                  text: T.waitBody.replace('{name}', r.participantName || '') }),
-        why ? el('p', { class: 'acc-waiting-body', text: why }) : null
+                  text: T.waitBody.replace('{name}', r.participantName || '') })
       ]));
     }
     // ADDRESSABLE, because every message about money links straight to it. The

@@ -554,35 +554,6 @@ async function commitEntries(spend, accountId, note) {
   return seen;
 }
 
-// ⚠ WHY A REGISTRATION IS WAITING, WHICH THE FAMILY WAS NEVER TOLD.
-//
-// A family registered for an activity whose Approve automatically is ON and was
-// answered "we will confirm the place before sessions can be booked". Nothing
-// was broken: autoApproves() stands aside when a STATED age range is not
-// positively satisfied, and the participant was 64 on an activity pitched at
-// children. That rule is deliberate and is not a rejection — the request waits
-// for a person, and the person may well say yes.
-//
-// But the screen said only that it was waiting. To somebody who had just set
-// auto-approve and watched it not happen, that reads as a setting being ignored,
-// which is exactly how a correct rule comes to be reported as a bug.
-//
-// So the reason travels. It is derived from what is already on the record —
-// `ageFlag` is stored at submission and nothing else branches on it — rather
-// than being a second decision that could disagree with autoApproves().
-function pendingReason(reg) {
-  if (!reg || reg.status !== 'pending') return null;
-  const flag = reg.ageFlag || {};
-  const stated = flag.min != null || flag.max != null;
-  if (!stated) return 'manual-approval';
-  // The two halves of "a stated range must be positively satisfied", kept apart
-  // because they are different things to be told: an age we checked and one we
-  // could not check at all.
-  if (flag.inRange === false) return 'age-outside-range';
-  if (flag.inRange !== true) return 'age-unknown';
-  return 'manual-approval';
-}
-
 // ONE ROW SHAPE, built once. The list and the single-registration view are two
 // views of the same record, and two builders would drift — the one the family
 // reads on a dashboard would stop agreeing with the one they read on the page
@@ -600,10 +571,20 @@ function regRow(reg, participant, lang, activity) {
     groupId: reg.groupId,
     groupName: reg.frozen.groupName,
     status: reg.status,
-    // Null unless it IS waiting, so a screen cannot print a reason for a
-    // registration that has already been decided.
-    pendingReason: pendingReason(reg),
-    ageFlag: reg.status === 'pending' ? reg.ageFlag : null,
+    // ⚠ NO ageFlag AND NO REASON, AND THAT IS THE POINT.
+    //
+    // Both were sent here for a release, so the family's waiting block could say
+    // "the age is outside the range this activity states". The rule behind it is
+    // right — autoApproves() stands aside on a stated range that is not
+    // positively satisfied — and the sentence was wrong: it lands on a parent as
+    // a verdict on their child, at the moment they have just signed up, over a
+    // flag that is advisory and a decision no person has taken yet.
+    //
+    // The reason belongs on the admin queue and is already there, with the
+    // numbers, from `reg.ageFlag` read by admin-registrations.js. Sending it to
+    // this payload as well would be an invitation to render it again — the
+    // family's screen is given the state and not our reasons for it, which is
+    // the same rule that has `pending` and `approved` share one pill.
     // The DERIVED answer, not the stored status. A pending registration whose
     // deadline passed an hour ago is already not holding a place, whether or not
     // the nightly sweep has run.
@@ -852,7 +833,6 @@ exports.handler = async (event) => {
           if (opened.created) await mail.sendReceived(reg, me, (activity.registration || {}).sessionCancelHours);
           return json(200, {
             ok: true, awaitingApproval: true, status: reg.status,
-            pendingReason: pendingReason(reg),
             registration: regRow(reg, participant, lang)
           });
         }
@@ -1015,8 +995,7 @@ exports.handler = async (event) => {
         const reg = opened.reg;
         if (reg.status !== 'approved') {
           if (opened.created) await mail.sendReceived(reg, me, (activity.registration || {}).sessionCancelHours);
-          return json(200, { ok: true, awaitingApproval: true, status: reg.status,
-                             pendingReason: pendingReason(reg) });
+          return json(200, { ok: true, awaitingApproval: true, status: reg.status });
         }
 
         // ⚠ THE OFFER IS RE-DECIDED HERE, from the activity, at this instant,

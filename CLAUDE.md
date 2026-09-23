@@ -3622,32 +3622,53 @@ it and would say nothing about the next rule somebody adds.
 
 **3. An activity set to approve automatically did not, and said only that it was
 waiting.** `autoApproves()` stands aside when a **stated** age range is not
-positively satisfied — deliberate, documented, and not a rejection; the request
-waits for a person and the person may well say yes. But to somebody who had just
-set auto-approve and watched it not happen, silence reads as a setting being
-ignored, which is how a correct rule gets reported as a bug.
+positively satisfied — deliberate, documented, and not a rejection; the
+registration waits for a person and the person may well say yes. To somebody who
+had just set auto-approve and watched it not happen, silence reads as a setting
+being ignored, which is how a correct rule gets reported as a bug.
 
-`pendingReason()` derives the answer from `ageFlag`, which is already on the
-record and which nothing else branches on — rather than being a second decision
-that could disagree with `autoApproves()`. Three values, and the third is the
-interesting one:
+⚠ **THE FIX FOR THAT ONE WAS PUT ON THE WRONG SCREEN, AND THAT IS THE LESSON.**
+The family's waiting block was given the reason — *"the age is outside the range
+this activity states"* — and it was rejected on sight. Three things are wrong
+with it and only the first is obvious:
+
+- **It reads as a verdict on somebody's child**, delivered at the moment they
+  have just signed up. Blunt at best, insulting at worst, and about a person
+  rather than about a form.
+- **It is not true yet.** The age flag is **advisory** and nothing branches on it
+  except `autoApproves()` standing aside; no person has decided anything. A
+  sentence explaining a refusal that has not happened invites the family to argue
+  with it, or to withdraw.
+- **The confusion being answered was the ADMIN'S**, not the family's — and the
+  admin's screen had the answer already, with the numbers on it.
+
+So the boundary is drawn and written down:
 
 | | |
 |---|---|
-| `age-outside-range` | the age was checked and is outside what the activity states |
-| `age-unknown` | a range is stated and there was no date of birth to check it against |
-| `manual-approval` | auto-approve is genuinely off — **and this renders nothing** |
+| the family | **the state, never the reason** — "registered, we are confirming a few details", identical for every kind of wait |
+| the admin queue | **the reason, with the figures** — `64 · outside 6-10`, amber, advisory |
 
-The block around it already says a person will confirm, and *"a person will
-confirm because a person confirms these"* is not an explanation. What was missing
-is only the case where the admin switched auto-approve **on** and it stood aside
-anyway. Both sentences say **it is not a refusal**, in all three languages,
-because that is exactly the case a person may well approve — and a test asserts
-each language says so rather than trusting a translation to have carried it.
+That is the same rule `pending` and `approved` sharing one pill already follows:
+*our queue must not leak onto their screen.* `pendingReason()` is deleted rather
+than left unused, and `regRow()` sends **no `ageFlag`** — a payload carrying it
+is an invitation to render it again, and the next person to find the field would
+wire it up. The flag is still on the stored record, which is where it has always
+been and what `admin-registrations.js` reads.
 
-One helper on the client, `waitWhy()`, because the same question is asked on two
-screens: the notice after registering for a drop-in, and the waiting block on a
-pending registration's cost card.
+The test pins the **boundary** rather than a sentence: every family-facing
+waiting string is checked against a list of reason words in three languages, the
+family payload is checked for the absence of both fields, and the admin row is
+checked for the presence of all four figures — so neither half can quietly become
+the other.
+
+Fixed in the same pass: the Russian drop-in confirmation still said
+**«Заявка принята»** — *your application has been received*. That is the queue's
+own framing and the one word this table removed everywhere else; a family signed a
+child up, and being told a decision is pending reads as a decision that might go
+either way over something they consider settled. All three now lead with
+**registered** and then say a few details are being confirmed, and a test pins
+that none of them calls it a request.
 
 **4. The cost card said "Cost per session €7 · Paid €0.00 · Still to pay €0.00"
 while an unpaid evening sat in the table below it.** `owedCentsFor()` bills the
