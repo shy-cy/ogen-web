@@ -32,6 +32,20 @@
 // So the rule is the activity's shape, it lives in ONE function, and the
 // assertions below check both halves of it and the direction a blank falls.
 //
+// ⚠ AND IT HAS MOVED TO THE FRONT OF A COURSE REGISTRATION, which is where it
+// should have been. Asked only at payment, it let a family register, wait days
+// for an admin to answer, open the email saying they had a place, and meet the
+// wall there — friction discovered after the commitment rather than before it,
+// which reads as a system that changed its mind. And it let us store a MINOR'S
+// NAME AND DATE OF BIRTH against an address nobody had shown they could read,
+// which is the stronger half of the argument and has nothing to do with money:
+// the confirmation, the approval, the expiry apology and every later message
+// about that child go to it.
+//
+// The gates at payment STAY, and are not redundant. A registration taken before
+// this existed sits on an unverified account already, and the client is hostile
+// by assumption. What changed is that they now almost never fire.
+//
 // And the amount is computed server-side. An amount in a request body is an
 // amount somebody can edit before sending it.
 
@@ -72,16 +86,36 @@ H.ok(/if \(me\.emailVerifiedAt\) return null;/.test(helper), 'and a confirmed ad
 // has no language of its own, so the caller renders it — in the language of the
 // page, like every other string this file puts on a screen.
 H.ok(/return 'email-unverified';/.test(helper), 'the refusal names itself');
-// ⚠ THREE CALL SITES, AND THE THIRD IS WHY THIS COUNT IS PINNED AT ALL.
+// ⚠ FOUR CALL SITES, AND THE COUNT IS PINNED BECAUSE TWO OF THEM WERE MISSING.
 //
 // `useCredit` settles the same debt on the same record and writes the same
 // payment status, and it asked NEITHER of the two questions `pay` asks — so an
 // account whose address was never confirmed settled a term with credit, on a
 // card where the pay button had been correctly withheld for exactly that
 // reason. Spending credit is paying; the only difference is which pocket.
-H.eq((bare2.match(/no\(403, refusal, \{ reason: 'email-unverified' \}\)/g) || []).length, 3,
+//
+// `submit` is the fourth and is now the one a family meets first.
+H.eq((bare2.match(/no\(403, refusal, \{ reason: 'email-unverified' \}\)/g) || []).length, 4,
   'and every call site answers 403 with the reason the client acts on — ' +
   'a permission, not a missing thing');
+
+// ⚠ REGISTERING IS ASKED FIRST, AND BEFORE ANYTHING IS WRITTEN. A refusal that
+// came after openRegistration() would leave the record it was refusing.
+const submit = bare2.slice(bare2.indexOf("case 'submit'"), bare2.indexOf("case 'cancel'"));
+H.ok(submit.length > 300, 'found the submit branch');
+H.ok(/verificationRefusal\(me, activity\.type\)/.test(submit),
+  'submit asks, from the ACTIVITY\'s type — there is no frozen one yet, because ' +
+  'the record does not exist');
+H.ok(submit.indexOf('verificationRefusal') < submit.indexOf('openRegistration'),
+  'and before a registration is opened, so a refusal leaves nothing behind');
+
+// The drop-in half of the split, at the door that matters most for it: a
+// walk-up registers and pays in one sitting, often having signed up minutes
+// earlier, so bookAndPay must never ask. It is exempt BY CONSTRUCTION rather
+// than by a condition, which the assertions further down already pin.
+const bap = bare2.slice(bare2.indexOf("case 'bookAndPay'"), bare2.indexOf("case 'paySession'"));
+H.ok(!/verificationRefusal/.test(bap),
+  'and bookAndPay still never asks — the split survives the move');
 // ONE function, or the condition is written at three call sites and the third
 // one is added later without it.
 H.eq((bare2.match(/emailVerifiedAt/g) || []).length, 1,

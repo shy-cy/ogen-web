@@ -244,9 +244,31 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
   H.ok(asked > before, 'the dates are re-read — what changed is on the screen they are looking at');
   H.ok(d2.mount.textContent.indexOf('no longer available') !== -1, 'and the family is told why');
 
-  console.log('\n[a course is untouched by any of this]');
+  // ⚠ AND THE COURSE HALF IS WHERE THE SPLIT NOW SHOWS FIRST.
+  //
+  // This account is deliberately unverified — it is the one that could not pay,
+  // and the whole drop-in flow above ran on it without ever being asked. A
+  // confirmed address is now required to REGISTER for a course rather than to
+  // pay for one, so the same account meets a wall here and nowhere above. That
+  // asymmetry IS the rule, executed rather than read.
+  console.log('\n[a course asks for a confirmed address, and a drop-in never has]');
   sent.length = 0;
-  const d3 = await screen({ view: 'activity', lang: 'en', search: '?register=hebrew' });
+  const unverified = await screen({ view: 'activity', lang: 'en', search: '?register=hebrew' });
+  H.eq(D.byTag(unverified.mount, 'form').length, 0,
+    'no registration form at all — a filled-in form that always loses is worse than none');
+  H.ok(has(unverified, 'confirm your email address'), 'the reason is on screen');
+  H.ok(has(unverified, 'Send again'),
+    'and the ONE control that clears it is under the sentence asking for it, not on another page');
+  unverified.mount.querySelector('.acc-notice').childNodes
+    .filter((n) => n.tagName === 'BUTTON')[0].click();
+  await settle();
+  H.ok(sent.some((b) => b.action === 'resendVerification'), 'and it resends');
+
+  console.log('\n[a course is otherwise untouched by any of this]');
+  sent.length = 0;
+  const d3 = await screen({ view: 'activity', lang: 'en', search: '?register=hebrew',
+    api: { me: () => ({ ok: true, expiresAt: Date.now() + 1e7,
+      account: Object.assign({}, ACCOUNT, { emailVerifiedAt: '2026-01-01T00:00:00Z' }) }) } });
   H.eq(D.byClass(d3.mount, 'acc-date').length, 0, 'no date picker on a term');
   H.ok(has(d3, '4 places left'), 'and the places-left line is still there, where it means something');
   D.byTag(d3.mount, 'form')[0].submit();

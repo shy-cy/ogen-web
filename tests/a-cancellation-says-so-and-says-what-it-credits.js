@@ -73,8 +73,8 @@ process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
     } }
   });
 
-  const r = await H.call(auth.handler, {
-    action: 'signup', email: 'dana@example.com', password: 'password-123', termsAccepted: true,
+  const r = await H.signUp(auth, blobs, {
+action: 'signup', email: 'dana@example.com', password: 'password-123', termsAccepted: true,
     profile: { firstName: 'Dana', preferredLanguage: 'ru' }
   });
   const dana = { token: r.body.token, accountId: r.body.account.accountId };

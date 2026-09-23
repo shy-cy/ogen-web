@@ -97,8 +97,8 @@ process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
   H.eq((await ledger.entriesFor(A)).length, 5, 'and the record still holds every line that led there');
 
   console.log('\n[a cancellation writes one, and the registration records it]');
-  const signed = await H.call(auth.handler, {
-    action: 'signup', email: 'dana@example.com', password: 'password-123', termsAccepted: true,
+  const signed = await H.signUp(auth, blobs, {
+action: 'signup', email: 'dana@example.com', password: 'password-123', termsAccepted: true,
     profile: { firstName: 'Dana', preferredLanguage: 'en' } });
   const dana = { token: signed.body.token, accountId: signed.body.account.accountId };
   const noa = (await H.call(family.handler, {
@@ -197,8 +197,8 @@ process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
   // being removed. There is no rule for what happens to it; there is a question,
   // and the action refuses to complete until it is answered.
   const adminFamily = H.loadWithStubs({ blobs, github, modules: ['admin-family'] })['admin-family'];
-  const second = await H.call(auth.handler, {
-    action: 'signup', email: 'yossi@example.com', password: 'password-123', termsAccepted: true,
+  const second = await H.signUp(auth, blobs, {
+action: 'signup', email: 'yossi@example.com', password: 'password-123', termsAccepted: true,
     profile: { firstName: 'Yossi', preferredLanguage: 'en' } });
   await H.call(adminFamily.handler, {
     action: 'linkGuardian', token: admin.token, participantId: noa, email: 'yossi@example.com' });

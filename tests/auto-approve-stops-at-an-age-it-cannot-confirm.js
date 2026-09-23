@@ -108,8 +108,8 @@ const NOW = Date.parse('2026-08-01T09:00:00Z');
 
   // ------------------------------------------------------------- end to end
   console.log('\n[through the handler, on both halves of both pairs]');
-  const r = await H.call(auth.handler, {
-    action: 'signup', email: 'dana@example.com', password: 'password-123', termsAccepted: true,
+  const r = await H.signUp(auth, blobs, {
+action: 'signup', email: 'dana@example.com', password: 'password-123', termsAccepted: true,
     profile: { firstName: 'Dana', preferredLanguage: 'he' }
   });
   const dana = { token: r.body.token, accountId: r.body.account.accountId };

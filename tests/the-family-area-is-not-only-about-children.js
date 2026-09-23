@@ -201,8 +201,8 @@ H.ok(/&amp;/.test(LABELS.en.gSchedule), 'the source really does carry an entity 
   const auth = mods['account-auth'], family = mods['account-family'],
         regs = mods['account-registrations'];
 
-  const up = await H.call(auth.handler, {
-    action: 'signup', email: 'michal@example.com', password: 'password-123',
+  const up = await H.signUp(auth, blobs, {
+action: 'signup', email: 'michal@example.com', password: 'password-123',
     termsAccepted: true,
     profile: { firstName: 'Michal', lastName: 'Shinitzky', preferredLanguage: 'en' }
   });
@@ -266,8 +266,8 @@ H.ok(/&amp;/.test(LABELS.en.gSchedule), 'the source really does carry an entity 
     'nor the sum of the yearly fee and the term price anywhere on it');
 
   console.log('\n[and a registration belonging to somebody else is not yours to open]');
-  const other = await H.call(auth.handler, {
-    action: 'signup', email: 'stranger@example.com', password: 'password-123',
+  const other = await H.signUp(auth, blobs, {
+action: 'signup', email: 'stranger@example.com', password: 'password-123',
     termsAccepted: true, profile: { firstName: 'Stranger', preferredLanguage: 'en' } });
   const stolen = await H.call(regs.handler, {
     action: 'registration', token: other.body.token,

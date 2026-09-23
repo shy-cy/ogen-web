@@ -174,10 +174,19 @@ const MESSAGES = {
     en: 'That link has expired or has already been used.',
     ru: 'Эта ссылка истекла или уже была использована.'
   },
+  // ⚠ IT NO LONGER SAYS "BEFORE PAYING", BECAUSE PAYING IS NO LONGER WHERE IT
+  // IS ASKED FIRST.
+  //
+  // The gate moved to the front of a course registration, so this one sentence
+  // is now shown at four doors — registering, paying, spending credit, and a
+  // per-session charge — and a message naming only the last of them would be
+  // wrong at the one people meet first. It names the ACT it is about (a course)
+  // and what to do, which is true at every door and is the half somebody can
+  // act on.
   'email-unverified': {
-    he: 'צריך לאשר את כתובת הדוא״ל לפני התשלום.',
-    en: 'Please confirm your email address before paying.',
-    ru: 'Подтвердите адрес эл. почты перед оплатой.'
+    he: 'צריך לאשר את כתובת הדוא״ל שלכם לפני הרשמה לקורס. שלחנו לכם קישור — אפשר גם לבקש אותו שוב מעמוד המשפחה.',
+    en: 'Please confirm your email address before registering for a course. We have sent you a link — you can ask for a new one from your family page.',
+    ru: 'Подтвердите адрес эл. почты перед записью на курс. Мы отправили вам ссылку — запросить новую можно на странице семьи.'
   },
 
   // --- the people on an account ---------------------------------------------

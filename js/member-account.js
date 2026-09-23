@@ -150,6 +150,7 @@
       waitBody: '{name} נרשם/ה. אנחנו משלימים כמה פרטים אחרונים, והתשלום ייפתח כאן. '
               + 'נעדכן אתכם במייל ברגע שאפשר.',
       payNeedsVerify: 'כדי לשלם, יש לאשר את כתובת האימייל. הקישור לאישור נמצא בעמוד החשבון.',
+      registerNeedsVerify: 'לפני הרשמה לקורס צריך לאשר את כתובת הדוא״ל. שלחנו לכם קישור — אם הוא לא הגיע:',
       sessionsTitle: 'המפגשים', dateCol: 'תאריך', statusCol: 'סטטוס',
       book: 'הרשמה למפגש', cancelSession: 'ביטול מפגש',
       cancelSessionConfirm: 'לבטל את המפגש הזה?',
@@ -277,6 +278,7 @@
       waitBody: '{name} is registered. We\u2019re confirming the last few details, and payment '
               + 'will open here. We\u2019ll email you the moment it does.',
       payNeedsVerify: 'To pay, please confirm your email address. The link to resend it is on your account page.',
+      registerNeedsVerify: 'Please confirm your email address before registering for a course. We have sent you a link — if it has not arrived:',
       sessionsTitle: 'Sessions', dateCol: 'Date', statusCol: 'Status',
       book: 'Book', cancelSession: 'Cancel this session',
       cancelSessionConfirm: 'Cancel this session?',
@@ -404,6 +406,7 @@
       waitBody: '{name} записан(а). Мы уточняем последние детали, оплата откроется здесь. '
               + 'Напишем вам, как только всё будет готово.',
       payNeedsVerify: 'Чтобы оплатить, подтвердите адрес электронной почты. Ссылка для повторной отправки — на странице аккаунта.',
+      registerNeedsVerify: 'Подтвердите адрес эл. почты перед записью на курс. Мы отправили вам ссылку — если она не пришла:',
       sessionsTitle: 'Занятия', dateCol: 'Дата', statusCol: 'Статус',
       book: 'Записаться', cancelSession: 'Отменить занятие',
       cancelSessionConfirm: 'Отменить это занятие?',
@@ -1209,12 +1212,7 @@
 
     if (!account.emailVerifiedAt) {
       mount.appendChild(el('p', { class: 'acc-notice is-warn' }, [
-        el('span', { text: T.verifyBanner + ' ' }),
-        el('button', { type: 'button', class: 'acc-link', text: T.verifyResend, onclick: function () {
-          post(AUTH, { action: 'resendVerification' }).then(function (res) {
-            say(res.ok ? 'ok' : 'err', res.ok ? T.verifySent : failure(res));
-          });
-        } })
+        el('span', { text: T.verifyBanner + ' ' }), resendButton()
       ]));
     }
 
@@ -1333,6 +1331,31 @@
   }
 
   function registerTerm(where, a, people, slug, title) {
+    // ⚠ A COURSE IS NOT REGISTERED FOR FROM AN UNCONFIRMED ADDRESS, and the
+    // form is not drawn at all rather than drawn and refused.
+    //
+    // This is the one place in the family area where a cosmetic check replaces
+    // a control instead of greying one. Everywhere else the rule is "offer it
+    // and let the server decide"; here the server WILL decide, every time, and
+    // a filled-in form that always loses is worse than no form — somebody
+    // picks a child, picks a group, presses, and is told the thing they could
+    // have been told before they started.
+    //
+    // The refusal carries the resend button. The gate used to sit at payment,
+    // where the sentence could afford to point at the dashboard; at the front
+    // of a registration it is the first wall a family meets, so the one control
+    // that clears it is under the sentence asking for it.
+    //
+    // Drop-ins never reach here — registerPerSession() is the other branch, and
+    // a walk-up is deliberately not asked.
+    if (!(S.account && S.account.emailVerifiedAt)) {
+      return where.appendChild(section(title, [
+        el('p', { class: 'acc-notice is-warn' }, [
+          el('span', { text: T.registerNeedsVerify + ' ' }), resendButton()
+        ])
+      ]));
+    }
+
     var who = peopleSelect(people);
 
     var groupSel = null;
@@ -1553,6 +1576,22 @@
   // would say the wrong thing about which pocket the money comes from.
   var WALLET = ['M17 14h.01',
                 'M7 7h10a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2'];
+
+  // ⚠ THE RESEND IS WHEREVER THE REFUSAL IS, not only on the dashboard.
+  //
+  // A missing button teaches nobody anything, and a button on ANOTHER page is
+  // most of the way to a missing one — the register panel used to say "the link
+  // to resend it is on your account page", which is a refusal plus directions.
+  // Now that a confirmed address is what stands between a family and a course,
+  // the one control that fixes it has to be under the sentence that asks for it.
+  function resendButton() {
+    return el('button', { type: 'button', class: 'acc-link', text: T.verifyResend,
+      onclick: function () {
+        post(AUTH, { action: 'resendVerification' }).then(function (res) {
+          say(res.ok ? 'ok' : 'err', res.ok ? T.verifySent : failure(res));
+        });
+      } });
+  }
 
   function browseLink() {
     return el('p', { class: 'acc-browse' },

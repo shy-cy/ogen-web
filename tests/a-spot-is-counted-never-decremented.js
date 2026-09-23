@@ -199,8 +199,8 @@ const REG_DEFAULT_DAYS = require(H.fnPath('_activity-registration')).DEFAULT_EXP
   // ------------------------------------------------------------ end to end
   console.log('\n[through the handler: the last place, and giving it back]');
   const signup = async (email) => {
-    const r = await H.call(auth.handler, {
-      action: 'signup', email: email, password: 'password-123', termsAccepted: true,
+    const r = await H.signUp(auth, blobs, {
+action: 'signup', email: email, password: 'password-123', termsAccepted: true,
       profile: { firstName: email.split('@')[0], preferredLanguage: 'en' }
     });
     return { token: r.body.token, accountId: r.body.account.accountId };

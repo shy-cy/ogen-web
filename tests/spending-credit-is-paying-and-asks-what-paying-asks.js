@@ -86,16 +86,33 @@ process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
   };
 
   // -------------------------------------------------------------------------
-  console.log('[an address nobody has confirmed is not payable, by either door]');
+  console.log('[the gate is at the FRONT now: no course from an unconfirmed address]');
 
+  const early = await H.call(regs.handler,
+    { action: 'submit', token: dana.token, slug: 'term', participantId: noa });
+  H.eq(early.status, 403, 'registering for a course is refused before anything is written');
+  H.eq(early.body.reason, 'email-unverified', 'naming the rule');
+  H.eq(await store.getRegistration(noa, manual.activityId), null,
+    'and no registration exists — the wall is before the commitment, not after it');
+
+  // -------------------------------------------------------------------------
+  console.log('[and the doors further down still hold, for a record taken before it]');
+
+  // A registration on an unconfirmed account is no longer creatable through the
+  // handlers, which is the point of the change. It still EXISTS: every one taken
+  // before today, and anything an admin registers by hand. So the gates at
+  // payment are not made redundant by the one at the front, and this is how a
+  // suite reaches that state.
+  await H.confirmAddress(blobs, dana.accountId);
   const sub = await H.call(regs.handler,
     { action: 'submit', token: dana.token, slug: 'term', participantId: noa });
-  H.ok(sub.status < 300, 'the registration is taken');
+  H.ok(sub.status < 300, 'the registration is taken once the address is confirmed');
   H.eq((await owing()).status, 'pending', 'and waits for a person, because autoApprove is off');
   H.ok((await owing()).owed > 0, 'with something owed on it — €' + (await owing()).owed / 100);
 
+  await H.confirmAddress(blobs, dana.accountId, false);
   const account = await accounts.getAccount(dana.accountId);
-  H.ok(!account.emailVerifiedAt, 'the address is unconfirmed, which is the reported state');
+  H.ok(!account.emailVerifiedAt, 'now the address is unconfirmed under a live registration');
 
   const payUnverified = await pay();
   H.eq(payUnverified.status, 403, 'the card door asks for a confirmed address on a term');
@@ -119,7 +136,7 @@ process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
 
   // The address is confirmed now, so the FIRST gate can no longer be what is
   // doing the refusing, and the second is tested rather than shadowed by it.
-  await accounts.markEmailVerified(dana.accountId);
+  await H.confirmAddress(blobs, dana.accountId);
   H.eq((await owing()).status, 'pending', 'the registration is still waiting for an admin');
 
   const payPending = await pay();

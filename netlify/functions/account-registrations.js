@@ -1181,6 +1181,41 @@ exports.handler = async (event) => {
         const activity = await published(body.slug);
         if (!activity) return no(404, 'no-such-activity');
 
+        // ⚠ A COURSE IS NOT REGISTERED FOR FROM AN ADDRESS NOBODY HAS PROVED.
+        //
+        // The gate used to sit at payment, three doors down, and that was the
+        // wrong place for it in both directions. A family registered, waited
+        // days for an admin to answer, opened the email saying they had a
+        // place — and met the wall there, after the commitment rather than
+        // before it. Friction discovered late reads as a system that changed
+        // its mind.
+        //
+        // And it let us store a MINOR'S NAME AND DATE OF BIRTH against an
+        // address nobody has shown they can read. That is the stronger half of
+        // the argument and it has nothing to do with money: the registration
+        // itself is the thing the address has to be good for, because the
+        // confirmation, the approval, the expiry apology and every later
+        // message about that child go to it. This project's most careful rule
+        // is about exactly that record.
+        //
+        // The DROP-IN SPLIT SURVIVES UNCHANGED and is the reason this is
+        // decided by verificationRefusal() rather than written here: a walk-up
+        // is decided and paid for in one sitting, often by a family who signed
+        // up minutes earlier, and bookAndPay never asks. `submit` is the course
+        // door.
+        //
+        // From the ACTIVITY's type, not a frozen one — there is no record yet.
+        // A missing type reads as `course`, which is the same direction the
+        // other call sites take and the one place in the family area where a
+        // blank resolves towards the gate rather than towards the family.
+        //
+        // The gates further down STAY. They are not made redundant by this one:
+        // a registration taken before today sits on an unverified account
+        // already, and the client is hostile by assumption. What changes is
+        // that they now almost never fire.
+        const refusal = verificationRefusal(me, activity.type);
+        if (refusal) return no(403, refusal, { reason: 'email-unverified' });
+
         const opened = await openRegistration({
           activity: activity, participant: participant,
           accountId: me.accountId, groupId: body.groupId || null

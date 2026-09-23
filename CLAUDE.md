@@ -3902,11 +3902,29 @@ than from a round number.
 The activity page still books **one evening at a time**, with a Pay button on
 each. That is the remaining surface running the old shape.
 
-### ⚠ The verified-address gate is a COURSE rule
+### ⚠ The verified-address gate is a COURSE rule, asked at the FRONT
 
 It has been wrong in both directions inside a week, which is why it is now one
 function with a test around it: `verificationRefusal()` in
 `account-registrations.js`.
+
+⚠ **AND IT USED TO BE ASKED ONLY AT PAYMENT, WHICH WAS THE WRONG PLACE IN BOTH
+DIRECTIONS.** A family registered, waited days for an admin to answer, opened the
+email saying they had a place — and met the wall *there*. Friction discovered
+after the commitment rather than before it reads as a system that changed its
+mind, and it is the one ordering that makes a one-minute task feel like a
+refusal.
+
+The stronger half of the argument has nothing to do with money. It let us store
+a **minor's name and date of birth** against an address nobody had shown they
+could read, and then send the confirmation, the approval, the expiry apology and
+every later message about that child to it. The registration itself is the thing
+the address has to be good for.
+
+So `submit` asks, **before `openRegistration()`**, so a refusal leaves no record
+behind. The doors further down **stay**: a registration taken before this existed
+sits on an unverified account already, and the client is hostile by assumption.
+What changed is that they now almost never fire.
 
 **A course asks for a confirmed address. A drop-in does not.** The split is the
 friction each one can carry, not a difference in how much the payer is trusted.
@@ -3931,13 +3949,18 @@ affordable and the message trail matters.
 
 Four things hold the rule together:
 
-- **One function, three call sites decided by it.** `pay` asks, from the
-  **frozen** type on the registration — it never opens the activity. `paySession`
-  asks, from the activity, and today that always passes, because an attendance
-  record exists only for a drop-in; the call is there anyway so a course that
-  ever becomes payable by the session inherits the rule instead of it being
-  something to remember. `bookAndPay` does not ask, and cannot need to: the line
-  above it has already refused everything that is not a drop-in.
+- **One function, four call sites decided by it.** `submit` asks, from the
+  **activity's** type — there is no frozen one yet, because the record does not
+  exist. `pay` asks, from the **frozen** type on the registration, and never
+  opens the activity. `useCredit` asks, from the frozen type too, because
+  spending credit settles the same debt on the same record and the only thing
+  that differs is which pocket. `paySession` asks, from the activity, and today
+  that always passes, because an attendance record exists only for a drop-in;
+  the call is there anyway so a course that ever becomes payable by the session
+  inherits the rule instead of it being something to remember. `bookAndPay` does
+  not ask, and cannot need to: the line above it has already refused everything
+  that is not a drop-in. The count is pinned, because two of the four were
+  missing and nothing said so.
 - **⚠ A missing type reads as `course`, which inverts this file's usual rule.**
   Every blank in `_credit.js` resolves towards the family; this one resolves
   towards the gate. A record with no `type` was written before drop-ins existed,
@@ -3946,16 +3969,35 @@ Four things hold the rule together:
 - **The client reads the same field.** `regRow()` sends `frozen.type` with the
   same `|| 'course'` default. Reading anything else would hide a button the
   server would have honoured, which reads as a broken page rather than as a rule.
-- **The refusal is shown, not hidden.** An unverified family on a term gets a
-  line saying so, because the resend button is on the dashboard and a missing
-  button teaches nobody anything.
+- **The refusal is shown, not hidden — and it carries the fix.** An unverified
+  family on a term gets a line saying so rather than a missing button, because a
+  missing button teaches nobody anything. ⚠ On the **register** panel the form
+  is not drawn at all, which is the one place in the family area where a
+  cosmetic check replaces a control instead of greying one: the server will
+  refuse *every* time, and a filled-in form that always loses is worse than no
+  form — somebody picks a child, picks a group, presses, and is told what they
+  could have been told before they started. The **resend button is under the
+  sentence**, not on the dashboard: at the front of a registration this is the
+  first wall a family meets, and a refusal plus directions to another page is
+  most of the way to a missing button.
+- **The sentence stopped saying "before paying".** One message is shown at four
+  doors now, and naming only the last of them would be wrong at the one people
+  meet first. It names the act — registering for a course — and what to do.
 
-`tests/what-stands-between-a-family-and-paying.js` pins both halves, the
+`tests/what-stands-between-a-family-and-paying.js` pins all four call sites, the
 direction a blank falls, and that `emailVerifiedAt` is read in exactly one place
 in that file. The drop-in half is also *executed*, by
 `tests/a-drop-in-is-booked-and-paid-in-one-step.js`, whose account is unverified
-throughout — it walks the whole booking flow to Checkout and is still asked to
-confirm its address on a term.
+throughout — it walks the whole booking flow to Checkout on a drop-in and, on a
+term, is drawn no form at all.
+
+⚠ **Moving it broke nine suites at once**, every one of which signed up and
+registered without ever touching the gate, and that is the clearest evidence it
+bites. They go through `H.signUp()` now, which signs up **and** confirms, so the
+next suite copies something correct; `H.confirmAddress(blobs, id, false)` clears
+it again, which is the only way to reach the state the payment-side gates still
+defend — a live registration on an unconfirmed account, no longer creatable
+through the handlers.
 
 ### Not built
 

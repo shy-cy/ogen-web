@@ -216,6 +216,40 @@ async function installSession(blobs, session) {
   return session;
 }
 
+// ⚠ CONFIRM AN ADDRESS, because registering for a COURSE now needs one.
+//
+// The gate used to sit at payment, so every fixture in this directory signed up
+// and registered without ever touching it. Moving it to the front of a course
+// registration broke nine suites at once, which is the clearest evidence it
+// bites — and the right fix is one helper rather than nine copies of the same
+// two lines, because the next suite would copy the ninth.
+//
+// It writes the record directly rather than going through the verify token: a
+// suite about capacity or about the ledger should not have to mint and redeem
+// an email link to get to its subject.
+// Pass `false` to clear it again, which is how a suite reaches a registration
+// that exists on an unconfirmed account: one taken before the gate moved to the
+// front. That state is not creatable through the handlers any more, and it is
+// exactly what the gates further down still defend.
+async function confirmAddress(blobs, accountId, on) {
+  const store = await blobs.requireStore('accounts');
+  const raw = await store.get('acct-' + accountId);
+  const account = JSON.parse(raw);
+  account.emailVerifiedAt = on === false ? null : new Date().toISOString();
+  await store.setJSON('acct-' + accountId, account);
+  return account;
+}
+
+// Sign up AND confirm the address, which is what a suite about something else
+// wants. A suite whose SUBJECT is the gate signs up with plain `call` and
+// leaves the address unconfirmed.
+async function signUp(auth, blobs, body) {
+  const res = await call(auth.handler, Object.assign({ action: 'signup', password: 'password-123',
+                                                       termsAccepted: true }, body));
+  if (res.body && res.body.account) await confirmAddress(blobs, res.body.account.accountId);
+  return res;
+}
+
 // Call a handler the way Netlify does.
 async function call(handler, body) {
   const res = await handler({ httpMethod: 'POST', body: JSON.stringify(body) });
@@ -224,5 +258,5 @@ async function call(handler, body) {
 
 module.exports = {
   ok, eq, done, fnPath, makeBlobs, makeGithub, loadWithStubs,
-  superAdminSession, ruReviewerSession, seedRepo, call, installSession
+  superAdminSession, ruReviewerSession, seedRepo, call, installSession, confirmAddress, signUp
 };

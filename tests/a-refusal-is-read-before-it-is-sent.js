@@ -70,8 +70,8 @@ const read = (p) => fs.readFileSync(path.join(R, p), 'utf8');
 
   // A family that reads RUSSIAN, on purpose: the whole point of the draft
   // carrying a language is that it is not the admin's.
-  const r = await H.call(auth.handler, {
-    action: 'signup', email: 'dana@example.com', password: 'password-123', termsAccepted: true,
+  const r = await H.signUp(auth, blobs, {
+action: 'signup', email: 'dana@example.com', password: 'password-123', termsAccepted: true,
     profile: { firstName: 'Dana', preferredLanguage: 'ru' }
   });
   const dana = { token: r.body.token };

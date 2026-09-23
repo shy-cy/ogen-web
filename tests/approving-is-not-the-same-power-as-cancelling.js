@@ -62,13 +62,13 @@ process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
   H.eq(Object.keys(byId['super-admin']).length, 3, 'exactly three axes, no more');
 
   // --- set up one real registration -----------------------------------------
-  const signed = await H.call(auth.handler, {
-    action: 'signup', email: 'dana@example.com', password: 'password-123', termsAccepted: true,
+  const signed = await H.signUp(auth, blobs, {
+action: 'signup', email: 'dana@example.com', password: 'password-123', termsAccepted: true,
     profile: { firstName: 'Dana', preferredLanguage: 'en' }
   });
   const dana = { token: signed.body.token, accountId: signed.body.account.accountId };
-  const other = await H.call(auth.handler, {
-    action: 'signup', email: 'stranger@example.com', password: 'password-123', termsAccepted: true,
+  const other = await H.signUp(auth, blobs, {
+action: 'signup', email: 'stranger@example.com', password: 'password-123', termsAccepted: true,
     profile: { firstName: 'Stranger', preferredLanguage: 'en' }
   });
   const stranger = { token: other.body.token };

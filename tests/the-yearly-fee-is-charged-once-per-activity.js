@@ -139,8 +139,8 @@ process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
 
   // ---------------------------------------------------------------- end to end
   console.log('\n[through the handler, autumn then spring]');
-  const signed = await H.call(auth.handler, {
-    action: 'signup', email: 'dana@example.com', password: 'password-123', termsAccepted: true,
+  const signed = await H.signUp(auth, blobs, {
+action: 'signup', email: 'dana@example.com', password: 'password-123', termsAccepted: true,
     profile: { firstName: 'Dana', preferredLanguage: 'en' }
   });
   const dana = { token: signed.body.token, accountId: signed.body.account.accountId };
