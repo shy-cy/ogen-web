@@ -1768,6 +1768,54 @@ again, opens a second, sends Escape, clicks elsewhere, clicks inside — because
 reading the source proves the source is self-consistent and can never prove that
 pressing it shows the words.
 
+### ⚠ A reload lands back on the activity you were on
+
+Both screens that are a picker beside one record — the Roster and Activities —
+kept the selection in a `S.slug` that lived exactly as long as the page did, and
+both booted by choosing for you: the Roster to the first row of the list,
+Activities to an empty "new activity" form. Reload while you are on one activity
+and you are handed a different one.
+
+Every other piece of state on those screens is cheap to re-reach. This one is
+not: it is the thing you were working on, and a reload is also what an admin
+does when something looks stale — which made *reload* and *lose your place* the
+same gesture on the screen where that costs the most.
+
+`js/admin-url.js` holds it in the URL as `?activity=<slug>`. The URL rather than
+`localStorage` because it is per **tab**, so two activities can be open side by
+side, and because it is a link an admin can send another admin.
+
+⚠ **`replaceState`, NEVER `pushState`, and that is what the shared module is
+for.** Pressing a row in the picker is not a navigation — it is the same screen
+showing a different record — and a history entry per press would put the Back
+button in charge of swapping the record underneath an admin, **without** the
+`beforeunload` guard the activities form relies on, which fires on a real unload
+and never on a history move. Back would silently discard whatever had been
+typed. So the URL tracks the selection and adds nothing to the history.
+
+Three details carry the rest:
+
+- **The Roster checks the slug against its list rather than trusting it.** A tab
+  left open across a delete or an unpublish holds a name the queue action would
+  refuse, and the screen that used to choose for you would then choose nothing
+  at all. It falls back to the first row, which rewrites the stale URL on its
+  way.
+- **Activities cannot check — the list arrives from the same call the record
+  does — so it recovers instead.** ⚠ A failed `load()` now draws the picker,
+  which it did not: at boot that is the first call the screen makes, and
+  returning early left an admin looking at an error with no list underneath it.
+  The parameter is read **before** the blank form is drawn, because drawing one
+  clears it.
+- **Every assignment to `S.slug` carries the URL with it**, including the one in
+  `doPublish` that `fillForm` would have covered a moment later. A rule with an
+  exception is a rule a test can only check by counting call sites; with none, a
+  test checks it **by shape**, and a fourth assignment added next year inherits
+  it. Failing to write the URL is silent — the screen is right and only the
+  address bar is wrong — until somebody reloads.
+
+It fails open: no history API, or an address that will not parse, costs the
+memory and nothing else.
+
 ### The rules that hold this together
 
 ⚠ **A DRAFT IS SAVED WHATEVER IS IN IT, AND IS TOLD WHAT WOULD STOP IT.**

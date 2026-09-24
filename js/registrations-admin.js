@@ -928,6 +928,10 @@
     // not meet on.
     if (slug !== S.slug) { S.date = null; S.register = null; }
     S.slug = slug;
+    // So a reload comes back to the activity you were on rather than to the
+    // first row of the list. See js/admin-url.js for why it replaces the
+    // history entry rather than adding one.
+    window.AdminUrl.remember('activity', slug);
     renderPicker();
     return send({ action: 'queue', slug: slug }).then(function (res) {
       if (!res.ok) return message('err', (res.data && res.data.error) || 'Could not load the queue');
@@ -980,8 +984,15 @@
     send({ action: 'activities' }).then(function (list) {
       if (!list.ok) return message('err', (list.data && list.data.error) || 'Could not list activities');
       S.activities = list.data.activities || [];
-      if (S.activities.length) loadQueue(S.activities[0].slug);
-      else renderPicker();
+      if (!S.activities.length) return renderPicker();
+      // The activity named in the URL wins over the first row — but it is
+      // CHECKED against the list rather than trusted. A tab left open across a
+      // delete or an unpublish holds a slug the queue action would refuse, and
+      // an admin who pressed reload would land on an error rather than on a
+      // screen. Falling back to the first row also rewrites the stale URL.
+      var want = window.AdminUrl.read('activity');
+      var known = S.activities.some(function (a) { return a.slug === want; });
+      loadQueue(known ? want : S.activities[0].slug);
     });
   });
 })();

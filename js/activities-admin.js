@@ -2582,6 +2582,13 @@
   function fillForm(record, baseUpdatedAt) {
     S.record = record;
     S.slug = record.slug || null;
+    // So a reload comes back to the activity you had open. fillForm is where a
+    // record becomes this screen's record, so it covers loading one, deleting
+    // one and the reload after a publish; a blank form clears the parameter,
+    // because "new activity" is a real state to come back to. See
+    // js/admin-url.js for why it replaces the history entry rather than adding
+    // one — Back must never swap the record under an unsaved form.
+    window.AdminUrl.remember('activity', S.slug);
     S.baseUpdatedAt = baseUpdatedAt || null;
     S.images = {};
     // undefined, not null: null means "the admin pressed Remove". Loading a
@@ -2614,7 +2621,15 @@
     clearConflict();
     message('');
     return send({ action: 'load', slug: slug }).then(function (res) {
-      if (!res.ok) return message('err', failure(res, 'Loading that activity'));
+      if (!res.ok) {
+        message('err', failure(res, 'Loading that activity'));
+        // ⚠ THE LIST HAS TO BE DRAWN EVEN WHEN THE LOAD FAILED. At boot this is
+        // the first call the screen makes, on a slug that came out of the URL
+        // and may name an activity deleted since the tab was opened — and
+        // returning here left an admin looking at an error with no picker
+        // underneath it to choose anything else from.
+        return refreshList(null);
+      }
       fillForm(res.data.activity, res.data.baseUpdatedAt);
       if (res.data.source === 'draft') {
         message('warn', 'You are editing a <b>draft</b>. It has no page on the site until you publish it.');
@@ -2695,6 +2710,11 @@
         if (!res.ok) return message('err', failure(res, 'Saving the draft'));
         S.baseUpdatedAt = res.data.baseUpdatedAt;
         S.slug = res.data.slug;
+        // The one place a slug is minted without going through fillForm: a
+        // brand new activity saved as a draft. Without this a reload straight
+        // after the first save would open the blank form again, and the work
+        // would look lost even though it is stored.
+        window.AdminUrl.remember('activity', S.slug);
         S.record = res.data.activity;
         S.dirty = false;
         // ⚠ SAVED, AND TOLD WHAT WOULD STOP IT BEING PUBLISHED.
@@ -2741,6 +2761,11 @@
         rememberFreshBytes(res.data.activity, pending);
         S.baseUpdatedAt = res.data.baseUpdatedAt;
         S.slug = res.data.slug;
+        // load() below goes through fillForm and would set this anyway. It is
+        // here so that EVERY assignment to S.slug carries the URL with it,
+        // which is a rule a test can check by shape — the reload after a
+        // publish is not the place to discover an exception.
+        window.AdminUrl.remember('activity', S.slug);
         S.dirty = false;
         // AFTER the reload, not before. load() clears the message box on its way
         // in, so a confirmation written here and then reloaded over is a
@@ -2811,7 +2836,13 @@
     S.editLangs = res.data.editLangs || [];
     S.canPublish = !!res.data.canPublish;
     $('who').textContent = res.data.name + ' · ' + res.data.roleName;
+    // Read BEFORE the blank form is drawn, because drawing one clears the
+    // parameter. A slug that no longer loads leaves the blank form, the list
+    // and a cleared URL, so pressing reload again does not meet the same
+    // failure a second time.
+    var want = window.AdminUrl.read('activity');
     fillForm(blankRecord(), null);
-    refreshList(null);
+    if (want) load(want);
+    else refreshList(null);
   });
 })();
