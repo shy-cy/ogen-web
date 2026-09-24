@@ -146,8 +146,8 @@
       "ru": "Test 1"
     },
     "cardImage": "/images/activities/test1-card-c8031266.jpg",
-    "testActivity": false,
-    "isoUpdated": "2026-09-23T16:33:49.873Z"
+    "testActivity": true,
+    "isoUpdated": "2026-09-24T11:39:10.824Z"
   },
   {
     "slug": "test2",
