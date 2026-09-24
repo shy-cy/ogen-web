@@ -1,0 +1,258 @@
+{
+  "slug": "test8",
+  "status": "open",
+  "motif": "ring",
+  "corner": "tl",
+  "cardImage": "/images/activities/test8-card-d4b8b680.png",
+  "shareImage": null,
+  "robots": "index",
+  "testActivity": true,
+  "type": "course",
+  "registration": {
+    "autoApprove": false,
+    "pendingExpiryDays": null,
+    "registrationFeeCutoffDate": null,
+    "cancellationPolicy": {
+      "mode": "flat",
+      "cancellationCutoffDate": null
+    },
+    "defaultBasis": null
+  },
+  "seriesId": "act-ecb73beba7893406",
+  "title": {
+    "he": "טסט 8",
+    "en": "Test 8",
+    "ru": "Test 8"
+  },
+  "summary": {
+    "he": "",
+    "en": "",
+    "ru": ""
+  },
+  "about": {
+    "he": "",
+    "en": "",
+    "ru": ""
+  },
+  "metaTitle": {
+    "he": "",
+    "en": "",
+    "ru": ""
+  },
+  "metaDescription": {
+    "he": "",
+    "en": "",
+    "ru": ""
+  },
+  "facts": {
+    "groupSize": {
+      "overrideText": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      }
+    },
+    "price": {
+      "registrationFee": null,
+      "fullPrice": null,
+      "perHourOverride": null,
+      "perSessionPrice": null,
+      "showPerLesson": false,
+      "lateDropIn": {
+        "enabled": false,
+        "hoursBefore": null,
+        "price": null
+      },
+      "bundles": []
+    }
+  },
+  "groups": [
+    {
+      "groupId": "g-mufnsw5jyaj1",
+      "name": {
+        "he": "",
+        "en": "Beginners",
+        "ru": "Для начинающих"
+      },
+      "capacity": 3,
+      "teacherIds": [],
+      "facts": {
+        "ages": {
+          "min": 3,
+          "max": 33
+        },
+        "schedule": {
+          "frequency": "weekly",
+          "sessions": [
+            {
+              "day": 3,
+              "time": "15:55"
+            }
+          ]
+        },
+        "duration": {
+          "startDate": "2026-09-24",
+          "endDate": "2027-01-14",
+          "sessionCount": 6,
+          "sessionMinutes": 45,
+          "sessionDates": [
+            {
+              "date": "2026-09-30",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-10-07",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-10-14",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-10-21",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-10-28",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-11-04",
+              "status": "scheduled"
+            }
+          ]
+        },
+        "instructionLanguage": {
+          "codes": [
+            "ru"
+          ],
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "prerequisites": {
+          "level": "beginner",
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "location": {
+          "text": {
+            "he": "לימסול",
+            "en": "Limassol",
+            "ru": "Лимассол"
+          }
+        },
+        "address": {
+          "text": {
+            "he": "PASIDI",
+            "en": "PASIDI",
+            "ru": "PASIDI"
+          }
+        }
+      }
+    },
+    {
+      "groupId": "g-mufnwrlwnbe7",
+      "name": {
+        "he": "מתקדמים",
+        "en": "Advanced",
+        "ru": "Передовой"
+      },
+      "capacity": 2,
+      "teacherIds": [],
+      "facts": {
+        "ages": {
+          "min": 2,
+          "max": 22
+        },
+        "schedule": {
+          "frequency": "monthly",
+          "sessions": [
+            {
+              "day": 6,
+              "time": "12:22"
+            }
+          ],
+          "weekOfMonth": 1
+        },
+        "duration": {
+          "startDate": "2026-10-08",
+          "endDate": "2027-02-24",
+          "sessionCount": 3,
+          "sessionMinutes": 90,
+          "sessionDates": [
+            {
+              "date": "2026-11-07",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-12-05",
+              "status": "scheduled"
+            },
+            {
+              "date": "2027-01-02",
+              "status": "scheduled"
+            }
+          ]
+        },
+        "instructionLanguage": {
+          "codes": [
+            "en"
+          ],
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "prerequisites": {
+          "level": "advanced",
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "location": {
+          "text": {
+            "he": "לימסול",
+            "en": "Limassol",
+            "ru": "Лимассол"
+          }
+        },
+        "address": {
+          "text": {
+            "he": "PASIDI",
+            "en": "PASIDI",
+            "ru": "PASIDI"
+          }
+        }
+      }
+    }
+  ],
+  "factVisibility": {
+    "ages": "public",
+    "schedule": "public",
+    "duration": "public",
+    "groupSize": "public",
+    "instructionLanguage": "public",
+    "prerequisites": "public",
+    "location": "public",
+    "address": "members",
+    "price": "public"
+  },
+  "faq": [],
+  "teachers": [],
+  "sponsors": [],
+  "isoUpdated": "2026-09-24T16:23:27.123Z",
+  "isoCreated": "2026-09-24T16:23:27.123Z",
+  "lastEditedBy": "michal@ogen.cy",
+  "lastEditedByName": "Michal",
+  "activityId": "act-ecb73beba7893406",
+  "lastPublishedAt": "2026-09-24T16:23:27.123Z"
+}

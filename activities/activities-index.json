@@ -223,5 +223,30 @@
     "cardImage": "/images/activities/test4-card-c8031266.jpg",
     "testActivity": true,
     "isoUpdated": "2026-09-24T12:01:24.252Z"
+  },
+  {
+    "slug": "test8",
+    "activityId": "act-ecb73beba7893406",
+    "seriesId": "act-ecb73beba7893406",
+    "type": "course",
+    "status": "open",
+    "langs": [
+      "he",
+      "en",
+      "ru"
+    ],
+    "title": {
+      "he": "טסט 8",
+      "en": "Test 8",
+      "ru": "Test 8"
+    },
+    "summary": {
+      "he": "",
+      "en": "",
+      "ru": ""
+    },
+    "cardImage": "/images/activities/test8-card-d4b8b680.png",
+    "testActivity": true,
+    "isoUpdated": "2026-09-24T16:23:27.123Z"
   }
 ]
