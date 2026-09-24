@@ -285,7 +285,12 @@ const creditNote = noteMaker(T);
     'and the place is genuinely given back');
 
   console.log('\n[every reason has a sentence, in every language]');
-  const REASONS = ['nothing-paid', 'too-late', 'started', 'per-session', 'past-cutoff', 'closed'];
+  // 'fee-held' joined the set when the yearly fee stopped coming back while
+  // another term of that year is still registered — see
+  // a-refunded-fee-must-not-leave-a-live-term-unpaid.js. This list is what
+  // makes an orphan detectable, so adding a reason means adding it here.
+  const REASONS = ['nothing-paid', 'fee-held', 'too-late', 'started',
+                   'per-session', 'past-cutoff', 'closed'];
   const tableSrc = ui.slice(ui.indexOf('var T = {'),
                             ui.indexOf('}[lang];', ui.indexOf('var T = {')) + '}[lang];'.length);
   ['he', 'en', 'ru'].forEach((l) => {

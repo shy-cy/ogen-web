@@ -167,6 +167,8 @@
       confirmTitle: 'לאשר?', confirmYes: 'כן, לבטל', confirmNo: 'חזרה',
       confirmCredit: 'הסכום ששולם יוחזר כזיכוי לחשבון:',
       confirmNoCredit: 'לא יוחזר זיכוי על הביטול הזה.',
+      confirmFeeHeld: 'דמי ההרשמה אינם כלולים בסכום הזה: הם נגבים פעם בשנה עבור הפעילות הזו, '
+                    + 'ועדיין קיימת הרשמה פעילה למחזור אחר.',
       // ⚠ WHY there is nothing to get back. The dialog said only that there was
       // not, which reads as a penalty whatever the actual reason — and the
       // commonest reason is the gentlest one, that nothing has been paid yet.
@@ -177,7 +179,9 @@
         'per-session': 'בפעילות הזו התשלום הוא לכל מפגש בנפרד, ולכן אין תשלום מראש להחזיר. '
                      + 'מפגשים שכבר נקבעו מתבטלים אחד־אחד.',
         'past-cutoff': 'המועד האחרון לקבלת זיכוי על הסכום ששולם כבר עבר.',
-        'closed': 'המועד האחרון לקבלת זיכוי על ההרשמה הזו כבר עבר. אפשר עדיין לבטל, אך ללא זיכוי.'
+        'closed': 'המועד האחרון לקבלת זיכוי על ההרשמה הזו כבר עבר. אפשר עדיין לבטל, אך ללא זיכוי.',
+        'fee-held': 'כל מה ששולם על ההרשמה הזו הוא דמי ההרשמה, הנגבים פעם בשנה עבור הפעילות '
+                  + 'הזו — ועדיין קיימת הרשמה פעילה למחזור אחר, ולכן הם נשארים בתוקף.'
       },
       useCredit: 'שימוש בזיכוי',
       creditUsed: 'הזיכוי נוצל.', creditHave: 'יש לכם זיכוי:',
@@ -316,6 +320,8 @@
       confirmTitle: 'Are you sure?', confirmYes: 'Yes, cancel it', confirmNo: 'Go back',
       confirmCredit: 'What you paid comes back as credit on your account:',
       confirmNoCredit: 'This cancellation earns no credit back.',
+      confirmFeeHeld: 'The registration fee is not part of this: it is charged once a year for '
+                    + 'this activity, and another term is still registered.',
       whyNothing: {
         'nothing-paid': 'Nothing has been paid for this session yet, so there is nothing to credit back.',
         'too-late': 'The window for cancelling this session with credit has closed.',
@@ -323,7 +329,10 @@
         'per-session': 'This activity is paid for one session at a time, so there is no payment '
                      + 'up front to give back. Sessions you have booked are cancelled one by one.',
         'past-cutoff': 'The date for getting back what has been paid has passed.',
-        'closed': 'The period for getting credit back on this registration has closed. It can still be cancelled, with nothing credited.'
+        'closed': 'The period for getting credit back on this registration has closed. It can still be cancelled, with nothing credited.',
+        'fee-held': 'Everything paid on this registration was the registration fee, which is '
+                  + 'charged once a year for this activity — and another term is still '
+                  + 'registered, so it stays paid.'
       },
       useCredit: 'Use credit',
       creditUsed: 'Your credit has been used.', creditHave: 'You have credit:',
@@ -456,6 +465,8 @@
       confirmTitle: 'Вы уверены?', confirmYes: 'Да, отменить', confirmNo: 'Назад',
       confirmCredit: 'Оплаченная сумма вернётся на счёт как зачёт:',
       confirmNoCredit: 'За эту отмену зачёт не начисляется.',
+      confirmFeeHeld: 'Регистрационный взнос в эту сумму не входит: он взимается один раз в год '
+                    + 'за это занятие, а другой семестр остаётся оформленным.',
       whyNothing: {
         'nothing-paid': 'За это занятие пока ничего не оплачено, поэтому возвращать нечего.',
         'too-late': 'Срок отмены этого занятия с возвратом на счёт уже истёк.',
@@ -463,7 +474,10 @@
         'per-session': 'Это занятие оплачивается по одному разу, поэтому предоплаты, которую можно '
                      + 'вернуть, нет. Уже записанные занятия отменяются по одному.',
         'past-cutoff': 'Срок возврата уплаченной суммы на счёт уже прошёл.',
-        'closed': 'Срок возврата средств по этой записи истёк. Отменить запись можно, но без зачёта.'
+        'closed': 'Срок возврата средств по этой записи истёк. Отменить запись можно, но без зачёта.',
+        'fee-held': 'Всё, что оплачено по этой записи, — это регистрационный взнос. Он '
+                  + 'взимается один раз в год за это занятие, а другой семестр остаётся '
+                  + 'оформленным, поэтому взнос сохраняется.'
       },
       useCredit: 'Использовать зачёт',
       creditUsed: 'Зачёт использован.', creditHave: 'На счету есть зачёт:',
@@ -770,9 +784,24 @@
   // sentence under it would be answering a question nobody asked.
   function creditNote(cancellation) {
     if (!cancellation) return null;
-    if (cancellation.credit > 0) return [T.confirmCredit + ' ' + money(cancellation.credit)];
-    var why = T.whyNothing[cancellation.whyNothing];
-    return why ? [T.confirmNoCredit, why] : [T.confirmNoCredit];
+    var lines;
+    if (cancellation.credit > 0) {
+      lines = [T.confirmCredit + ' ' + money(cancellation.credit)];
+    } else {
+      var why = T.whyNothing[cancellation.whyNothing];
+      lines = why ? [T.confirmNoCredit, why] : [T.confirmNoCredit];
+    }
+    // ⚠ SAID EVEN WHEN THERE IS CREDIT, which every other line here is not.
+    //
+    // The rule above is that a figure explains itself and a sentence under it
+    // answers a question nobody asked. This is the case where it does not: a
+    // family who paid €350 is being offered €300 back, and the €50 that is
+    // missing is the yearly registration fee staying paid because another term
+    // of this year is still registered. Unexplained, that gap reads as a
+    // deduction — in the last thing somebody reads before an action that cannot
+    // be undone.
+    if (cancellation.feeHeldElsewhere) lines.push(T.confirmFeeHeld);
+    return lines;
   }
 
   // ⚠ WHAT IS COMING, DRAWN AT ITS OWN SHAPE.

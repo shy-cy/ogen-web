@@ -735,6 +735,18 @@
       draft.creditCents > 0
         ? el('p', { class: 'modal-credit', text: 'Credits ' + money(draft.creditCents) })
         : null,
+      // ⚠ WHY THE FIGURE IS SMALLER THAN WHAT WAS PAID, on the one screen where
+      // somebody is about to send it to a family. The yearly fee is charged once
+      // a year for an activity, so cancelling one term does not hand it back
+      // while another term of that year is still standing on it — and an admin
+      // reading "credits €300.00" against a €350.00 payment, with no account of
+      // the difference, is an admin who cannot answer the email that follows.
+      // It is state rather than a manual, so it stays on screen.
+      draft.feeHeldElsewhere
+        ? el('p', { class: 'hint', style: 'margin-top:6px;', text:
+            'The registration fee is not in that figure: it is charged once a year for this ' +
+            'activity, and this participant is still registered for another term of it.' })
+        : null,
       K.note ? el('label', { class: 'modal-label', text: 'Why (recorded internally, not sent)' }) : null,
       K.note ? note : null,
       el('label', { class: 'modal-label', text: 'Subject' }), subject,

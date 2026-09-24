@@ -384,6 +384,13 @@ async function sessionsPayload(activity, participantId, now) {
 function whyNoCredit(c, credit, paidCents) {
   if (credit > 0) return null;
   if (!(paidCents > 0)) return 'nothing-paid';
+  // ⚠ SECOND, AND BEFORE EVERY DEADLINE, for the same reason 'nothing-paid' is
+  // first: the deadline sentences all imply that something was lost by being
+  // late, and this zero is not that. Everything paid here was the yearly fee,
+  // and the fee stays paid because another term of this year is still
+  // registered. It reaches this line only when the fee was the whole of what
+  // was paid — with course money in it the credit is not zero.
+  if (c.feeHeldElsewhere) return 'fee-held';
   // A drop-in registration credits nothing by design: there was no upfront
   // commitment to unwind, and what money there is sits on the evenings.
   if (c.reason === 'per-session') return 'per-session';
@@ -415,6 +422,12 @@ function cancellationView(c, paidCents) {
     // Null whenever there IS credit — the figure is its own explanation, and a
     // sentence under it would be explaining something nobody asked about.
     whyNothing: whyNoCredit(c, credit, paidCents),
+    // ⚠ THIS ONE IS SHOWN EVEN WHEN THERE IS CREDIT, which is the exception to
+    // the line above and the whole point of it. A family who paid €350 and is
+    // offered €300 back is looking at a figure that does NOT explain itself,
+    // and the missing €50 is the one they will write in about. `false` on an
+    // evening's answer, which has no fee in it at all.
+    feeHeldElsewhere: !!c.feeHeldElsewhere,
     // Only one of these is ever set, and each is named by what it is: the
     // instant one evening stops being creditable, and the date a whole term did.
     deadline: c.deadline == null ? null : c.deadline,
@@ -594,7 +607,18 @@ async function commitEntries(spend, accountId, note) {
 // views of the same record, and two builders would drift — the one the family
 // reads on a dashboard would stop agreeing with the one they read on the page
 // they opened from it.
-function regRow(reg, participant, lang, activity) {
+// ⚠ `siblings` IS THIS PARTICIPANT'S OTHER REGISTRATIONS, and it decides money.
+//
+// Cancelling a term does not hand back the yearly fee while another term of that
+// year is still standing on it — see feeHeldByLiveTerm() — and this row draws
+// the cancel button AND the figure beside it. Omitted, the flag reads false and
+// the screen promises €50 the ledger will not write, which is the exact failure
+// the clock argument below already caused once.
+//
+// It is a parameter rather than a scan inside because the dashboard has the rows
+// in hand already: one list per participant, and asking again per registration
+// would be a read per row of a screen built to be one call.
+function regRow(reg, participant, lang, activity, siblings) {
   // ⚠ THE CLOCK IS THE CALLER'S TO SUPPLY, AND EVERY CALLER HAD FORGOTTEN.
   //
   // _credit.js never asks what time it is — that is its whole contract, and it
@@ -611,6 +635,8 @@ function regRow(reg, participant, lang, activity) {
   // record disagreed by the entire amount, in the one place this file promises
   // they cannot: "what is offered is what happens".
   const now = Date.now();
+  const owed = credit.creditFor(reg, now,
+    { feeHeldElsewhere: R.feeHeldByLiveTerm(reg, siblings) });
   return {
     participantId: reg.participantId,
     participantName: participant
@@ -657,7 +683,7 @@ function regRow(reg, participant, lang, activity) {
     // What cancelling would do, computed from the terms frozen onto this
     // registration — so the answer shown is the answer that will be applied, and
     // both come from the same function.
-    cancellation: cancellationView(credit.creditFor(reg, now), reg.payment.paidCents),
+    cancellation: cancellationView(owed, reg.payment.paidCents),
     // ⚠ THE TERMS AS FROZEN, NOT AS THE ACTIVITY NOW READS THEM. The whole
     // reason freezeCancellation() runs at submission is that an admin switching
     // a course from flat to prorated in March must not change what a January
@@ -679,7 +705,7 @@ function regRow(reg, participant, lang, activity) {
       // Decided here rather than in a clockless module: creditFor() has already
       // said whether the window is shut, and the sentence has to agree with the
       // button it sits under.
-      closed: credit.creditFor(reg, now).reason === 'cancellation-closed',
+      closed: owed.reason === 'cancellation-closed',
       sessionCancelHours: ((activity || {}).registration || {}).sessionCancelHours,
       // Here the waiver IS decided: the fee was billed on this registration or
       // it was not, and `feeCharged` says which. Absent reads as charged, the
@@ -891,7 +917,8 @@ exports.handler = async (event) => {
           if (opened.created) await mail.sendReceived(reg, me, (activity.registration || {}).sessionCancelHours);
           return json(200, {
             ok: true, awaitingApproval: true, status: reg.status,
-            registration: regRow(reg, participant, lang)
+            registration: regRow(reg, participant, lang, null,
+                                 await store.forParticipant(participant.participantId))
           });
         }
 
@@ -1347,7 +1374,10 @@ exports.handler = async (event) => {
         const rows = [];
         for (const id of ids) {
           const p = await participants.getParticipant(id);
-          for (const reg of await store.forParticipant(id)) rows.push(regRow(reg, p, lang));
+          // The same list, handed to every row: the fee question is about this
+          // participant's OTHER registrations, and they are already here.
+          const regs = await store.forParticipant(id);
+          for (const reg of regs) rows.push(regRow(reg, p, lang, null, regs));
         }
         const entries = await ledger.entriesFor(me.accountId);
         return json(200, {
@@ -1368,6 +1398,8 @@ exports.handler = async (event) => {
         if (!participant) return no(404, 'no-such-participant');
         const reg = await store.getRegistration(body.participantId, body.activityId);
         if (!reg) return no(404, 'no-such-registration');
+        // One prefix scan, for the fee question the cancel button turns on.
+        const siblings = await store.forParticipant(body.participantId);
 
         const index = (await readJson('activities/activities-index.json')) || [];
         const entry = index.filter((a) => a.activityId === reg.activityId)[0] || null;
@@ -1380,7 +1412,7 @@ exports.handler = async (event) => {
         const L = LABELS[lang] || LABELS.he;
         return json(200, {
           ok: true,
-          registration: regRow(reg, participant, lang, activity),
+          registration: regRow(reg, participant, lang, activity, siblings),
           activity: activity ? Object.assign(activityView(activity, report, lang), {
             // THE SAME ROWS THE PUBLIC PAGE SHOWS, from the one place a fact
             // becomes text. isPubliclyVisible() keeps its exact current meaning
@@ -1487,11 +1519,12 @@ exports.handler = async (event) => {
           return no(409, 'already-in-status', null, { status: reg.status });
         }
 
-        // ⚠ WITH THE CLOCK. Omitted, `past()` is false and this refusal could
-        // never fire — the gate below was dead, and a family past the cutoff
-        // cancelled successfully while being promised a figure the ledger then
-        // did not write.
-        const owed = credit.creditFor(reg, Date.now());
+        // ⚠ THERE IS NO creditFor() CALL HERE ANY MORE. One stood here to feed
+        // the 409 below, and when that refusal was deleted the variable was left
+        // behind reading nothing — a computation of money with no consumer,
+        // which is the shape somebody later wires up believing it was load
+        // bearing. cancelAndCredit() works out the figure, and it is the only
+        // caller that writes.
 
         // ⚠ THE HARD CUTOFF GOVERNS ENTITLEMENT AND NOTHING ELSE, and a 409
         // refusing the family stood here.

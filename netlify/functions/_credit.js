@@ -229,7 +229,19 @@ const remaining = (starts, now) => starts.filter((t) => t > ms(now)).length;
 //
 //   Fee      100% before registrationFeeCutoffDate
 //            0%   after it, wherever that date happens to fall
-function creditFor(reg, now) {
+// ⚠ `opts.feeHeldElsewhere` IS THE CALLER'S TO SUPPLY, exactly as `now` is.
+//
+// This module reads one record and one timestamp and nothing else, which is what
+// makes the same pair return the same figure a year later. Whether ANOTHER of
+// this family's registrations is leaning on the fee paid here is a fact about
+// other records, and going to find it would be this file opening a store — the
+// one thing it may not do.
+//
+// So it is an argument, decided by R.feeHeldByLiveTerm() where the sibling
+// records are already in hand, and every caller passes it for the same reason
+// every caller passes the clock: `undefined` reads as "no", which is the
+// generous direction and, here, the loophole. A test greps for it.
+function creditFor(reg, now, opts) {
   const frozen = (reg && reg.frozen) || {};
   const C = frozen.cancellation || {};
   const price = frozen.price || {};
@@ -255,6 +267,7 @@ function creditFor(reg, now) {
     return {
       guardianMayCancel: true,
       feeCredit: 0, courseCredit: 0, total: 0,
+      feeHeldElsewhere: false,
       reason: 'per-session'
     };
   }
@@ -287,13 +300,32 @@ function creditFor(reg, now) {
     return {
       guardianMayCancel: true,
       feeCredit: 0, courseCredit: 0, total: 0,
+      // The window shutting is the operative reason here and the fee is nought
+      // either way, so this does not also claim to be holding one back: two
+      // explanations for one zero is one explanation too many.
+      feeHeldElsewhere: false,
       reason: 'cancellation-closed',
       closedOn: C.cancellationCutoffDate
     };
   }
 
-  // 2. The fee is judged on its OWN date, whatever the course is doing.
-  const feeCredit = past(C.registrationFeeCutoffDate, now) ? 0 : fee;
+  // 2. The fee is judged on its OWN date, whatever the course is doing —
+  //    unless the year it paid for is still live, which is the one input that
+  //    does not come off this record.
+  //
+  // ⚠ THE FEE IS CHARGED ONCE A YEAR FOR THIS ACTIVITY, so while another term of
+  // that year is still standing on the strength of it, cancelling this one does
+  // not give it back. Without this, registering for both terms and cancelling
+  // the first was a way to attend the second having paid no fee at all — see
+  // feeHeldByLiveTerm() in _registration.js for the whole of it.
+  const feeClosed = past(C.registrationFeeCutoffDate, now);
+  const held = !!(opts && opts.feeHeldElsewhere);
+  const feeCredit = feeClosed || held ? 0 : fee;
+  // Reported true only when it actually SUPPRESSED something. A screen shows a
+  // sentence off this, and a sentence explaining a difference that is not there
+  // is noise — with no fee paid, or its own date already past, the zero has
+  // another cause and already has words for it.
+  const feeHeldElsewhere = held && !feeClosed && fee > 0;
 
   // 3. The course: has it started, and then which mode.
   //
@@ -311,6 +343,7 @@ function creditFor(reg, now) {
     feeCredit: feeCredit,
     courseCredit: courseCredit,
     total: feeCredit + courseCredit,
+    feeHeldElsewhere: feeHeldElsewhere,
     reason: !hasStarted(starts, now) ? 'not-started'
           : C.mode === 'prorated' ? 'prorated'
           : 'flat'
@@ -327,11 +360,15 @@ function creditFor(reg, now) {
 // Under the frozen policy this is also reproducible: creditFor() re-run against
 // the same registration and the same timestamp returns the same figure a year
 // later, which a live-policy design could not promise.
-function basisFor(reg, now) {
+// ⚠ IT TAKES THE SAME `opts`, and must. The ledger entry is the account of the
+// figure beside it, so a basis built from a different answer than the one
+// credited is a record that explains the wrong number — which is the failure
+// this whole block exists to make impossible.
+function basisFor(reg, now, opts) {
   const C = ((reg && reg.frozen) || {}).cancellation || {};
   const price = ((reg && reg.frozen) || {}).price || {};
   const starts = sessionInstants(C);
-  const result = creditFor(reg, now);
+  const result = creditFor(reg, now, opts);
   const split = splitPaid(((reg && reg.payment) || {}).paidCents, price.registrationFee, price.feeCharged);
   return {
     at: new Date(ms(now)).toISOString(),
@@ -349,6 +386,11 @@ function basisFor(reg, now) {
     paidFeeCents: split.fee,
     paidCourseCents: split.course,
     feeCredit: result.feeCredit,
+    // Why the fee half is nought when the dates say it should not be: the family
+    // is still registered for another term of this activity this year, and the
+    // fee is charged once a year. A family reading their ledger back to an
+    // admin gets the answer from the record.
+    feeHeldElsewhere: !!result.feeHeldElsewhere,
     courseCredit: result.courseCredit,
     total: result.total,
     reason: result.reason,

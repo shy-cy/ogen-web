@@ -2736,6 +2736,77 @@ fee and the course answer to **different dates**, so it moves the total too. The
 flag is tri-state: `false` waived, `true` billed, **absent reads as charged**,
 because every registration written before the waiver existed was charged.
 
+### ⚠ The fee does not come back while the year it paid for is still live
+
+Reported as a loophole, and it was one:
+
+```
+autumn   registered, the yearly fee charged, €350 paid
+spring   registered, fee WAIVED — the autumn term stands
+autumn   cancelled before its cutoffs -> €350 back, the fee included
+```
+
+The family attends the spring term having paid **no registration fee at all** for
+that academic year. Executed against the real modules before anything changed,
+the figure collected was €0.00.
+
+**The cause is that the waiver only ever looked backwards.** `feeStandsOn()`
+asks, of a NEW registration, whether this child has already been charged this
+year — and that half is right, and already closes the mirror-image hole where
+refunding the fee makes a third term chargeable again. Nothing looked *forwards*
+from a cancellation at the registrations that were waived because of it. The
+waiver is decided once, at submission, and the condition it rests on could
+disappear afterwards with nothing watching.
+
+`feeHeldByLiveTerm()` in `_registration.js` is the other direction, and it sits
+beside `feeApplies()` because the two are halves of one rule. Three conditions,
+each load-bearing: this registration must be the one the fee was billed on, the
+other must be **live**, and ⚠ the other's own fee must have been **waived** —
+two live terms each charged their own fee is not this situation, and withholding
+there would take €50 from a family who owes nothing.
+
+**`creditFor()` takes it as an argument, never a lookup.** That module reads one
+record and one timestamp and opens no store, which is what makes the same pair
+give the same figure a year later; whether another of this family's
+registrations is leaning on the fee paid here is a fact about *other records*. So
+it is `opts.feeHeldElsewhere`, decided where the sibling records are already in
+hand, and every caller passes it for the same reason every caller passes the
+clock — `undefined` reads as "no", which is the generous direction and, here, the
+loophole. A test greps for it, and `basisFor()` takes the same object so a ledger
+entry cannot explain a figure it did not produce.
+
+**It is said out loud, and that is the half that is not arithmetic.** A family
+who paid €350 and is offered €300 is looking at a figure that does not explain
+itself, so `confirmFeeHeld` is the one line in the cancellation dialog that
+appears **even when there is credit** — everywhere else the rule is that a figure
+is its own explanation. `whyNothing['fee-held']` covers the case where the fee
+was all that was paid, and it is asked **before every deadline** for the same
+reason `nothing-paid` is: the deadline sentences all imply something was lost by
+being late, and this is not that. The admin's cancel draft says it too, on the
+screen where somebody is about to send that figure to a family.
+
+⚠ **AND THE UNPAID VARIANT IS DELIBERATELY STILL OPEN.** The same hole opens with
+no money moving: register for both terms before paying anything, cancel the
+autumn, and the invoice that carried the fee stops standing while the spring bill
+was frozen at €300 in advance. Nothing is withheld when nothing was paid. Closing
+it means **re-billing the surviving term** — moving `feeCharged` and `owedCents`
+on a live registration, which turns "paid in full" into a debt and would have to
+be explained in the dialog and the email before a family confirms. That was
+weighed and deferred, not missed; the suite says so at the top so nobody reads it
+as covered. Today an admin closes it with `adjustCredit`, which writes a note.
+
+Two smaller gaps that come with withholding, both known:
+
+- **Cancel both terms inside the fee window and the €50 is stranded** on the
+  cancelled autumn record, because the spring's own `feeCharged` is false and
+  there is no fee on it to credit. In practice the fee's own cutoff is early in
+  the autumn, so by the time a spring term is cancelled the honest answer is
+  nought anyway — but inside that window it is a family losing money, and it is
+  `adjustCredit`'s to fix.
+- **The cancellation email states the credit and does not explain it.** The
+  dialog does, before anything is confirmed, and the admin's draft does; the
+  message itself would need the sentence in three languages.
+
 ### The ledger
 
 `ogen-account-credits`, keyed `cred-<accountId>__<ISO>__<random>`.

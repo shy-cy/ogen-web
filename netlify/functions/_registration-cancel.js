@@ -91,8 +91,18 @@ async function releaseFutureSessions(reg, { by, source, at, note }) {
 
 async function cancelAndCredit(reg, { by, source, note, now }) {
   const at = now == null ? Date.now() : now;
-  const owed = credit.creditFor(reg, at);
-  const basis = credit.basisFor(reg, at);
+  // ⚠ THE YEAR'S FEE OUTLIVES ONE TERM OF IT, so the credit needs one fact that
+  // is not on this record: whether another term of this academic year is still
+  // standing on the fee that was paid here. The scan is the cheap direction of
+  // the key — reg-<participantId>__ — and it is the same one the waiver itself
+  // makes at submission.
+  //
+  // It is the CALLER'S to supply for the same reason the clock is: _credit.js
+  // reads one record and one timestamp and opens no store.
+  const siblings = await store.forParticipant(reg.participantId);
+  const opts = { feeHeldElsewhere: R.feeHeldByLiveTerm(reg, siblings) };
+  const owed = credit.creditFor(reg, at, opts);
+  const basis = credit.basisFor(reg, at, opts);
   const total = owed.total;
 
   // THE DROP-IN PATH, and it is a branch here rather than a second function so

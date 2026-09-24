@@ -376,9 +376,16 @@ exports.handler = async (event) => {
         // what was paid, and cancelAndCredit() — which does pass a timestamp —
         // wrote the real figure. The family was told a number nobody credited
         // them, which is the exact thing the guard below exists to prevent.
-        const owed = credit.creditFor(reg, Date.now());
+        // ⚠ AND WITH THE SIBLINGS, for the same class of reason. The yearly fee
+        // does not come back while another term of that year is still standing
+        // on it, so a draft built without asking names a figure €50 above what
+        // the ledger will write — and the guard in `cancel` below would then
+        // refuse the admin's own draft with a 409 nobody could explain.
+        const siblings = await store.forParticipant(reg.participantId);
+        const owed = credit.creditFor(reg, Date.now(),
+          { feeHeldElsewhere: R.feeHeldByLiveTerm(reg, siblings) });
         return json(200, Object.assign(
-          { ok: true, to: account.email },
+          { ok: true, to: account.email, feeHeldElsewhere: owed.feeHeldElsewhere },
           mail.cancelledDraft(reg, account, owed.total)));
       }
 
@@ -405,8 +412,11 @@ exports.handler = async (event) => {
         // the arithmetic, which is where it was always coming from.
         // ⚠ WITH THE CLOCK, for the reason cancelPreview carries above: without
         // it `owed.total` is always the most generous figure, so the check below
-        // compared two copies of one wrong number and agreed with itself.
-        const owed = credit.creditFor(reg, Date.now());
+        // compared two copies of one wrong number and agreed with itself. And
+        // with the siblings, so the figure compared is the one cancelAndCredit()
+        // is about to write rather than a second opinion of it.
+        const owed = credit.creditFor(reg, Date.now(),
+          { feeHeldElsewhere: R.feeHeldByLiveTerm(reg, await store.forParticipant(reg.participantId)) });
 
         // ⚠ THE DRAFT'S FIGURE MUST STILL BE THE TRUE FIGURE.
         //

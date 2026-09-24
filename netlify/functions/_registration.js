@@ -393,6 +393,65 @@ function feeApplies(priorRegistrations, seriesId, feeYear) {
     feeStandsOn(r));
 }
 
+// ⚠ AND THE WAIVER ONLY EVER LOOKED BACKWARDS.
+//
+// feeStandsOn() asks, of a NEW registration, whether this child has already been
+// charged the fee for this series this year. That half is right and it already
+// closes the mirror-image hole: refund the fee and a third term is charged
+// again, because `cancelled` counts only while the fee was paid and not given
+// back.
+//
+// Nothing looked FORWARDS from a cancellation at the registrations that were
+// waived because of it. So:
+//
+//   autumn  registered, fee charged, paid
+//   spring  registered, fee WAIVED — autumn stands
+//   autumn  cancelled before its cutoffs -> the fee comes back in full
+//
+// and the family attends the spring term having paid no registration fee at all
+// for that academic year. The waiver was decided once, at submission, and the
+// condition it rested on disappeared afterwards with nothing watching.
+//
+// This is the question the other direction: is the fee this registration paid
+// still doing its job for a term the family is STILL IN? If it is, cancelling
+// this one must not hand it back — the fee is charged once a year for this
+// activity, and the year is still live.
+//
+// Three conditions, and each one is load-bearing:
+//
+//   - this registration must be the one the fee was billed on. A registration
+//     whose own fee was waived has no fee to withhold — splitPaid() already
+//     returns nought for it — and asking anyway would be a flag that means
+//     nothing.
+//   - the other registration must be LIVE. A cancelled or expired sibling is
+//     not relying on anything.
+//   - ⚠ and the other registration's own fee must have been WAIVED. Two live
+//     terms each charged their own fee is not this situation: that sibling
+//     carries its own, so withholding here would take €50 from a family who
+//     owes nothing. It arises the moment a refunded fee is charged again on a
+//     third term, which is exactly the case feeStandsOn() already handles.
+//
+// Deliberately NOT a rule about who caused what. A year with three terms, one
+// charged and two waived, answers the same way for each of the two: while any
+// waived term is still standing, the fee that covers it stays paid.
+function feeHeldByLiveTerm(reg, siblings) {
+  const frozen = (reg || {}).frozen || {};
+  if (((frozen.price || {}).feeCharged) === false) return false;
+  const seriesId = frozen.seriesId;
+  const feeYear = frozen.feeYear;
+  // The same blank-resolves-towards-the-family direction feeApplies() takes: a
+  // registration written before the waiver existed has neither, and nothing
+  // about it can be relying on anything.
+  if (!seriesId || !feeYear) return false;
+  return (siblings || []).some((r) =>
+    r &&
+    r.activityId !== reg.activityId &&
+    ((r.frozen || {}).seriesId) === seriesId &&
+    ((r.frozen || {}).feeYear) === feeYear &&
+    ((((r.frozen || {}).price) || {}).feeCharged) === false &&
+    LIVE_STATUSES.indexOf(r.status) !== -1);
+}
+
 // What this registration is billed, in integer cents. Euros are a display
 // concern; float arithmetic drifts, and a balance that drifts is a balance
 // nobody can explain.
@@ -623,7 +682,8 @@ function transition(reg, { status, by, source, note, now }) {
 module.exports = {
   STATUSES, CANCEL_SOURCES, CURRENCY, key, CHARGED_STATUSES, LIVE_STATUSES,
   ACADEMIC_YEAR_STARTS,
-  academicYearOf, feeYearOf, seriesOf, feeStandsOn, feeApplies, owedCentsFor,
+  academicYearOf, feeYearOf, seriesOf, feeStandsOn, feeApplies, feeHeldByLiveTerm,
+  owedCentsFor,
   holdsASpot, hasLapsed, countSpots, capacityReport, hasRoom,
   capacityForDate, holdsASeat, SEAT_STATUSES,
   ageCheckMoment, flagFor, autoApproves,
