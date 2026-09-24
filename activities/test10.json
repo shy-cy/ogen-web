@@ -60,12 +60,12 @@
       "registrationFee": null,
       "fullPrice": null,
       "perHourOverride": null,
-      "perSessionPrice": null,
+      "perSessionPrice": 7,
       "showPerLesson": false,
       "lateDropIn": {
         "enabled": false,
-        "hoursBefore": null,
-        "price": null
+        "hoursBefore": 1,
+        "price": 10
       },
       "bundles": [
         {
@@ -190,10 +190,10 @@
   "faq": [],
   "teachers": [],
   "sponsors": [],
-  "isoUpdated": "2026-09-24T21:31:14.084Z",
+  "isoUpdated": "2026-09-24T21:33:49.505Z",
   "isoCreated": "2026-09-24T21:31:14.084Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
   "activityId": "act-7a206ec6baafac83",
-  "lastPublishedAt": "2026-09-24T21:31:14.084Z"
+  "lastPublishedAt": "2026-09-24T21:33:49.505Z"
 }
