@@ -1269,6 +1269,21 @@ td .acc-actions{ gap:14px; }
   background:var(--stone); color:var(--camel);
 }
 
+/* ⚠ WAITING IS NEITHER OF THE TWO ABOVE, so it is painted as neither.
+   Olive would say "you are in", and the grey of rejected/expired/cancelled would
+   say "this is over" — and it is the one status on this list where the answer is
+   genuinely open. Outlined rather than filled, on the same argument the activity
+   page's status badge was rebuilt on: a solid fill plus a full pill is what this
+   site reserves for things you press, and nothing about a queue position is
+   pressable.
+
+   --navy at 10.8:1 on paper, which is the token this file already reaches for
+   when a label has to be readable rather than decorative — the warm ones are
+   backgrounds chosen to sit under white text and fail as foregrounds. */
+.acc-pill.is-waitlisted{
+  background:transparent; color:var(--navy); box-shadow:inset 0 0 0 1px var(--navy);
+}
+
 /* ⚠ REGISTERED, PAYMENT NOT YET OPEN — and it must read as "nothing is wrong".
    It sits where the pay button would be, so the first thing it has to do is not
    look like one: this codebase learned the hard way that a SOLID FILL PLUS A

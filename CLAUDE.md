@@ -2425,10 +2425,86 @@ the unit** for why reading it any other way makes a full class report as empty.
 With two or more it belongs to no row and says so, and the rows deliberately do
 not sum to the total.
 
-**There is no waitlist.** The place is simply gone and the next submission takes
-it, first come. A waitlist has to choose who gets a freed place, tell them, and
-give them a deadline before it moves on again, and none of that is decided. The
-counting model supports one without change.
+### ⚠ A full activity can still take your name
+
+**"This activity is full" used to be the end of the road.** Reported from QA,
+looking at a term whose three places were held by three *pending* registrations
+that had paid nothing and would hold them for forty-five days: *"where these
+registered ppl might not pay or some might pay and cancel, we should have these
+over-capacity ppl to be added to a waiting list."* The refusal that produced it
+carried a comment naming what had never been built — a waitlist has to choose
+who gets a freed place, tell them, and give them a deadline. Those are decided
+now.
+
+**Everybody waiting is told at once, and the first one back takes it.** The
+alternative — offer it to the first on the list, with a deadline, then move down
+— needs a clock per person, and an evening can free up thirty minutes before the
+class, where there is no time to work down a list. The cost is that most people
+lose the race every time, and that is answered in the **words** rather than in
+the code: `PLACE_OPEN` says out loud that everybody waiting has been sent this
+and it goes to whoever takes it first. A fair thing to lose.
+
+| | |
+|---|---|
+| joining | `waitlisted`, the same record in the same key — one participant, one activity, one blob, so waiting and then getting a place is **one row** rather than two |
+| what it holds | **nothing**. `holdsASpot()` does not recognise the status, and capacity is counted rather than decremented, so a status the count ignores cannot move a number. That property is why nothing else in the arithmetic had to change |
+| what it owes | nought. A queue is not a bill, and a roster showing "€0.00 / €55.00 OWED" against somebody with no place would be the screen inventing a debt |
+| when terms freeze | when a **place is taken**, never when somebody joins a queue. `newRegistration()` runs again over the same record, so a family who waited from September is quoted December's price |
+
+⚠ **A PLACE CLAIMED OFF THE LIST IS HELD FOR HOURS, NOT WEEKS.** Unpaid holds are
+the entire reason the queue exists, so handing the claimer the ordinary 45-day
+window would rebuild the problem one layer up. `CLAIM_HOURS` is 48 on a course.
+
+⚠ **AND ON ONE EVENING IT IS MINUTES, WHICH NEEDED THE ONE NEW COUNTING RULE.** A
+drop-in fills one evening at a time, so its queue is per **date** — waiting for
+Tuesday says nothing about Thursday. `holdsASeat()` now reads a `claimExpiresAt`
+the same way `holdsASpot()` has always read `expiresAt`: **no job releases the
+seat**, because nothing was ever decremented — the record stops being counted the
+instant the deadline passes, which is what makes a fifteen-minute window possible
+at all when the sweep runs nightly. Three details carry it: an absent deadline
+means an **ordinary** booking and holds its seat (absent must never read as
+lapsed, or every register on the site empties); anything **paid** holds for good,
+since the deadline existed to make the money arrive; and `attended` is above all
+of it. `CLAIM_MINUTES` is 15 — not five, because Checkout with a mistyped card or
+a 3-D Secure prompt takes a couple of minutes and the worst outcome this rule can
+produce is an honest payer losing their seat while typing their card number — and
+**never past the session's start**, since holding a seat into the lesson keeps the
+room shut against somebody who could still walk in.
+
+⚠ **CLAIMING IS NOT AN ACTION.** Whether somebody is taking a place off the list
+is read from the record that is already there — a family who was queueing and is
+now registering *is* claiming, by definition. So there is no claim endpoint to
+forget, and no flag a hostile client can leave out to buy itself the ordinary
+open-ended hold.
+
+**Where a freed place is announced from**: a family's cancellation, an admin's
+cancellation, a rejection (easy to forget — it is the one decision that does not
+feel like one), a cancelled evening, and the nightly sweep's expiry pass. That
+last is the only freeing with no human action behind it, and without it a lapsed
+hold would free a place nobody was ever told about. ⚠ A **lapsed claim** reopens
+a place silently — nothing fires at a derived moment — and the next natural event
+re-announces it. On a course that is the sweep; on an evening minutes before a
+class, it simply reopens.
+
+**The admin gets a list, not a sixth kind of queue row.** Nothing in a queue row
+applies to somebody waiting — no place to approve, nothing to reject, no money
+owed, no deadline running — so it is its own table under the queue, in join
+order, with no controls on it. A "give this one a place" button would be a second,
+quieter rule running beside the announced race, and the two would disagree the
+first time anybody used it.
+
+**Leaving the queue is not a cancellation** and deliberately does not go through
+`cancelAndCredit()`: nothing was owed, paid or held, so there is no credit to work
+out and no ledger line to write. The record is marked `cancelled` rather than
+deleted, so an admin can see a family who waited, left and came back — and
+`cancelled` with nothing paid is invisible to the fee waiver, which asks what was
+actually paid and not given back.
+
+**And there is a lever that is not this feature.** Those three places were held
+for 45 days because that is `DEFAULT_EXPIRY_DAYS`; *"Unanswered registrations are
+released after"* on the Registration panel overrides it per activity. On an
+activity that fills fast, a week is the right number, and it helps whether or not
+anybody is queueing.
 
 **`expiresAt` is stamped at submission**, with `expiryDays` and `expirySource`
 beside it. Computing `submittedAt + N` on read would make every change

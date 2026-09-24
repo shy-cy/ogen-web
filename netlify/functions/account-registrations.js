@@ -47,6 +47,7 @@ const plainLabel = (s) => String(s || '')
   .replace(/&#(\d+);/g, (m, n) => String.fromCharCode(+n))
   .replace(/&amp;/g, '&');
 const mail = require('./_registration-email');
+const waitlist = require('./_waitlist');
 
 const json = (statusCode, payload) => ({
   statusCode,
@@ -476,7 +477,19 @@ async function bundlesPayload(activity, participantId, now) {
 // differently about the ONE case they genuinely disagree on: a registration
 // that already holds a place is a refusal to `submit` and is simply the
 // registration to book against for `bookAndPay`.
-async function openRegistration({ activity, participant, accountId, groupId }) {
+// ⚠ `waitlist` SAYS WHAT TO DO IF IT IS FULL, not what to do. A family pressing
+// "join the waiting list" on an activity where a place has appeared in the
+// meantime wants the place, so they get it — the flag chooses between a refusal
+// and a queue, and never between a place and a queue.
+//
+// ⚠ AND CLAIMING IS NOT AN ACTION. Whether this is somebody taking a place off
+// the waiting list is read from the record that is already there, rather than
+// from anything the client sends: a family who was queueing and is now
+// registering IS claiming, by definition. So there is no claim endpoint to
+// forget, no flag a hostile client can set to buy itself the ordinary 45-day
+// hold, and the emailed link can simply point at the page with the Register
+// button already on it.
+async function openRegistration({ activity, participant, accountId, groupId, waitlist }) {
   // ⚠ KEYS, NOT SENTENCES. This function has no language — it is called from
   // two actions and knows nothing about who is reading — so it names the
   // refusal and the handler renders it. `errors` still travels whole, because
@@ -486,6 +499,7 @@ async function openRegistration({ activity, participant, accountId, groupId }) {
 
   const existing = await store.getRegistration(participant.participantId, activity.activityId);
   if (existing && R.holdsASpot(existing)) return { reg: existing, already: true };
+  const claiming = R.isWaiting(existing);
 
   // ⚠ A DROP-IN REGISTRATION IS NOT CAPPED BY THE SIZE OF THE ROOM.
   //
@@ -501,12 +515,16 @@ async function openRegistration({ activity, participant, accountId, groupId }) {
   // it belongs: in bookSession and in bookAndPay.
   const regs = await store.forActivity(activity.activityId);
   const report = R.capacityReport(activity, regs);
-  if (activity.type !== 'dropin' && !R.hasRoom(report, groupId)) {
-    // No waitlist yet. The design flagged one and did not build it: a waitlist
-    // has to choose who gets a freed place, tell them, and give them a deadline
-    // before it moves on again, and none of that is decided. Today the place is
-    // simply gone and the next submission takes it, first come.
-    return { status: 409, key: 'activity-full', extra: { full: true, capacity: report.capacity } };
+  const full = activity.type !== 'dropin' && !R.hasRoom(report, groupId);
+  if (full && !waitlist) {
+    // ⚠ THE REFUSAL NOW OFFERS SOMETHING. It used to be the end of the road, and
+    // the comment here said why: a waiting list has to choose who gets a freed
+    // place, tell them, and give them a deadline, and none of that was decided.
+    // It is now — everyone waiting is told, and the first to come back takes it.
+    return {
+      status: 409, key: 'activity-full',
+      extra: { full: true, capacity: report.capacity, canWaitlist: !claiming }
+    };
   }
 
   const reg = R.newRegistration({
@@ -515,7 +533,15 @@ async function openRegistration({ activity, participant, accountId, groupId }) {
     // to one participant, one activity, one academic year, so the waiver is
     // answerable from a prefix scan of their own key space — no sibling lookup,
     // no account aggregate, no ledger.
-    priorRegistrations: await store.forParticipant(participant.participantId)
+    priorRegistrations: await store.forParticipant(participant.participantId),
+    waiting: full,
+    // ⚠ RE-FROZEN, WHICH IS THE POINT OF RUNNING THIS BUILDER AGAIN. A waiting
+    // entry froze a price when they joined the queue, and joining a queue is not
+    // agreeing to a price — so a family who waited from September to December is
+    // quoted December's terms at the moment they are actually offered a place.
+    // The fee waiver and the age check are re-decided here too, for the same
+    // reason: they are facts about the day a place was taken.
+    claim: claiming && !full
   });
 
   // A record already existed for this pair — rejected, expired or cancelled —
@@ -810,13 +836,33 @@ exports.handler = async (event) => {
         if (existing && R.holdsASeat(existing)) {
           return no(409, 'evening-already-booked', { status: existing.status });
         }
+        // ⚠ CLAIMING IS READ OFF THE RECORD, NOT OFF THE REQUEST. A family who
+        // was in this evening's queue and is now booking it IS taking a place
+        // that opened, by definition — so there is no claim action to forget and
+        // no flag a hostile client can leave out to buy itself an ordinary,
+        // open-ended hold on a seat other families are queueing for.
+        const claiming = !!existing && existing.status === 'waiting';
 
         // The room on THAT evening, not the term. Counted, never decremented —
         // so a cancellation frees the place the moment it is written.
         const all = await attendance.forActivity(activity.activityId, body.sessionDate);
         const cap = R.capacityForDate(activity, all, body.sessionDate);
         if (cap.left != null && cap.left <= 0) {
-          return no(409, 'evening-full', { full: true });
+          if (body.waitlist !== true || claiming) {
+            return no(409, 'evening-full', { full: true, canWaitlist: !claiming });
+          }
+          // In the queue for this evening. No seat, nothing owed, and no price
+          // frozen — late pricing means the only honest moment to fix a price
+          // is when a place is actually taken.
+          const queued = attendance.newAttendance({
+            activity: activity, participantId: participant.participantId,
+            accountId: me.accountId, groupId: reg.groupId, sessionDate: body.sessionDate,
+            waiting: true
+          });
+          if (existing) queued.history = (existing.history || []).concat(queued.history);
+          await attendance.saveAttendance(queued);
+          await mail.sendWaiting(reg, me, body.sessionDate);
+          return json(200, { ok: true, attendance: queued, waiting: true });
         }
 
         // ⚠ AN ENTRY IS SPENT BEFORE A PRICE IS CHARGED. A bundle covering this
@@ -830,7 +876,15 @@ exports.handler = async (event) => {
         const att = attendance.newAttendance({
           activity: activity, participantId: participant.participantId,
           accountId: me.accountId, groupId: reg.groupId, sessionDate: body.sessionDate,
-          bundle: !!from, bundleId: from ? from.bundleId : null
+          bundle: !!from, bundleId: from ? from.bundleId : null,
+          // ⚠ A SEAT TAKEN OFF THE QUEUE IS HELD ONLY UNTIL IT IS PAID FOR. The
+          // whole reason this evening had a queue is that seats were being held
+          // and not paid for, so handing the claimer an open-ended hold would
+          // rebuild the problem one layer down. Never past the session's start.
+          claimUntil: claiming
+            ? R.sessionClaimDeadline((credit.freezeSession(activity, body.sessionDate, null,
+                { groupId: reg.groupId }) || {}).startsAt, Date.now())
+            : null
         });
         // A re-booking after a cancellation lands on the same key, so the earlier
         // history is carried forward rather than overwritten — the same rule a
@@ -1339,6 +1393,9 @@ exports.handler = async (event) => {
           status: owed.credit > 0 ? 'credited' : next.payment.status
         });
         await attendance.saveAttendance(next);
+        // ⚠ THIS EVENING'S QUEUE, NOT THE ACTIVITY'S. Waiting for Tuesday says
+        // nothing about Thursday — the room is per date and so is the list.
+        await waitlist.seatOpened(att.activityId, att.sessionDate);
         return json(200, { ok: true, session: next, credit: owed, entry: entry,
                            balance: await ledger.balanceFor(me.accountId) });
       }
@@ -1491,7 +1548,10 @@ exports.handler = async (event) => {
 
         const opened = await openRegistration({
           activity: activity, participant: participant,
-          accountId: me.accountId, groupId: body.groupId || null
+          accountId: me.accountId, groupId: body.groupId || null,
+          // Only ever chooses between a refusal and a queue. With room, the
+          // family gets the place whatever this says.
+          waitlist: body.waitlist === true
         });
         if (opened.status) return no(opened.status, opened.key, opened.extra);
         if (opened.already) {
@@ -1503,9 +1563,38 @@ exports.handler = async (event) => {
         const reg = opened.reg;
         // Best effort, and after the write. An email that fails must not undo a
         // registration that succeeded.
-        if (reg.status === 'approved') await mail.sendApproved(reg, me, (activity.registration || {}).sessionCancelHours);
+        if (R.isWaiting(reg)) await mail.sendWaiting(reg, me, null);
+        else if (reg.status === 'approved') await mail.sendApproved(reg, me, (activity.registration || {}).sessionCancelHours);
         else await mail.sendReceived(reg, me, (activity.registration || {}).sessionCancelHours);
-        return json(200, { ok: true, registration: reg });
+        return json(200, { ok: true, registration: reg, waiting: R.isWaiting(reg) });
+      }
+
+      // --- leave the queue ---------------------------------------------------
+      //
+      // ⚠ NOT A CANCELLATION, and it deliberately does not go through
+      // cancelAndCredit(). Nothing was ever owed, paid or held, so there is no
+      // credit to work out, no ledger line to write and no place to give back —
+      // running the money path over a record that has never had any money on it
+      // would be asking four questions whose answers are all nought.
+      //
+      // The record is marked `cancelled` rather than deleted, because deleting
+      // it would take the history with it and an admin looking at a family who
+      // waited, left, and came back a month later should be able to see all
+      // three. `cancelled` with nothing paid is invisible to the fee waiver —
+      // feeStandsOn() asks what was actually paid and not given back — so it
+      // cannot quietly buy anybody a waived registration fee.
+      case 'leaveWaitlist': {
+        const participant = await mustGuard(body.participantId);
+        if (!participant) return no(404, 'no-such-participant');
+        const reg = await store.getRegistration(body.participantId, body.activityId);
+        if (!reg) return no(404, 'no-such-registration');
+        if (!R.isWaiting(reg)) return no(409, 'already-in-status', null, { status: reg.status });
+        const next = R.transition(reg, {
+          status: 'cancelled', by: me.accountId, source: 'guardian',
+          note: 'left the waiting list', now: Date.now()
+        });
+        await store.saveRegistration(next);
+        return json(200, { ok: true, registration: next });
       }
 
       // --- give a place back ------------------------------------------------
@@ -1566,6 +1655,11 @@ exports.handler = async (event) => {
         // goes through a panel, which is the only difference between the two.
         await mail.sendCancelled(done.registration, me,
           (done.entry && done.entry.amountCents) || 0);
+
+        // ⚠ AFTER THE WRITE, AND IT CANNOT FAIL THE ACTION. The place is already
+        // free — capacity is counted, so it opened the instant `cancelled` was
+        // written — and this only tells the people who asked to be told.
+        await waitlist.placeOpened(reg.activityId);
 
         return json(200, {
           ok: true, registration: done.registration, credit: done.credit,

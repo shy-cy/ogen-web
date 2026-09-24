@@ -40,6 +40,7 @@ const B = require('./_bundle');
 const bundleStore = require('./_bundle-store');
 const { recordAudit } = require('./_audit');
 const mail = require('./_registration-email');
+const waitlist = require('./_waitlist');
 const { sanitiseRich } = require('./_sanitise-rich');
 const codes = require('./_checkin-token');
 const { strip, SITE } = require('./_email-shell');
@@ -81,6 +82,9 @@ async function row(reg) {
     holdsASpot: R.holdsASpot(reg),
     lapsed: R.hasLapsed(reg),
     submittedAt: reg.submittedAt,
+    // When they joined the queue. Kept after a place is taken, so a row can
+    // still say the family waited three weeks for it.
+    waitingSince: reg.waitingSince || null,
     expiresAt: reg.expiresAt,
     expiryDays: reg.expiryDays,
     expirySource: reg.expirySource,
@@ -256,12 +260,29 @@ exports.handler = async (event) => {
         // list, and reading it twice is both a wasted round trip and a way for
         // the count above the table to disagree with the table under it.
         const all = await store.forActivity(activity.activityId);
-        let regs = all;
+        // ⚠ WAITING IS NOT A QUEUE ENTRY, so it is its own list rather than a
+        // sixth pill in the table. Nothing in the table's row applies to it:
+        // there is no place to approve, nothing to reject, no money owed and no
+        // deadline running. Mixed in, every one of those columns would be blank
+        // and the two decision buttons would be offering to decide something
+        // that has not been asked.
+        //
+        // In JOIN ORDER, which is the only order a list like this has. It is not
+        // a promise — a freed place is announced to everybody at once and goes
+        // to whoever takes it first — but it is what an admin is looking at when
+        // somebody phones to ask how long they have been waiting.
+        let regs = all.filter((r) => !R.isWaiting(r));
         if (body.status) regs = regs.filter((r) => r.status === body.status);
         if (body.groupId) regs = regs.filter((r) => r.groupId === body.groupId);
         const rows = [];
         for (const reg of regs) rows.push(await row(reg));
+        const waitingRows = [];
+        for (const reg of all.filter(R.isWaiting)
+          .sort((a, b) => String(a.waitingSince || '').localeCompare(String(b.waitingSince || '')))) {
+          waitingRows.push(await row(reg));
+        }
         return json(200, {
+          waiting: waitingRows,
           ok: true,
           activity: { activityId: activity.activityId, slug: activity.slug, title: activity.title, type: activity.type },
           // Says "23 / 20 — over capacity" plainly rather than pretending it
@@ -347,6 +368,11 @@ exports.handler = async (event) => {
               : await mail.sendRejected(out.payload.registration, account, override);
           }
           out.payload.emailed = emailed;
+          // ⚠ A REJECTION FREES A PLACE, which is easy to forget because it is
+          // the one decision here that does not feel like one. It is the same
+          // mechanism as a cancellation to everything that counts: holdsASpot()
+          // stopped counting the record the moment `rejected` was written.
+          if (status === 'rejected') await waitlist.placeOpened(body.activityId);
           await recordAudit(session, 'registrations.' + body.action,
             body.participantId + '__' + body.activityId, 'ok',
             { detail: out.payload.registration.frozen.participantName +
@@ -471,6 +497,7 @@ exports.handler = async (event) => {
           { detail: reg.frozen.participantName +
                     (done.entry ? ' · credited ' + done.entry.amountCents + 'c' : ' · no credit') +
                     (body.note ? ' · ' + body.note : '') });
+        await waitlist.placeOpened(body.activityId);
         return json(200, {
           ok: true, registration: done.registration, credit: done.credit, entry: done.entry,
           sessions: done.sessions, emailed: emailed

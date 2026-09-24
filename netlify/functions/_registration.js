@@ -27,7 +27,31 @@ const groups = require('./_activity-groups');
 // Five, and deliberately five. `rejected` and `expired` and `cancelled` are all
 // "does not hold a spot", but they are different things that happened and the
 // record is kept for each — a cancellation is an event, not an absence.
-const STATUSES = ['pending', 'approved', 'rejected', 'expired', 'cancelled'];
+// ⚠ SIX NOW, AND THE SIXTH HOLDS NOTHING. `waitlisted` is somebody who asked
+// for a place that was already taken. It is the same record in the same key —
+// one participant, one activity, one blob — because a family who waits and is
+// then given a place is one story, and two rows for it would read as two
+// children on two places.
+//
+// It is deliberately NOT counted by holdsASpot(), which is what makes the whole
+// feature safe to add: capacity is counted and never decremented, so a status
+// the count does not recognise cannot affect a number. Nothing else in the
+// arithmetic changed.
+const STATUSES = ['pending', 'approved', 'rejected', 'expired', 'cancelled', 'waitlisted'];
+
+// How long a place claimed off a waiting list is held before it lapses.
+//
+// ⚠ IT IS SHORT ON PURPOSE, and shortness is the whole point of it. An ordinary
+// registration holds its place for 45 days because nobody is queueing for it. A
+// place claimed while other families are waiting is the opposite case: the
+// reason this feature exists is that unpaid holds were keeping everyone else
+// out, so handing the claimer the ordinary window would rebuild the problem one
+// layer up.
+//
+// Lapsing needs no job. holdsASpot() reads the deadline, so the place is free
+// the instant it passes — the nightly sweep only tidies the wording afterwards,
+// exactly as it has always done for an ordinary expiry.
+const CLAIM_HOURS = 48;
 
 // Provenance, NOT a second status. A guardian's cancellation and an admin's are
 // the same thing to everything that reads one — capacity, the queue, reminders —
@@ -69,6 +93,10 @@ function holdsASpot(reg, now) {
   if (until == null) return true;
   return (ms(now) == null ? Date.now() : ms(now)) < until;
 }
+
+// Is this family in the queue rather than in the class? One word, in one place,
+// so no screen has to remember which status string means waiting.
+const isWaiting = (reg) => !!reg && reg.status === 'waitlisted';
 
 // Has a pending registration run out, as at a moment? The sweep's question, and
 // exactly the negation of the clause above — written once so the two cannot
@@ -194,10 +222,10 @@ function capacityReport(activity, regs, now) {
 //
 // It takes the attendance records rather than reading them, so this stays pure
 // and testable with no fixtures — the same shape capacityReport() has.
-function capacityForDate(activity, attendances, sessionDate) {
+function capacityForDate(activity, attendances, sessionDate, now) {
   const capacity = groups.totalCapacity(activity);
   const held = (attendances || []).filter(
-    (a) => a && a.sessionDate === sessionDate && holdsASeat(a));
+    (a) => a && a.sessionDate === sessionDate && holdsASeat(a, now));
   const byGroup = Object.create(null);
   held.forEach((a) => { const g = a.groupId || ''; byGroup[g] = (byGroup[g] || 0) + 1; });
 
@@ -215,9 +243,58 @@ function capacityForDate(activity, attendances, sessionDate) {
 // no-show do not. A no-show is deliberately NOT counted — the question this
 // answers is "is there room", and somebody who did not come is not in the room.
 // Whether they still owe for it is a different question, answered by the payment
-// on their own record.
+// on their own record. `waiting` is somebody in the queue for that evening, and
+// holds nothing at all.
 const SEAT_STATUSES = ['booked', 'attended'];
-const holdsASeat = (att) => !!att && SEAT_STATUSES.indexOf(att.status) !== -1;
+
+// ⚠ A SEAT CLAIMED OFF A WAITING LIST IS HELD ONLY WHILE ITS CLOCK IS RUNNING,
+// and this is the one genuinely new counting rule the waiting list needed.
+//
+// An evening can free up thirty minutes before the class, and the queue for it
+// then has minutes rather than days. No job can release a seat fifteen minutes
+// from now — the sweep runs nightly — but nothing has to, because a seat is
+// COUNTED and never decremented: the moment the deadline passes the record
+// stops being counted, and the seat is genuinely free, with nothing having run.
+//
+// That is exactly the shape holdsASpot() has had since Phase 4 for a pending
+// registration, at a different speed, and the three details are the same three:
+//
+//   - no deadline stamped means an ORDINARY booking, which holds its seat. Only
+//     a claim carries one, so absent must not read as lapsed;
+//   - anything PAID holds its seat for good. The deadline exists to stop an
+//     unpaid claim sitting on a place other families are queueing for, and once
+//     the money is in there is nothing left to enforce;
+//   - `attended` is above all of it. Somebody who came was in the room, whatever
+//     any clock says now.
+function holdsASeat(att, now) {
+  if (!att) return false;
+  if (att.status === 'attended') return true;
+  if (att.status !== 'booked') return false;
+  const until = ms(att.claimExpiresAt);
+  if (until == null) return true;
+  if (((att.payment || {}).paidCents || 0) > 0) return true;
+  return (ms(now) == null ? Date.now() : ms(now)) < until;
+}
+
+// How long a seat claimed off an evening's waiting list is held.
+//
+// ⚠ FIFTEEN, NOT FIVE, and the asymmetry is the argument. Checkout with a
+// mistyped card or a bank's 3-D Secure prompt takes a couple of minutes, and
+// the worst outcome this rule can produce is an honest payer losing their seat
+// WHILE TYPING THEIR CARD NUMBER. Too long merely delays the next family.
+const CLAIM_MINUTES = 15;
+
+// ⚠ AND NEVER PAST THE START. A seat freeing six minutes before the class gives
+// six minutes, not fifteen: holding it into the lesson would keep the room shut
+// against a family who could still walk in, which is the whole thing this
+// feature exists to stop happening.
+function sessionClaimDeadline(startsAt, now, minutes) {
+  const at = ms(now) == null ? Date.now() : ms(now);
+  const mins = minutes == null ? CLAIM_MINUTES : Number(minutes);
+  const window = at + Math.max(0, mins) * 60 * 1000;
+  const starts = ms(startsAt);
+  return new Date(starts == null ? window : Math.min(window, starts)).toISOString();
+}
 
 // Is there room for one more, in the group they asked for?
 function hasRoom(report, groupId) {
@@ -581,10 +658,28 @@ function groupIdFor(activity, groupId) {
 // The record also keeps WHICH number produced it and WHERE IT CAME FROM. Without
 // those, "why did this one expire in three days and that one in fourteen" is
 // unanswerable a month later.
-function newRegistration({ activity, participant, accountId, groupId, now, env, priorRegistrations }) {
+// ⚠ `waiting` AND `claim` ARE THE TWO WAYS IN THAT ARE NOT AN ORDINARY
+// SUBMISSION, and both go through this one builder rather than beside it.
+//
+//   waiting  the activity was full, so this is an expression of interest. It
+//            holds no place, owes nothing and never lapses.
+//   claim    a place has opened and this family got to it first. An ordinary
+//            registration in every respect except the deadline, which is hours
+//            rather than weeks.
+//
+// A waiting entry still freezes, and that is worth saying because it looks
+// wasteful: the admin's list needs the name, the date of birth and the age flag
+// to be of any use, and those are exactly what freeze() captures. What it must
+// NOT do is let a family agree to a price months before they are offered a
+// place — so a claim runs this builder AGAIN, over the same record, and the
+// terms that bind are the ones true at the moment the place was taken.
+function newRegistration({ activity, participant, accountId, groupId, now, env,
+                           priorRegistrations, waiting, claim }) {
   const at = ms(now) == null ? Date.now() : ms(now);
   const iso = new Date(at).toISOString();
-  const expiry = REG.resolveExpiryDays(activity, env || process.env);
+  const expiry = claim
+    ? { days: CLAIM_HOURS / 24, source: 'waitlist-claim' }
+    : REG.resolveExpiryDays(activity, env || process.env);
   // ⚠ RESOLVED ONCE, HERE, AND USED FOR EVERYTHING AFTER IT. With one group the
   // family was never asked, so the null they sent becomes that group's id before
   // anything is frozen against it — the age range, the start date, the calendar
@@ -613,9 +708,16 @@ function newRegistration({ activity, participant, accountId, groupId, now, env, 
     // bill and the credit belong to.
     accountId: accountId,
     groupId: gid,
-    status: auto ? 'approved' : 'pending',
+    status: waiting ? 'waitlisted' : auto ? 'approved' : 'pending',
     submittedAt: iso,
-    expiresAt: new Date(at + expiry.days * 24 * 60 * 60 * 1000).toISOString(),
+    // ⚠ NULL WHILE WAITING, and that is not the same as "no deadline stamped".
+    // holdsASpot() reads an unstamped deadline on a PENDING record as "hold the
+    // place", because an unstamped record is a bug in the writer. A waitlisted
+    // record never reaches that line at all — it is not pending — so null here
+    // means what it says: nothing is being held, so nothing has to run out.
+    expiresAt: waiting
+      ? null
+      : new Date(at + expiry.days * 24 * 60 * 60 * 1000).toISOString(),
     expiryDays: expiry.days,
     expirySource: expiry.source,
     decidedAt: auto ? iso : null,
@@ -629,11 +731,17 @@ function newRegistration({ activity, participant, accountId, groupId, now, env, 
     // ADVISORY ONLY. It annotates the queue and nothing branches on it except
     // autoApproves above, which reads it to decide whether to stand aside.
     ageFlag: flag,
+    // When this family joined the queue, which is the order the admin's list is
+    // read in and the only thing a waiting entry is really about. Kept on the
+    // record after a claim, so "waited three weeks" survives getting a place.
+    waitingSince: waiting ? iso : null,
     payment: {
       // Computed at submission, with the fee already decided — see feeApplies
       // above for the scope, and frozen.price.feeCharged for what was concluded
-      // about this one.
-      owedCents: owedCentsFor(activity, fee.charged),
+      // about this one. ⚠ NOUGHT WHILE WAITING: a queue is not a bill, and an
+      // admin's roster showing "€0.00 / €55.00 OWED" against somebody who has
+      // no place would be the screen inventing a debt.
+      owedCents: waiting ? 0 : owedCentsFor(activity, fee.charged),
       paidCents: 0,
       currency: CURRENCY,
       paidAt: null,
@@ -681,11 +789,12 @@ function transition(reg, { status, by, source, note, now }) {
 
 module.exports = {
   STATUSES, CANCEL_SOURCES, CURRENCY, key, CHARGED_STATUSES, LIVE_STATUSES,
+  CLAIM_HOURS, isWaiting,
   ACADEMIC_YEAR_STARTS,
   academicYearOf, feeYearOf, seriesOf, feeStandsOn, feeApplies, feeHeldByLiveTerm,
   owedCentsFor,
   holdsASpot, hasLapsed, countSpots, capacityReport, hasRoom,
-  capacityForDate, holdsASeat, SEAT_STATUSES,
+  capacityForDate, holdsASeat, SEAT_STATUSES, CLAIM_MINUTES, sessionClaimDeadline,
   ageCheckMoment, flagFor, autoApproves,
   freeze, submissionErrors, groupIdFor, newRegistration, transition
 };

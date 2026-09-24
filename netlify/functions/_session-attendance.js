@@ -41,7 +41,10 @@ const PREFIX = 'att-';
 //           this record rather than by the status
 // cancelled — told us in advance; releases the place immediately, because the
 //           count reads the status rather than a decremented number
-const STATUSES = ['booked', 'attended', 'no-show', 'cancelled'];
+// waiting — in the queue for an evening that was full when they asked. Holds
+//           no seat, owes nothing, and becomes an ordinary booking the moment
+//           they claim a place that has opened.
+const STATUSES = ['booked', 'attended', 'no-show', 'cancelled', 'waiting'];
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const key = (participantId, activityId, date) =>
@@ -128,8 +131,20 @@ function validate(activity, sessionDate) {
 // What one evening costs, frozen at booking. The price is frozen for the same
 // reason a term price is: an admin raising it in March must not change what a
 // family already booked in January owes.
+// ⚠ `waiting` AND `claimUntil` ARE THE TWO WAYS IN THAT ARE NOT AN ORDINARY
+// BOOKING, and both go through this builder for the reason newRegistration()
+// takes the same pair: a second builder is a second place the frozen price and
+// the group's calendar can be decided differently.
+//
+//   waiting     the evening was full. No seat, nothing owed, no price to honour
+//               later — the price is frozen when they actually take a place, and
+//               late pricing means that is the only honest moment for it.
+//   claimUntil  a seat opened and this family reached it first. An ordinary
+//               booking except that it holds its seat only until this instant,
+//               unless it is paid for first.
 function newAttendance({ activity, participantId, accountId, groupId, sessionDate,
-                         resolveSessionInstant, bookedAt, bundle, bundleId }) {
+                         resolveSessionInstant, bookedAt, bundle, bundleId,
+                         waiting, claimUntil }) {
   const now = new Date().toISOString();
   // ⚠ `bookedAt` IS WHAT MAKES LATE PRICING REAL. priceForSession() needs to
   // know when the booking was made to tell a late one from an ordinary one, and
@@ -154,14 +169,22 @@ function newAttendance({ activity, participantId, accountId, groupId, sessionDat
     // the account that registered the participant in the first place.
     accountId: accountId,
     groupId: groupId || null,
-    status: 'booked',
+    status: waiting ? 'waiting' : 'booked',
     frozen: frozen,
+    // ⚠ NULL ON AN ORDINARY BOOKING, and holdsASeat() reads null as "holds its
+    // seat". Only a claim carries a deadline, so absent must never read as
+    // lapsed — that inversion would empty every register on the site.
+    claimExpiresAt: claimUntil || null,
+    // When they joined the queue for this evening. The order the list is read
+    // in, and it survives the claim so "waited since Tuesday" is still true on
+    // the booking it became.
+    waitingSince: waiting ? now : null,
     payment: {
-      owedCents: owed, paidCents: 0, currency: 'EUR',
-      status: owed > 0 ? 'owed' : 'paid',
+      owedCents: waiting ? 0 : owed, paidCents: 0, currency: 'EUR',
+      status: waiting || owed > 0 ? 'owed' : 'paid',
       paidAt: null, creditedCents: 0, creditedToAccountId: null
     },
-    history: [{ iso: now, action: 'booked', by: accountId, note: null }],
+    history: [{ iso: now, action: waiting ? 'waiting' : 'booked', by: accountId, note: null }],
     createdAt: now,
     isoUpdated: now
   };

@@ -26,6 +26,7 @@ const store = require('./_registration-store');
 const accounts = require('./_account-store');
 const R = require('./_registration');
 const mail = require('./_registration-email');
+const waitlist = require('./_waitlist');
 const auto = require('./_activity-autocomplete');
 const B = require('./_bundle');
 const bundleStore = require('./_bundle-store');
@@ -104,6 +105,7 @@ async function runRegistrations(now) {
   const all = await store.allRegistrations();
   const lapsed = all.filter((r) => R.hasLapsed(r, at));
   const expired = [];
+  const freed = new Set();
 
   for (const reg of lapsed) {
     const next = R.transition(reg, {
@@ -121,9 +123,21 @@ async function runRegistrations(now) {
     // and it is the one the record names as owing.
     const account = await accounts.getAccount(next.accountId);
     if (account) await mail.sendExpired(next, account);
+    // ⚠ THE PLACE WAS ALREADY FREE, and that is exactly why this belongs here.
+    // holdsASpot() stopped counting a lapsed hold the instant it lapsed, so
+    // nothing about capacity was waiting on this job — but nobody had been TOLD,
+    // and a queue nobody is told about is a queue that never moves. It is the
+    // one place a freed place has no human action behind it to announce it.
+    freed.add(next.activityId);
   }
 
-  return { checked: all.length, expired: expired.length, keys: expired, at: new Date(at).toISOString() };
+  // After the whole pass, so three lapsed holds on one activity are one round of
+  // messages rather than three.
+  for (const activityId of freed) {
+    try { await waitlist.placeOpened(activityId); } catch (e) { /* never blocks a sweep */ }
+  }
+  return { checked: all.length, expired: expired.length, keys: expired,
+           toldWaiting: freed.size, at: new Date(at).toISOString() };
 }
 
 // ---- the third job: keep every bundle's promise ---------------------------

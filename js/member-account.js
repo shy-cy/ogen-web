@@ -183,6 +183,17 @@
         'fee-held': 'כל מה ששולם על ההרשמה הזו הוא דמי ההרשמה, הנגבים פעם בשנה עבור הפעילות '
                   + 'הזו — ועדיין קיימת הרשמה פעילה למחזור אחר, ולכן הם נשארים בתוקף.'
       },
+      registerFullLead: 'הפעילות מלאה כרגע.',
+      registerWaitGo: 'הצטרפות לרשימת המתנה',
+      registerWaitBody: 'אין מקום פנוי כרגע. אפשר להצטרף לרשימת ההמתנה ללא תשלום. '
+                      + 'ברגע שיתפנה מקום נשלח מייל לכל הממתינים, והמקום יינתן למי שיירשם ראשון.',
+      registerWaitDone: 'הצטרפתם לרשימת ההמתנה. נשלח מייל ברגע שיתפנה מקום.',
+      waitingLead: 'ברשימת ההמתנה',
+      waitingWhy: 'הפעילות היתה מלאה, ולכן שמרנו את מקומכם בתור. לא בוצע חיוב ולא נשמר מקום. '
+                + 'ברגע שיתפנה מקום נשלח מייל לכל הממתינים, והמקום יינתן למי שיירשם ראשון.',
+      leaveWait: 'יציאה מרשימת ההמתנה',
+      leaveWaitConfirm: 'לצאת מרשימת ההמתנה?',
+      leaveWaitDone: 'יצאתם מרשימת ההמתנה.',
       useCredit: 'שימוש בזיכוי',
       creditUsed: 'הזיכוי נוצל.', creditHave: 'יש לכם זיכוי:',
       creditAll: '{used} יקוזזו מהסכום הזה, ולא יישאר מה לשלם.',
@@ -230,7 +241,7 @@
       loading: 'טוען…', problem: 'משהו השתבש. נסו שוב.',
       offline: 'אין חיבור לשרת. נסו שוב בעוד רגע.',
       status: { pending: 'רשום/ה', approved: 'רשום/ה', rejected: 'לא אושר',
-                expired: 'פג תוקף', cancelled: 'בוטל' }
+                expired: 'פג תוקף', cancelled: 'בוטל', waitlisted: 'ברשימת המתנה' }
     },
     en: {
       signInTitle: 'Sign in', email: 'Email', password: 'Password',
@@ -334,6 +345,19 @@
                   + 'charged once a year for this activity — and another term is still '
                   + 'registered, so it stays paid.'
       },
+      registerFullLead: 'This activity is full at the moment.',
+      registerWaitGo: 'Join the waiting list',
+      registerWaitBody: 'There is no place free at the moment. You can join the waiting list, '
+                      + 'which costs nothing. As soon as a place opens we email everybody waiting, '
+                      + 'and it goes to the first person to take it.',
+      registerWaitDone: 'You are on the waiting list. We will email you as soon as a place opens.',
+      waitingLead: 'On the waiting list',
+      waitingWhy: 'The activity was full, so we have kept your place in the queue. Nothing has '
+                + 'been charged and no place is being held. As soon as one opens we email '
+                + 'everybody waiting, and it goes to the first person to take it.',
+      leaveWait: 'Leave the waiting list',
+      leaveWaitConfirm: 'Leave the waiting list?',
+      leaveWaitDone: 'You have left the waiting list.',
       useCredit: 'Use credit',
       creditUsed: 'Your credit has been used.', creditHave: 'You have credit:',
       creditAll: '{used} comes off this, and nothing is left to pay.',
@@ -375,7 +399,7 @@
       loading: 'Loading…', problem: 'Something went wrong. Please try again.',
       offline: 'Could not reach the server. Try again in a moment.',
       status: { pending: 'Registered', approved: 'Registered', rejected: 'Not offered',
-                expired: 'Expired', cancelled: 'Cancelled' }
+                expired: 'Expired', cancelled: 'Cancelled', waitlisted: 'Waiting list' }
     },
     ru: {
       signInTitle: 'Вход', email: 'Эл. почта', password: 'Пароль',
@@ -479,6 +503,19 @@
                   + 'взимается один раз в год за это занятие, а другой семестр остаётся '
                   + 'оформленным, поэтому взнос сохраняется.'
       },
+      registerFullLead: 'Сейчас на занятии нет мест.',
+      registerWaitGo: 'В список ожидания',
+      registerWaitBody: 'Свободных мест сейчас нет. Можно встать в список ожидания — это бесплатно. '
+                      + 'Как только место освободится, мы напишем всем, кто ждёт, и оно достанется '
+                      + 'тому, кто запишется первым.',
+      registerWaitDone: 'Вы в списке ожидания. Мы напишем, как только появится место.',
+      waitingLead: 'В списке ожидания',
+      waitingWhy: 'Мест не было, и мы сохранили вашу очередь. Оплата не списана и место не '
+                + 'забронировано. Как только оно освободится, мы напишем всем, кто ждёт, и оно '
+                + 'достанется тому, кто запишется первым.',
+      leaveWait: 'Выйти из списка ожидания',
+      leaveWaitConfirm: 'Выйти из списка ожидания?',
+      leaveWaitDone: 'Вы вышли из списка ожидания.',
       useCredit: 'Использовать зачёт',
       creditUsed: 'Зачёт использован.', creditHave: 'На счету есть зачёт:',
       creditAll: '{used} будет вычтено из этой суммы, доплачивать не придётся.',
@@ -520,7 +557,7 @@
       loading: 'Загрузка…', problem: 'Что-то пошло не так. Попробуйте ещё раз.',
       offline: 'Не удалось связаться с сервером. Попробуйте через минуту.',
       status: { pending: 'Записан(а)', approved: 'Записан(а)', rejected: 'Не предложено',
-                expired: 'Истекло', cancelled: 'Отменено' }
+                expired: 'Истекло', cancelled: 'Отменено', waitlisted: 'Список ожидания' }
     }
   }[lang];
 
@@ -1490,11 +1527,19 @@
       });
     }
 
-    var go = el('button', { type: 'submit', class: 'btn-primary', text: T.registerGo });
+    // ⚠ ONE BUTTON, TWO JOBS, AND THE SERVER DECIDES WHICH. `full` comes off the
+    // same capacityReport() the refusal is built from, so the label cannot
+    // promise a place the next line is about to refuse. The flag it sends only
+    // ever chooses between a refusal and a queue — if a place has appeared while
+    // this screen was open, the family gets the place, whatever the button said.
+    var isFull = !!a.full;
+    var go = el('button', { type: 'submit', class: 'btn-primary',
+                            text: isFull ? T.registerWaitGo : T.registerGo });
     var form = el('form', { onsubmit: function (e) {
       e.preventDefault();
       var done = busy(go);
       post(REGS, { action: 'submit', slug: slug, participantId: who.value,
+                   waitlist: isFull,
                    groupId: groupSel ? groupSel.value : null }).then(function (res) {
         done();
         if (!res.ok) return say('err', failure(res));
@@ -1522,9 +1567,28 @@
         rewriteQuery('p=' + encodeURIComponent(r.participantId) +
                      '&a=' + encodeURIComponent(r.activityId));
         renderActivity();
-        say('ok', T.registerDone);
+        say('ok', res.data.waiting ? T.registerWaitDone : T.registerDone);
       });
     } }, [
+      // ⚠ SAID BEFORE THE PRESS, NOT AFTER IT. A form whose button quietly means
+      // something else is a form that surprises people, and the surprise here is
+      // about a child's place. `.acc-waiting` is the tinted, unpressable idiom
+      // this file already uses for "nothing is wrong, here is what happens next"
+      // — deliberately not the solid pill, which on this site means press me.
+      isFull ? el('div', { class: 'acc-waiting' }, [
+        // ⚠ THE BLOCK'S OWN CLASSES, not a bare <b> and <p>. Its children are
+        // styled by class and nothing else, so unclassed elements here would
+        // render at browser defaults inside a designed panel — the same shape as
+        // `.acc-evening-acts`, which had a name the stylesheet had never heard
+        // of and rendered three buttons flush against each other.
+        //
+        // No glyph, deliberately. The check in the other use of this block means
+        // "nothing is wrong, you are registered"; here nothing has been agreed
+        // yet, and a tick over "this activity is full" would say the opposite of
+        // what the words under it say.
+        el('p', { class: 'acc-waiting-lead' }, [el('span', { text: T.registerFullLead })]),
+        el('p', { class: 'acc-waiting-body', text: T.registerWaitBody })
+      ]) : null,
       el('div', { class: 'acc-field' }, [el('label', { text: T.registerWho }), who]),
       groupSel ? el('div', { class: 'acc-field' }, [el('label', { text: T.registerGroup }), groupSel]) : null,
       go
@@ -2301,6 +2365,35 @@
   // so their sum is a figure nobody is ever billed. The figures come from
   // priceRows() on the server, the same builder the public page uses.
   function costBlock(r, act, balance, onDone, perSession) {
+    // ⚠ A FAMILY IN THE QUEUE HAS NO COST CARD, because they have no place and
+    // owe nothing. Priced rows, a paid line and a "still to pay" of zero would
+    // be the screen describing a purchase nobody has made — the same failure the
+    // drop-in card had when it arrived at "you owe nothing" for a family who
+    // owed €7. What they came to this page for is the state and the way out of
+    // it, so that is the whole card.
+    if (r.status === 'waitlisted') {
+      return section(T.costTitle, [
+        el('div', { class: 'acc-waiting' }, [
+          el('p', { class: 'acc-waiting-lead' }, [el('span', { text: T.waitingLead })]),
+          el('p', { class: 'acc-waiting-body', text: T.waitingWhy })
+        ]),
+        actions([
+          el('button', { type: 'button', class: 'btn-secondary', text: T.leaveWait,
+            onclick: function () {
+              confirmAction({ question: T.leaveWaitConfirm, yes: T.leaveWait }, function () {
+                post(REGS, { action: 'leaveWaitlist', participantId: r.participantId,
+                             activityId: r.activityId }).then(function (res) {
+                  if (!res.ok) return say('err', failure(res));
+                  // Carried ACROSS the page change, because the screen that
+                  // would have shown it is the one being left.
+                  flash(T.leaveWaitDone);
+                  window.location.href = url('/account');
+                });
+              });
+            } })
+        ])
+      ], 'pay');
+    }
     // ⚠ A DROP-IN'S COST CARD IS ABOUT ITS EVENINGS, NOT ABOUT A TERM.
     //
     // owedCentsFor() bills the yearly fee and, for a COURSE, the term price — so

@@ -21,7 +21,7 @@
 
 const email = require('./_email');
 const { lang, pathFor, esc, strip, shell, shellRaw, SITE } = require('./_email-shell');
-const { pick } = require('./_activity-facts');
+const { pick, dayAndMonth } = require('./_activity-facts');
 const terms = require('./_cancellation-terms');
 
 const titleOf = (reg, l) => pick(((reg && reg.frozen) || {}).activityTitle, l) || '';
@@ -109,6 +109,114 @@ const RECEIVED = {
     button: 'Страница записи'
   }
 };
+
+// --- the waiting list ------------------------------------------------------
+//
+// TWO MESSAGES, AND THE SECOND ONE IS A RACE, WHICH IT HAS TO SAY OUT LOUD.
+//
+// When a place frees, everyone waiting is told at once and the first to come
+// back takes it. That is the behaviour that was asked for, and it is fair — but
+// only if the message says so. "A place is yours" followed by nothing is a
+// promise broken; "a place has opened and the first person to take it gets it"
+// is a fair thing to receive and lose. Most people on a list lose, every time,
+// so the wording is the whole difference between disappointment and betrayal.
+//
+// `when` is the evening, on a drop-in, and null on a course. One pair of
+// messages rather than four: what a family is waiting for differs by a date, not
+// by a paragraph.
+const WAITING = {
+  he: {
+    subject: (child, act) => `${child} ברשימת ההמתנה ל${act}`,
+    heading: 'ברשימת ההמתנה',
+    body: (child, act, when) => when
+      ? `${child} ברשימת ההמתנה למפגש בתאריך ${when} ב${act}.`
+      : `${child} ברשימת ההמתנה ל${act}.`,
+    next: 'אין מקום פנוי כרגע. ברגע שיתפנה מקום נשלח מייל לכל הממתינים, והמקום יינתן למי שיירשם ראשון. לא בוצע חיוב.',
+    button: 'לעמוד הפעילות'
+  },
+  en: {
+    subject: (child, act) => `${child} is on the waiting list for ${act}`,
+    heading: 'On the waiting list',
+    body: (child, act, when) => when
+      ? `${child} is on the waiting list for the session on ${when} of ${act}.`
+      : `${child} is on the waiting list for ${act}.`,
+    next: 'There is no place free at the moment. As soon as one opens we email everybody waiting, and it goes to the first person to take it. Nothing has been charged.',
+    button: 'Go to the activity'
+  },
+  ru: {
+    subject: (child, act) => `${child} в списке ожидания на ${act}`,
+    heading: 'В списке ожидания',
+    body: (child, act, when) => when
+      ? `${child} в списке ожидания на занятие ${when} — ${act}.`
+      : `${child} в списке ожидания на ${act}.`,
+    next: 'Свободных мест сейчас нет. Как только место освободится, мы напишем всем, кто ждёт, и оно достанется тому, кто запишется первым. Оплата не списана.',
+    button: 'Страница занятия'
+  }
+};
+
+const PLACE_OPEN = {
+  he: {
+    subject: (child, act) => `התפנה מקום ב${act}`,
+    heading: 'התפנה מקום',
+    body: (child, act, when) => when
+      ? `התפנה מקום במפגש בתאריך ${when} ב${act}, ו${child} ברשימת ההמתנה.`
+      : `התפנה מקום ב${act}, ו${child} ברשימת ההמתנה.`,
+    // ⚠ THE RACE, NAMED. Everybody waiting gets this at the same moment.
+    next: 'המייל הזה נשלח לכל מי שברשימת ההמתנה, והמקום יינתן למי שיירשם ראשון. כדי לשמור את המקום צריך להשלים את התשלום — אחרת המקום חוזר לרשימה.',
+    button: 'לתפוס את המקום'
+  },
+  en: {
+    subject: (child, act) => `A place has opened on ${act}`,
+    heading: 'A place has opened',
+    body: (child, act, when) => when
+      ? `A place has opened on the session on ${when} of ${act}, and ${child} is on the waiting list.`
+      : `A place has opened on ${act}, and ${child} is on the waiting list.`,
+    next: 'Everybody on the waiting list has been sent this, and the place goes to the first person to take it. Paying is what secures it \u2014 an unpaid place goes back to the list.',
+    button: 'Take the place'
+  },
+  ru: {
+    subject: (child, act) => `Освободилось место на ${act}`,
+    heading: 'Освободилось место',
+    body: (child, act, when) => when
+      ? `Освободилось место на занятии ${when} — ${act}, а ${child} в списке ожидания.`
+      : `Освободилось место на ${act}, а ${child} в списке ожидания.`,
+    next: 'Это письмо получили все, кто в списке ожидания, и место достанется тому, кто запишется первым. Место закрепляется оплатой \u2014 неоплаченное место возвращается в список.',
+    button: 'Занять место'
+  }
+};
+
+// ⚠ `when` IS AN ISO DATE AND IS FORMATTED HERE, not by the caller. A caller
+// formatting it would be formatting it in ITS language — and the one caller
+// that matters is a request handler, whose language is the language of the PAGE
+// somebody is looking at, where an email's is the language of the ACCOUNT it
+// is going to. Those differ exactly when a family has a preference and is
+// reading a different tree, and the result would be a Russian message naming a
+// date in Hebrew. A test greps for this and caught it.
+function waitingMessage(reg, account, when) {
+  const l = lang(((account || {}).profile || {}).preferredLanguage);
+  const T = WAITING[l];
+  const child = childOf(reg), act = titleOf(reg, l);
+  when = when ? dayAndMonth(when, l) || when : null;
+  const html = shell(l, T.heading,
+    [esc(T.body(child, act, when || null)), esc(T.next)],
+    { href: activityHref(reg, l), label: T.button });
+  return { to: account.email, subject: T.subject(child, act), html: html, text: strip(html) };
+}
+
+// ⚠ IT POINTS AT THE REGISTRATION PAGE, not the public activity page, because
+// that is where the button that takes the place is. The waiting-list
+// acknowledgement above points at the public page instead: nothing can be done
+// there yet, and a link to a page offering no action reads as a broken button.
+function placeOpenMessage(reg, account, when) {
+  const l = lang(((account || {}).profile || {}).preferredLanguage);
+  const T = PLACE_OPEN[l];
+  const child = childOf(reg), act = titleOf(reg, l);
+  when = when ? dayAndMonth(when, l) || when : null;
+  const html = shell(l, T.heading,
+    [esc(T.body(child, act, when || null)), esc(T.next)],
+    { href: registrationHref(reg, l), label: T.button });
+  return { to: account.email, subject: T.subject(child, act), html: html, text: strip(html) };
+}
 
 // --- you have a place ------------------------------------------------------
 //
@@ -586,6 +694,16 @@ const sendCancelled = (reg, account, creditCents, override) =>
     email.send(cancelledMessage(reg, account, creditCents, override),
       { template: 'registration-cancelled', lang: langOf(account) }));
 
+const sendWaiting = (reg, account, when) =>
+  email.settle('registration-waiting', account.email, () =>
+    email.send(waitingMessage(reg, account, when),
+      { template: 'registration-waiting', lang: langOf(account) }));
+
+const sendPlaceOpen = (reg, account, when) =>
+  email.settle('registration-place-open', account.email, () =>
+    email.send(placeOpenMessage(reg, account, when),
+      { template: 'registration-place-open', lang: langOf(account) }));
+
 const sendPaid = (reg, account, paidCents, outstandingCents) =>
   email.settle('registration-paid', account.email, async () =>
     email.send(paidMessage(reg, account, paidCents, outstandingCents,
@@ -595,8 +713,9 @@ const sendPaid = (reg, account, paidCents, outstandingCents) =>
 module.exports = {
   payUrlFor,
   sendReceived, sendApproved, sendRejected, sendExpired, sendCancelled,
+  sendWaiting, sendPlaceOpen,
   receivedMessage, approvedMessage, rejectedMessage, expiredMessage, rejectedDraft,
-  cancelledMessage, cancelledDraft,
-  RECEIVED, APPROVED, REJECTED, EXPIRED, CANCELLED,
+  cancelledMessage, cancelledDraft, waitingMessage, placeOpenMessage,
+  RECEIVED, APPROVED, REJECTED, EXPIRED, CANCELLED, WAITING, PLACE_OPEN,
   paidMessage, sendPaid
 };

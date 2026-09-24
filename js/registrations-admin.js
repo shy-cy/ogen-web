@@ -308,7 +308,7 @@
 
     if (!q.registrations.length) {
       box.appendChild(el('p', { class: 'hint', text: 'Nobody has registered for this activity yet.' }));
-      return;
+      return renderWaiting(box);
     }
     var head = el('tr', {}, ['Participant', 'Age', 'Group', 'Status', 'Requested', 'Paid / owed', '']
       .map(function (h) { return el('th', { text: h }); }));
@@ -331,6 +331,52 @@
         el('td', {}, [actions(r)])
       ]);
     });
+    box.appendChild(el('table', { class: 'queue' }, [
+      el('thead', {}, [head]), el('tbody', {}, rows)
+    ]));
+    renderWaiting(box);
+  }
+
+  // ⚠ A LIST, NOT A SECOND QUEUE, and it is drawn below the table rather than
+  // mixed into it.
+  //
+  // Nothing in a queue row applies to somebody waiting: there is no place to
+  // approve, nothing to reject, no money owed and no deadline running. Mixed in,
+  // every one of those columns would be blank and the two decision buttons would
+  // be offering to decide something nobody has asked.
+  //
+  // There are no controls on it on purpose. A freed place is announced to
+  // everybody waiting at once and goes to whoever takes it first — that is the
+  // rule that was chosen — so a "give this one a place" button here would be a
+  // second, quieter rule running beside it, and the two would disagree the first
+  // time somebody used it.
+  function renderWaiting(box) {
+    var list = (S.queue && S.queue.waiting) || [];
+    if (!list.length) return;
+    var head = el('tr', {}, ['Waiting', 'Age', 'Group', 'Since'].map(function (h) {
+      return el('th', { text: h });
+    }));
+    var rows = list.map(function (r) {
+      return el('tr', {}, [
+        el('td', { class: 'who' }, [
+          el('b', { text: r.name }),
+          el('span', { text: r.accountEmail || r.accountId }),
+          r.stillExists ? null : el('span', { class: 'flag', text: 'participant deleted' })
+        ]),
+        el('td', {}, [ageCell(r)]),
+        el('td', {}, [el('span', { text: r.groupName ? titleOf(r.groupName, r.groupId) : '—' })]),
+        el('td', {}, [el('span', { text: shortDate((r.waitingSince || '').slice(0, 10)) })])
+      ]);
+    });
+    box.appendChild(el('div', { class: 'label-row', style: 'margin-top:26px;' }, [
+      el('h3', { class: 'field-label', style: 'margin:0;',
+                 text: list.length + ' waiting' }),
+      window.AdminHelp.badge('Families who asked for a place that was already taken. They hold ' +
+        'nothing and owe nothing. When a place opens \u2014 somebody cancels, is rejected, or an ' +
+        'unpaid request lapses \u2014 every one of them is emailed at once, and it goes to whoever ' +
+        'takes it first. Paying is what secures it: a place claimed off this list is held for ' +
+        'hours rather than weeks, and goes back to the list if it is not paid for.')
+    ]));
     box.appendChild(el('table', { class: 'queue' }, [
       el('thead', {}, [head]), el('tbody', {}, rows)
     ]));
