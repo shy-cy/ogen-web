@@ -4035,6 +4035,27 @@ looked up by a screen that would have to know the shape of `facts.price` — "la
 on its own is a label, "usually €7.00" is an explanation. It appears only on a
 late row: a note on every row is a note nobody reads.
 
+⚠ **AND THE FIX WENT ON THE PICKER AND NOT ON THE TABLE.** The picker is where
+the evening is chosen and is gone a moment later; the **evenings table on the
+registration page** is where a family comes back to read what they owe, and it
+printed the higher figure alone for every release since. Reported twice in one
+QA session, as two separate steps: *"it says cost 7 EUR and you need to pay 10
+EUR… very confusing."*
+
+Neither half was broken. `sessionsPayload()` has carried `standardPriceCents`
+since the picker was fixed — the table simply never read it, which is the same
+shape as `priceBasis` sitting unread in the first place, one screen over. A fix
+that lands on one of two screens showing one figure is half a fix, and the half
+that survives is the one somebody was looking at that day.
+
+It is the **same class and the same string** — `.acc-date-why` and `T.lateWhy`
+— rather than a second treatment, so a redesign cannot move one and leave the
+other behind; `shared.css` gains one rule making it a block inside a table cell,
+because the cell is already end-aligned and nowrap and the note belongs under
+the figure it explains. And it is shown only when the two figures actually
+**differ**: an activity whose late price equals its standard one has nothing to
+explain, and *"usually €7.00"* beside €7.00 is noise dressed as information.
+
 **2. The date and the price were printed with nothing between them** —
 `יום חמישי, 24 בספטמבר€10.00` on the live Hebrew page. A **cascade collision**,
 and the instructive kind: `.acc-field label` is (0,1,1) and `.acc-date` is

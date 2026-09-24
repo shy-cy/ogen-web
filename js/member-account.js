@@ -2789,8 +2789,29 @@
             : el('span', { class: 'acc-meta', text: '—' })]),
           // €0.00 on an evening a family paid for in advance reads as a
           // mistake. The reason it is nothing is the interesting part.
-          el('td', { class: 'is-num', text: s.priceBasis === 'bundle'
-            ? T.fromBundle : money(s.owedCents) }),
+          //
+          // ⚠ AND SO IS THE REASON IT IS MORE. The date picker has explained a
+          // late price since late pricing was built — "late booking · usually
+          // €7.00" — and this table, which is where the family comes back to
+          // and where the bill actually sits, printed the higher figure alone.
+          // Reported twice in one session: "it says cost 7 EUR and you need to
+          // pay 10 EUR… very confusing." Both figures were true and neither
+          // accounted for itself, and a family cannot tell which of the two is
+          // the error.
+          //
+          // The same class the picker uses, deliberately: one sentence, one
+          // treatment, so the two screens cannot drift into two looks for one
+          // explanation. And only when the two figures actually DIFFER — an
+          // activity whose late price equals its standard one has nothing to
+          // explain, and a note on every row is a note nobody reads.
+          el('td', { class: 'is-num' }, [
+            el('span', { text: s.priceBasis === 'bundle' ? T.fromBundle : money(s.owedCents) }),
+            (s.priceBasis === 'late' && s.standardPriceCents != null &&
+             s.standardPriceCents !== s.owedCents)
+              ? el('span', { class: 'acc-date-why',
+                             text: T.lateWhy.replace('{price}', money(s.standardPriceCents)) })
+              : null
+          ]),
           el('td', { class: 'is-num', text: money(s.paidCents) }),
           el('td', {}, [eveningAction(s, data, r, act, draw, balance)])
         ]));

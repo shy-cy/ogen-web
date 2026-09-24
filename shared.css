@@ -1594,6 +1594,12 @@ td .acc-actions{ gap:14px; }
 }
 .acc-table tr:last-child td{ border-block-end:0; }
 .acc-table .is-num{ text-align:end; font-variant-numeric:tabular-nums; white-space:nowrap; }
+/* The late-price explanation, in the evenings table as well as in the picker.
+   Same class and same treatment on purpose — one sentence about one figure, so
+   the two screens cannot drift into two looks for it. All it needs here is to
+   sit on its own line under the number rather than beside it; the cell is
+   already nowrap and end-aligned, so the note follows the figure it explains. */
+.acc-table .acc-date-why{ display:block; }
 
 /* The family-area link in the mobile menu, set apart because it is the one
    entry that leads somewhere private rather than to a section of this page. */

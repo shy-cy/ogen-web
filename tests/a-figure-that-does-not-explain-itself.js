@@ -352,5 +352,84 @@ const css = read('shared.css');
     H.ok(/€7\.00/.test(pickerText(late, l)), l + ' names the usual price too');
   });
 
+  // =========================================================================
+  // ⚠ AND THE TABLE THE FAMILY COMES BACK TO SAID NOTHING AT ALL.
+  //
+  // The picker above has explained a late price since late pricing was built.
+  // The evenings table on the registration page — which is where the family
+  // reads what they owe, days after the picker is gone — printed the higher
+  // figure alone. Reported twice in one QA session, as 3.23 and 3.26: "it says
+  // cost 7 EUR and you need to pay 10 EUR… very confusing."
+  //
+  // Both halves were right on their own, which is why it survived: the payload
+  // has carried `standardPriceCents` since the picker was fixed, and the table
+  // simply never read it. The same shape as `priceBasis` sitting unread in the
+  // first place, one screen over.
+  console.log('\n[the evenings table explains the same figure]');
+
+  function tableText(session, lang) {
+    const dom = D.makeDom({ lang: lang });
+    const box = dom.node('div');
+    const T = strings(lang);
+    const ctx = vm.createContext({
+      document: dom.document, T: T,
+      money: (c) => '€' + (Number(c) / 100).toFixed(2),
+      dayMonth: (d) => d,
+      // The controls at the end of the row are their own function and their own
+      // suite; this one is about the figure.
+      eveningAction: () => null,
+      data: {}, r: {}, act: {}, draw: () => {}, balance: 0,
+      box: box
+    });
+    vm.runInContext(
+      ui.slice(ui.indexOf('  function el(tag, attrs, kids) {'), ui.indexOf('  function clear(')) +
+      'this.el = el;', ctx);
+    // Lifted verbatim from paint(), so the test cannot drift from the screen.
+    const cells = ui.slice(ui.indexOf("          el('td', { text: dayMonth(s.date) }),"),
+                           ui.indexOf("          el('td', {}, [eveningAction("));
+    vm.runInContext('var s = ' + JSON.stringify(session) + ';\n' +
+                    'box.appendChild(el("tr", {}, [' + cells + 'null]));', ctx);
+    return box.textContent;
+  }
+
+  const lateRow = { date: '2026-10-06', status: 'booked', priceBasis: 'late',
+                    owedCents: 1000, paidCents: 0, standardPriceCents: 700 };
+  const stdRow = Object.assign({}, lateRow, { priceBasis: 'standard', owedCents: 700 });
+  const bundleRow = Object.assign({}, lateRow, { priceBasis: 'bundle', owedCents: 0 });
+
+  const lateEn = tableText(lateRow, 'en');
+  H.ok(/€10\.00/.test(lateEn), 'the figure being charged is there: ' + lateEn);
+  H.ok(/late booking/.test(lateEn), '⚠ AND SAYS WHY IT IS NOT THE PUBLISHED RATE');
+  H.ok(/€7\.00/.test(lateEn), 'naming the usual price, which is the actual explanation');
+
+  H.ok(!/late booking/.test(tableText(stdRow, 'en')),
+    'an ordinary evening says nothing extra — a note on every row is a note nobody reads');
+
+  // An activity whose late price equals its standard one has nothing to explain,
+  // and "usually €7.00" beside €7.00 is noise dressed as information.
+  const sameRow = Object.assign({}, lateRow, { owedCents: 700 });
+  H.ok(!/late booking/.test(tableText(sameRow, 'en')),
+    'and neither does a "late" price that is the same figure');
+
+  // The branch that was already there must survive the one being added.
+  H.ok(tableText(bundleRow, 'en').indexOf(strings('en').fromBundle) !== -1,
+    'a bundle evening still says it came from a bundle rather than showing €0.00');
+
+  ['he', 'ru'].forEach((l) => {
+    const t = tableText(lateRow, l);
+    H.ok(/€7\.00/.test(t), l + ': the table names the usual price too');
+    H.ok(t.indexOf(strings(l).lateWhy.split('{price}')[0].trim()) !== -1,
+      l + ': in ' + l + ', from the same string the picker uses');
+  });
+
+  // ONE TREATMENT, not two. The picker and the table say one sentence about one
+  // figure, so they share the class as well as the words — or the next redesign
+  // moves one and leaves the other behind.
+  const paint = ui.slice(ui.indexOf('    function paint(data) {'),
+                         ui.indexOf("      panel.appendChild(section(T.sessionsTitle, [el('div'"));
+  H.ok(/acc-date-why/.test(paint), 'and wears the same class the picker does');
+  H.ok(/\.acc-table \.acc-date-why\{/.test(fs.readFileSync(path.join(R, 'shared.css'), 'utf8')),
+    '⚠ which shared.css has a rule for — a class nobody styled is a layout nobody designed');
+
   H.done();
 })();
