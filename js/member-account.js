@@ -184,6 +184,7 @@
                   + 'הזו — ועדיין קיימת הרשמה פעילה למחזור אחר, ולכן הם נשארים בתוקף.'
       },
       registerFullLead: 'הפעילות מלאה כרגע.',
+      groupFullLead: 'הקבוצה הזו מלאה כרגע.',
       registerWaitGo: 'הצטרפות לרשימת המתנה',
       registerWaitBody: 'אין מקום פנוי כרגע. אפשר להצטרף לרשימת ההמתנה ללא תשלום. '
                       + 'ברגע שיתפנה מקום נשלח מייל לכל הממתינים, והמקום יינתן למי שיירשם ראשון.',
@@ -200,7 +201,7 @@
       creditPart: '{used} יקוזזו מהסכום הזה. יישאר לתשלום {left}.',
       registerTitle: 'הרשמה לפעילות', registerWho: 'מי נרשם/ת?',
       registerGroup: 'קבוצה', registerGo: 'הרשמה',
-      registerFull: 'הפעילות מלאה.',
+      groupFull: 'מלאה — רשימת המתנה',
       perSessionIntro: 'בוחרים מי מגיע/ה ולאילו מפגשים, ומשלמים רק עליהם. אפשר להוסיף מפגשים נוספים בכל עת.',
       pickDates: 'לאילו מפגשים?', pickAtLeastOne: 'יש לבחור לפחות מפגש אחד.',
       dateFull: 'מלא', dateBooked: 'כבר נרשמתם',
@@ -346,6 +347,7 @@
                   + 'registered, so it stays paid.'
       },
       registerFullLead: 'This activity is full at the moment.',
+      groupFullLead: 'This group is full at the moment.',
       registerWaitGo: 'Join the waiting list',
       registerWaitBody: 'There is no place free at the moment. You can join the waiting list, '
                       + 'which costs nothing. As soon as a place opens we email everybody waiting, '
@@ -364,7 +366,7 @@
       creditPart: '{used} comes off this. {left} would still be payable.',
       registerTitle: 'Register for an activity', registerWho: 'Who is registering?',
       registerGroup: 'Group', registerGo: 'Register',
-      registerFull: 'This activity is full.',
+      groupFull: 'full — waiting list',
       perSessionIntro: 'Choose who is coming and which sessions. You pay only for the sessions you pick, and you can book more at any time.',
       pickDates: 'Which sessions?', pickAtLeastOne: 'Choose at least one session.',
       dateFull: 'full', dateBooked: 'already booked',
@@ -504,6 +506,7 @@
                   + 'оформленным, поэтому взнос сохраняется.'
       },
       registerFullLead: 'Сейчас на занятии нет мест.',
+      groupFullLead: 'В этой группе сейчас нет мест.',
       registerWaitGo: 'В список ожидания',
       registerWaitBody: 'Свободных мест сейчас нет. Можно встать в список ожидания — это бесплатно. '
                       + 'Как только место освободится, мы напишем всем, кто ждёт, и оно достанется '
@@ -522,7 +525,7 @@
       creditPart: '{used} будет вычтено из этой суммы. Останется к оплате {left}.',
       registerTitle: 'Запись на занятие', registerWho: 'Кто записывается?',
       registerGroup: 'Группа', registerGo: 'Записаться',
-      registerFull: 'Свободных мест нет.',
+      groupFull: 'мест нет — список ожидания',
       perSessionIntro: 'Выберите, кто придёт и на какие занятия. Вы платите только за выбранные даты и можете добавить другие в любой момент.',
       pickDates: 'Какие занятия?', pickAtLeastOne: 'Выберите хотя бы одно занятие.',
       dateFull: 'мест нет', dateBooked: 'уже записаны',
@@ -1516,13 +1519,35 @@
     // that chooses between this and registerPerSession — one rule for both.
     var who = peopleSelect(people);
 
+    // ⚠ A FULL GROUP IS CHOOSABLE, BECAUSE CHOOSING IT IS HOW YOU JOIN ITS QUEUE.
+    //
+    // It was `disabled`, with the activity-level "This activity is full" hung
+    // off it as a label — so on an activity with two groups, one full and one
+    // not, the screen said "2 places left" at the top and "this activity is
+    // full" against a row nobody could select, and there was NO WAY TO WAIT for
+    // the full one. Reported as "where is the waiting list feature??".
+    //
+    // The server was right the whole time: hasRoom() answers PER GROUP and
+    // `submit` takes a groupId beside `waitlist`, so a queue for one group of a
+    // half-empty activity has always been writable. Only the door was missing —
+    // the same shape as the invite button labelled with a description.
+    //
+    // And it matters more here than "a control was hard to find". Under the
+    // equal-hours rule two groups can meet on a different day, at a different
+    // hour, in a different place, with different teachers and a different age
+    // range — that is what groups are FOR. So "the other group has room" is not
+    // an answer to a family whose child can only come on Thursdays, and
+    // disabling the row told them to go away.
     var groupSel = null;
     if (a.groups) {
       groupSel = el('select', {});
       a.groups.forEach(function (g) {
         groupSel.appendChild(el('option', {
-          value: g.groupId, text: g.label + (g.full ? ' — ' + T.registerFull : ''),
-          disabled: g.full || null
+          // ⚠ NOT `registerFull`, which says the ACTIVITY is full. That string
+          // sat on a group row directly under a line counting the places still
+          // free, which is two statements on one screen contradicting each
+          // other. This names what is full and what pressing it will do.
+          value: g.groupId, text: g.label + (g.full ? ' — ' + T.groupFull : '')
         }));
       });
     }
@@ -1532,7 +1557,31 @@
     // promise a place the next line is about to refuse. The flag it sends only
     // ever chooses between a refusal and a queue — if a place has appeared while
     // this screen was open, the family gets the place, whatever the button said.
-    var isFull = !!a.full;
+    // ⚠ FULLNESS IS THE SELECTED GROUP'S, NOT THE ACTIVITY'S. `a.full` is
+    // deliberately ALWAYS FALSE once there is a choice — activityView() sets it
+    // `&& !offersAChoice(activity)`, because "is the activity full" is not a
+    // question with an honest answer when two groups can each be full or not.
+    // Reading it here meant the waiting list could never appear on any
+    // multi-group activity, however full every one of its groups was.
+    var chosenGroup = function () {
+      if (!groupSel || !a.groups) return null;
+      return a.groups.filter(function (g) { return g.groupId === groupSel.value; })[0] || null;
+    };
+    var fullNow = function () {
+      var g = chosenGroup();
+      return g ? !!g.full : !!a.full;
+    };
+
+    // The lead names WHAT is full. On an activity with a choice that is a group;
+    // with one group, or none to pick, it is the activity — and saying "this
+    // group is full" about the only group there is would be telling a family
+    // about a structure the page has never shown them.
+    var leadText = function () {
+      return chosenGroup() ? T.groupFullLead : T.registerFullLead;
+    };
+
+    var isFull = fullNow();
+    var wait = null, waitLead = null;
     var go = el('button', { type: 'submit', class: 'btn-primary',
                             text: isFull ? T.registerWaitGo : T.registerGo });
     var form = el('form', { onsubmit: function (e) {
@@ -1575,7 +1624,7 @@
       // about a child's place. `.acc-waiting` is the tinted, unpressable idiom
       // this file already uses for "nothing is wrong, here is what happens next"
       // — deliberately not the solid pill, which on this site means press me.
-      isFull ? el('div', { class: 'acc-waiting' }, [
+      wait = el('div', { class: 'acc-waiting', hidden: isFull ? null : 'hidden' }, [
         // ⚠ THE BLOCK'S OWN CLASSES, not a bare <b> and <p>. Its children are
         // styled by class and nothing else, so unclassed elements here would
         // render at browser defaults inside a designed panel — the same shape as
@@ -1586,9 +1635,9 @@
         // "nothing is wrong, you are registered"; here nothing has been agreed
         // yet, and a tick over "this activity is full" would say the opposite of
         // what the words under it say.
-        el('p', { class: 'acc-waiting-lead' }, [el('span', { text: T.registerFullLead })]),
+        waitLead = el('p', { class: 'acc-waiting-lead' }, [el('span', { text: leadText() })]),
         el('p', { class: 'acc-waiting-body', text: T.registerWaitBody })
-      ]) : null,
+      ]),
       el('div', { class: 'acc-field' }, [el('label', { text: T.registerWho }), who]),
       groupSel ? el('div', { class: 'acc-field' }, [el('label', { text: T.registerGroup }), groupSel]) : null,
       go
@@ -1608,14 +1657,29 @@
       if (box) note.appendChild(box);
     };
     var groupTerms = function () {
-      if (!groupSel || !a.groups) return null;
-      var g = a.groups.filter(function (x) { return x.groupId === groupSel.value; })[0];
+      var g = chosenGroup();
       return g ? g.cancellationTerms : null;
     };
+
+    // ⚠ THE BUTTON AND THE BLOCK FOLLOW THE SELECT, because what is being
+    // offered changes with it: one group of this activity may have a place and
+    // the next may only have a queue. Said BEFORE the press, never discovered
+    // after it — a button that quietly means something else is a surprise about
+    // a child's place.
+    var syncFullness = function () {
+      isFull = fullNow();
+      go.textContent = isFull ? T.registerWaitGo : T.registerGo;
+      if (!wait) return;
+      if (isFull) wait.removeAttribute('hidden');
+      else wait.setAttribute('hidden', 'hidden');
+      if (waitLead) waitLead.childNodes[0].textContent = leadText();
+    };
+
     showTerms(a.cancellationTerms || groupTerms());
     if (groupSel) {
       groupSel.addEventListener('change', function () {
         showTerms(a.cancellationTerms || groupTerms());
+        syncFullness();
       });
     }
 

@@ -450,11 +450,34 @@ function feeStandsOn(reg) {
 
 // THE WAIVER, in one place.
 //
-//   THE FEE IS SCOPED TO ONE PARTICIPANT, ONE ACTIVITY, ONE ACADEMIC YEAR.
+//   THE FEE IS SCOPED TO ONE PARTICIPANT AND ONE SERIES. The academic year is
+//   the boundary for a SINGLE activity, and is not a boundary between two terms
+//   an admin deliberately linked.
 //
-//   same child, same activity, second term  -> not charged again
-//   same child, a different activity        -> charged
-//   a sibling, any activity                 -> charged
+//   same child, same activity, second term of one year  -> not charged again
+//   same child, a LINKED later term, ANY year           -> not charged again
+//   same child, the same activity again in a new year   -> charged
+//   same child, a different activity                    -> charged
+//   a sibling, any activity                             -> charged
+//
+// ⚠ WHY THE YEAR SURVIVES FOR ONE ACTIVITY AND NOT BETWEEN TWO.
+//
+// Asked for as "if a course is marked that it is part of another course,
+// whether it's the same year or another year, the registration fee should be
+// omitted". The marking is what triggers it, and the marking is `seriesId` —
+// the "Part of" select, which points one term at another.
+//
+// So the test is not a flag on the record being registered for. `seriesOf()`
+// DEFAULTS to the activity's own id, so every activity is a series of one and
+// "does this carry a seriesId" cannot tell a linked first term from an unlinked
+// one — the first term of a series is usually the pointer TARGET and carries
+// nothing itself. What is reliably true is the pair: two DIFFERENT activityIds
+// resolving to one seriesId can only have got there because somebody linked
+// them. That is "marked as part of another course", read off the registrations
+// rather than off a field that means two things.
+//
+// Same activity, a second year, is therefore still charged: nobody marked it as
+// part of anything, and re-running one course next year is a new year of it.
 //
 // It is answerable from this participant's own registrations and nothing else —
 // a prefix scan of reg-<participantId>__, which is the cheap direction of the
@@ -462,12 +485,20 @@ function feeStandsOn(reg) {
 // of the SCOPE rather than of the implementation: a family-level rule would have
 // had to resolve every participant on the account before it could price one
 // registration.
-function feeApplies(priorRegistrations, seriesId, feeYear) {
-  if (!seriesId || !feeYear) return true;
-  return !(priorRegistrations || []).some((r) =>
-    ((r.frozen || {}).seriesId) === seriesId &&
-    ((r.frozen || {}).feeYear) === feeYear &&
-    feeStandsOn(r));
+function feeApplies(priorRegistrations, seriesId, feeYear, activityId) {
+  if (!seriesId) return true;
+  return !(priorRegistrations || []).some((r) => {
+    if (((r.frozen || {}).seriesId) !== seriesId) return false;
+    if (!feeStandsOn(r)) return false;
+    // A DIFFERENT term of the same series: linked on purpose, so the year is not
+    // a boundary. This is the whole of the change.
+    if (activityId && r.activityId && r.activityId !== activityId) return true;
+    // The same activity again. Absent either year the answer is "a different
+    // year", which charges — the one place in this file where a blank resolves
+    // AWAY from the family, and it does so because the alternative is waiving a
+    // fee on the strength of a field nobody filled in.
+    return !!feeYear && ((r.frozen || {}).feeYear) === feeYear;
+  });
 }
 
 // ⚠ AND THE WAIVER ONLY EVER LOOKED BACKWARDS.
@@ -511,20 +542,26 @@ function feeApplies(priorRegistrations, seriesId, feeYear) {
 // Deliberately NOT a rule about who caused what. A year with three terms, one
 // charged and two waived, answers the same way for each of the two: while any
 // waived term is still standing, the fee that covers it stays paid.
+// ⚠ AND IT ASKS NO YEAR, BECAUSE IT ONLY EVER LOOKS AT A DIFFERENT TERM.
+//
+// `r.activityId !== reg.activityId` is already in the test, so every sibling
+// this can find is a linked term — exactly the case feeApplies() now waives
+// across years. Leaving a feeYear condition here would put the two halves of
+// one rule out of step in the direction that costs a family money: a spring
+// term waived on the strength of last autumn's fee, the autumn then cancelled,
+// and the fee handed back in full while the spring term goes on leaning on it.
+// That is the loophole this function exists to close, moved one year over.
 function feeHeldByLiveTerm(reg, siblings) {
   const frozen = (reg || {}).frozen || {};
   if (((frozen.price || {}).feeCharged) === false) return false;
   const seriesId = frozen.seriesId;
-  const feeYear = frozen.feeYear;
-  // The same blank-resolves-towards-the-family direction feeApplies() takes: a
-  // registration written before the waiver existed has neither, and nothing
+  // A registration written before the waiver existed has no series, and nothing
   // about it can be relying on anything.
-  if (!seriesId || !feeYear) return false;
+  if (!seriesId) return false;
   return (siblings || []).some((r) =>
     r &&
     r.activityId !== reg.activityId &&
     ((r.frozen || {}).seriesId) === seriesId &&
-    ((r.frozen || {}).feeYear) === feeYear &&
     ((((r.frozen || {}).price) || {}).feeCharged) === false &&
     LIVE_STATUSES.indexOf(r.status) !== -1);
 }
@@ -698,7 +735,8 @@ function newRegistration({ activity, participant, accountId, groupId, now, env,
     feeYear: feeYearOf(activity, at, gid),
     charged: false
   };
-  fee.charged = feeApplies(priorRegistrations, fee.seriesId, fee.feeYear);
+  fee.charged = feeApplies(priorRegistrations, fee.seriesId, fee.feeYear,
+                           activity.activityId);
 
   return {
     participantId: participant.participantId,

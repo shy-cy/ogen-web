@@ -2564,6 +2564,44 @@ a place silently — nothing fires at a derived moment — and the next natural 
 re-announces it. On a course that is the sweep; on an evening minutes before a
 class, it simply reopens.
 
+⚠ **AND FOR A RELEASE IT WAS UNREACHABLE ON EVERY MULTI-GROUP ACTIVITY.**
+Reported as *"Where is the waiting list feature??"*, looking at an activity with
+two groups, one of them full, and nothing on the screen offering to wait for it.
+
+The server was right the whole time. `hasRoom(report, groupId)` answers **per
+group**, `submit` takes a `groupId` beside `waitlist`, and a queue for one group
+of a half-empty activity has always been writable. **The door was never drawn** —
+the same shape as the invite button labelled with a description, and as the pure
+bundle module wired to nothing.
+
+Two lines in the register panel did it, and each reads as correct on its own:
+
+- `var isFull = !!a.full` — the **activity's** fullness. `activityView()` sets
+  that field `&& !groups.offersAChoice(activity)`, deliberately, because *"is the
+  activity full"* has no honest answer once two groups can each be full or not.
+  So on every multi-group activity it is **permanently false**, and the
+  waiting-list button could never appear however full every group was.
+- the full group's option was **`disabled`**, so it could not be chosen — and it
+  was labelled `registerFull`, *"This activity is full"*, rendering directly
+  under a line counting the places still free. Two statements on one screen
+  contradicting each other, and the one a family would act on was the wrong one.
+
+⚠ **The cost is not "a control was hard to find".** Under the equal-hours rule
+two groups may meet on a different day, at a different hour, in a different
+place, with different teachers and a different age range — that is what groups
+are **for**. So *"the other group has room"* is not an answer to a family whose
+child can only come on Thursdays; disabling the row told them to go away, on an
+activity that would have taken their name.
+
+A full group is **choosable** now, because choosing it is how you join its queue,
+and the button and the waiting block follow the **select** rather than the
+activity — said before the press, since a button that quietly means something
+else is a surprise about a child's place. `groupFull` and `groupFullLead` name
+the **group**; the activity-level wording survives for the one-group case, where
+telling a family *"this group is full"* would describe a structure the page has
+never shown them. `registerFull` is **deleted** rather than left unused, and the
+string-table test is what insisted on that.
+
 **The admin gets a list, not a sixth kind of queue row.** Nothing in a queue row
 applies to somebody waiting — no place to approve, nothing to reject, no money
 owed, no deadline running — so it is its own table under the queue, in join
@@ -2825,13 +2863,48 @@ activity, and a third argument on `splitPaid()`.
 
 ### The registration fee, and the one case it is waived
 
-**THE FEE IS SCOPED TO ONE PARTICIPANT, ONE ACTIVITY, ONE ACADEMIC YEAR.**
+**THE FEE IS SCOPED TO ONE PARTICIPANT AND ONE SERIES.** The academic year is
+the boundary for a **single** activity, and is **not** a boundary between two
+terms an admin deliberately linked.
 
 | | Fee |
 |---|---|
-| Same child, same activity, second term | **not** charged again |
+| Same child, same activity, second term of one year | **not** charged again |
+| Same child, a **linked** later term, **any** year | **not** charged again |
+| Same child, the same activity again in a new year | charged |
 | Same child, a different activity | charged |
 | A sibling, same or different activity | charged |
+
+⚠ **THE SECOND ROW IS NEW, AND THE THIRD IS WHY IT IS NOT SIMPLER.** Asked for
+as *"if a course is marked that it is part of another course, whether it's the
+same year or another year, the registration fee should be omitted"* — so the
+**marking** is the trigger, and a programme running autumn, spring and then the
+following autumn stops charging the fee twice for what a family experiences as
+one thing.
+
+The marking is `seriesId`, the *Part of* select. But the test is **the pair, not
+a flag on the record**, and that is the part worth remembering: `seriesOf()`
+defaults to the activity's own id, so every activity is a series of one and
+*"does this carry a seriesId"* cannot tell a linked first term from an unlinked
+activity — the first term of a series is usually the pointer **target** and
+carries nothing itself. What is reliably true is that two **different**
+`activityId`s resolving to **one** `seriesId` can only have got there because
+somebody linked them. So `feeApplies()` reads it off the registrations: a prior
+registration for a *different* activity in this series waives in any year, one
+for the *same* activity waives only within its own year.
+
+⚠ **AND THE FORWARD-LOOKING HALF MOVED WITH IT.** `feeHeldByLiveTerm()` already
+only ever looks at a **different** `activityId`, so every sibling it can find is
+a linked term — exactly the case that now waives across years. Leaving a
+`feeYear` condition there would have reopened the loophole that function exists
+to close, one year over: spring 2027 waived on autumn 2026's fee, the autumn
+cancelled, the fee refunded in full, and the spring term standing with no fee
+paid anywhere. It asks no year now.
+
+Nothing about *what counts as already charged* was weakened by crossing years —
+see the `feeStandsOn()` table below. Register, don't pay, cancel, register again
+is still not a way to avoid the fee, and now not across years either, which
+would have been longer for nobody to notice.
 
 Not per family and not per account. The scope is what makes the waiver
 answerable from **that child's own registrations and nothing else** — a prefix
@@ -2841,8 +2914,8 @@ briefly described a family-level rule, which was wrong in both directions at
 once: it would have waived a sibling's fee, which Ogen does charge, and it would
 have needed the whole family resolved before it could price one registration.
 
-**The year is academic, not calendar, and that is the feature rather than a
-refinement.** Autumn runs October to December and spring January to June, so on
+**Where the year still applies, it is academic, not calendar, and that is the
+feature rather than a refinement.** Autumn runs October to December and spring January to June, so on
 a calendar year the two halves of one course fall either side of the boundary and
 a returning child is charged twice — the exact case the waiver exists for.
 September is the boundary, which is when the school year starts in both Israel

@@ -152,9 +152,22 @@ const POLICY = {
   H.eq(held(term(), [Object.assign({}, waivedLive, {
     frozen: { seriesId: 'act-somethingelse00', feeYear: YEAR, price: { feeCharged: false } } })]), false,
     'a different activity is a different fee');
+  // ⚠ AND A DIFFERENT ACADEMIC YEAR IS THE SAME FEE, WHICH IS A POLICY CHANGE.
+  //
+  // It used to be `false` here: the waiver was scoped to one academic year, so a
+  // term in the next year carried its own fee and could not be relying on this
+  // one. The rule asked for is that a term MARKED as part of another is waived
+  // "whether it's the same year or another year" — so a linked later term does
+  // lean on this fee, and cancelling this registration must not hand it back
+  // while that term is still standing. That is the same loophole this suite is
+  // named for, one year over rather than one term over.
+  //
+  // Note this only ever looks at a DIFFERENT activityId, which is what makes it
+  // safe to drop the year: the same activity re-run next year is still charged.
   H.eq(held(term(), [Object.assign({}, waivedLive, {
-    frozen: { seriesId: SERIES, feeYear: '2027/28', price: { feeCharged: false } } })]), false,
-    'and a different academic year is a different fee');
+    frozen: { seriesId: SERIES, feeYear: '2027/28', price: { feeCharged: false } } })]), true,
+    '⚠ and a LINKED term in another year leans on this fee too — the waiver ' +
+    'crosses years, so withholding has to cross them with it');
   // The list a caller hands over is that participant's WHOLE key space, this
   // registration included, so being handed itself has to be harmless.
   //
