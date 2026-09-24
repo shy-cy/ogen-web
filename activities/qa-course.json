@@ -11,12 +11,15 @@
   "registration": {
     "autoApprove": false,
     "pendingExpiryDays": null,
-    "registrationFeeCutoffDate": null,
+    "registrationFeeCutoffDate": "2026-09-17",
     "cancellationPolicy": {
       "mode": "flat",
-      "cancellationCutoffDate": null
+      "cancellationCutoffDate": "2026-10-04"
     },
-    "defaultBasis": null
+    "defaultBasis": {
+      "startDate": "2026-10-01",
+      "sessionCount": 2
+    }
   },
   "seriesId": "act-150a47f2e326ab9a",
   "title": {
@@ -30,7 +33,7 @@
     "ru": "Далеко-далеко за словесными горами в стране гласных и согласных живут рыбные тексты. Вдали от всех живут"
   },
   "about": {
-    "he": "לורם איפסום<p>לורם איפסום דולור סיט אמט, קונסקטורר אדיפיסינג אלית נולום ארווס סאפיאן - פוסיליס קוויס, אקווזמן קוואזי במר מודוף. אודיפו בלאסטיק מונופץ קליר, בנפת נפקט למסון בלרק - וענוף קולורס מונפרד אדנדום סילקוף, מרגשי ומרגשח. עמחליף קולורס מונפרד אדנדום סילקוף, מרגשי ומרגשח. עמחליף לפרומי בלוף קינץ תתיח לרעח. לת צשחמי צש בליא, מנסוטו צמלח לביקו ננבי, צמוקו בלוקריה שיצמה ברורק. הוגדוב היושגב שגוש שמצוית - שלוטגע ותלשצרו חמבלו שעוצסשך וחעית נוגש ערפשף. זותה מנק הבלאץ אפדח דלצסת יבץ, כאשזה ניצטקו נמרטש שהכמב תוק, הדמד שנטק התמבם הכלויר וג.</p><p><br></p>",
+    "he": "<p>לורם איפסום&lt;p&gt;לורם איפסום דולור סיט אמט, קונסקטורר אדיפיסינג אלית נולום ארווס סאפיאן - פוסיליס קוויס, אקווזמן קוואזי במר מודוף. אודיפו בלאסטיק מונופץ קליר, בנפת נפקט למסון בלרק - וענוף קולורס מונפרד אדנדום סילקוף, מרגשי ומרגשח. עמחליף קולורס מונפרד אדנדום סילקוף, מרגשי ומרגשח. עמחליף לפרומי בלוף קינץ תתיח לרעח. לת צשחמי צש בליא, מנסוטו צמלח לביקו ננבי, צמוקו בלוקריה שיצמה ברורק. הוגדוב היושגב שגוש שמצוית - שלוטגע ותלשצרו חמבלו שעוצסשך וחעית נוגש ערפשף. זותה מנק הבלאץ אפדח דלצסת יבץ, כאשזה ניצטקו נמרטש שהכמב תוק, הדמד שנטק התמבם הכלויר וג.&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;</p>",
     "en": "<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis metus neque, rhoncus nec elit ac, sodales sollicitudin turpis. Quisque hendrerit sit amet felis at auctor. Fusce ut neque cursus justo efficitur pretium. Donec ultricies augue risus, sit amet consequat orci suscipit at. Praesent rutrum sapien vel neque blandit, non vestibulum nisi sollicitudin. Maecenas et fringilla mauris. Aenean dapibus sem ipsum. Vivamus arcu mauris, molestie a magna sit amet, venenatis viverra augue. Cras tempus nisi ut tellus facilisis pharetra ac in elit. Phasellus dapibus tellus ac ligula pellentesque ultricies. Etiam pulvinar rhoncus convallis.</p>",
     "ru": "<p>Далеко-далеко за словесными горами в стране гласных и согласных живут рыбные тексты. Вдали от всех живут они в буквенных домах на берегу Семантика большого языкового океана. Маленький ручеек Даль журчит по всей стране и обеспечивает ее всеми необходимыми правилами.</p>"
   },
@@ -70,30 +73,47 @@
     {
       "groupId": "g-mufg50nz6cct",
       "name": {
-        "he": "",
-        "en": "",
-        "ru": ""
+        "he": "טסט ",
+        "en": "Test ",
+        "ru": "Test "
       },
-      "capacity": null,
+      "capacity": 3,
       "teacherIds": [],
       "facts": {
         "ages": {
-          "min": null,
-          "max": null
+          "min": 2,
+          "max": 22
         },
         "schedule": {
           "frequency": "weekly",
-          "sessions": []
+          "sessions": [
+            {
+              "day": 0,
+              "time": "14:00"
+            }
+          ]
         },
         "duration": {
-          "startDate": "",
-          "endDate": "",
-          "sessionCount": null,
-          "sessionMinutes": null,
-          "sessionDates": []
+          "startDate": "2026-10-01",
+          "endDate": "2026-10-31",
+          "sessionCount": 2,
+          "sessionMinutes": 45,
+          "sessionDates": [
+            {
+              "date": "2026-10-04",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-10-11",
+              "status": "scheduled"
+            }
+          ]
         },
         "instructionLanguage": {
-          "codes": [],
+          "codes": [
+            "he",
+            "el"
+          ],
           "text": {
             "he": "",
             "en": "",
@@ -101,25 +121,25 @@
           }
         },
         "prerequisites": {
-          "level": null,
+          "level": "intermediate",
           "text": {
-            "he": "",
-            "en": "",
-            "ru": ""
+            "he": "שרכגדכ",
+            "en": "afgsadfg",
+            "ru": "agfdafg"
           }
         },
         "location": {
           "text": {
-            "he": "",
-            "en": "",
-            "ru": ""
+            "he": "לימסול",
+            "en": "Limassol",
+            "ru": "Лимассол"
           }
         },
         "address": {
           "text": {
-            "he": "",
-            "en": "",
-            "ru": ""
+            "he": "PASIDI",
+            "en": "PASIDI",
+            "ru": "PASIDI"
           }
         }
       }
@@ -139,10 +159,10 @@
   "faq": [],
   "teachers": [],
   "sponsors": [],
-  "isoUpdated": "2026-09-24T11:37:46.839Z",
+  "isoUpdated": "2026-09-24T13:34:07.733Z",
   "isoCreated": "2026-09-24T11:37:46.839Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
   "activityId": "act-150a47f2e326ab9a",
-  "lastPublishedAt": "2026-09-24T11:37:46.839Z"
+  "lastPublishedAt": "2026-09-24T13:34:07.733Z"
 }
