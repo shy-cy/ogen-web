@@ -916,6 +916,45 @@ disagreeing. For hebrew4kids that is 28 Oct rather than the calendar's 4 Nov.
 recomputes on its own: an activity postponed by a month keeps the dates it was
 given, because a formula re-evaluating would rewrite terms already agreed.
 
+⚠ **AND THE FORM COMPARED IT AGAINST NOTHING.** Reported as *"what does this
+mean? It has no meaning"*, on a panel reading:
+
+```
+The dates these were computed from have changed
+Computed from a start of 2025-09-23 and 1 sessions. It is now — and 1.
+```
+
+The em dash is the bug wearing its symptom. `defaultBasis.startDate` is stamped
+by `defaultIfBlank()` from `groups.durationFor(activity, firstGroupId)` — the
+**group's** duration, which is where that fact has lived since a group became the
+unit. `js/activities-admin.js` read it back from `S.record.facts.duration`, the
+**activity's**, which has been empty on every record since that move.
+
+So the comparison was always *a real date versus an empty string*. Three things
+followed, and only the first was visible:
+
+- the notice fired on **every course carrying a basis**, permanently, whatever
+  its schedule said — and a warning that is always on is a warning nobody reads;
+- the sentence had a hole in it, which is what got it reported;
+- ⚠ **and the button had the same fault, which is the one that mattered.** It
+  computed the fee cutoff from that same empty start date, so `minusDaysLocal()`
+  got `undefined` and returned `''`, and `regSetInput()` skips a blank. The fee
+  cutoff was **silently not set** while the message said *"Both dates
+  recomputed"* — a claim about two dates that govern refunds, one of which had
+  not moved.
+
+**`basisChanged()` on the server was right the whole time.** This is one rule
+with two implementations and the second drifted; a browser cannot `require` a
+Netlify function, so the copy stays and is **pinned by a test**, as
+`MIN_PASSWORD` and the activities menu's status groups are. `FEE_CUTOFF_DAYS`
+and `CANCEL_FRACTION` are pinned with it, and the sentence **interpolates** them
+rather than repeating the digits, so it cannot describe a formula the button does
+not apply.
+
+The confirmation now names **which dates actually moved**, and says so plainly
+when neither could be computed. A missing start date reads *"no start date"*
+rather than an em dash mid-sentence, and one session is *"1 session"*.
+
 ### ⚠ A test activity: published for real, reachable only by its link
 
 There was **no way to rehearse a registration on the live site**. Everything that

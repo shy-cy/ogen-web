@@ -41,6 +41,15 @@
   var statusPill = function (status) {
     return (STATUS_LABELS[status] && STATUS_LABELS[status].pill) || status;
   };
+  // ⚠ WRITTEN TWICE, AND PINNED. These are `_activity-registration.js`'s
+  // FEE_CUTOFF_DAYS and CANCEL_FRACTION — the two defaults the server computes a
+  // blank cutoff from. A browser cannot require a Netlify function, so the
+  // recompute button and the sentence describing it need their own copy, and a
+  // test asserts the two agree. Same arrangement as MIN_PASSWORD and the
+  // activities menu's status groups.
+  var FEE_CUTOFF_DAYS = 14;
+  var CANCEL_FRACTION = 0.3;
+
   var S = {
     schema: null,
     editLangs: [],
@@ -513,28 +522,71 @@
     // keeps two cutoff dates computed from where it used to be, and both are
     // then wrong in the direction that costs families money — but a formula
     // that quietly re-evaluates would rewrite terms after they were agreed.
+    // ⚠ READ OFF THE GROUP, THE WAY THE SERVER WROTE IT.
+    //
+    // `defaultBasis.startDate` is stamped by defaultIfBlank() from
+    // `groups.durationFor(activity, firstGroupId)` — the GROUP's duration, which
+    // is where that fact has lived since a group became the unit. This read it
+    // from `S.record.facts.duration`, the ACTIVITY's, which has been empty on
+    // every record since. So the comparison was always "a real date versus an
+    // empty string", the notice fired on every course carrying a basis whatever
+    // its schedule said, and the sentence rendered "It is now — and 1."
+    //
+    // Reported as "what does this mean? it has no meaning", which is exactly
+    // right: it was comparing against nothing.
+    //
+    // ⚠ AND THE BUTTON HAD THE SAME FAULT, WHICH WAS WORSE. It read the fee
+    // cutoff's start date from the same empty place, so minusDaysLocal() got
+    // undefined and returned '', and regSetInput() skips a blank — the fee
+    // cutoff was silently not set while the message said "Both dates
+    // recomputed". A claim about two dates that govern refunds, one of which
+    // had not moved.
+    //
+    // The server has basisChanged() and it is correct. A browser cannot require
+    // a Netlify function, so this is the second copy — pinned against the first
+    // by a test, the way the activities menu's status groups are.
     var basis = reg.defaultBasis;
     if (basis && type === 'course') {
-      var nowStart = ((S.record.facts || {}).duration || {}).startDate || '';
+      var dur = firstGroupDuration();
+      var nowStart = dur.startDate || '';
       var nowCount = scheduledCount();
       if (String(basis.startDate || '') !== String(nowStart) ||
           Number(basis.sessionCount || 0) !== Number(nowCount)) {
         var btn = el('button', { type: 'button', class: 'add-btn',
-          text: 'Recompute both dates from the current schedule' });
+          text: 'Recompute both cutoff dates' });
         btn.addEventListener('click', function () {
-          var d = ((S.record.facts || {}).duration || {});
-          regSetInput('registrationFeeCutoffDate', minusDaysLocal(d.startDate, 14));
-          regSetInput('cancellationPolicy.cancellationCutoffDate', thirtyPercentLocal());
+          var feeDate = minusDaysLocal(firstGroupDuration().startDate, FEE_CUTOFF_DAYS);
+          var cancelDate = thirtyPercentLocal();
+          regSetInput('registrationFeeCutoffDate', feeDate);
+          regSetInput('cancellationPolicy.cancellationCutoffDate', cancelDate);
           S.dirty = true;
-          message('ok', 'Both dates recomputed. Nothing is saved until you save.');
+          // ⚠ SAY WHICH ONES ACTUALLY MOVED. "Both dates recomputed" was untrue
+          // for a year and nothing on screen contradicted it; a message about
+          // money has to report what happened rather than what was attempted.
+          var moved = [feeDate ? 'fee cutoff' : null,
+                       cancelDate ? 'cancellation cutoff' : null].filter(Boolean);
+          if (!moved.length) {
+            message('err', 'Neither date could be computed — this activity has no ' +
+                           'start date and no session calendar to compute from.');
+          } else {
+            message('ok', 'Recomputed the ' + moved.join(' and the ') +
+                          '. Nothing is saved until you save.');
+          }
         });
+        var when = function (iso) { return iso || 'no start date'; };
+        var many = function (n) { return Number(n) === 1 ? '1 session' : (Number(n) || 0) + ' sessions'; };
         box.appendChild(el('div', { class: 'legacy-note' }, [
-          el('b', { text: 'The dates these were computed from have changed' }),
-          el('div', { text: 'Computed from a start of ' + (basis.startDate || '—') + ' and ' +
-                            basis.sessionCount + ' sessions. It is now ' + (nowStart || '—') +
-                            ' and ' + nowCount + '.' }),
-          el('div', { class: 'hint', text: 'Nothing has changed on its own. Recomputing is a decision, ' +
-                      'because a family who has already registered keeps the terms they were given.' }),
+          el('b', { text: 'The two cutoff dates were computed from a schedule that has moved' }),
+          el('div', { text: 'They were set from a start of ' + when(basis.startDate) + ' and ' +
+                            many(basis.sessionCount) + '. The schedule now says ' +
+                            when(nowStart) + ' and ' + many(nowCount) + '.' }),
+          // What pressing it will DO, which nothing said. An admin was being
+          // asked to accept a recomputation without being told the formula.
+          el('div', { class: 'hint', text: 'Nothing has changed on its own — a family who has ' +
+                      'already registered keeps the terms they were given. Recomputing puts the ' +
+                      'registration-fee cutoff ' + FEE_CUTOFF_DAYS + ' days before the start, and the ' +
+                      'cancellation cutoff on the session ' + Math.round(CANCEL_FRACTION * 100) +
+                      '% of the way through.' }),
           btn
         ]));
       }
@@ -551,6 +603,14 @@
   // totals are equal by the rule the server refuses a save over — and these two
   // sums feed the recompute BUTTON only, which is a suggestion an admin accepts
   // rather than a value anything is stored from.
+  // ⚠ THE SAME PLACE THE SERVER STAMPS THE BASIS FROM. defaultIfBlank() uses
+  // groups.durationFor(activity, firstGroupId); reading the activity's own
+  // `facts.duration` instead is what made this whole panel compare a date
+  // against an empty string.
+  function firstGroupDuration() {
+    var g = ((S.record.groups) || [])[0] || {};
+    return ((g.facts || {}).duration) || {};
+  }
   function firstGroupCalendar() {
     var g = ((S.record.groups) || [])[0] || {};
     return (((g.facts || {}).duration || {}).sessionDates) || [];
@@ -571,7 +631,7 @@
     var rows = firstGroupCalendar()
       .filter(function (r) { return r && r.date && r.status !== 'excluded'; });
     if (!rows.length) return '';
-    return rows[Math.min(Math.ceil(0.3 * rows.length), rows.length) - 1].date;
+    return rows[Math.min(Math.ceil(CANCEL_FRACTION * rows.length), rows.length) - 1].date;
   }
 
   // Read back ONLY what was drawn. A field this type does not draw is left out
