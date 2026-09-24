@@ -1,0 +1,148 @@
+{
+  "slug": "qa-course",
+  "status": "open",
+  "motif": "ring",
+  "corner": "tl",
+  "cardImage": "/images/activities/qa-course-card-c8031266.jpg",
+  "shareImage": null,
+  "robots": "noindex",
+  "testActivity": true,
+  "type": "course",
+  "registration": {
+    "autoApprove": false,
+    "pendingExpiryDays": null,
+    "registrationFeeCutoffDate": null,
+    "cancellationPolicy": {
+      "mode": "flat",
+      "cancellationCutoffDate": null
+    },
+    "defaultBasis": null
+  },
+  "seriesId": "act-150a47f2e326ab9a",
+  "title": {
+    "he": "טסט 5",
+    "en": "Test ",
+    "ru": "Test "
+  },
+  "summary": {
+    "he": "לורם איפסום דולור סיט אמט, קונסקטורר אדיפיסינג אלית נולום ארווס סאפיאן - פוסיליס קוויס, אקווזמן קוואזי במר מודוף. אודיפו בלאסטיק מונופץ קליר, בנפת נפקט למסון בלרק - וענוף קולורס מונפרד אדנדום סילקוף",
+    "en": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis metus neque, rhoncus nec elit ac, xxx sss tggg eeew",
+    "ru": "Далеко-далеко за словесными горами в стране гласных и согласных живут рыбные тексты. Вдали от всех живут"
+  },
+  "about": {
+    "he": "לורם איפסום<p>לורם איפסום דולור סיט אמט, קונסקטורר אדיפיסינג אלית נולום ארווס סאפיאן - פוסיליס קוויס, אקווזמן קוואזי במר מודוף. אודיפו בלאסטיק מונופץ קליר, בנפת נפקט למסון בלרק - וענוף קולורס מונפרד אדנדום סילקוף, מרגשי ומרגשח. עמחליף קולורס מונפרד אדנדום סילקוף, מרגשי ומרגשח. עמחליף לפרומי בלוף קינץ תתיח לרעח. לת צשחמי צש בליא, מנסוטו צמלח לביקו ננבי, צמוקו בלוקריה שיצמה ברורק. הוגדוב היושגב שגוש שמצוית - שלוטגע ותלשצרו חמבלו שעוצסשך וחעית נוגש ערפשף. זותה מנק הבלאץ אפדח דלצסת יבץ, כאשזה ניצטקו נמרטש שהכמב תוק, הדמד שנטק התמבם הכלויר וג.</p><p><br></p>",
+    "en": "<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis metus neque, rhoncus nec elit ac, sodales sollicitudin turpis. Quisque hendrerit sit amet felis at auctor. Fusce ut neque cursus justo efficitur pretium. Donec ultricies augue risus, sit amet consequat orci suscipit at. Praesent rutrum sapien vel neque blandit, non vestibulum nisi sollicitudin. Maecenas et fringilla mauris. Aenean dapibus sem ipsum. Vivamus arcu mauris, molestie a magna sit amet, venenatis viverra augue. Cras tempus nisi ut tellus facilisis pharetra ac in elit. Phasellus dapibus tellus ac ligula pellentesque ultricies. Etiam pulvinar rhoncus convallis.</p>",
+    "ru": "<p>Далеко-далеко за словесными горами в стране гласных и согласных живут рыбные тексты. Вдали от всех живут они в буквенных домах на берегу Семантика большого языкового океана. Маленький ручеек Даль журчит по всей стране и обеспечивает ее всеми необходимыми правилами.</p>"
+  },
+  "metaTitle": {
+    "he": "",
+    "en": "",
+    "ru": ""
+  },
+  "metaDescription": {
+    "he": "",
+    "en": "",
+    "ru": ""
+  },
+  "facts": {
+    "groupSize": {
+      "overrideText": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      }
+    },
+    "price": {
+      "registrationFee": null,
+      "fullPrice": null,
+      "perHourOverride": null,
+      "perSessionPrice": null,
+      "showPerLesson": false,
+      "lateDropIn": {
+        "enabled": false,
+        "hoursBefore": null,
+        "price": null
+      },
+      "bundles": []
+    }
+  },
+  "groups": [
+    {
+      "groupId": "g-mufg50nz6cct",
+      "name": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      },
+      "capacity": null,
+      "teacherIds": [],
+      "facts": {
+        "ages": {
+          "min": null,
+          "max": null
+        },
+        "schedule": {
+          "frequency": "weekly",
+          "sessions": []
+        },
+        "duration": {
+          "startDate": "",
+          "endDate": "",
+          "sessionCount": null,
+          "sessionMinutes": null,
+          "sessionDates": []
+        },
+        "instructionLanguage": {
+          "codes": [],
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "prerequisites": {
+          "level": null,
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "location": {
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "address": {
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        }
+      }
+    }
+  ],
+  "factVisibility": {
+    "ages": "public",
+    "schedule": "public",
+    "duration": "public",
+    "groupSize": "public",
+    "instructionLanguage": "public",
+    "prerequisites": "public",
+    "location": "public",
+    "address": "members",
+    "price": "public"
+  },
+  "faq": [],
+  "teachers": [],
+  "sponsors": [],
+  "isoUpdated": "2026-09-24T11:37:46.839Z",
+  "isoCreated": "2026-09-24T11:37:46.839Z",
+  "lastEditedBy": "michal@ogen.cy",
+  "lastEditedByName": "Michal",
+  "activityId": "act-150a47f2e326ab9a",
+  "lastPublishedAt": "2026-09-24T11:37:46.839Z"
+}
