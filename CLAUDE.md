@@ -1700,6 +1700,74 @@ it, the save succeeds, and the value is gone. `SIMPLE_KEYS` therefore concats
 every group, and a test asserts that exactly the groups drawn are the groups
 read back.
 
+### ⚠ An explanation is a control, not a paragraph
+
+Every hint in the admin is an **(i) beside the thing it is about**, and the text
+arrives on a click. `js/admin-help.js` is the one builder and all five admin
+pages load it.
+
+It was reported as clutter and it was: the Settings panel put a four-line
+paragraph under the Test activity checkbox and another under the *Part of*
+select, so a screen an admin opens to change one thing arrived as a wall of
+prose about things they were not changing. **The words are not the problem** —
+most of them exist because somebody got something wrong once, and one of them
+had been rewritten the week before precisely because the old wording left a
+question open. A sentence that is *always on screen* is the problem: read once,
+scrolled past forever, and pushing the control it describes below the fold.
+
+Asked for as a rule across the whole admin, which is the only way it works. A
+tooltip on one screen and a paragraph on the next is worse than either, because
+an admin then has to learn which screens hide things.
+
+⚠ **AND NOT EVERY `.hint` IS AN EXPLANATION.** That is the line that keeps this
+from becoming "hide everything":
+
+| | |
+|---|---|
+| behind the **(i)** | what would read the same on an empty activity as on a full one — how a field works, what a setting does, why a rule exists |
+| still **on screen** | what is true right now: *"Nobody has registered for this activity yet"*, *"3 of 11 dates are going ahead"*, a bundle's computed total, *"the code drawer did not load"* |
+
+Several places were **split rather than moved whole**: the calendar keeps its
+count and hides the manual under it; the group list says *"2 groups"* and puts
+what that means behind the (i); the rejection draft keeps *"this is what Dana
+will receive, in Russian"* and hides the rule behind the feature. Hiding an
+answer is not the same as hiding a manual.
+
+Four details carry it:
+
+- **It is a real `<button>`**, not a span with a handler — in the tab order,
+  carrying `aria-expanded` and `aria-controls`, with the popover as a `role=note`.
+- ⚠ **The click is `preventDefault`ed**, because several of these badges sit
+  beside a `<label for="…">` wrapping a checkbox. Without it, asking what *Test
+  activity* means would tick it. The badge is a **sibling** of the label rather
+  than inside it, for the same reason and because a button inside a label is
+  interactive content inside a label.
+- **One open at a time**, and the popover is `position:fixed` against the
+  viewport rather than in the flow — several admin panels clip their overflow,
+  and a popover inside one gets cut off by whichever card it lands in.
+- **Two entry points, one builder.** Generated markup calls
+  `AdminHelp.badge(text)`; authored markup carries `data-hint="…"` on a heading
+  and `AdminHelp.wire()` converts it. `setText()` exists for the one hint whose
+  words change with the screen — the Role select's description of the selected
+  role.
+
+⚠ **AND THE WRAPPER BROKE THE CASCADE, SILENTLY, WHICH IS THE PART TO REMEMBER.**
+Putting the label inside a `.label-row` changes what a **child** combinator
+matches: `.field-row > .field-label` was correct and stopped matching the moment
+the wrapper appeared, so every translatable field's heading kept its text and
+lost its weight, its colour and its spacing, with nothing erroring. That is the
+same collision `.acc-field > label` was in `shared.css`, and just as invisible.
+`.fact-head`'s `flex:1` had to move out to the wrapper for the same reason, and
+the label's `margin-bottom` with it — dropping it closes every field on every
+admin screen by five pixels.
+
+The test checks this **by shape rather than by looking for the fix**: any rule
+reaching a `label` or `.field-label` through `>` must reach it through
+`.label-row`. It also executes the thing — builds a badge, presses it, presses it
+again, opens a second, sends Escape, clicks elsewhere, clicks inside — because
+reading the source proves the source is self-consistent and can never prove that
+pressing it shows the words.
+
 ### The rules that hold this together
 
 ⚠ **A DRAFT IS SAVED WHATEVER IS IN IT, AND IS TOLD WHAT WOULD STOP IT.**

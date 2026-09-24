@@ -143,8 +143,8 @@
       ]);
     });
     return el('div', { class: 'field-row' }, [
-      el('div', { class: 'field-label', text: descriptor.label + (descriptor.required ? ' *' : '') }),
-      descriptor.hint ? el('div', { class: 'hint', text: descriptor.hint }) : null,
+      withHelp(el('div', { class: 'field-label', text: descriptor.label + (descriptor.required ? ' *' : '') }),
+               descriptor.hint),
       el('div', { class: 'lang-grid' }, cells)
     ]);
   }
@@ -204,8 +204,8 @@
       ]);
     });
     return el('div', { class: 'field-row' }, [
-      el('div', { class: 'field-label', text: descriptor.label + (descriptor.required ? ' *' : '') }),
-      descriptor.hint ? el('div', { class: 'hint', text: descriptor.hint }) : null,
+      withHelp(el('div', { class: 'field-label', text: descriptor.label + (descriptor.required ? ' *' : '') }),
+               descriptor.hint),
       el('div', { class: 'rich-stack' }, blocks)
     ]);
   }
@@ -238,6 +238,17 @@
     });
   }
 
+  // ⚠ AN EXPLANATION IS A CONTROL, NOT A PARAGRAPH — see js/admin-help.js for
+  // why, and for the line between the two. This is the only shape a hint about a
+  // FIELD takes: the label, and an (i) beside it. Wrapped in a row rather than
+  // put inside the <label>, because a <button> inside a label is interactive
+  // content inside a label — and on a checkbox row, pressing it would toggle the
+  // very setting you were asking about.
+  function withHelp(node, hint) {
+    if (!hint) return node;
+    return el('div', { class: 'label-row' }, [node, window.AdminHelp.badge(hint)]);
+  }
+
   function readLangField(idPrefix) {
     var out = {};
     S.schema.langs.forEach(function (lang) {
@@ -268,8 +279,12 @@
 
     var slugInput = el('input', { type: 'text', id: 'f-slug', value: rec.slug || '', disabled: !isNew || null });
     box.appendChild(el('div', {}, [
-      el('label', { for: 'f-slug', text: 'Slug (URL)' }), slugInput,
-      el('div', { class: 'hint', text: isNew ? 'lower-case-words-with-hyphens' : 'Fixed once published' })
+      withHelp(el('label', { for: 'f-slug', text: 'Slug (URL)' }),
+               isNew ? 'Lower-case words separated by single hyphens, e.g. hebrew-for-kids. It becomes the '
+                     + 'page address and cannot be changed once the activity is published.'
+                     : 'Fixed once published \u2014 it is the page address, the sitemap entry and what '
+                     + 'every link to this activity points at.'),
+      slugInput
     ]));
 
     // What KIND of activity. It decides which price field is drawn, which
@@ -322,13 +337,12 @@
     testBox.checked = rec.testActivity === true;
     testBox.addEventListener('change', function () { S.dirty = true; });
     box.appendChild(el('div', {}, [
-      el('label', { for: 'f-test', class: 'check-row' },
+      withHelp(el('label', { for: 'f-test', class: 'check-row' },
         [testBox, el('span', { text: 'Test activity \u2014 reachable only by its own link' })]),
-      el('div', { class: 'hint', text:
         'Publish it as usual and it behaves exactly like any other activity: the page is live, ' +
         'registration and payment work. It is left off the activities listing, out of the menu ' +
         'and out of sitemap.xml, and the page tells search engines not to index it or follow ' +
-        'its links. The only way to it is the URL, so keep that to yourself.' })
+        'its links. The only way to it is the URL, so keep that to yourself.')
     ]));
     box.appendChild(select('f-motif', 'Header motif', S.schema.motifs, rec.motif || 'ring'));
     box.appendChild(select('f-corner', 'Motif corner', S.schema.corners, rec.corner || 'tl', {
@@ -373,18 +387,18 @@
       }));
     });
     sel.addEventListener('change', function () { S.dirty = true; });
+    // ⚠ IT SAYS HOW, NOT ONLY WHAT. QA read this hint and asked "how do I
+    // create a second term? Is this a new activity that I connect to another
+    // activity?" — which is exactly the question it left open. A picker that
+    // explains the consequence and not the procedure is a picker nobody
+    // reaches, because the thing it acts on has to be made first.
     return el('div', {}, [
-      el('label', { for: 'f-series', text: 'Part of' }), sel,
-      // ⚠ IT SAYS HOW, NOT ONLY WHAT. QA read this hint and asked "how do I
-      // create a second term? Is this a new activity that I connect to another
-      // activity?" — which is exactly the question it left open. A picker that
-      // explains the consequence and not the procedure is a picker nobody
-      // reaches, because the thing it acts on has to be made first.
-      el('div', { class: 'hint', text:
+      withHelp(el('label', { for: 'f-series', text: 'Part of' }),
         'A second term is a NEW activity with its own slug, dates and page — create it here as usual, ' +
         'then set this to the first term. That is the only field saying two records are the same course, ' +
         'and it is what stops a returning child being charged the yearly registration fee twice. ' +
-        'It changes nothing on either page.' })
+        'It changes nothing on either page.'),
+      sel
     ]);
   }
 
@@ -440,11 +454,10 @@
       S.dirty = true;
     });
     return el('div', {}, [
-      el('label', { for: regId(d.key), text: d.label }),
+      withHelp(el('label', { for: regId(d.key), text: d.label }), d.hint),
       date,
       el('label', { for: regId(d.key) + '-off', class: 'check-row' },
-        [box, el('span', { text: 'No cutoff — always creditable' })]),
-      d.hint ? el('div', { class: 'hint', text: d.hint }) : null
+        [box, el('span', { text: 'No cutoff — always creditable' })])
     ]);
   }
 
@@ -456,8 +469,8 @@
       cb.checked = value === true;
       cb.addEventListener('change', function () { S.dirty = true; });
       return el('div', {}, [
-        el('label', { for: regId(d.key), class: 'check-row' }, [cb, el('span', { text: d.label })]),
-        d.hint ? el('div', { class: 'hint', text: d.hint }) : null
+        withHelp(el('label', { for: regId(d.key), class: 'check-row' }, [cb, el('span', { text: d.label })]),
+                 d.hint)
       ]);
     }
     if (d.kind === 'mode') {
@@ -467,8 +480,7 @@
           text: m === 'flat' ? 'Flat — a fixed share' : 'Prorated — by sessions remaining' }));
       });
       sel.addEventListener('change', function () { S.dirty = true; });
-      return el('div', {}, [el('label', { for: regId(d.key), text: d.label }), sel,
-        d.hint ? el('div', { class: 'hint', text: d.hint }) : null]);
+      return el('div', {}, [withHelp(el('label', { for: regId(d.key), text: d.label }), d.hint), sel]);
     }
     // 'days' — a number and a unit. The label ends in "after" and the unit
     // follows the box, which is what keeps it from being read as the fee
@@ -480,9 +492,8 @@
     input.value = value == null ? '' : value;
     input.addEventListener('input', function () { S.dirty = true; });
     return el('div', {}, [
-      el('label', { for: regId(d.key), text: d.label + (d.unit ? ' … ' + d.unit : '') }),
-      input,
-      d.hint ? el('div', { class: 'hint', text: d.hint }) : null
+      withHelp(el('label', { for: regId(d.key), text: d.label + (d.unit ? ' … ' + d.unit : '') }), d.hint),
+      input
     ]);
   }
 
@@ -753,8 +764,11 @@
     sel.addEventListener('change', function () { S.dirty = true; });
 
     box.appendChild(el('div', {}, [
-      el('label', { for: 'f-robots', text: 'Search engines' }), sel,
-      el('div', { class: 'hint', text: 'Choose "not indexed" for a page that is live but should not be found in search — a private group, or a draft you are sharing by link.' })
+      withHelp(el('label', { for: 'f-robots', text: 'Search engines' }),
+               'Choose "not indexed" for a page that is live but should not be found in search \u2014 a ' +
+               'private group, or a draft you are sharing by link. For an activity nobody outside this ' +
+               'office should reach at all, use the Test activity box in Settings instead.'),
+      sel
     ]));
   }
 
@@ -880,7 +894,7 @@
     input.checked = value === true;
     input.addEventListener('change', function () { S.dirty = true; refreshPerHour(); });
     var row = el('label', { for: id, class: 'check-row' }, [input, el('span', { text: label })]);
-    return el('div', {}, hint ? [row, el('div', { class: 'hint', text: hint })] : [row]);
+    return el('div', {}, [withHelp(row, hint)]);
   }
 
   function readBool(id) { var n = $(id); return !!(n && n.checked); }
@@ -1126,9 +1140,18 @@
     var live = rows.filter(function (r) { return r.status !== 'excluded'; }).length;
     var box = el('div', { class: 'session-cal' });
 
-    box.appendChild(el('div', { class: 'hint', text: rows.length
-      ? live + ' of ' + rows.length + ' dates are going ahead. ' + opts.lead
-      : opts.empty }));
+    // ⚠ THE COUNT STAYS AND THE MANUAL DOES NOT. "3 of 11 dates are going ahead"
+    // is what is true right now and is the reason to look at this block at all;
+    // everything else here reads the same on every activity, so it is an (i).
+    box.appendChild(el('div', { class: 'label-row' }, [
+      el('div', { class: 'hint', style: 'margin-top:0;',
+                  text: rows.length ? live + ' of ' + rows.length + ' dates are going ahead.'
+                                    : opts.empty }),
+      window.AdminHelp.badge(opts.lead + ' An unticked date keeps its place here so it can be put ' +
+        'back, and it survives a regeneration along with its reason. It reaches the page in ' +
+        'neither form \u2014 not the date and not the reason. Delete is for a date that should ' +
+        'not be in the list at all.')
+    ]));
 
     var gen = el('button', { type: 'button', class: 'add-btn',
       text: rows.length ? opts.generateLabel.regenerate : opts.generateLabel.generate,
@@ -1212,10 +1235,6 @@
     });
     box.appendChild(list);
 
-    box.appendChild(el('div', { class: 'hint', text:
-      'An unticked date keeps its place here so it can be put back, and it survives a ' +
-      'regeneration along with its reason. It reaches the page in neither form — not the ' +
-      'date and not the reason. Delete is for a date that should not be in the list at all.' }));
     return box;
   }
 
@@ -1394,16 +1413,16 @@
       body = null;
     } else if (d.kind === 'duration') {
       body = el('div', {}, [
+        el('div', { class: 'label-row' }, [window.AdminHelp.badge(
+          'The number of sessions is a CAP on generation; the calendar below is what the page ' +
+          'prints and what a cancellation is divided by. Sessions \u00d7 minutes is what the ' +
+          'price is sold against, and every group has to add up to the same total.')]),
         el('div', { class: 'fact-grid' }, [
           dateField(p + '-duration-startDate', 'Starts', fact.startDate),
           dateField(p + '-duration-endDate', 'Ends', fact.endDate),
           numField(p + '-duration-sessionCount', 'Number of sessions', fact.sessionCount),
           numField(p + '-duration-sessionMinutes', 'Minutes per session', fact.sessionMinutes)
         ]),
-        el('div', { class: 'hint', text:
-          'The number of sessions is a CAP on generation; the calendar below is what the page ' +
-          'prints and what a cancellation is divided by. Sessions \u00d7 minutes is what the ' +
-          'price is sold against, and every group has to add up to the same total.' })
       ]);
     } else if (d.kind === 'groupSize') {
       // Three languages, through the same fieldRow the location fact uses, so
@@ -1482,8 +1501,8 @@
     var body = factEditor(d, fact, p);
     if (!body) return null;
     return el('div', { class: 'fact-block' }, [
-      bare ? null : el('div', { class: 'fact-head' }, [el('div', { class: 'field-label', text: d.label })]),
-      !bare && d.hint ? el('div', { class: 'hint', text: d.hint }) : null,
+      bare ? null : el('div', { class: 'fact-head' },
+        [withHelp(el('div', { class: 'field-label', text: d.label }), d.hint)]),
       body,
       legacyNote(d, fact || {})
     ]);
@@ -1497,11 +1516,6 @@
     // No heading of its own any more — the panel is headed "What is published",
     // and "Who can see these" underneath it was the same sentence twice.
     var box = el('div', { class: 'fact-block' });
-    box.appendChild(el('div', { class: 'hint', text:
-      'Every fact is published unless it is ticked here. A members-only fact is left out of ' +
-      'the page ENTIRELY \u2014 never rendered and hidden, because the file is static and anyone ' +
-      'can read its source. It applies to the whole activity, so a fact every group fills in ' +
-      'is published, or none of them is.' }));
     var grid = el('div', { class: 'fact-checks' });
     S.schema.facts.forEach(function (d) { grid.appendChild(visibilityControl(d.key, d.label)); });
     box.appendChild(grid);
@@ -1535,10 +1549,9 @@
   function lateDropInEditor(fact) {
     var late = fact.lateDropIn || {};
     var box = el('div', { style: 'margin-top:18px;' });
-    box.appendChild(el('div', { class: 'field-label', text: 'Late booking price (optional)' }));
-    box.appendChild(el('div', { class: 'hint', text:
+    box.appendChild(withHelp(el('div', { class: 'field-label', text: 'Late booking price (optional)' }),
       'A different price for somebody booking close to the start. Bundle entries are ' +
-      'never charged it — a family who paid in advance has already settled that evening.' }));
+      'never charged it \u2014 a family who paid in advance has already settled that evening.'));
     box.appendChild(checkField('fact-price-late-enabled', 'Charge a different price for late bookings',
                                late.enabled === true));
     box.appendChild(el('div', { class: 'fact-grid' }, [
@@ -1568,12 +1581,11 @@
 
   function drawBundles(box) {
     box.innerHTML = '';
-    box.appendChild(el('div', { class: 'field-label', text: 'Bundles (optional)' }));
-    box.appendChild(el('div', { class: 'hint', text:
+    box.appendChild(withHelp(el('div', { class: 'field-label', text: 'Bundles (optional)' }),
       'A number of sessions bought in advance at a fixed rate. A bundle is only OFFERED ' +
-      'when the calendar ahead can cover every entry inside its validity window — it is ' +
+      'when the calendar ahead can cover every entry inside its validity window \u2014 it is ' +
       'never quietly sold at a smaller size. If we later cancel a session it cannot replace, ' +
-      'the difference is credited back at the rate that was paid.' }));
+      'the difference is credited back at the rate that was paid.'));
 
     S.bundles.forEach(function (b, i) {
       var id = b.bundleId;
@@ -1750,7 +1762,13 @@
   function drawGroups(box) {
     box.innerHTML = '';
     var list = S.groups || [];
-    box.appendChild(el('div', { class: 'hint', text: list.length > 1
+    // The COUNT is what is true right now; the paragraph about what a count
+    // means is the manual, and goes behind the (i). Two texts, because one
+    // group and two are genuinely different arrangements.
+    box.appendChild(withHelp(
+      el('div', { class: 'field-label',
+                  text: list.length === 1 ? 'One group' : list.length + ' groups' }),
+      list.length > 1
       ? 'This activity has more than one group, so a family CHOOSES one when they register \u2014 ' +
         'the names are published, they go on the roster and on every receipt, and each group ' +
         'keeps its own ages, teachers, language, level, room and timetable. Every group has ' +
@@ -1758,7 +1776,7 @@
       : 'One group, so nobody is asked to choose: the name is not published and the family is ' +
         'assigned to it. Everything about the class \u2014 ages, teachers, language, level, room, ' +
         'timetable \u2014 is set on its page. Add a second group only when a family genuinely has ' +
-        'to pick between them.' }));
+        'to pick between them.'));
 
     list.forEach(function (g) {
       var open = el('button', { type: 'button', class: 'add-btn', text: 'Open this group \u2192',
@@ -2023,13 +2041,15 @@
 
     page.appendChild(el('div', { class: 'panel' }, [
       back,
-      el('h2', { text: many ? 'Group · ' + groupLabel({ name: e.name }) : 'The class' }),
-      el('div', { class: 'hint', text: many
+      el('h2', {}, [
+        el('span', { text: many ? 'Group · ' + groupLabel({ name: e.name }) : 'The class' }),
+        window.AdminHelp.badge(many
         ? 'Everything about this group. A family picks between the groups by NAME when they ' +
-          'register, so it is required — and every group has to add up to the same number of ' +
+          'register, so it is required \u2014 and every group has to add up to the same number of ' +
           'teaching hours, because one price buys the activity whichever one they join.'
         : 'Everything about this class. With one group nobody is asked to choose: the name is ' +
-          'not published and a family is simply assigned to it, so it can be left blank.' })
+          'not published and a family is simply assigned to it, so it can be left blank.')
+      ])
     ]));
 
     // --- who they are --------------------------------------------------------

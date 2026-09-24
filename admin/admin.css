@@ -89,14 +89,58 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--olive);
 input:disabled,textarea:disabled,select:disabled{background:#f2f0ea;color:#8b8b84;cursor:not-allowed;}
 .hint{font-size:11.5px;color:var(--muted);margin-top:4px;font-weight:400;text-transform:none;letter-spacing:0;}
 
+/* ⚠ AN EXPLANATION IS A CONTROL, NOT A PARAGRAPH — see js/admin-help.js.
+   `.hint` survives for the things that are TRUE RIGHT NOW: an empty state, a
+   computed total, a count of dates. What moved behind the (i) is the part that
+   would read the same on an empty activity as on a full one. */
+/* ⚠ THE WRAPPER TAKES OVER THE LABEL'S BOTTOM MARGIN rather than removing it.
+   A label is `display:block; margin-bottom:5px` and the control under it is
+   spaced by exactly that; dropping the margin without putting it back closes
+   every field on every admin screen by five pixels, which nothing errors about
+   and nobody can point at. */
+.label-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:5px;}
+.label-row > label,.label-row > .field-label{margin:0;}
+button.help{
+  flex:none;appearance:none;cursor:pointer;
+  width:16px;height:16px;padding:0;border-radius:999px;
+  border:1px solid var(--muted);background:transparent;color:var(--muted);
+  font:600 11px/1 Georgia,'Times New Roman',serif;font-style:italic;
+  display:inline-grid;place-items:center;vertical-align:1px;
+  margin-inline-start:6px;
+}
+/* Outlined and small on purpose: it sits beside a label and is not the thing
+   on the screen to press. Solid fill plus a full pill is what this project
+   reserves for an action, and a badge shaped like one gets pressed instead of
+   the button it is explaining. */
+button.help:hover{border-color:var(--navy);color:var(--navy);}
+button.help:focus-visible{outline:2px solid var(--terracotta);outline-offset:2px;}
+button.help[aria-expanded="true"]{background:var(--navy);border-color:var(--navy);color:#fff;}
+h2 > button.help,h3 > button.help{vertical-align:2px;}
+
+.help-pop{
+  position:fixed;z-index:200;max-width:min(320px,calc(100vw - 16px));
+  background:#fff;color:var(--ink);border:1px solid var(--stone);border-radius:8px;
+  padding:10px 12px;font-size:12.5px;line-height:1.5;font-weight:400;
+  box-shadow:0 2px 4px rgba(0,0,0,.05),0 12px 28px -12px rgba(0,0,0,.35);
+}
+@media print{button.help,.help-pop{display:none;}}
+
 .settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;}
 
 /* Three columns, HE / EN / RU side by side. Not tabs: translating is a
    comparison task and you cannot compare what you cannot see at once. */
 .field-row{border-top:1px solid #eee7d8;padding:14px 0;}
 .field-row:first-of-type{border-top:none;padding-top:0;}
-.field-row > .field-label{font-size:12.5px;font-weight:800;color:var(--navy);
+/* ⚠ A DESCENDANT SELECTOR, NOT A CHILD ONE, because the label now sits inside
+   a .label-row whenever it carries an (i). The child combinator was correct and
+   silently stopped matching the moment the wrapper appeared — the same cascade
+   collision `.acc-field > label` was, one directory over, and the same shape:
+   nothing errors, the rule simply stops applying and the heading loses its
+   weight and its colour. */
+.field-row .field-label{font-size:12.5px;font-weight:800;color:var(--navy);
   text-transform:none;letter-spacing:0;margin-bottom:8px;}
+.field-row > .label-row{margin-bottom:8px;}
+.field-row > .label-row > .field-label{margin-bottom:0;}
 .lang-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
 .lang-cell label{font-size:10.5px;color:var(--camel);}
 .lang-cell[dir=rtl] input,.lang-cell[dir=rtl] textarea{text-align:right;}
@@ -204,6 +248,10 @@ input:disabled,textarea:disabled,select:disabled{background:#f2f0ea;color:#8b8b8
 .fact-block{border-top:1px solid #eee7d8;padding:16px 0;}
 .fact-block:first-child{border-top:none;padding-top:0;}
 .fact-head{display:flex;align-items:flex-start;gap:16px;margin-bottom:10px;}
+/* The head is a flex row and its first child is now the label ROW, so the
+   `flex:1` that made the label push the controls to the far end has to move
+   out with it. */
+.fact-head > .label-row{flex:1;margin-bottom:0;}
 .fact-head .field-label{flex:1;font-size:12.5px;font-weight:800;color:var(--navy);
   text-transform:none;letter-spacing:0;margin:0;}
 .fact-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;}

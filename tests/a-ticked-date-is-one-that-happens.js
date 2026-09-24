@@ -98,7 +98,7 @@ const boxes = (n) => all(n, (x) => x.tagName === 'INPUT' && x.attributes.type ==
 const buttons = (n, label) =>
   all(n, (x) => x.tagName === 'BUTTON' && x.textContent.indexOf(label) !== -1);
 
-const ctx = { document: { createElement: node }, result: null };
+const ctx = { document: { createElement: node }, window: H.adminHelpWindow(node), result: null };
 vm.createContext(ctx);
 vm.runInContext(elSrc + '\n' + calSrc + '\nresult = sessionCalendarBox;', ctx);
 const sessionCalendarBox = ctx.result;

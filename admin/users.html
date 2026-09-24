@@ -45,10 +45,8 @@
         <div class="settings-grid">
           <div><label for="u-name">Name</label><input type="text" id="u-name"></div>
           <div><label for="u-email">Email</label><input type="email" id="u-email"></div>
-          <div><label for="u-role">Role</label><select id="u-role"></select>
-            <div class="hint" id="role-hint"></div></div>
-          <div><label for="u-pass">Password</label><input type="password" id="u-pass" autocomplete="new-password">
-            <div class="hint">At least 8 characters. There is no reset email — you set it and tell them.</div></div>
+          <div><div class="label-row"><label for="u-role">Role</label><span id="role-help"></span></div><select id="u-role"></select></div>
+          <div><div class="label-row"><label for="u-pass">Password</label><span data-hint="At least 8 characters. There is no reset email &mdash; you set it and tell them."></span></div><input type="password" id="u-pass" autocomplete="new-password"></div>
         </div>
         <div class="actions" style="position:static;margin-top:16px;">
           <button type="button" class="btn btn-publish" id="u-save">Create account</button>
@@ -60,6 +58,7 @@
 </div>
 
 <script src="/js/admin-session.js"></script>
+<script src="/js/admin-help.js"></script>
 <script src="/js/password-reveal.js"></script>
 <script>
 (function () {
@@ -90,6 +89,7 @@
            (role.permissions.users && role.permissions.users.access ? ' · manages accounts' : '');
   }
 
+  var roleHelp = null;
   function renderRoles() {
     var sel = $('u-role');
     sel.innerHTML = '';
@@ -98,9 +98,17 @@
       o.value = r.id; o.textContent = r.name;
       sel.appendChild(o);
     });
+    // ⚠ THE ONE HINT IN THE ADMIN WHOSE WORDS CHANGE WITH THE SCREEN, so it is
+    // the one that needs setText rather than a badge built once. The sentence
+    // describes the SELECTED role, and a badge left holding the previous one
+    // would be worse than no badge at all.
+    if (!roleHelp) {
+      roleHelp = window.AdminHelp.badge('');
+      $('role-help').appendChild(roleHelp);
+    }
     sel.onchange = function () {
       var r = roles.filter(function (x) { return x.id === sel.value; })[0];
-      $('role-hint').textContent = r ? describe(r) : '';
+      window.AdminHelp.setText(roleHelp, r ? describe(r) : '');
     };
     sel.onchange();
   }

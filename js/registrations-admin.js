@@ -436,9 +436,11 @@
     ]));
 
     if (!rows.length) {
-      box.appendChild(el('p', { class: 'hint',
-        text: 'Nobody has booked this evening yet. A registration holds no place on a date — '
-            + 'a family books each evening they are coming.' }));
+      box.appendChild(el('div', { class: 'label-row' }, [
+        el('p', { class: 'hint', style: 'margin-top:0;', text: 'Nobody has booked this evening yet.' }),
+        window.AdminHelp.badge('A registration holds no place on a date \u2014 a family books each '
+          + 'evening they are coming, and the capacity you set governs the room on one night.')
+      ]));
       return;
     }
 
@@ -559,11 +561,12 @@
       box.appendChild(el('p', { class: 'hint', text: 'This activity has no dates in its calendar yet.' }));
       return;
     }
-    box.appendChild(el('p', { class: 'hint', text:
-      'One code per evening. Print or show the one for the date — each works only ' +
-      'on its own day, and stops working when that day ends. Anyone holding it can ' +
-      'see the names booked for that evening and mark any of them present; nobody ' +
-      'can book, cancel or see money with it.' }));
+    box.appendChild(el('div', { class: 'label-row' }, [
+      el('div', { class: 'field-label', text: 'One code per evening' }),
+      window.AdminHelp.badge('Print or show the one for the date \u2014 each works only on its own ' +
+        'day, and stops working when that day ends. Anyone holding it can see the names booked for ' +
+        'that evening and mark any of them present; nobody can book, cancel or see money with it.')
+    ]));
 
     d.codes.forEach(function (c) {
       var art = el('div', { class: 'qr-art' });
@@ -621,10 +624,12 @@
       box.appendChild(el('p', { class: 'hint', text: 'Nobody has bought a bundle for this activity.' }));
       return;
     }
-    box.appendChild(el('p', { class: 'hint', text:
-      'Sessions bought in advance. Entries left is derived from the dates used, never ' +
-      'stored — and a date we cancel that cannot be replaced is credited back at the ' +
-      'rate that was paid, by the nightly pass, once the activity is over.' }));
+    box.appendChild(el('div', { class: 'label-row' }, [
+      el('div', { class: 'field-label', text: 'Sessions bought in advance' }),
+      window.AdminHelp.badge('Entries left is derived from the dates used, never stored \u2014 and a ' +
+        'date we cancel that cannot be replaced is credited back at the rate that was paid, by the ' +
+        'nightly pass, once the activity is over.')
+    ]));
 
     list.forEach(function (b) {
       var head = el('div', { class: 'bundle-head' }, [
@@ -714,10 +719,14 @@
 
     var panel = el('div', { class: 'modal' }, [
       el('h3', { text: K.verb + ' · ' + r.name }),
-      el('p', { class: 'hint', text:
-        'This is what ' + (draft.to || 'the family') + ' will receive, in ' +
-        LANG_NAME[draft.lang] + ' — the language they read. Send it as it is, or ' +
-        'add a reason. ' + K.hint }),
+      // The recipient and the language are what is true of THIS message and
+      // stay on screen; the rule behind the feature is an (i).
+      el('div', { class: 'label-row' }, [
+        el('p', { class: 'hint', style: 'margin-top:0;', text:
+          'This is what ' + (draft.to || 'the family') + ' will receive, in ' +
+          LANG_NAME[draft.lang] + ' \u2014 the language they read.' }),
+        window.AdminHelp.badge('Send it as it is, or add a reason. ' + K.hint)
+      ]),
       // What the ledger will record, on its own line rather than left to be
       // spotted inside the prose. ABSENT when there is nothing to credit:
       // "credits €0.00" reads as a decision taken against the family rather
@@ -885,8 +894,11 @@
         openAccount(r);
       });
     });
+    // ⚠ AN EXPLANATION IS A CONTROL — see js/admin-help.js. The heading names
+    // the action; what it does to the ledger is behind the (i).
     return el('div', { style: 'margin-top:16px;padding-top:14px;border-top:1px solid #f0ece1;' }, [
-      el('div', { class: 'hint', text: hint }),
+      el('div', { class: 'label-row' },
+        [el('div', { class: 'field-label', text: title }), window.AdminHelp.badge(hint)]),
       el('div', { style: 'display:flex;gap:8px;margin-top:8px;align-items:center;' },
         [amount, note, btn])
     ]);

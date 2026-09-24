@@ -250,6 +250,32 @@ async function signUp(auth, blobs, body) {
   return res;
 }
 
+// ⚠ THE ADMIN RUNTIME NOW INCLUDES js/admin-help.js, so a VM executing admin
+// client code has to provide it exactly as it provides `document`.
+//
+// Every explanation in the admin is an (i) beside its label rather than a
+// paragraph under it, and the builder lives in one file loaded by all five admin
+// pages. A VM that left `window` undefined would throw the moment a field with a
+// hint is drawn — which is the right failure: a silent fallback that returned the
+// label unchanged would let a page ship with every explanation missing and every
+// test still green.
+function adminHelpWindow(makeNode) {
+  return {
+    AdminHelp: {
+      badge: function (text) {
+        var n = makeNode('button');
+        n.className = 'help';
+        n.textContent = 'i';
+        n._helpText = String(text == null ? '' : text);
+        return n;
+      },
+      setText: function (n, text) { if (n) n._helpText = String(text == null ? '' : text); },
+      wire: function () {},
+      close: function () {}
+    }
+  };
+}
+
 // Call a handler the way Netlify does.
 async function call(handler, body) {
   const res = await handler({ httpMethod: 'POST', body: JSON.stringify(body) });
@@ -258,5 +284,6 @@ async function call(handler, body) {
 
 module.exports = {
   ok, eq, done, fnPath, makeBlobs, makeGithub, loadWithStubs,
-  superAdminSession, ruReviewerSession, seedRepo, call, installSession, confirmAddress, signUp
+  superAdminSession, ruReviewerSession, seedRepo, call, installSession, confirmAddress, signUp,
+  adminHelpWindow
 };

@@ -57,8 +57,7 @@
         <!-- The square picture belongs with the other things that identify the
              activity rather than in a panel of its own. -->
         <div id="card-image-panel" style="margin-top:24px;">
-          <h3>Card image</h3>
-          <p class="hint" style="margin:6px 0 14px;">A square picture, shown at the top of the activity's own page and on the activities listing. Any shape is accepted and cropped to a square from the centre, so keep the subject — and any text — away from the edges. Shared links use the share image in Search &amp; sharing, not this one.</p>
+          <h3 data-hint="A square picture, shown at the top of the activity's own page and on the activities listing. Any shape is accepted and cropped to a square from the centre, so keep the subject — and any text — away from the edges. Shared links use the share image in Search &amp; sharing, not this one.">Card image</h3>
           <div id="card-image"></div>
         </div>
       </div>
@@ -69,8 +68,7 @@
       </div>
 
       <div class="panel" id="list-teachers-panel">
-        <h2>Teachers</h2>
-        <p class="hint" style="margin:-8px 0 14px;">Any number. They render as a row that wraps.</p>
+        <h2 data-hint="Any number. They render as a row that wraps.">Teachers</h2>
         <div class="items" id="list-teachers"></div>
         <button type="button" class="add-btn" data-add="teachers" style="margin-top:12px;">+ Add a teacher</button>
       </div>
@@ -119,7 +117,7 @@
            the same checkbox repeated on every group's page — the same setting
            editable from two places is a trap this codebase has already met. -->
       <div class="panel">
-        <h2>What is published</h2>
+        <h2 data-hint="Every fact is published unless it is ticked here. A members-only fact is left out of the page ENTIRELY &mdash; never rendered and hidden, because the file is static and anyone can read its source. It applies to the whole activity, so a fact every group fills in is published, or none of them is.">What is published</h2>
         <div id="visibility-fields"></div>
       </div>
 
@@ -133,8 +131,7 @@
            mergeRegistration on the server. Switch a course to a drop-in and back
            and the term settings are still there. -->
       <div class="panel" id="registration-panel">
-        <h2>Registration</h2>
-        <p class="hint" style="margin:-8px 0 14px;">Nothing here is published on the page. It is what the registration system will read when it exists. Changing any of it applies to registrations taken afterwards only &mdash; everything already submitted keeps the terms it was given.</p>
+        <h2 data-hint="Nothing here is published on the page. It is what the registration system will read when it exists. Changing any of it applies to registrations taken afterwards only &mdash; everything already submitted keeps the terms it was given.">Registration</h2>
         <div id="registration-fields"></div>
       </div>
 
@@ -149,8 +146,7 @@
            change. Sitting among the content fields, "Meta description" read as
            more body copy to write. -->
       <div class="panel" id="seo-panel">
-        <h2>Search &amp; sharing</h2>
-        <p class="hint" style="margin:-8px 0 14px;">How this activity appears in search results and when someone shares the link. Leave a field empty and the page falls back to the title and the site defaults.</p>
+        <h2 data-hint="How this activity appears in search results and when someone shares the link. Leave a field empty and the page falls back to the title and the site defaults.">Search &amp; sharing</h2>
         <div id="seo-fields"></div>
         <div id="seo-options" style="margin-top:18px;"></div>
         <!-- The share card. Without one, a shared link uses the site's own
@@ -176,8 +172,7 @@
       </div>
 
       <div class="panel" id="preview-panel" hidden>
-        <h2>Preview</h2>
-        <p class="hint" style="margin:-8px 0 12px;">Rendered by the same function that publishes. What you see here is what gets committed.</p>
+        <h2 data-hint="Rendered by the same function that publishes. What you see here is what gets committed.">Preview</h2>
         <div class="preview-tabs" id="preview-tabs"></div>
         <iframe id="preview-frame" title="Preview"></iframe>
         <ul class="file-list" id="preview-files"></ul>
@@ -188,6 +183,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.min.js"></script>
 <script src="/js/admin-session.js"></script>
+<script src="/js/admin-help.js"></script>
 <script src="/js/image-optimize.js"></script>
 <script src="/js/repeatable-items.js"></script>
 <script src="/js/activities-admin.js"></script>

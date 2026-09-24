@@ -84,8 +84,12 @@ const admin = require(H.fnPath('activities-admin'))._internal;
   });
   H.ok(markup.indexOf('id="facts"') === -1, 'the single "facts" mount is gone, not left behind');
   H.ok(!/<h2>Activity facts<\/h2>/.test(markup), 'and so is the heading that held all three');
-  ['<h2>Groups</h2>', '<h2>Price</h2>', '<h2>What is published</h2>'].forEach((h) => {
-    H.ok(markup.indexOf(h) !== -1, 'panel heading present: ' + h);
+  // ⚠ MATCHED BY TEXT, NOT BY THE WHOLE TAG. A panel heading may carry a
+  // `data-hint`, which is how an explanation reaches the (i) beside it — see
+  // js/admin-help.js — and pinning the literal `<h2>…</h2>` made adding one look
+  // like deleting the panel.
+  ['Groups', 'Price', 'What is published'].map((t) => new RegExp('<h2[^>]*>' + t + '</h2>')).forEach((h) => {
+    H.ok(h.test(markup), 'panel heading present: ' + h);
   });
 
   // The override belongs with the GROUPS, because what it replaces is the line

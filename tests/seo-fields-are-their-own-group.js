@@ -71,7 +71,9 @@ H.ok(/const SIMPLE_KEYS = FIELD_SCHEMA\.simple[\s\S]{0,160}FIELD_SCHEMA\.seo/.te
 
 console.log('\n[the form renders it, in its own panel, at the end]');
 H.ok(adminHtml.indexOf('id="seo-fields"') !== -1, 'the panel container exists');
-H.ok(/<h2>Search &amp; sharing<\/h2>/.test(adminHtml), 'and is headed like every other section');
+// The heading may carry a `data-hint` — the explanation that used to sit under
+// it as a paragraph is an (i) beside it now. See js/admin-help.js.
+H.ok(/<h2[^>]*>Search &amp; sharing<\/h2>/.test(adminHtml), 'and is headed like every other section');
 // Grouping is only real if it is at the end: a "Search & sharing" panel sitting
 // above "What to bring" would be a heading, not a separation.
 H.ok(adminHtml.indexOf('id="seo-panel"') > adminHtml.indexOf('id="list-faq-panel"'),

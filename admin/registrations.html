@@ -44,11 +44,7 @@
         <!-- Drop-in only, for the same reason: a course sells nothing in
              advance, so there is nothing here to list. -->
         <button type="button" class="add-btn" id="btn-bundles" style="margin-top:12px;" hidden>Bundles bought</button>
-        <button type="button" class="add-btn" id="btn-sweep" style="margin-top:12px;">Expire unanswered requests</button>
-        <div class="hint" id="sweep-hint" style="margin-top:6px;">
-          Runs nightly on its own. The place is already free either way — this only
-          updates what the queue says and tells the family.
-        </div>
+        <div class="label-row" id="sweep-row" style="margin-top:12px;"><button type="button" class="add-btn" id="btn-sweep">Expire unanswered requests</button><span data-hint="Runs nightly on its own. The place is already free either way — this only updates what the queue says and tells the family."></span></div>
       </div>
     </div>
 
@@ -90,6 +86,7 @@
      not the ability to use it. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="/js/admin-session.js"></script>
+<script src="/js/admin-help.js"></script>
 <script src="/js/registrations-admin.js"></script>
 </body>
 </html>

@@ -419,6 +419,7 @@ console.log('\n[a two-group activity survives a save]');
 
   const drawCtx = {
     document: { createElement: node },
+    window: H.adminHelpWindow(node),
     DAY_NAMES: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
     canEditAll: () => true,
     openGroupPage: (id) => { drawCtx.opened = id; },
@@ -426,7 +427,7 @@ console.log('\n[a two-group activity survives a save]');
   };
   vm.createContext(drawCtx);
   vm.runInContext(elSrc + '\n' +
-    ['mintGroupId', 'groupById', 'groupLabel', 'liveDates', 'groupSummary',
+    ['withHelp', 'mintGroupId', 'groupById', 'groupLabel', 'liveDates', 'groupSummary',
      'blankGroupFacts', 'drawGroups', 'duplicateGroup'].map(slice).join('\n') +
     '\nexports = { drawGroups, groupSummary };', drawCtx);
 
@@ -441,8 +442,15 @@ console.log('\n[a two-group activity survives a save]');
   let box = node('div');
   drawCtx.exports.drawGroups(box);
   H.eq(buttons(box, 'Open this group').length, 1, 'one group draws one way in');
-  H.ok(box.textContent.indexOf('One group, so nobody is asked to choose') !== -1,
-    'and the hint says what one group means rather than describing a choice');
+  // ⚠ READ OFF THE (i), NOT OFF THE PAGE. Every explanation in the admin is a
+  // control now rather than a paragraph — see js/admin-help.js — so the words
+  // live on the badge and the line on screen is the COUNT, which is the part
+  // that is true of this activity rather than of activities in general.
+  const helpText = (n) => walk(n, (x) => (x.className || '') === 'help')
+    .map((x) => x._helpText).join(' ');
+  H.ok(box.textContent.indexOf('One group') !== -1, 'the line on screen is the count');
+  H.ok(helpText(box).indexOf('One group, so nobody is asked to choose') !== -1,
+    'and the (i) says what one group means rather than describing a choice');
   H.ok(box.textContent.indexOf('Wednesday 16:00') !== -1, 'with its timetable summarised on the row');
   H.ok(box.textContent.indexOf('up to 20') !== -1, 'and its places');
 
@@ -461,8 +469,9 @@ console.log('\n[a two-group activity survives a save]');
   ] }, withSchema);
   box = node('div');
   drawCtx.exports.drawGroups(box);
-  H.ok(box.textContent.indexOf('a family CHOOSES one when they register') !== -1,
-    'two groups says that a family chooses');
+  H.ok(box.textContent.indexOf('2 groups') !== -1, 'the line on screen counts them');
+  H.ok(helpText(box).indexOf('a family CHOOSES one when they register') !== -1,
+    'and the (i) says that a family chooses');
   H.eq(buttons(box, 'Duplicate').length, 2, 'and each one can be duplicated');
   buttons(box, 'Duplicate')[0].click();
   H.eq(drawCtx.S.groups.length, 3, 'duplicating adds a third');
