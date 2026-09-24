@@ -35,14 +35,24 @@ const read = (p) => fs.readFileSync(path.join(R, p), 'utf8');
 const memberSession = read('js/member-session.js');
 const memberAccount = read('js/member-account.js');
 
+// ⚠ CONFIRMED, AND IT USED TO BE DELIBERATELY UNCONFIRMED.
+//
+// This suite was built around a split that no longer exists: a course asked for
+// a confirmed address and a drop-in did not, so the whole booking flow below ran
+// on an account nobody had confirmed and that WAS the point. QA registered and
+// paid for a drop-in that way and asked whether it was meant to be possible. It
+// was not: the same request writes a minor's name and date of birth and then
+// opens Checkout, and a class on Tuesday stores exactly the record a term does.
+//
+// So the flow runs confirmed, and UNCONFIRMED is its own section at the end —
+// which is now the same answer for both shapes.
 const ACCOUNT = {
   accountId: 'a-1', email: 'michal@example.com',
-  // ⚠ DELIBERATELY UNVERIFIED. This is the account that could not pay, and the
-  // whole flow this suite describes is the one it refused: sign up, register,
-  // pay, in one sitting.
-  emailVerifiedAt: null,
+  emailVerifiedAt: '2026-01-01T00:00:00Z',
   profile: { firstName: 'Michal', preferredLanguage: 'en' }
 };
+const UNCONFIRMED = { me: () => ({ ok: true, expiresAt: Date.now() + 1e7,
+  account: Object.assign({}, ACCOUNT, { emailVerifiedAt: null }) }) };
 const PARTICIPANTS = [
   { participantId: 'p-1', firstName: 'Michal', lastName: 'Shinitzky', isSelf: true, isPrimary: true },
   { participantId: 'p-2', firstName: 'Noa', lastName: 'Levi', isSelf: false, isPrimary: true }
@@ -247,31 +257,33 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
   H.ok(asked > before, 'the dates are re-read — what changed is on the screen they are looking at');
   H.ok(d2.mount.textContent.indexOf('no longer available') !== -1, 'and the family is told why');
 
-  // ⚠ AND THE COURSE HALF IS WHERE THE SPLIT NOW SHOWS FIRST.
+  // ⚠ AND AN UNCONFIRMED ADDRESS MEETS THE SAME WALL ON BOTH SHAPES.
   //
-  // This account is deliberately unverified — it is the one that could not pay,
-  // and the whole drop-in flow above ran on it without ever being asked. A
-  // confirmed address is now required to REGISTER for a course rather than to
-  // pay for one, so the same account meets a wall here and nowhere above. That
-  // asymmetry IS the rule, executed rather than read.
-  console.log('\n[a course asks for a confirmed address, and a drop-in never has]');
-  sent.length = 0;
-  const unverified = await screen({ view: 'activity', lang: 'en', search: '?register=hebrew' });
-  H.eq(D.byTag(unverified.mount, 'form').length, 0,
-    'no registration form at all — a filled-in form that always loses is worse than none');
-  H.ok(has(unverified, 'confirm your email address'), 'the reason is on screen');
-  H.ok(has(unverified, 'Send again'),
-    'and the ONE control that clears it is under the sentence asking for it, not on another page');
-  unverified.mount.querySelector('.acc-notice').childNodes
-    .filter((n) => n.tagName === 'BUTTON')[0].click();
-  await settle();
-  H.ok(sent.some((b) => b.action === 'resendVerification'), 'and it resends');
+  // It used to meet it on the course only, and the drop-in panel above drew a
+  // full date picker for an account nobody had confirmed. The register panel
+  // asks the question ONCE, above the branch that chooses between the two
+  // shapes, so a third shape added later inherits it rather than copying it.
+  console.log('\n[neither shape is registered for from an address nobody has proved]');
+  for (const [what, query] of [['a course', '?register=hebrew'], ['a drop-in', '?register=folk']]) {
+    sent.length = 0;
+    const unverified = await screen({ view: 'activity', lang: 'en', search: query,
+      api: UNCONFIRMED });
+    H.eq(D.byTag(unverified.mount, 'form').length, 0,
+      what + ': no registration form at all — a filled-in form that always loses is worse than none');
+    H.eq(D.byClass(unverified.mount, 'acc-date').length, 0,
+      what + ': and no date picker either');
+    H.ok(has(unverified, 'confirm your email address'), what + ': the reason is on screen');
+    H.ok(has(unverified, 'Send again'),
+      what + ': and the ONE control that clears it is under the sentence asking for it');
+    unverified.mount.querySelector('.acc-notice').childNodes
+      .filter((n) => n.tagName === 'BUTTON')[0].click();
+    await settle();
+    H.ok(sent.some((b) => b.action === 'resendVerification'), what + ': and it resends');
+  }
 
   console.log('\n[a course is otherwise untouched by any of this]');
   sent.length = 0;
-  const d3 = await screen({ view: 'activity', lang: 'en', search: '?register=hebrew',
-    api: { me: () => ({ ok: true, expiresAt: Date.now() + 1e7,
-      account: Object.assign({}, ACCOUNT, { emailVerifiedAt: '2026-01-01T00:00:00Z' }) }) } });
+  const d3 = await screen({ view: 'activity', lang: 'en', search: '?register=hebrew' });
   H.eq(D.byClass(d3.mount, 'acc-date').length, 0, 'no date picker on a term');
   H.ok(has(d3, '4 places left'), 'and the places-left line is still there, where it means something');
   D.byTag(d3.mount, 'form')[0].submit();
@@ -361,22 +373,22 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
     'money is not split across blobs by a figure nobody checked — that lands it ' +
     'against the wrong debt, which is worse than money nobody can place');
 
-  console.log('\n[and the gate that stopped all this is now a COURSE rule]');
-  // THE SAME UNVERIFIED ACCOUNT as every screen above. That is the point: it
-  // walked the whole drop-in flow to Checkout, and on a term it is still asked
-  // to confirm its address first — a considered commitment can carry a minute of
-  // friction once; a walk-up cannot carry it at all.
-  const term = await screen({ view: 'activity', lang: 'en', search: '?p=p-1&a=act-1' });
-  H.ok(term.mount.textContent.indexOf('confirm your email address') !== -1,
-    'a term tells an unverified family to confirm their address');
-  H.eq(D.byTag(term.mount, 'button').filter((b) => /Pay securely/.test(b.textContent)).length, 0,
-    'and draws no pay button — shown rather than hidden, because the resend is on the dashboard');
-
-  const walk = await screen({ view: 'activity', lang: 'en', search: '?p=p-1&a=act-2' });
-  H.ok(walk.mount.textContent.indexOf('confirm your email address') === -1,
-    'a drop-in asks the same family for nothing');
-  H.eq(D.byTag(walk.mount, 'button').filter((b) => /Pay securely/.test(b.textContent)).length, 1,
-    'and gives them the button');
+  console.log('\n[and the cost card asks it of both too]');
+  // It used to ask on a term and not on a drop-in, reading `r.type !== 'dropin'`
+  // — the client's copy of a split the server no longer makes. A client that
+  // hides a button the server would honour, or offers one it will refuse, looks
+  // broken either way, so the two read the same field; this one has no field
+  // left to read.
+  for (const [what, query] of [['a term', '?p=p-1&a=act-1'], ['a drop-in', '?p=p-1&a=act-2']]) {
+    const card = await screen({ view: 'activity', lang: 'en', search: query, api: UNCONFIRMED });
+    H.ok(card.mount.textContent.indexOf('confirm your email address') !== -1,
+      what + ': an unconfirmed family is told why, rather than shown a missing button');
+    H.eq(D.byTag(card.mount, 'button').filter((b) => /Pay securely/.test(b.textContent)).length, 0,
+      what + ': and no pay button');
+  }
+  const paid = await screen({ view: 'activity', lang: 'en', search: '?p=p-1&a=act-2' });
+  H.eq(D.byTag(paid.mount, 'button').filter((b) => /Pay securely/.test(b.textContent)).length, 1,
+    'and a confirmed one gets the button');
 
   console.log('\n[the bundle card, on the activity page]');
   const bun = await screen({ view: 'activity', lang: 'en', search: '?p=p-1&a=act-2' });

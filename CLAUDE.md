@@ -3550,12 +3550,17 @@ and neither gate is about the pocket. It was written as a wallet feature rather
 than as a payment, which is why nobody asked — the same shape as the six files
 that claimed to arm the legal gate and were invisible to it.
 
-`verificationRefusal()` now has **three** call sites and the count is pinned, so
-a fourth door cannot be added without one. `isPayable()` is read here too, which
-is the same list `pay` and the emailed `/pay` link read. The per-**session**
-spend is exempt on purpose and says so in one explicit condition: an attendance
-record exists only for a drop-in, which never asks for a confirmed address, and
-a booked evening is a booking rather than a request somebody may refuse.
+`verificationRefusal()` now has **five** call sites and the count is pinned, so a
+sixth door cannot be added without one. `isPayable()` is read here too, which is
+the same list `pay` and the emailed `/pay` link read.
+
+⚠ **And the two gates are not the same shape, which is why the per-session spend
+skips one and not the other.** The address says whether we can reach this family
+at all, which is as true of an evening as of a term, so it is asked **outside**
+the branch — it used to sit inside it, on the reasoning that "an attendance
+record exists only for a drop-in, which never asks for a confirmed address", and
+a drop-in asks now. The approval gate stays inside: a booked evening is already a
+booking rather than a request somebody may still refuse.
 
 ⚠ **And the client made it worse rather than hiding it.** The credit button was
 drawn **above** the block that decides whether to draw the pay button, so a
@@ -4479,102 +4484,86 @@ than from a round number.
 The activity page still books **one evening at a time**, with a Pay button on
 each. That is the remaining surface running the old shape.
 
-### ⚠ The verified-address gate is a COURSE rule, asked at the FRONT
+### ⚠ The verified-address gate, asked at the FRONT, of everything
 
-It has been wrong in both directions inside a week, which is why it is now one
-function with a test around it: `verificationRefusal()` in
-`account-registrations.js`.
+It has now been wrong in three directions, which is why it is one function with
+a test around it: `verificationRefusal()` in `account-registrations.js`.
 
-⚠ **AND IT USED TO BE ASKED ONLY AT PAYMENT, WHICH WAS THE WRONG PLACE IN BOTH
+⚠ **IT USED TO BE ASKED ONLY AT PAYMENT, WHICH WAS THE WRONG PLACE IN BOTH
 DIRECTIONS.** A family registered, waited days for an admin to answer, opened the
 email saying they had a place — and met the wall *there*. Friction discovered
 after the commitment rather than before it reads as a system that changed its
 mind, and it is the one ordering that makes a one-minute task feel like a
 refusal.
 
-The stronger half of the argument has nothing to do with money. It let us store
-a **minor's name and date of birth** against an address nobody had shown they
-could read, and then send the confirmation, the approval, the expiry apology and
-every later message about that child to it. The registration itself is the thing
-the address has to be good for.
+The stronger half of the argument has nothing to do with money. It let us store a
+**minor's name and date of birth** against an address nobody had shown they could
+read, and then send the confirmation, the approval, the expiry apology and every
+later message about that child to it. The registration itself is the thing the
+address has to be good for.
 
 So `submit` asks, **before `openRegistration()`**, so a refusal leaves no record
 behind. The doors further down **stay**: a registration taken before this existed
 sits on an unverified account already, and the client is hostile by assumption.
 What changed is that they now almost never fire.
 
-**A course asks for a confirmed address. A drop-in does not.** The split is the
-friction each one can carry, not a difference in how much the payer is trusted.
-A term is a considered commitment — hundreds of euros, months of attendance, a
-place an admin agreed to — and a minute spent clicking a link in an inbox buys
-something real in return: the receipt, the reminders and every later message
-about that money reach an address somebody has proved is theirs. A drop-in is a
-walk-up: decided and paid for in one sitting, often by a family who signed up
-minutes earlier.
+⚠ **AND THEN IT EXEMPTED DROP-INS, WHICH WAS THE LAST WRONG ANSWER.** The split
+was argued on the friction each shape can carry — a term is a considered
+commitment worth a minute in an inbox, a drop-in is a walk-up decided and paid
+for in one sitting, often by a family who signed up minutes earlier — and it was
+reported back from QA in one line: *"Don't we need to confirm the account before
+being able to register to a drop in? Now, I was able to register and pay for a
+drop in before the account is approved."*
 
-It was on **everything** first. `emailVerifiedAt` had been stored since Phase 2,
-shown as a banner since Phase 6 and enforced by nothing; payment was where it was
-finally enforced, and it turned out to refuse exactly one flow and no others —
-sign up, register, pay, in one visit. On a pay-per-session activity that is not an
-edge case, it is **the** case.
+The exemption traded away the wrong thing. It is a **convenience** argument, and
+what it was buying convenience with is a child's record: `bookAndPay` writes a
+minor's name and date of birth and opens Checkout **in one request**, and a class
+on Tuesday stores exactly the record a term does. Every message about that
+booking — the confirmation, the receipt, a cancellation — then goes to an address
+nobody has proved.
 
-Then it came off everything, which was too far. The argument for removing it —
-that `/pay` is a link we ourselves email and is deliberately exempt, so a gate
-with a door we post through is not a gate — is a good argument about the
-**emailed** door and not a reason to drop the check where the friction is
-affordable and the message trail matters.
+So there is one rule, and ⚠ **`verificationRefusal()` TAKES NO TYPE.** That is
+the half worth keeping: a rule with a type in it is a rule each call site can get
+wrong, and one call site already had **no check at all** — `bookAndPay` sits
+behind a line refusing everything that is not a drop-in, so while the gate stood
+aside for a drop-in the check there would have been unreachable. The one flow
+with no confirmed address was also the one flow that wrote a child's record and
+then took money. With no parameter there is nothing to leave out, and a door
+added tomorrow inherits the rule instead of remembering it.
 
-Four things hold the rule together:
+Four things hold it together:
 
-- **One function, four call sites decided by it.** `submit` asks, from the
-  **activity's** type — there is no frozen one yet, because the record does not
-  exist. `pay` asks, from the **frozen** type on the registration, and never
-  opens the activity. `useCredit` asks, from the frozen type too, because
-  spending credit settles the same debt on the same record and the only thing
-  that differs is which pocket. `paySession` asks, from the activity, and today
-  that always passes, because an attendance record exists only for a drop-in;
-  the call is there anyway so a course that ever becomes payable by the session
-  inherits the rule instead of it being something to remember. `bookAndPay` does
-  not ask, and cannot need to: the line above it has already refused everything
-  that is not a drop-in. The count is pinned, because two of the four were
-  missing and nothing said so.
-- **⚠ A missing type reads as `course`, which inverts this file's usual rule.**
-  Every blank in `_credit.js` resolves towards the family; this one resolves
-  towards the gate. A record with no `type` was written before drop-ins existed,
-  so it *is* a course — and the errors are not symmetric: guessing drop-in skips
-  a gate somebody asked for, guessing course costs one verification email.
-- **The client reads the same field.** `regRow()` sends `frozen.type` with the
-  same `|| 'course'` default. Reading anything else would hide a button the
-  server would have honoured, which reads as a broken page rather than as a rule.
-- **The refusal is shown, not hidden — and it carries the fix.** An unverified
-  family on a term gets a line saying so rather than a missing button, because a
-  missing button teaches nobody anything. ⚠ On the **register** panel the form
-  is not drawn at all, which is the one place in the family area where a
-  cosmetic check replaces a control instead of greying one: the server will
-  refuse *every* time, and a filled-in form that always loses is worse than no
-  form — somebody picks a child, picks a group, presses, and is told what they
-  could have been told before they started. The **resend button is under the
-  sentence**, not on the dashboard: at the front of a registration this is the
-  first wall a family meets, and a refusal plus directions to another page is
-  most of the way to a missing button.
-- **The sentence stopped saying "before paying".** One message is shown at four
-  doors now, and naming only the last of them would be wrong at the one people
-  meet first. It names the act — registering for a course — and what to do.
+- **One function, five call sites, and the count is pinned** — `submit`,
+  `bookAndPay`, `pay`, `paySession` and `useCredit`. Three of the five were
+  missing at one time or another, which is the whole reason for counting them.
+- **The client reads the same field, and now has none to read.** `needsVerify` on
+  the cost card was `r.type !== 'dropin' && !emailVerifiedAt`; it is the second
+  half alone. A client reading a field the server has stopped reading hides a
+  button the server would have honoured, which reads as a broken page rather
+  than as a rule.
+- **The register panel asks ONCE, above the branch** that chooses between the
+  term form and the drop-in picker — so a third shape inherits it rather than
+  copying it. The form is **not drawn at all**, which is the one place in the
+  family area where a cosmetic check replaces a control instead of greying one:
+  the server will refuse *every* time, and a filled-in form that always loses is
+  worse than no form. The **resend button is under the sentence**, because this
+  is the first wall a family meets.
+- **The emailed `/pay` link stays exempt, by construction.** The token was mailed
+  to that address and nowhere else, so following it is itself proof of reading
+  that inbox — which is all `emailVerifiedAt` ever attested. It is still
+  deliberately not treated *as* a verification: confirming an address is a
+  separate act with separate consequences, and a payment must not quietly
+  perform one.
 
-`tests/what-stands-between-a-family-and-paying.js` pins all four call sites, the
-direction a blank falls, and that `emailVerifiedAt` is read in exactly one place
-in that file. The drop-in half is also *executed*, by
-`tests/a-drop-in-is-booked-and-paid-in-one-step.js`, whose account is unverified
-throughout — it walks the whole booking flow to Checkout on a drop-in and, on a
-term, is drawn no form at all.
+There is no longer a blank to resolve. The old rule read a missing `type` as
+`course`, inverting this file's usual direction on purpose; with one rule there
+is no type to be missing, and a whole class of asymmetry stops existing.
 
-⚠ **Moving it broke nine suites at once**, every one of which signed up and
-registered without ever touching the gate, and that is the clearest evidence it
-bites. They go through `H.signUp()` now, which signs up **and** confirms, so the
-next suite copies something correct; `H.confirmAddress(blobs, id, false)` clears
-it again, which is the only way to reach the state the payment-side gates still
-defend — a live registration on an unconfirmed account, no longer creatable
-through the handlers.
+`tests/what-stands-between-a-family-and-paying.js` pins all five call sites and
+that the helper knows nothing about activity types.
+`tests/a-drop-in-is-booked-and-paid-in-one-step.js` **executes** it: its account
+is confirmed and walks the whole booking flow to Checkout, and an unconfirmed one
+is drawn no form on either shape.
 
 ### Not built
 
@@ -4806,16 +4795,15 @@ old email cannot charge for a place since cancelled, and a part payment opens a
 session for what is *left*, not for the figure that was outstanding when the
 message went out.
 
-The second gate, a verified address, applies to a course — and this link is
+The second gate, a verified address, applies to everything — and this link is
 exempt from it
 **by construction and by something stronger**: the token was mailed to that
 address and nowhere else, so following it is itself proof of reading that inbox,
-which is all `emailVerifiedAt` ever attested. That exemption is the argument the
-whole split rests on — see **The verified-address gate is a COURSE rule**.
-Following the link is still deliberately **not** treated as a verification:
-confirming an address is a separate act with separate consequences, and a payment
-must not quietly perform one. So an emailed link pays a **course** without the
-gate; nothing else does.
+which is all `emailVerifiedAt` ever attested. See **The verified-address gate,
+asked at the FRONT, of everything**. Following the link is still deliberately
+**not** treated as a verification: confirming an address is a separate act with
+separate consequences, and a payment must not quietly perform one. So an emailed
+link pays without the gate; nothing else does.
 
 **Not single use**, the one place it parts company with the reset and verify
 tokens. Those grant something once; this names a debt, and a debt can

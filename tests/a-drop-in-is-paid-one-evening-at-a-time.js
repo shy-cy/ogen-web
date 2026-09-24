@@ -189,9 +189,10 @@ const HOUR = 3600 * 1000;
 
   // ------------------------------------------------------------ end to end ---
   console.log('\n[through the handlers]');
-  const signed = await H.call(auth.handler, {
-    action: 'signup', email: 'dana@example.com', password: 'password-123', termsAccepted: true,
-    profile: { firstName: 'Dana', preferredLanguage: 'en' } });
+  // H.signUp confirms the address. A drop-in asks for one now, exactly as a
+  // course does — see verificationRefusal(), which no longer takes a type.
+  const signed = await H.signUp(auth, blobs, {
+    email: 'dana@example.com', profile: { firstName: 'Dana', preferredLanguage: 'en' } });
   const dana = { token: signed.body.token, accountId: signed.body.account.accountId };
   const kid = async (n) => (await H.call(family.handler, {
     action: 'createParticipant', token: dana.token,

@@ -153,7 +153,7 @@
       waitBody: '{name} נרשם/ה. אנחנו משלימים כמה פרטים אחרונים, והתשלום ייפתח כאן. '
               + 'נעדכן אתכם במייל ברגע שאפשר.',
       payNeedsVerify: 'כדי לשלם, יש לאשר את כתובת האימייל. הקישור לאישור נמצא בעמוד החשבון.',
-      registerNeedsVerify: 'לפני הרשמה לקורס צריך לאשר את כתובת הדוא״ל. שלחנו לכם קישור — אם הוא לא הגיע:',
+      registerNeedsVerify: 'לפני ההרשמה צריך לאשר את כתובת הדוא״ל. שלחנו לכם קישור — אם הוא לא הגיע:',
       sessionsTitle: 'המפגשים', dateCol: 'תאריך', statusCol: 'סטטוס',
       book: 'הרשמה למפגש', cancelSession: 'ביטול מפגש',
       cancelSessionConfirm: 'לבטל את המפגש הזה?',
@@ -302,7 +302,7 @@
       waitBody: '{name} is registered. We\u2019re confirming the last few details, and payment '
               + 'will open here. We\u2019ll email you the moment it does.',
       payNeedsVerify: 'To pay, please confirm your email address. The link to resend it is on your account page.',
-      registerNeedsVerify: 'Please confirm your email address before registering for a course. We have sent you a link — if it has not arrived:',
+      registerNeedsVerify: 'Please confirm your email address before registering. We have sent you a link — if it has not arrived:',
       sessionsTitle: 'Sessions', dateCol: 'Date', statusCol: 'Status',
       book: 'Book', cancelSession: 'Cancel this session',
       cancelSessionConfirm: 'Cancel this session?',
@@ -442,7 +442,7 @@
       waitBody: '{name} записан(а). Мы уточняем последние детали, оплата откроется здесь. '
               + 'Напишем вам, как только всё будет готово.',
       payNeedsVerify: 'Чтобы оплатить, подтвердите адрес электронной почты. Ссылка для повторной отправки — на странице аккаунта.',
-      registerNeedsVerify: 'Подтвердите адрес эл. почты перед записью на курс. Мы отправили вам ссылку — если она не пришла:',
+      registerNeedsVerify: 'Подтвердите адрес эл. почты перед записью. Мы отправили вам ссылку — если она не пришла:',
       sessionsTitle: 'Занятия', dateCol: 'Дата', statusCol: 'Статус',
       book: 'Записаться', cancelSession: 'Отменить занятие',
       cancelSessionConfirm: 'Отменить это занятие?',
@@ -1383,6 +1383,28 @@
         ]));
       }
 
+      // ⚠ THE ADDRESS GATE IS ASKED HERE, ABOVE BOTH SHAPES, because it is one
+      // rule now. It sat inside registerTerm() while a drop-in was exempt, so
+      // moving it up is the client half of verificationRefusal() losing its
+      // type — and it means the next register shape added inherits it instead
+      // of somebody remembering to copy the branch.
+      //
+      // The form is NOT DRAWN AT ALL rather than drawn and refused, which is
+      // the one place in the family area where a cosmetic check replaces a
+      // control instead of greying one: the server will refuse every time, and
+      // a filled-in form that always loses is worse than no form — somebody
+      // picks a child, picks dates, presses, and is told the thing they could
+      // have been told before they started. The resend button is under the
+      // sentence, because this is the first wall a family meets and a refusal
+      // plus directions to another page is most of the way to a missing button.
+      if (!(S.account && S.account.emailVerifiedAt)) {
+        return where.appendChild(section(title, [
+          el('p', { class: 'acc-notice is-warn' }, [
+            el('span', { text: T.registerNeedsVerify + ' ' }), resendButton()
+          ])
+        ]));
+      }
+
       if (a.perSession) registerPerSession(where, a, people, slug, title);
       else registerTerm(where, a, people, slug, title);
     });
@@ -1424,31 +1446,8 @@
   }
 
   function registerTerm(where, a, people, slug, title) {
-    // ⚠ A COURSE IS NOT REGISTERED FOR FROM AN UNCONFIRMED ADDRESS, and the
-    // form is not drawn at all rather than drawn and refused.
-    //
-    // This is the one place in the family area where a cosmetic check replaces
-    // a control instead of greying one. Everywhere else the rule is "offer it
-    // and let the server decide"; here the server WILL decide, every time, and
-    // a filled-in form that always loses is worse than no form — somebody
-    // picks a child, picks a group, presses, and is told the thing they could
-    // have been told before they started.
-    //
-    // The refusal carries the resend button. The gate used to sit at payment,
-    // where the sentence could afford to point at the dashboard; at the front
-    // of a registration it is the first wall a family meets, so the one control
-    // that clears it is under the sentence asking for it.
-    //
-    // Drop-ins never reach here — registerPerSession() is the other branch, and
-    // a walk-up is deliberately not asked.
-    if (!(S.account && S.account.emailVerifiedAt)) {
-      return where.appendChild(section(title, [
-        el('p', { class: 'acc-notice is-warn' }, [
-          el('span', { text: T.registerNeedsVerify + ' ' }), resendButton()
-        ])
-      ]));
-    }
-
+    // The address check used to live here and is one level up, above the branch
+    // that chooses between this and registerPerSession — one rule for both.
     var who = peopleSelect(people);
 
     var groupSel = null;
@@ -2377,16 +2376,13 @@
     //
     // A settled balance draws nothing, since the figures above already say why.
     //
-    // The third condition — a confirmed email address — is A COURSE RULE and
-    // applies here only. See verificationRefusal() in account-registrations.js:
-    // a term is a considered commitment that can carry a minute of friction, and
-    // a drop-in is a walk-up decided and paid for in one sitting. This card is
-    // the term's, so it asks; the per-session button below does not.
-    //
-    // `r.type` is the FROZEN type, which is what the server decides from too —
-    // the two must not read different fields, or the client hides a button the
-    // server would have honoured.
-    var needsVerify = r.type !== 'dropin' && !(S.account && S.account.emailVerifiedAt);
+    // The third condition is a confirmed email address, and it is now asked of
+    // everything: see verificationRefusal() in account-registrations.js, which
+    // takes no type. It used to read `r.type !== 'dropin'` here, and a client
+    // that hides a button the server would honour — or offers one it will
+    // refuse — is a page that looks broken either way, so the two have to read
+    // the same field. This one has no field left to read.
+    var needsVerify = !(S.account && S.account.emailVerifiedAt);
     var payable = r.status === 'approved';
 
     // ⚠ THE WALLET SITS BEHIND THE SAME TWO GATES, and it did not.

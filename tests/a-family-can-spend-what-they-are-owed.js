@@ -126,14 +126,21 @@ H.ok(!/kids\.push\(useIt\);[\s\S]{0,200}var needsVerify/.test(ui),
 // assumption, so the cosmetic check above proves only that a family is not
 // offered something about to be refused.
 const useCreditGates = api.slice(api.indexOf("case 'useCredit'"), api.indexOf("case 'cancelSession'"));
-H.ok(/verificationRefusal\(me, \(record\.frozen && record\.frozen\.type\) \|\| 'course'\)/.test(useCreditGates),
-  'the server asks for a confirmed address on a term, from the FROZEN type');
+H.ok(/const refusal = verificationRefusal\(me\);/.test(useCreditGates),
+  'the server asks for a confirmed address — one question, no type, so this door ' +
+  'cannot apply a narrower rule than the others');
 H.ok(/checkout\.isPayable\(record\)/.test(useCreditGates),
   'and reads the same isPayable() both other doors read — a pending place is not ' +
   'payable with credit either');
+// ⚠ THE TWO GATES ARE NOT THE SAME SHAPE, and that is deliberate. The address
+// says whether we can reach this family at all, which is as true of an evening
+// as of a term; approval says whether a place exists yet, and a booked evening
+// is already a booking rather than a request somebody may still refuse.
 H.ok(/if \(!body\.sessionDate\) \{/.test(useCreditGates),
-  'and skips both for a single evening, which is a drop-in booking rather than a ' +
-  'request somebody may refuse');
+  'the APPROVAL gate is skipped for a single evening');
+H.ok(useCreditGates.indexOf('verificationRefusal(me)') <
+     useCreditGates.indexOf('if (!body.sessionDate) {'),
+  'while the ADDRESS gate is asked before that branch, so an evening is asked too');
 
 console.log('\n[the fee line stopped saying something untrue]');
 // It was printed under EVERY cost card: it restated a row already on the card,

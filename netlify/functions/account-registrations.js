@@ -516,39 +516,37 @@ async function openRegistration({ activity, participant, accountId, groupId }) {
   return { reg: reg, created: true };
 }
 
-// ⚠ WHICH PAYMENTS NEED A CONFIRMED ADDRESS — ONE RULE, ONE PLACE.
+// ⚠ A CONFIRMED ADDRESS, FOR EVERYTHING — ONE RULE, ONE PLACE, NO PARAMETER.
 //
-// A COURSE DOES; A DROP-IN DOES NOT, and the split is the friction each one can
-// carry rather than a difference in how much we trust the payer.
+// It used to take a `type` and stand aside for a drop-in, on the argument that a
+// term is a considered commitment that can carry a minute of friction while a
+// walk-up is decided and paid for in one sitting. That argument is about
+// convenience, and QA answered it with the one that is not:
 //
-// A term is a considered decision: hundreds of euros, months of attendance, a
-// place an admin has agreed to. Asking somebody to click a link in their inbox
-// first costs them a minute, once, on a commitment they are already taking
-// seriously — and it means the receipt, the reminders and every later message
-// about that money reach an address somebody has proved is theirs.
+//     "Don't we need to confirm the account before being able to register to a
+//      drop in? Now, I was able to register and pay for a drop in before the
+//      account is approved."
 //
-// A drop-in is a walk-up: "we will come on Tuesday", chosen and paid for in one
-// sitting, often by a family who signed up minutes earlier. The gate refused
-// exactly that flow, every time, and it was the only flow it ever refused.
+// We store a MINOR'S NAME AND DATE OF BIRTH against that address, in the EU, and
+// then send the booking, the receipt, every reminder and every later message
+// about that child to it. None of that is worth less because the class is on
+// Tuesday rather than for a term. An address nobody has shown they can read is
+// an address we cannot reach a family on, and the first time that matters is
+// the first time something goes wrong.
 //
-// It is a SINGLE function because the alternative is the condition written at
-// three call sites, where the third gets it wrong or is added later without it.
-// Returning a response or null keeps the branches reading as a list of refusals.
+// ⚠ THE PARAMETER IS GONE RATHER THAN ALWAYS-PASSED, and that is the point of
+// the edit rather than a tidy-up. A rule with a type in it is a rule each call
+// site can get wrong — and one already had none at all, because `bookAndPay`
+// sat behind a line refusing everything that was not a drop-in, so the check
+// would have been unreachable. With no parameter there is nothing to get wrong
+// and nothing to leave out, and a call site added tomorrow inherits the rule
+// instead of remembering it.
 //
-// ⚠ A MISSING TYPE READS AS `course`, WHICH INVERTS THIS FILE'S USUAL RULE.
-// Every blank in _credit.js resolves towards the family; this one resolves
-// towards the gate. The reason is what a blank actually means here: a record
-// written before `type` existed, which was a course, because drop-ins did not
-// exist either. And the errors are not symmetric — guessing drop-in skips a gate
-// somebody asked for, guessing course costs one verification email.
-function verificationRefusal(me, type) {
-  if (type === 'dropin') return null;
-  if (me.emailVerifiedAt) return null;
-  // A KEY, for the same reason openRegistration() returns one: this is called
-  // from two actions and has no language of its own. The caller renders it and
-  // keeps `reason: 'email-unverified'`, which the client already branches on to
-  // put the resend button in front of the person.
-  return 'email-unverified';
+// Returning a key or null keeps the branches reading as a list of refusals;
+// the caller renders it and keeps `reason: 'email-unverified'`, which the client
+// branches on to put the resend button in front of the person.
+function verificationRefusal(me) {
+  return me.emailVerifiedAt ? null : 'email-unverified';
 }
 
 // ⚠ WHICH BUNDLE PAYS FOR EACH DATE, ALLOCATED ACROSS THE WHOLE SELECTION.
@@ -852,10 +850,16 @@ exports.handler = async (event) => {
         if (activity.type !== 'dropin') {
           return no(400, 'term-not-by-session');
         }
-        // No verificationRefusal() call, and not because it was forgotten: the
-        // line above has already refused everything that is not a drop-in, so
-        // the check would be unreachable. This is the flow the gate used to
-        // block — sign up, register, pay, in one sitting.
+        // ⚠ AND THIS IS THE CALL SITE THAT DID NOT EXIST. The line above refuses
+        // everything that is not a drop-in, and while the gate stood aside for a
+        // drop-in that made the check unreachable — so the one flow with no
+        // confirmed address was also the one flow that wrote a child's name and
+        // date of birth and then took money. It asks now, before anything is
+        // opened, so a refusal leaves no record behind.
+        {
+          const refusal = verificationRefusal(me);
+          if (refusal) return no(403, refusal, { reason: 'email-unverified' });
+        }
 
         const wanted = Array.isArray(body.sessionDates) ? body.sessionDates.map(String) : [];
         const dates = wanted.filter((d, i) => wanted.indexOf(d) === i).sort();
@@ -992,7 +996,7 @@ exports.handler = async (event) => {
         // here anyway rather than a comment saying so — if a course ever becomes
         // payable by the session, the rule follows it instead of being a thing
         // somebody has to remember.
-        const refusal = verificationRefusal(me, activity.type);
+        const refusal = verificationRefusal(me);
         if (refusal) return no(403, refusal, { reason: 'email-unverified' });
 
         let session;
@@ -1225,13 +1229,18 @@ exports.handler = async (event) => {
         // `payment.status`, so it is a payment whatever it is called — the only
         // difference is which pocket it comes out of.
         //
-        // Both gates are the registration's, so a per-SESSION spend skips them
-        // deliberately: an attendance record exists only for a drop-in, which
-        // never asks for a confirmed address, and a booked evening is already a
-        // booking rather than a request somebody may refuse.
+        // ⚠ THE ADDRESS GATE IS OUTSIDE THIS BRANCH AND THE APPROVAL GATE IS
+        // INSIDE IT, because they are about different things.
+        //
+        // The address is about whether we can reach this family at all, which is
+        // true of an evening exactly as it is of a term — it used to sit inside
+        // the branch on the reasoning that "an attendance record exists only for
+        // a drop-in, which never asks for a confirmed address", and a drop-in
+        // asks now. The approval gate stays inside: a booked evening is already
+        // a booking rather than a request somebody may still refuse.
+        const refusal = verificationRefusal(me);
+        if (refusal) return no(403, refusal, { reason: 'email-unverified' });
         if (!body.sessionDate) {
-          const refusal = verificationRefusal(me, (record.frozen && record.frozen.type) || 'course');
-          if (refusal) return no(403, refusal, { reason: 'email-unverified' });
           if (!checkout.isPayable(record)) {
             return no(409, 'not-approved-for-payment',
                       { reason: 'not-approved', status: record.status }, { status: record.status });
@@ -1418,7 +1427,7 @@ exports.handler = async (event) => {
         const activity = await published(body.slug);
         if (!activity) return no(404, 'no-such-activity');
 
-        // ⚠ A COURSE IS NOT REGISTERED FOR FROM AN ADDRESS NOBODY HAS PROVED.
+        // ⚠ NOTHING IS REGISTERED FOR FROM AN ADDRESS NOBODY HAS PROVED.
         //
         // The gate used to sit at payment, three doors down, and that was the
         // wrong place for it in both directions. A family registered, waited
@@ -1435,22 +1444,17 @@ exports.handler = async (event) => {
         // message about that child go to it. This project's most careful rule
         // is about exactly that record.
         //
-        // The DROP-IN SPLIT SURVIVES UNCHANGED and is the reason this is
-        // decided by verificationRefusal() rather than written here: a walk-up
-        // is decided and paid for in one sitting, often by a family who signed
-        // up minutes earlier, and bookAndPay never asks. `submit` is the course
-        // door.
-        //
-        // From the ACTIVITY's type, not a frozen one — there is no record yet.
-        // A missing type reads as `course`, which is the same direction the
-        // other call sites take and the one place in the family area where a
-        // blank resolves towards the gate rather than towards the family.
+        // There used to be a drop-in exemption here and it is gone — see
+        // verificationRefusal(), which no longer takes a type. The friction
+        // argument for it was real and was about convenience; this one is about
+        // a child's record, and a walk-up on Tuesday stores exactly the same
+        // record a term does.
         //
         // The gates further down STAY. They are not made redundant by this one:
         // a registration taken before today sits on an unverified account
         // already, and the client is hostile by assumption. What changes is
         // that they now almost never fire.
-        const refusal = verificationRefusal(me, activity.type);
+        const refusal = verificationRefusal(me);
         if (refusal) return no(403, refusal, { reason: 'email-unverified' });
 
         const opened = await openRegistration({
@@ -1549,10 +1553,9 @@ exports.handler = async (event) => {
       //
       // TWO GATES, AND BOTH ARE ABOUT NOT TAKING MONEY WE SHOULD NOT HAVE.
       //
-      // 1. A COURSE NEEDS A CONFIRMED ADDRESS; A DROP-IN DOES NOT. The rule and
-      //    the whole argument live in verificationRefusal() above, and the one
-      //    thing to know here is that it is decided from the FROZEN type on the
-      //    record rather than from the activity, which this branch never opens.
+      // 1. A CONFIRMED ADDRESS. The rule and the whole argument live in
+      //    verificationRefusal() above, which asks one question of one field and
+      //    takes no type — so this branch needs to open nothing to apply it.
       //
       // 2. THE REGISTRATION MUST BE APPROVED. A `pending` registration is a
       //    request that may still be refused, and taking money for a place that
@@ -1572,10 +1575,7 @@ exports.handler = async (event) => {
         const reg = await store.getRegistration(body.participantId, body.activityId);
         if (!reg) return no(404, 'no-such-registration');
 
-        // THE FROZEN TYPE, not the activity's current one. It is what the family
-        // registered under, and it is read from the record already in hand —
-        // this branch never opens the activity at all.
-        const refusal = verificationRefusal(me, (reg.frozen && reg.frozen.type) || 'course');
+        const refusal = verificationRefusal(me);
         if (refusal) return no(403, refusal, { reason: 'email-unverified' });
 
         // ONE LIST, BOTH DOORS — see isPayable() in _checkout.js, which the

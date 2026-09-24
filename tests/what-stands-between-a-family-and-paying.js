@@ -11,36 +11,39 @@
 //    button produce the same status, which is the whole point of the status
 //    being the single source of truth.
 //
-// 2. A COURSE NEEDS A CONFIRMED ADDRESS; A DROP-IN DOES NOT.
+// 2. THE ADDRESS MUST BE CONFIRMED, for everything.
 //
-// ⚠ THAT SPLIT IS THE PART THIS SUITE EXISTS FOR, because it has been wrong in
-// both directions inside a week.
+// ⚠ THAT RULE IS THE PART THIS SUITE EXISTS FOR, because it has been wrong in
+// three directions now.
 //
-// It was on everything first. `emailVerifiedAt` had been stored since Phase 2,
-// shown as a banner since Phase 6 and enforced by nothing, and payment was where
-// it was finally enforced — which turned out to refuse exactly one flow and no
-// others: sign up, register, pay, in one sitting. That is not an edge case on a
-// pay-per-session activity, it is the ONLY case. A walk-up decision made and
-// paid for in a single visit is what a drop-in is.
+// It was on everything first, and asked ONLY AT PAYMENT. That turned out to
+// refuse exactly one flow and no others: sign up, register, pay, in one sitting
+// — which on a pay-per-session activity is not an edge case, it is the case.
 //
 // Then it came off everything, which was too far the other way. A term is a
-// considered commitment — hundreds of euros, months of attendance, a place an
-// admin agreed to — and it can carry a minute of friction once, in exchange for
-// a receipt and every later message about that money reaching an address
-// somebody has proved is theirs.
+// considered commitment and can carry a minute of friction once, in exchange
+// for every later message about that money reaching an address somebody has
+// proved is theirs.
 //
-// So the rule is the activity's shape, it lives in ONE function, and the
-// assertions below check both halves of it and the direction a blank falls.
+// ⚠ THEN IT EXEMPTED DROP-INS, AND THAT WAS THE LAST WRONG ANSWER. QA registered
+// and paid for a drop-in on an account nobody had confirmed and asked whether
+// that was meant to be possible. The exemption was argued on FRICTION — a
+// walk-up is decided in one sitting — and the thing it was trading away is not
+// convenience: we store a MINOR'S NAME AND DATE OF BIRTH against that address,
+// in the EU, and send the booking, the receipt and every reminder to it. A class
+// on Tuesday stores exactly the record a term does.
 //
-// ⚠ AND IT HAS MOVED TO THE FRONT OF A COURSE REGISTRATION, which is where it
-// should have been. Asked only at payment, it let a family register, wait days
-// for an admin to answer, open the email saying they had a place, and meet the
-// wall there — friction discovered after the commitment rather than before it,
-// which reads as a system that changed its mind. And it let us store a MINOR'S
-// NAME AND DATE OF BIRTH against an address nobody had shown they could read,
-// which is the stronger half of the argument and has nothing to do with money:
-// the confirmation, the approval, the expiry apology and every later message
-// about that child go to it.
+// So there is one rule, in one function, and ⚠ THE FUNCTION TAKES NO TYPE. That
+// is the half worth pinning: a rule with a type in it is a rule each call site
+// can get wrong, and one call site already had no check at all because the
+// exemption made it unreachable. With no parameter there is nothing to leave
+// out, and a door added tomorrow inherits the rule instead of remembering it.
+//
+// ⚠ AND IT IS ASKED AT THE FRONT, not at payment. Asked only at payment it let a
+// family register, wait days for an admin to answer, open the email saying they
+// had a place, and meet the wall there — friction discovered after the
+// commitment rather than before it, which reads as a system that changed its
+// mind.
 //
 // The gates at payment STAY, and are not redundant. A registration taken before
 // this existed sits on an unverified account already, and the client is hostile
@@ -75,18 +78,22 @@ H.ok(/^\s*case 'pay': \{\s*const participant = await mustGuard\(body\.participan
 H.ok(pay.indexOf('mustGuard') < pay.indexOf('getRegistration'),
   'and before the store is read — a stranger must not learn a registration exists');
 
-console.log('\n[the verification gate is a COURSE rule, decided in one place]');
+console.log('\n[the verification gate is one rule, with no type in it]');
 const bare2 = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 const helper = bare2.slice(bare2.indexOf('function verificationRefusal'),
                            bare2.indexOf('function regRow'));
 H.ok(helper.length > 80, 'there is one verificationRefusal()');
-H.ok(/if \(type === 'dropin'\) return null;/.test(helper), 'a drop-in is never asked');
-H.ok(/if \(me\.emailVerifiedAt\) return null;/.test(helper), 'and a confirmed address passes');
+H.ok(/function verificationRefusal\(me\) \{/.test(helper),
+  '⚠ it takes ONE argument — no type, so no call site can apply a narrower rule ' +
+  'than the others, and none can forget to pass one');
+H.ok(!/dropin/.test(helper), 'and nothing in it knows what kind of activity this is');
+H.ok(/me\.emailVerifiedAt \? null : 'email-unverified'/.test(helper),
+  'a confirmed address passes and nothing else does');
 // ⚠ IT ANSWERS WITH A KEY, NOT A RESPONSE. It is called from two actions and
 // has no language of its own, so the caller renders it — in the language of the
 // page, like every other string this file puts on a screen.
-H.ok(/return 'email-unverified';/.test(helper), 'the refusal names itself');
-// ⚠ FOUR CALL SITES, AND THE COUNT IS PINNED BECAUSE TWO OF THEM WERE MISSING.
+H.ok(/'email-unverified'/.test(helper), 'the refusal names itself');
+// ⚠ FIVE CALL SITES, AND THE COUNT IS PINNED BECAUSE THREE OF THEM WERE MISSING.
 //
 // `useCredit` settles the same debt on the same record and writes the same
 // payment status, and it asked NEITHER of the two questions `pay` asks — so an
@@ -94,8 +101,11 @@ H.ok(/return 'email-unverified';/.test(helper), 'the refusal names itself');
 // card where the pay button had been correctly withheld for exactly that
 // reason. Spending credit is paying; the only difference is which pocket.
 //
-// `submit` is the fourth and is now the one a family meets first.
-H.eq((bare2.match(/no\(403, refusal, \{ reason: 'email-unverified' \}\)/g) || []).length, 4,
+// `submit` is the one a family meets first. And `bookAndPay` is the fifth: it
+// had no check at all, because the exemption made one unreachable — so the one
+// flow with no confirmed address was also the one flow that wrote a child's
+// record and then took money.
+H.eq((bare2.match(/no\(403, refusal, \{ reason: 'email-unverified' \}\)/g) || []).length, 5,
   'and every call site answers 403 with the reason the client acts on — ' +
   'a permission, not a missing thing');
 
@@ -103,19 +113,19 @@ H.eq((bare2.match(/no\(403, refusal, \{ reason: 'email-unverified' \}\)/g) || []
 // came after openRegistration() would leave the record it was refusing.
 const submit = bare2.slice(bare2.indexOf("case 'submit'"), bare2.indexOf("case 'cancel'"));
 H.ok(submit.length > 300, 'found the submit branch');
-H.ok(/verificationRefusal\(me, activity\.type\)/.test(submit),
-  'submit asks, from the ACTIVITY\'s type — there is no frozen one yet, because ' +
-  'the record does not exist');
+H.ok(/verificationRefusal\(me\)/.test(submit), 'submit asks');
 H.ok(submit.indexOf('verificationRefusal') < submit.indexOf('openRegistration'),
   'and before a registration is opened, so a refusal leaves nothing behind');
 
-// The drop-in half of the split, at the door that matters most for it: a
-// walk-up registers and pays in one sitting, often having signed up minutes
-// earlier, so bookAndPay must never ask. It is exempt BY CONSTRUCTION rather
-// than by a condition, which the assertions further down already pin.
+// ⚠ AND THE DROP-IN DOOR ASKS TOO, BEFORE ANYTHING IS OPENED. This is the call
+// site that did not exist: `bookAndPay` sits behind a line refusing everything
+// that is not a drop-in, so while the gate stood aside for a drop-in the check
+// here would have been unreachable — and this is the flow that registers, writes
+// a child's name and date of birth, and opens Checkout in one request.
 const bap = bare2.slice(bare2.indexOf("case 'bookAndPay'"), bare2.indexOf("case 'paySession'"));
-H.ok(!/verificationRefusal/.test(bap),
-  'and bookAndPay still never asks — the split survives the move');
+H.ok(/verificationRefusal\(me\)/.test(bap), 'bookAndPay asks');
+H.ok(bap.indexOf('verificationRefusal') < bap.indexOf('openRegistration'),
+  'and before a registration is opened, so a refusal leaves nothing behind');
 // ONE function, or the condition is written at three call sites and the third
 // one is added later without it.
 H.eq((bare2.match(/emailVerifiedAt/g) || []).length, 1,
@@ -125,28 +135,16 @@ console.log('\n[and every paying branch is wired to it, or provably cannot need 
 const paySession = bare2.slice(bare2.indexOf("case 'paySession'"), bare2.indexOf("case 'cancelSession'"));
 const bookAndPay = bare2.slice(bare2.indexOf("case 'bookAndPay'"), bare2.indexOf("case 'paySession'"));
 H.ok(paySession.length > 300 && bookAndPay.length > 600, 'found the other two branches');
-// A course: from the FROZEN type on the record, which is what the family
-// registered under — and this branch never opens the activity at all.
-H.ok(/verificationRefusal\(me, \(reg\.frozen && reg\.frozen\.type\) \|\| 'course'\)/.test(pay),
-  'pay asks, from the frozen type on the registration');
+H.ok(/verificationRefusal\(me\)/.test(pay), 'pay asks');
 H.ok(pay.indexOf('verificationRefusal') < pay.indexOf('isPayable'),
   'and the cheap check runs before the status one');
-// ⚠ A MISSING TYPE READS AS `course`. This inverts the usual rule in this
-// project, where every blank resolves towards the family — and deliberately: a
-// record with no type was written before drop-ins existed, so it IS a course,
-// and the errors are not symmetric. Guessing drop-in skips a gate somebody
-// asked for; guessing course costs one verification email.
-H.ok(/\|\| 'course'/.test(pay), 'with a blank falling to the gated side, not the open one');
-// Present today only so a future course-by-the-session inherits the rule
-// instead of it being something somebody has to remember.
-H.ok(/verificationRefusal\(me, activity\.type\)/.test(paySession),
-  'paySession asks too, from the activity it was called for');
-// And the one-step drop-in does not, because the line above it has already
-// refused everything that is not a drop-in.
-H.ok(!/verificationRefusal/.test(bookAndPay),
-  'bookAndPay does not — the flow the gate used to block is the flow it is exempt from');
-H.ok(/activity\.type !== 'dropin'/.test(bookAndPay),
-  'and it is exempt BY CONSTRUCTION: it refuses anything that is not a drop-in first');
+// ⚠ AND THERE IS NO LONGER A BLANK TO RESOLVE. The old rule read a missing type
+// as `course`, which inverted this project's usual direction on purpose —
+// guessing drop-in skipped a gate somebody asked for, guessing course cost one
+// verification email. With one rule there is no type to be missing, which is a
+// whole class of asymmetry that simply stops existing.
+H.ok(!/'course'/.test(pay), 'no type is read, so no blank has to fall anywhere');
+H.ok(/verificationRefusal\(me\)/.test(paySession), 'paySession asks');
 // The emailed link never asked, and that exemption is the argument the whole
 // split rests on — following it is itself proof of reading the inbox.
 const payLink = fs.readFileSync(path.join(R, 'netlify/functions/pay-link.js'), 'utf8');
@@ -318,15 +316,24 @@ const reg = { participantId: 'p-1', activityId: 'act-1',
     l + ': and links to the registration, addressed by id');
 });
 
-console.log('\n[the client draws the same split, from the same field]');
+console.log('\n[the client draws the same rule, from the same field]');
 // Cosmetic, like every permission check on this side — the server re-decides it.
 // It exists so a family is not offered an action about to be refused, and so a
 // REFUSAL THEY CAN ACT ON is explained rather than hidden.
 const ui = fs.readFileSync(path.join(R, 'js/member-account.js'), 'utf8');
 H.ok(/action: 'pay', participantId: r\.participantId, activityId: r\.activityId/.test(ui),
   'the client calls the pay action with the registration key');
-H.ok(/var needsVerify = r\.type !== 'dropin' && !\(S\.account && S\.account\.emailVerifiedAt\)/.test(ui),
-  'the term card asks for a confirmed address, and only on a term');
+H.ok(/var needsVerify = !\(S\.account && S\.account\.emailVerifiedAt\);/.test(ui),
+  'the cost card asks for a confirmed address, on both shapes');
+H.ok(!/r\.type !== 'dropin'/.test(ui.replace(/^\s*\/\/.*$/gm, '')),
+  '⚠ and the type is gone from the condition — a client reading a field the ' +
+  'server has stopped reading hides a button the server would have honoured');
+// Asked ONCE, above the branch that picks between the two register shapes, so a
+// third shape inherits it rather than copying it.
+const panelTail = ui.slice(ui.indexOf('if (a.perSession) registerPerSession'));
+H.ok(!/emailVerifiedAt/.test(panelTail.slice(0, panelTail.indexOf('function costBlock'))) ||
+     ui.indexOf('emailVerifiedAt') < ui.indexOf('if (a.perSession) registerPerSession'),
+  'and the register panel asks it above the branch, not inside one arm of it');
 H.ok(/var payable = r\.status === 'approved';/.test(ui),
   'the client reads the same single status the server does');
 // ⚠ AND THE WAITING STATE IS ITS OWN BRANCH, not the absence of a button. A
