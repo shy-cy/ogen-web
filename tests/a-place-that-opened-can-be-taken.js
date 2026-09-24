@@ -208,7 +208,7 @@ const labelled = (dom, text) => D.byTag(dom.mount, 'button')
   // =========================================================================
   console.log('\n[the three languages]');
   for (const [l, lead, btn] of [
-    ['he', 'התפנה מקום', 'לתפוס את המקום'],
+    ['he', 'התפנה מקום', 'תפוס/י מקום'],
     ['ru', 'Освободилось место', 'Занять место']
   ]) {
     const d = await screen({ view: 'activity', lang: l, search: '?p=p-1&a=act-2',

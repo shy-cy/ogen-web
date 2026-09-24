@@ -169,7 +169,7 @@ const PLACE_OPEN = {
       : `התפנה מקום ב${act}, ו${child} ברשימת ההמתנה.`,
     // ⚠ THE RACE, NAMED. Everybody waiting gets this at the same moment.
     next: 'המייל הזה נשלח לכל מי שברשימת ההמתנה, והמקום יינתן למי שיירשם ראשון. כדי לשמור את המקום צריך להשלים את התשלום — אחרת המקום חוזר לרשימה.',
-    button: 'לתפוס את המקום'
+    button: 'תפוס/י מקום'
   },
   en: {
     subject: (child, act) => `A place has opened on ${act}`,

@@ -2644,6 +2644,23 @@ Four details:
   languages: a family reads *Take the place* in an inbox and has to find it on a
   page, and two tables holding that string is two places it can be reworded.
 
+⚠ **AND THE HEBREW IS THE SITE'S ONLY SLASHED BUTTON, ON PURPOSE.** It read
+*"שלחנו מייל לכל הממתינים, אז כדאי לתפוס אותו עכשיו"* — `אז` is a spoken
+connective, `כדאי` is advisory about something that is actually a race, and
+`אותו` had no antecedent in its own sentence, since `מקום` was only in the
+heading above it. It is *"המקום יינתן לראשון שיתפוס אותו. אפשר לשלם כאן מיד לאחר
+מכן."*, and the sentence about everybody being emailed is **dropped in all three
+languages** — the email already says it, and cutting a fact in one language only
+would have three pages telling families different amounts.
+
+Every other button in the family area is **nominal** — `הרשמה`, `הרשמה ותשלום`,
+`הצטרפות לרשימת המתנה`, `יציאה מרשימת ההמתנה` — which is why none of them has
+ever needed a gender form: a שם פעולה has none. This one is an **imperative**,
+because taking a place is an act rather than a form, so it carries the slash the
+rest of the site's Hebrew already uses for people (`נרשם/ת`, `משתתף/ת`,
+`רשום/ה`): **`תפוס/י מקום`**. Chosen over the nominal `אישור המקום` deliberately.
+The email's Hebrew button moves with it, which is what the pin is for.
+
 **And the waiting copy said two opposite things.** *"We have kept your place in
 the queue"* and *"no place is being held"*, two sentences apart, under a heading
 asking what it costs. It is *"You have not been charged. When a place opens we

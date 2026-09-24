@@ -191,11 +191,16 @@
       registerWaitDone: 'הצטרפתם לרשימת ההמתנה. נשלח מייל ברגע שיתפנה מקום.',
       waitingLead: 'ברשימת ההמתנה',
       waitingWhy: 'לא חויבתם. כשיתפנה מקום נשלח מייל לכל הממתינים, '
-                + 'והמקום יינתן לראשון שיירשם.',
+                + 'והמקום יינתן לראשון שיתפוס אותו.',
       waitingOpenLead: 'התפנה מקום',
-      waitingOpenWhy: 'שלחנו מייל לכל הממתינים, אז כדאי לתפוס אותו עכשיו. '
-                    + 'מיד אחר כך אפשר לשלם כאן.',
-      takePlace: 'לתפוס את המקום',
+      waitingOpenWhy: 'המקום יינתן לראשון שיתפוס אותו. אפשר לשלם כאן מיד לאחר מכן.',
+      // ⚠ THE ONE SLASHED BUTTON ON THE SITE, and deliberately. Every other
+      // button in the family area is nominal — הרשמה, הצטרפות לרשימת המתנה,
+      // יציאה מרשימת ההמתנה — which sidesteps gender by construction. This one
+      // is an imperative because taking a place is an act, not a form, so it
+      // takes the slash the rest of the site's Hebrew already uses for people
+      // (נרשם/ת, משתתף/ת, רשום/ה). Chosen over the nominal on purpose.
+      takePlace: 'תפוס/י מקום',
       takePlaceDone: 'המקום שלכם. אפשר להשלים את התשלום כאן.',
       leaveWait: 'יציאה מרשימת ההמתנה',
       leaveWaitConfirm: 'לצאת מרשימת ההמתנה?',
@@ -362,7 +367,7 @@
       waitingWhy: 'You have not been charged. When a place opens we email everyone waiting, '
                 + 'and the first to take it gets it.',
       waitingOpenLead: 'A place has opened',
-      waitingOpenWhy: 'Everyone waiting has been emailed, so take it now to keep it. '
+      waitingOpenWhy: 'The place goes to the first person to take it. '
                     + 'You can pay here straight afterwards.',
       takePlace: 'Take the place',
       takePlaceDone: 'The place is yours. You can pay for it here.',
@@ -525,7 +530,7 @@
       waitingWhy: 'Оплата не списана. Как только освободится место, мы напишем всем, кто ждёт, '
                 + 'и оно достанется тому, кто займёт его первым.',
       waitingOpenLead: 'Освободилось место',
-      waitingOpenWhy: 'Мы написали всем, кто ждёт, поэтому займите его сейчас. '
+      waitingOpenWhy: 'Место достанется тому, кто займёт его первым. '
                     + 'Оплатить можно здесь же сразу после.',
       takePlace: 'Занять место',
       takePlaceDone: 'Место ваше. Оплатить можно здесь.',
