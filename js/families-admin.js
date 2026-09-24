@@ -106,9 +106,13 @@
       (d.account.emailVerifiedAt ? ' · address confirmed' : ' · address NOT confirmed') +
       (d.account.profile && d.account.profile.phone ? ' · ' + d.account.profile.phone : '') }));
 
-    // The people. A NAME and a link, and no date of birth: an admin opening one
-    // child's record is doing the job the age flag exists for, and a list of
-    // everybody on the site is a different thing that does not need one.
+    // ⚠ WITH THE DATE OF BIRTH AND THE AGE. This carried names alone, under an
+    // argument about the list of every account on the site — which is the panel
+    // on the left and still carries names alone. This is one account, opened on
+    // purpose, already showing what those people are registered to and what is
+    // owed; and there is nothing here to click through to, so the date of birth
+    // was not one step away, it was absent. An admin cannot tell an adult from a
+    // seven-year-old on a row reading "ttt rrr · primary guardian".
     body.appendChild(el('h3', { text: 'People on this account' }));
     if (!d.participants.length) {
       body.appendChild(el('p', { class: 'hint', text: 'Nobody yet — the account exists and has added no one.' }));
@@ -117,6 +121,11 @@
       d.participants.forEach(function (p) {
         people.appendChild(el('tr', {}, [
           el('td', { text: p.name }),
+          // Both, not one. The age is what an admin is actually reading for and
+          // the date is what they check it against — a birthday next week makes
+          // "9" and "10" the same child, and only the date says which.
+          el('td', { text: p.dateOfBirth || '\u2014' }),
+          el('td', { text: p.age == null ? '\u2014' : p.age + ' years' }),
           el('td', { text: p.isPrimary ? 'primary guardian' : 'guardian' })
         ]));
       });

@@ -4326,10 +4326,32 @@ bar already appeared to have a screen for this and did not. Renaming it to
 Gated on the `family` tool, Super Admin only, for the reason that permission
 exists: opening a family record means reading who somebody's children are.
 
-**No dates of birth.** The `participant` action returns one, because an admin
-opening a single child's record is doing the job the age flag exists for. A list
-of everybody on the site is a different thing and does not need one, so this
-carries the name and the link and the DOB stays one deliberate click away.
+⚠ **DATES OF BIRTH ARE ON THE OPENED ACCOUNT, AND NOT ON THE LIST**, and the
+line moved once because it had been drawn on the wrong screen.
+
+Neither carried one. The argument was that "a list of everybody on the site does
+not need a date of birth, so it stays one deliberate click away" — true of the
+**picker**, which is every account that exists, scanned rather than opened, and
+which still carries a name, an address and a count. It was never true of one
+account opened on purpose, which already shows who is on it, what they are
+registered to and what is owed. Reported as *"not enough information can be seen.
+Would be good to see also DOB"*, on a row reading `ttt rrr · primary guardian`
+where an admin could not tell an adult from a seven-year-old.
+
+⚠ **And the click it deferred to did not exist.** Nothing on that screen opens a
+participant, so the date of birth was not one step away — it was unreachable. A
+rule pointing at a door nobody built, which is the same shape as the invite
+button labelled with a description.
+
+The **age** travels beside it, derived by `ageAt()` and never stored. Both, not
+one: the age is what an admin is reading for and the date is what they check it
+against, because a birthday next week makes "9" and "10" the same child.
+
+`tests/a-family-record-says-who-these-people-are.js` holds **both halves**, and
+the second is the one that matters in a year — the bulk list is asserted to carry
+no date of birth anywhere in its response, not even as a bare value. The
+`account` action had never been executed by anything until that suite, which is
+how a payload nobody had run came to be the one the screen was built from.
 
 `allAccounts()` is the only scan in `_account-store.js` and says so: nothing in
 the signed-in area ever needs it, because a family reads their own record through

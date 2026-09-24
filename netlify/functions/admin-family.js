@@ -140,11 +140,24 @@ exports.handler = async (event) => {
       // One account in full: who they are, who they guard, what those people are
       // registered to, and what the account is holding in credit.
       //
-      // ⚠ NO DATES OF BIRTH. `participant` above returns one, because an admin
-      // opening a single child's record is doing the job the age flag exists
-      // for. A list of everybody on the site is a different thing, and it does
-      // not need one — so the shape here is the NAME and the link, and the DOB
-      // stays one deliberate click away on the record it belongs to.
+      // ⚠ THIS DOES CARRY DATES OF BIRTH, AND THE LINE MOVED ON PURPOSE.
+      //
+      // It did not, under an argument that was right about the wrong screen:
+      // "a list of everybody on the site does not need one, so the DOB stays one
+      // deliberate click away". The list of everybody on the site is the
+      // `accounts` action above, and it still carries names alone. THIS action
+      // is that click — it is one account, opened deliberately, already showing
+      // who is on it, what they are registered to and what is owed.
+      //
+      // And the click it deferred to did not exist. Nothing on this screen opens
+      // a participant, so the date of birth was not one step away, it was
+      // unreachable — which is how an admin ends up reading "ttt rrr, primary
+      // guardian" with no way to tell an adult from a seven-year-old. Reported
+      // as "not enough information can be seen".
+      //
+      // The AGE travels beside it, derived and never stored — ageAt() counts
+      // birthdays rather than dividing by 365.25, because "11 not 12" is exactly
+      // the difference an age range turns on.
       case 'account': {
         const account = await accounts.getAccount(body.accountId);
         if (!account) return json(404, { error: 'No such account.' });
@@ -157,6 +170,8 @@ exports.handler = async (event) => {
           people.push({
             participantId: p.participantId,
             name: [p.firstName, p.lastName].filter(Boolean).join(' '),
+            dateOfBirth: p.dateOfBirth || null,
+            age: participants.ageAt(p.dateOfBirth, Date.now()),
             isPrimary: p.primaryAccountId === account.accountId
           });
           for (const reg of await registrations.forParticipant(id)) {
