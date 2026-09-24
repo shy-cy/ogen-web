@@ -652,12 +652,13 @@ function priceRows(f, lang, duration) {
 
   const L = {
     he: { fee: 'דמי הרשמה', lesson: 'עלות לשיעור', term: 'עלות לסמסטר', perSession: 'עלות למפגש',
+          late: 'הרשמה מאוחרת',
           session: ['מפגש', 'מפגשים'], unit: ['שיעור', 'שיעורים'] },
     en: { fee: 'Registration fee', lesson: 'Cost per lesson', term: 'Cost per semester',
-          perSession: 'Cost per session',
+          perSession: 'Cost per session', late: 'Late booking',
           session: ['session', 'sessions'], unit: ['lesson', 'lessons'] },
     ru: { fee: 'Регистрационный взнос', lesson: 'Стоимость урока', term: 'Стоимость семестра',
-          perSession: 'Стоимость занятия' }
+          perSession: 'Стоимость занятия', late: 'Поздняя запись' }
   }[lang] || null;
   if (!L) return [];
   // ⚠ THE KEY IS WHAT THE ROW IS, and it is here so that a caller wanting ONE of
@@ -698,6 +699,42 @@ function priceRows(f, lang, duration) {
   // not needed: the price card was already built this way.
   const perSession = num(f.perSessionPrice);
   if (perSession != null && perSession > 0) rows.push(row('perSession', L.perSession, money(perSession)));
+
+  // ⚠ AND THE LATE RATE, BESIDE THE ORDINARY ONE, because a card quoting one
+  // price on an activity that charges two is a card that will be contradicted.
+  //
+  // Reported three times from one QA round, each time as a different screen:
+  // the picker said €10 under a card saying €7; the evenings table said €10
+  // under a card saying €7; and finally, plainly — "under Price it says 7 EUR
+  // and under what to pay it shows 10 EUR. We must write under Price: regular
+  // 7, late 10." The first two were fixed where they were noticed, which is
+  // how a card that never mentioned the second rate survived both.
+  //
+  // This is the fix at the source: the price card is where a family reads what
+  // an activity costs, and until now it could not say that the answer depends
+  // on when you book. The other two screens explain a FIGURE they are charging;
+  // this explains the ACTIVITY, and it is the only one a reader sees before
+  // they have chosen anything.
+  //
+  // Conditional on its own figure like every other row here, so an activity
+  // with no late pricing renders exactly as it did before.
+  const late = f.lateDropIn || {};
+  const lateHours = Number(late.hoursBefore);
+  const latePrice = num(late.price);
+  if (late.enabled && latePrice != null && latePrice > 0) {
+    // The note is WHEN, which is the half a figure cannot carry. Without it
+    // "Late booking €10" invites the question it was meant to answer.
+    let when = '';
+    if (Number.isFinite(lateHours) && lateHours > 0) {
+      when = lang === 'he'
+        ? (lateHours === 1 ? '(פחות משעה לפני המפגש)' : `(פחות מ-${lateHours} שעות לפני המפגש)`)
+        : lang === 'ru'
+        ? `(менее чем за ${lateHours} ${ruPlural(lateHours, 'час', 'часа', 'часов')} до занятия)`
+        : (lateHours === 1 ? '(within an hour of the session)'
+                           : `(within ${lateHours} hours of the session)`);
+    }
+    rows.push(row('lateSession', L.late, money(latePrice), when));
+  }
 
   if (hasFull) {
     const sessions = sessionTotal(duration);

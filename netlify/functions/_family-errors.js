@@ -396,6 +396,14 @@ const MESSAGES = {
     en: 'This activity does not meet on that date.',
     ru: 'В этот день занятие не проводится.'
   },
+  // A class that has already happened. Worded as a fact about the evening
+  // rather than as a refusal of the family — nobody did anything wrong by
+  // pressing a button the screen was still offering.
+  'session-has-passed': {
+    he: 'המפגש הזה כבר התקיים.',
+    en: 'That session has already taken place.',
+    ru: 'Это занятие уже прошло.'
+  },
   'need-approved-registration': {
     he: 'צריך קודם הרשמה מאושרת לפעילות הזו.',
     en: 'You need an approved registration for this activity first.',

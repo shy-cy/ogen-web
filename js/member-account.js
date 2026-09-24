@@ -141,7 +141,7 @@
       regNotFound: 'לא נמצאה הרשמה.',
       activityGone: 'הפעילות אינה מפורסמת כרגע. פרטי ההרשמה נשמרו.',
 
-      costTitle: 'מה זה עולה', stillToPay: 'נותר לתשלום', credited: 'זוכה',
+      costTitle: 'עלות ותשלום', stillToPay: 'נותר לתשלום', credited: 'זוכה',
       payNow: 'תשלום מאובטח', payOpening: 'פותח תשלום…',
       paidThanks: 'התשלום התקבל. תודה!',
       paidSettling: 'התשלום התקבל — אנחנו רושמים אותו. הסכומים כאן יתעדכנו עוד רגע.',
@@ -2888,7 +2888,15 @@
       return actions(acts);
     }
     if (s.status === 'attended' || s.status === 'no-show') return null;
-    if (!data.mayBook || s.full) return null;
+    // ⚠ AND NOT AN EVENING THAT HAS ALREADY HAPPENED. `past` has been in this
+    // payload since the screen was built and nothing read it, so the table
+    // offered "register for this session" beside dates three weeks gone. The
+    // server refuses it now too; this is the cosmetic half, as every check on
+    // this side is — the point is not to offer what is about to be refused.
+    //
+    // The register PANEL has always dropped them, which is why it took a report
+    // to find: one list, filtered in one place and not the other.
+    if (!data.mayBook || s.full || s.past) return null;
     return el('button', { type: 'button', class: 'acc-link', text: T.book,
       onclick: function () {
         post(REGS, { action: 'bookSession', participantId: r.participantId,

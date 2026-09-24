@@ -575,6 +575,23 @@ renders a single row. The "(N sessions × M lessons)" qualifier appears only whe
 a session divides into whole lessons — a 60-minute session is 1.33 lessons,
 which is arithmetic, not a sentence.
 
+⚠ **AND A DROP-IN WITH LATE PRICING STATES BOTH RATES.** The card quoted one
+price on an activity that charges two, and it was reported three times in one QA
+round as three different screens: the date picker said €10 under a card saying
+€7, then the evenings table did, and finally plainly — *"under Price it says 7
+EUR and under what to pay it shows 10 EUR. We must write under Price: regular 7,
+late 10."*
+
+The first two were fixed **where they were noticed**, and that is how a card
+which never mentioned the second rate survived both. Each of those screens
+explains the **figure it is charging**; the price card explains the
+**activity**, and it is the only one a reader meets before they have chosen
+anything. The row carries the hours as its `note` — *(within 3 hours of the
+session)* — because "Late booking €10" without a window invites the question it
+exists to answer. Conditional on its own figure like every other row, so an
+activity with no late pricing renders exactly as before, and the listing card
+picks its headline **by key** so the tag still advertises the ordinary price.
+
 **Cost per lesson is off by default**, behind `price.showPerLesson`. It is a
 number a teacher reads as a rate to be compared against other schools, and it
 is a division of two figures that are both already on the card. The other three
@@ -3086,6 +3103,28 @@ different list. `booked` and `attended` occupy a place; `cancelled` and
 come is not in the room. Whether they still owe for it is a different question,
 answered by the payment on their own record.
 
+⚠ **AN EVENING THAT HAS ALREADY HAPPENED IS NOT BOOKABLE, and nothing said so.**
+The registration page listed 3 and 10 September with a live *register for this
+session* link beside them, on the 24th. `sessionsPayload()` has sent a `past`
+flag per date since that screen was built and **nothing read it** — neither the
+table nor the server — so a family could book, and be charged for, a class
+nobody can attend. The register **panel** has always dropped past dates, which
+is exactly why it survived: one list, filtered in one place and not the other.
+
+`validate()` refuses it now, which is the half that counts. The deadline is the
+**end of that day in `Asia/Nicosia`** — the same answer the payload's own flag
+gives and the same one the check-in token uses, so the screen and the refusal
+cannot disagree. **Today's class stays bookable all of today** on purpose: a
+drop-in place can free thirty minutes before the lesson, and that is what the
+late price is for.
+
+⚠ **`now` is the caller's to pass and is not optional in meaning.**
+`past(date, undefined)` is false — the generous direction every blank in
+`_credit.js` takes — so a caller that forgets the clock reads every evening as
+still ahead and books a class that finished a fortnight ago. Exactly the shape
+five callers of `creditFor()` once had, and greppable for the same reason: a
+test scans every `attendance.validate(` call and asserts each passes one.
+
 ⚠ **A drop-in registration is not capped by the size of the room**, and it was.
 For a course the two are one question — a place is held for the whole term. For a
 drop-in they are not: forty families can be registered and eight turn up.
@@ -3580,6 +3619,14 @@ the same keys (a missing Russian key is not a missing translation, it is
 `undefined` rendered into a label), and that **no key is left unreferenced** — an
 orphan is dead copy three languages carry, and is indistinguishable from a key
 whose only caller was renamed, which is a real bug wearing a harmless costume.
+
+⚠ **The Hebrew cost-card heading was English translated a word at a time.**
+`מה זה עולה` is "What it costs" rendered literally, and it is not a sentence
+anybody would write as a heading. The card is a summary of the money on one
+registration — the fee, the term, what is paid, what is left — so it is headed
+as one: **`עלות ותשלום`**. The English and the Russian are unchanged; each
+language gets idiomatic copy rather than a translation of one, which is the same
+choice `פעיל` over `פעילות` makes in the activities menu.
 
 A shell's `.page-header` carries the page's single `<h1>`; the heading the script
 draws is an **`<h2>`**. Two h1s are two claims about what the page is. These are

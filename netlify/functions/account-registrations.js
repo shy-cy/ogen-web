@@ -824,7 +824,7 @@ exports.handler = async (event) => {
         if (!participant) return no(404, 'no-such-participant');
         const activity = await published(body.slug);
         if (!activity) return no(404, 'no-such-activity');
-        const bad = attendance.validate(activity, body.sessionDate);
+        const bad = attendance.validate(activity, body.sessionDate, Date.now());
         if (bad) return no(400, bad);
 
         const reg = await store.getRegistration(participant.participantId, activity.activityId);
@@ -949,7 +949,7 @@ exports.handler = async (event) => {
                     { max: checkout.MAX_SESSION_LINES });
         }
         for (const d of dates) {
-          const bad = attendance.validate(activity, d);
+          const bad = attendance.validate(activity, d, Date.now());
           if (bad) return no(400, bad);
         }
 
@@ -1192,7 +1192,7 @@ exports.handler = async (event) => {
         if (!participant) return no(404, 'no-such-participant');
         const activity = await published(body.slug);
         if (!activity) return no(404, 'no-such-activity');
-        const bad = attendance.validate(activity, body.toDate);
+        const bad = attendance.validate(activity, body.toDate, Date.now());
         if (bad) return no(400, bad);
 
         const att = await attendance.getAttendance(

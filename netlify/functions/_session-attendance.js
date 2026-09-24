@@ -110,9 +110,30 @@ function bookableDates(activity, groupId) {
 // ⚠ A KEY, NOT A SENTENCE — see submissionErrors() in _registration.js, for
 // the same reason: a pure rule module has no reader and so has no language.
 // The three refusals live in _family-errors.js and are rendered by the caller.
-function validate(activity, sessionDate) {
+// ⚠ `now` IS THE CALLER'S TO PASS AND IT IS NOT OPTIONAL IN MEANING.
+//
+// past(date, undefined) is FALSE — the generous direction every blank in
+// _credit.js takes — so a caller that forgets the clock reads every evening as
+// still ahead and books a class that finished a fortnight ago. That is exactly
+// the shape of bug this codebase already met when five callers of creditFor()
+// dropped their timestamp, so it is greppable and a test greps for it.
+function validate(activity, sessionDate, now) {
   if ((activity && activity.type) !== 'dropin') return 'dropin-only';
   if (!ISO_DATE.test(String(sessionDate || ''))) return 'session-needs-a-date';
+  // ⚠ AN EVENING THAT HAS ALREADY HAPPENED IS NOT BOOKABLE, and nothing said so.
+  //
+  // Reported from QA: the registration page listed 3 and 10 September with a
+  // live "register for this session" link beside them, three weeks after they
+  // happened. `sessionsPayload()` has sent a `past` flag per date since the
+  // screen was built and NOTHING read it — server or client — so a family could
+  // book, and be charged for, a class nobody can attend.
+  //
+  // The end of that day in Asia/Nicosia, which is the same answer the payload's
+  // own flag gives and the same one the check-in token uses, so the screen and
+  // the refusal cannot disagree. Today's class stays bookable all of today on
+  // purpose: a drop-in place can free thirty minutes before the lesson, and
+  // that is what the late price exists for.
+  if (credit.past(sessionDate, now)) return 'session-has-passed';
   // ⚠ ANY, EXPLICITLY. The question is "does this activity meet on that evening
   // at all", which is the union across its groups — and omitting the argument
   // would THROW on an activity with more than one, which is precisely the case
