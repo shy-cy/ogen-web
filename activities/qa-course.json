@@ -56,8 +56,8 @@
       }
     },
     "price": {
-      "registrationFee": null,
-      "fullPrice": null,
+      "registrationFee": 22,
+      "fullPrice": 33,
       "perHourOverride": null,
       "perSessionPrice": null,
       "showPerLesson": false,
@@ -159,10 +159,10 @@
   "faq": [],
   "teachers": [],
   "sponsors": [],
-  "isoUpdated": "2026-09-24T13:34:46.283Z",
+  "isoUpdated": "2026-09-24T13:35:53.149Z",
   "isoCreated": "2026-09-24T11:37:46.839Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
   "activityId": "act-150a47f2e326ab9a",
-  "lastPublishedAt": "2026-09-24T13:34:46.283Z"
+  "lastPublishedAt": "2026-09-24T13:35:53.149Z"
 }
