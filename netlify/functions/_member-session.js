@@ -19,7 +19,7 @@
 // ⚠ Arms the legal gate, correctly — these sessions belong to people.
 
 const crypto = require('crypto');
-const { requireStore, optionalStore } = require('./_blobs');
+const { requireStore, optionalStore, readMany, deleteMany } = require('./_blobs');
 const accounts = require('./_account-store');
 
 const SESSIONS = 'member-sessions';
@@ -113,13 +113,17 @@ async function destroyAllSessions(accountId, exceptToken) {
   let removed = 0;
   try {
     const { blobs } = await store.list({ prefix: 'msess-' });
-    for (const b of blobs) {
-      const s = await store.get(b.key, { type: 'json' });
-      if (!s || s.accountId !== accountId) continue;
-      if (exceptToken && s.token === exceptToken) continue;
-      await store.delete(b.key).catch(() => {});
-      removed++;
-    }
+    // A reset ends every other session, so this runs while somebody waits at a
+    // form. Read them together, then delete the matches together.
+    const keys = blobs.map((b) => b.key);
+    const rows = await readMany(store, keys);
+    const doomed = keys.filter((k, i) => {
+      const s = rows[i];
+      if (!s || s.accountId !== accountId) return false;
+      return !(exceptToken && s.token === exceptToken);
+    });
+    await deleteMany(store, doomed);
+    removed = doomed.length;
   } catch (e) {
     console.warn('[member-session] could not clear sessions: ' + e.message);
   }

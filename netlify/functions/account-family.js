@@ -106,23 +106,25 @@ exports.handler = async (event) => {
       // --- the children on this account ------------------------------------
       case 'listParticipants': {
         const ids = await guardians.participantIdsFor(me.accountId);
-        const out = [];
-        for (const id of ids) {
-          const p = await participants.getParticipant(id);
-          if (!p) continue;
+        // Together rather than one after another — see the dashboard's note.
+        // Order comes from the map, so the list does not reshuffle per load.
+        const out = (await Promise.all(ids.map(async (id) => {
           // The link, not just its existence: it carries whether this
           // participant is the reader themselves, which is what lets the screen
           // say "that is you" and stop offering "remove myself from this
           // record" on a record that IS the person reading it.
-          const link = await guardians.getLink(id, me.accountId);
-          out.push(Object.assign(participants.publicParticipant(p), {
+          const [p, link] = await Promise.all([
+            participants.getParticipant(id), guardians.getLink(id, me.accountId)
+          ]);
+          if (!p) return null;
+          return Object.assign(participants.publicParticipant(p), {
             // Age is derived on read, never stored — a written-down age is
             // wrong from the day after it is written.
             age: participants.ageAt(p.dateOfBirth),
             isPrimary: p.primaryAccountId === me.accountId,
             isSelf: !!(link && link.isSelf)
-          }));
-        }
+          });
+        }))).filter(Boolean);
         out.sort((a, b) => String(a.firstName).localeCompare(String(b.firstName)));
         return json(200, { ok: true, participants: out });
       }
@@ -211,18 +213,20 @@ exports.handler = async (event) => {
         const p = await mustGuard(body.participantId, me.accountId);
         if (!p) return no(404, 'no-such-participant');
         const links = await guardians.guardiansOf(p.participantId);
-        const out = [];
-        for (const l of links) {
+        // Two guardians is the maximum, so this one is small — but it is the
+        // same shape and the same fix, and a rule with an exception is a rule
+        // somebody re-breaks.
+        const out = await Promise.all(links.map(async (l) => {
           const a = await accounts.getAccount(l.accountId);
-          out.push({
+          return {
             accountId: l.accountId,
             email: a ? a.email : null,
             name: a ? displayName(a) : null,
             addedVia: l.addedVia,
             addedAt: l.addedAt,
             isPrimary: p.primaryAccountId === l.accountId
-          });
-        }
+          };
+        }));
         const invites = (await guardians.invitesFor(p.participantId))
           .filter((i) => i.status === 'pending')
           .map((i) => ({ token: i.token, invitedEmail: i.invitedEmail, expiresAt: i.expiresAt }));

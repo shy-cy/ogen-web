@@ -1428,15 +1428,30 @@ exports.handler = async (event) => {
         // participant it guards". The ids come back from a key scan without a
         // blob being opened.
         const ids = await guardians.participantIdsFor(me.accountId);
-        const rows = [];
-        for (const id of ids) {
-          const p = await participants.getParticipant(id);
-          // The same list, handed to every row: the fee question is about this
-          // participant's OTHER registrations, and they are already here.
-          const regs = await store.forParticipant(id);
-          for (const reg of regs) rows.push(regRow(reg, p, lang, null, regs));
-        }
-        const entries = await ledger.entriesFor(me.accountId);
+        // ⚠ ALL OF THEM AT ONCE, AND THE LEDGER ALONGSIDE.
+        //
+        // This was a `for` loop awaiting two reads per participant and then the
+        // ledger after all of it — so a family with three people paid about
+        // fifteen network round trips end to end, in series, every time the
+        // dashboard opened. None of them needs anything from the one before it:
+        // the ids are already in hand, and the balance is about the ACCOUNT and
+        // has nothing to do with the participants at all.
+        //
+        // Promise.all over a map rather than pushing as they land, so the rows
+        // stay in the order the ids came back in — a dashboard whose list
+        // reshuffles between two loads reads as a screen that cannot be trusted.
+        const [people, entries] = await Promise.all([
+          Promise.all(ids.map(async (id) => {
+            // The same list, handed to every row: the fee question is about this
+            // participant's OTHER registrations, and they are already here.
+            const [p, regs] = await Promise.all([
+              participants.getParticipant(id), store.forParticipant(id)
+            ]);
+            return regs.map((reg) => regRow(reg, p, lang, null, regs));
+          })),
+          ledger.entriesFor(me.accountId)
+        ]);
+        const rows = [].concat.apply([], people);
         return json(200, {
           ok: true,
           // A COUNT, not the people. The dashboard tile shows a number and links

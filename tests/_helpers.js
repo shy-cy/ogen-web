@@ -37,16 +37,36 @@ function done() {
 
 // --- in-memory Blobs -------------------------------------------------------
 
-function makeBlobs() {
+// ⚠ THE REAL readMany/deleteMany, NOT A SECOND COPY. They are pure functions
+// over whatever store object they are handed, so the fake store can be fed to
+// the genuine article — and a bug in the bounded-concurrency pool is then a
+// failing suite rather than something only production meets. Requiring the real
+// module here is safe: it loads @netlify/blobs lazily, inside a call.
+const realBlobs = require('../netlify/functions/_blobs');
+
+function makeBlobs(options) {
   const stores = new Map();
+  // Every read costs this many milliseconds. Zero by default, so nothing pays
+  // for it — but a suite that wants to prove reads OVERLAP rather than queue
+  // sets it, which is the only way to tell the two apart from outside.
+  const latency = (options && options.latencyMs) || 0;
+  const pause = () => (latency ? new Promise((r) => setTimeout(r, latency)) : null);
+  let reads = 0;
+  let live = 0, peak = 0;
   const storeFor = (name) => {
     if (!stores.has(name)) stores.set(name, new Map());
     const data = stores.get(name);
     return {
       async get(key, opts) {
-        const raw = data.get(key);
-        if (raw === undefined) return null;
-        return opts && opts.type === 'json' ? JSON.parse(raw) : raw;
+        reads++;
+        live++; if (live > peak) peak = live;
+        try {
+          const wait = pause();
+          if (wait) await wait;
+          const raw = data.get(key);
+          if (raw === undefined) return null;
+          return opts && opts.type === 'json' ? JSON.parse(raw) : raw;
+        } finally { live--; }
       },
       async setJSON(key, value) { data.set(key, JSON.stringify(value)); },
       async set(key, value) { data.set(key, String(value)); },
@@ -68,8 +88,16 @@ function makeBlobs() {
   };
   return {
     _stores: stores,
+    // What the reads actually did: how many there were, and how many were ever
+    // in flight at once. `_peak` of 1 means they queued.
+    _counts: () => ({ reads: reads, peak: peak }),
+    _reset: () => { reads = 0; peak = 0; },
     requireStore: async (name) => storeFor(name),
-    optionalStore: async (name) => storeFor(name)
+    optionalStore: async (name) => storeFor(name),
+    readMany: realBlobs.readMany,
+    deleteMany: realBlobs.deleteMany,
+    READ_CONCURRENCY: realBlobs.READ_CONCURRENCY,
+    STORE_PREFIX: realBlobs.STORE_PREFIX
   };
 }
 

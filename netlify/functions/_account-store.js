@@ -24,7 +24,7 @@
 
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
-const { requireStore, optionalStore } = require('./_blobs');
+const { requireStore, optionalStore, readMany } = require('./_blobs');
 
 const ROUNDS = 12;
 const LANGS = ['he', 'en', 'ru'];
@@ -122,11 +122,7 @@ async function allAccounts() {
   const store = await optionalStore(ACCOUNTS);
   if (!store) return [];
   const { blobs } = await store.list({ prefix: 'acct-' });
-  const out = [];
-  for (const b of blobs) {
-    const rec = await store.get(b.key, { type: 'json' });
-    if (rec) out.push(rec);
-  }
+  const out = (await readMany(store, blobs.map((b) => b.key))).filter(Boolean);
   return out.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
 }
 

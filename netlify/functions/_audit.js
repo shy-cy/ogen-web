@@ -4,7 +4,7 @@
 //
 // Audit failures must never block the action they describe.
 
-const { optionalStore } = require('./_blobs');
+const { optionalStore, readMany } = require('./_blobs');
 
 async function recordAudit(session, action, target, outcome, extra) {
   try {
@@ -32,12 +32,7 @@ async function listAudit(limit) {
   if (!store) return [];
   const { blobs } = await store.list();
   const keys = blobs.map((b) => b.key).sort().reverse().slice(0, limit || 100);
-  const out = [];
-  for (const k of keys) {
-    const e = await store.get(k, { type: 'json' });
-    if (e) out.push(e);
-  }
-  return out;
+  return (await readMany(store, keys)).filter(Boolean);
 }
 
 module.exports = { recordAudit, listAudit };

@@ -27,7 +27,7 @@
 //
 // ⚠ Arms the legal gate, correctly.
 
-const { requireStore, optionalStore } = require('./_blobs');
+const { requireStore, optionalStore, readMany, deleteMany } = require('./_blobs');
 const credit = require('./_credit');
 const groups = require('./_activity-groups');
 const R = require('./_registration');
@@ -72,11 +72,7 @@ async function forParticipant(participantId, activityId) {
   if (!store || !participantId) return [];
   const prefix = PREFIX + participantId + '__' + (activityId ? activityId + '__' : '');
   const { blobs } = await store.list({ prefix: prefix });
-  const out = [];
-  for (const b of blobs) {
-    const a = await store.get(b.key, { type: 'json' });
-    if (a) out.push(a);
-  }
+  const out = (await readMany(store, blobs.map((b) => b.key))).filter(Boolean);
   return out.sort((a, b) => String(a.sessionDate).localeCompare(String(b.sessionDate)));
 }
 
@@ -87,12 +83,9 @@ async function forActivity(activityId, sessionDate) {
   if (!store || !activityId) return [];
   const { blobs } = await store.list({ prefix: PREFIX });
   const suffix = '__' + activityId + '__' + (sessionDate || '');
-  const out = [];
-  for (const b of blobs) {
-    if (sessionDate ? !b.key.endsWith(suffix) : b.key.indexOf('__' + activityId + '__') === -1) continue;
-    const a = await store.get(b.key, { type: 'json' });
-    if (a) out.push(a);
-  }
+  const keys = blobs.map((b) => b.key).filter((k) => sessionDate
+    ? k.endsWith(suffix) : k.indexOf('__' + activityId + '__') !== -1);
+  const out = (await readMany(store, keys)).filter(Boolean);
   return out.sort((a, b) => String(a.sessionDate).localeCompare(String(b.sessionDate)));
 }
 
@@ -206,7 +199,7 @@ async function removeForParticipant(participantId) {
   const store = await optionalStore(STORE);
   if (!store || !participantId) return 0;
   const { blobs } = await store.list({ prefix: PREFIX + participantId + '__' });
-  for (const b of blobs) await store.delete(b.key).catch(() => {});
+  await deleteMany(store, blobs.map((b) => b.key));
   return blobs.length;
 }
 

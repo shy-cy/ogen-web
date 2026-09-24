@@ -26,7 +26,7 @@
 // ⚠ Arms the legal gate, correctly.
 
 const crypto = require('crypto');
-const { requireStore, optionalStore } = require('./_blobs');
+const { requireStore, optionalStore, readMany } = require('./_blobs');
 
 const STORE = 'account-credits';
 const PREFIX = 'cred-';
@@ -91,11 +91,12 @@ async function entriesFor(accountId) {
   const store = await optionalStore(STORE);
   if (!store || !accountId) return [];
   const { blobs } = await store.list({ prefix: PREFIX + accountId + '__' });
-  const out = [];
-  for (const b of blobs) {
-    const e = await store.get(b.key, { type: 'json' });
-    if (e) out.push(Object.assign({ key: b.key }, e));
-  }
+  // ⚠ ZIPPED BACK AGAINST ITS KEYS, which is why readMany keeps an empty slot
+  // rather than dropping it: an entry carries the key it was written under.
+  const keys = blobs.map((b) => b.key);
+  const out = (await readMany(store, keys))
+    .map((e, i) => (e ? Object.assign({ key: keys[i] }, e) : null))
+    .filter(Boolean);
   return out.sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
 }
 

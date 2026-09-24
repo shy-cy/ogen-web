@@ -24,7 +24,7 @@
 // ⚠ Arms the legal gate, correctly.
 
 const crypto = require('crypto');
-const { requireStore, optionalStore } = require('./_blobs');
+const { requireStore, optionalStore, readMany, deleteMany } = require('./_blobs');
 
 const LINKS = 'guardian-links';
 const INVITES = 'guardian-invites';
@@ -51,11 +51,7 @@ async function guardiansOf(participantId) {
   const store = await optionalStore(LINKS);
   if (!store || !participantId) return [];
   const { blobs } = await store.list({ prefix: 'link-' + participantId + '__' });
-  const out = [];
-  for (const b of blobs) {
-    const row = await store.get(b.key, { type: 'json' });
-    if (row) out.push(row);
-  }
+  const out = (await readMany(store, blobs.map((b) => b.key))).filter(Boolean);
   return out.sort((a, b) => String(a.addedAt).localeCompare(String(b.addedAt)));
 }
 
@@ -149,7 +145,7 @@ async function removeAllLinks(participantId) {
   const store = await optionalStore(LINKS);
   if (!store) return 0;
   const rows = await guardiansOf(participantId);
-  for (const r of rows) await store.delete(linkKey(participantId, r.accountId)).catch(() => {});
+  await deleteMany(store, rows.map((r) => linkKey(participantId, r.accountId)));
   return rows.length;
 }
 
@@ -186,11 +182,12 @@ async function invitesFor(participantId) {
   const store = await optionalStore(INVITES);
   if (!store) return [];
   const { blobs } = await store.list({ prefix: 'inv-' });
-  const out = [];
-  for (const b of blobs) {
-    const inv = await store.get(b.key, { type: 'json' });
-    if (inv && inv.participantId === participantId) out.push(withExpiry(inv));
-  }
+  // The participant is inside the record rather than in the key, so every
+  // invite has to be opened — which is exactly the case reading them together
+  // helps most.
+  const out = (await readMany(store, blobs.map((b) => b.key)))
+    .filter((inv) => inv && inv.participantId === participantId)
+    .map(withExpiry);
   return out.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 }
 

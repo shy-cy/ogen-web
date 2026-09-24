@@ -11,7 +11,7 @@
 // Only super-admin is granted right now. ru-reviewer is defined so that
 // granting it later is a grant, not a code change.
 
-const { optionalStore, requireStore } = require('./_blobs');
+const { optionalStore, requireStore, readMany } = require('./_blobs');
 
 const ALL_LANGS = ['he', 'en', 'ru'];
 // `family` is its own tool, and separate from `activities` on purpose: an admin
@@ -83,12 +83,11 @@ async function listRoles() {
   if (!store) return roles;
   try {
     const { blobs } = await store.list();
-    for (const b of blobs) {
-      const custom = await store.get(b.key, { type: 'json' });
+    (await readMany(store, blobs.map((b) => b.key))).forEach((custom) => {
       if (custom && custom.id && !roles.some((r) => r.id === custom.id)) {
         roles.push(Object.assign({ builtin: false }, custom));
       }
-    }
+    });
   } catch (err) {
     console.warn('[roles] could not list custom roles:', err.message);
   }

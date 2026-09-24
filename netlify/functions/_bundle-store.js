@@ -18,7 +18,7 @@
 //
 // ⚠ Arms the legal gate, correctly — a record here names a participant.
 
-const { requireStore, optionalStore } = require('./_blobs');
+const { requireStore, optionalStore, readMany } = require('./_blobs');
 const B = require('./_bundle');
 
 const STORE = 'bundles';
@@ -48,12 +48,8 @@ async function forParticipant(participantId, activityId) {
   const store = await optionalStore(STORE);
   if (!store || !participantId || !activityId) return [];
   const { blobs } = await store.list({ prefix: prefixFor(participantId, activityId) });
-  const out = [];
-  for (const b of blobs.sort((x, y) => x.key.localeCompare(y.key))) {
-    const rec = await store.get(b.key, { type: 'json' });
-    if (rec) out.push(rec);
-  }
-  return out;
+  const keys = blobs.map((b) => b.key).sort((x, y) => x.localeCompare(y));
+  return (await readMany(store, keys)).filter(Boolean);
 }
 
 // Every bundle for an activity, which is what the nightly pass and the admin
@@ -63,13 +59,11 @@ async function forActivity(activityId) {
   const store = await optionalStore(STORE);
   if (!store || !activityId) return [];
   const { blobs } = await store.list({ prefix: PREFIX });
-  const out = [];
-  for (const b of blobs) {
-    if (b.key.indexOf('__' + activityId + '__') === -1) continue;
-    const rec = await store.get(b.key, { type: 'json' });
-    if (rec) out.push(rec);
-  }
-  return out;
+  // Keys first, blobs second: the match runs over names only, so nothing is
+  // opened that is not wanted.
+  const keys = blobs.map((b) => b.key)
+    .filter((k) => k.indexOf('__' + activityId + '__') !== -1);
+  return (await readMany(store, keys)).filter(Boolean);
 }
 
 // The bundle an entry should be spent from for one evening: the OLDEST that

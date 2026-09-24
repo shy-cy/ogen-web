@@ -17,7 +17,7 @@
 //
 // ⚠ Arms the legal gate, correctly.
 
-const { requireStore, optionalStore } = require('./_blobs');
+const { requireStore, optionalStore, readMany, deleteMany } = require('./_blobs');
 const { key, holdsASpot } = require('./_registration');
 
 const STORE = 'registrations';
@@ -41,11 +41,7 @@ async function forParticipant(participantId) {
   const store = await optionalStore(STORE);
   if (!store || !participantId) return [];
   const { blobs } = await store.list({ prefix: PREFIX + participantId + '__' });
-  const out = [];
-  for (const b of blobs) {
-    const r = await store.get(b.key, { type: 'json' });
-    if (r) out.push(r);
-  }
+  const out = (await readMany(store, blobs.map((b) => b.key))).filter(Boolean);
   return out.sort((a, b) => String(a.submittedAt).localeCompare(String(b.submittedAt)));
 }
 
@@ -57,12 +53,8 @@ async function forActivity(activityId) {
   if (!store || !activityId) return [];
   const { blobs } = await store.list({ prefix: PREFIX });
   const suffix = '__' + activityId;
-  const out = [];
-  for (const b of blobs) {
-    if (!b.key.endsWith(suffix)) continue;
-    const r = await store.get(b.key, { type: 'json' });
-    if (r) out.push(r);
-  }
+  const keys = blobs.map((b) => b.key).filter((k) => k.endsWith(suffix));
+  const out = (await readMany(store, keys)).filter(Boolean);
   return out.sort((a, b) => String(a.submittedAt).localeCompare(String(b.submittedAt)));
 }
 
@@ -73,12 +65,7 @@ async function allRegistrations() {
   const store = await optionalStore(STORE);
   if (!store) return [];
   const { blobs } = await store.list({ prefix: PREFIX });
-  const out = [];
-  for (const b of blobs) {
-    const r = await store.get(b.key, { type: 'json' });
-    if (r) out.push(r);
-  }
-  return out;
+  return (await readMany(store, blobs.map((b) => b.key))).filter(Boolean);
 }
 
 // Deleting a participant takes their registrations with it. A registration
@@ -89,8 +76,7 @@ async function removeForParticipant(participantId) {
   const store = await optionalStore(STORE);
   if (!store || !participantId) return 0;
   const { blobs } = await store.list({ prefix: PREFIX + participantId + '__' });
-  for (const b of blobs) await store.delete(b.key).catch(() => {});
-  return blobs.length;
+  return deleteMany(store, blobs.map((b) => b.key));
 }
 
 // Convenience for the one question every caller asks after reading a list.

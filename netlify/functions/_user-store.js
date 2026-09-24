@@ -3,7 +3,7 @@
 // Passwords are bcrypt-hashed at 12 rounds. Plaintext is never stored or logged.
 
 const bcrypt = require('bcryptjs');
-const { requireStore, optionalStore } = require('./_blobs');
+const { requireStore, optionalStore, readMany } = require('./_blobs');
 
 const ROUNDS = 12;
 const key = (email) => 'user-' + encodeURIComponent(String(email).trim().toLowerCase());
@@ -41,11 +41,8 @@ async function listUsers() {
   const store = await optionalStore('admin-users');
   if (!store) return [];
   const { blobs } = await store.list();
-  const out = [];
-  for (const b of blobs) {
-    const u = await store.get(b.key, { type: 'json' });
-    if (u) out.push(publicUser(u));
-  }
+  const out = (await readMany(store, blobs.map((b) => b.key)))
+    .filter(Boolean).map(publicUser);
   return out.sort((a, b) => String(a.email).localeCompare(String(b.email)));
 }
 

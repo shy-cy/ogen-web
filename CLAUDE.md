@@ -2059,6 +2059,67 @@ flattens an animated GIF, never rasterises an SVG, and honours EXIF orientation
 so a phone photo isn't drawn sideways. Publishing also deletes images the
 record has stopped pointing at, since changing format changes the filename.
 
+### ⚠ A list is read together, not one blob at a time
+
+Reported as *"the website is slow, especially the family section"*. Measured
+against the live site: an API call answered in about **a second at the Netlify
+origin before doing any real work**, and every screen behind it then queued its
+reads behind each other.
+
+Every store here has one shape of query — `list()` the keys under a prefix, then
+open each one — and each open is a network round trip that was being awaited
+before the next was asked for. **Twelve store functions** did it, and the
+dashboard did it again one level up: a `for` loop awaiting the participant, then
+that participant's registrations, then the ledger after all of it. A family with
+four people and two registrations each paid about **fifteen round trips end to
+end**. Nothing needed anything from the one before it — the ids were already in
+hand, and the **balance is a fact about the account** with nothing to do with the
+participants at all.
+
+This is the lesson `_github.js` already carries on the publish path — *"don't
+reintroduce a per-file `await` in a loop here"* — arriving one service later, and
+the fix is the same. `readMany()` and `deleteMany()` live in `_blobs.js`, the one
+place a store is opened, with a cap of **eight**: the cap is about not opening
+forty sockets from one function, not about our patience, and a family's list is
+single figures anyway, so in the case it exists for it never binds. Measured on
+the dashboard fixture: **14 reads, up to 12 at once, 43ms against ~168ms
+serial**.
+
+Three properties are load-bearing, and two of them are not about speed:
+
+- ⚠ **`readMany` returns one slot per key, including the empty ones.** Dropping
+  them would silently shorten the array and break any caller zipping it back
+  against its keys — which the ledger does, because an entry carries the key it
+  was written under.
+- ⚠ **A FAILED read still throws.** The loops it replaces dropped a *missing*
+  blob and let a *broken* one take the request down, which is right. The
+  tempting rewrite — `Promise.all(keys.map(k => get(k).catch(() => null)))` —
+  turns a store having a bad minute into a family being shown a shorter list of
+  their own registrations, with nothing erroring and nobody able to tell.
+  `skipErrors` is opt-in **because it is the dangerous default**; it has exactly
+  one caller, `_email-log.js`, which would rather lose one unreadable entry than
+  lose the history, and a test pins that there is only one.
+- **`Promise.all` over a `map`, never pushed as they land**, so rows keep the
+  order the ids came back in. A dashboard whose list reshuffles between two
+  loads reads as a screen that cannot be trusted.
+
+The fake Blobs in `tests/_helpers.js` now re-exports the **real** `readMany` and
+`deleteMany` rather than reimplementing them, and takes a `latencyMs` so a suite
+can tell overlapping reads from queued ones — `_counts()` reports how many reads
+there were and how many were ever in flight, and a peak of 1 means they queued.
+`a-family-screen-is-not-fifteen-round-trips.js` holds both halves: a source scan
+asserting no function opens blobs one at a time, and the dashboard executed with
+a cost on every read.
+
+**What this does NOT fix, and both are outside this repository.** The function's
+own floor is ~0.7-1.0s at the Netlify origin for a request that does nothing —
+measured identically on a 9-module endpoint and a 32-module one, so it is the
+runtime plus one Blobs session read rather than anything here. And
+**`/api/*` through Cloudflare is intermittently taking 75 seconds and answering
+`520`** while the same call to `ogen-web.netlify.app` answers in under a second;
+Cloudflare also adds ~600ms to every API call that does succeed. That is a proxy
+problem, not a code one.
+
 **7. A publish is a handful of requests, not one per file.** Netlify kills a
 function at ten seconds and a publish was taking eight, because it asked GitHub
 for everything in sequence. Text files now carry their content **inline in the

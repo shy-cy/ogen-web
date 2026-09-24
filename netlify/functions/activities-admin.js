@@ -23,7 +23,7 @@
 
 const crypto = require('crypto');
 const { authenticate, canAccess, canPublish, editLangs, canEditLang } = require('./_session-store');
-const { requireStore, optionalStore } = require('./_blobs');
+const { requireStore, optionalStore, readMany } = require('./_blobs');
 const { readJson, commitToBranch, mapConcurrent, CONCURRENCY } = require('./_github');
 const { recordAudit } = require('./_audit');
 const {
@@ -248,12 +248,7 @@ async function listDrafts() {
   const store = await optionalStore(DRAFT_STORE);
   if (!store) return [];
   const { blobs } = await store.list();
-  const out = [];
-  for (const b of blobs) {
-    const rec = await store.get(b.key, { type: 'json' });
-    if (rec) out.push(rec);
-  }
-  return out;
+  return (await readMany(store, blobs.map((b) => b.key))).filter(Boolean);
 }
 
 const getPublished = async (slug) => {

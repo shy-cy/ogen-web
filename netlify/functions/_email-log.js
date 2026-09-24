@@ -214,13 +214,10 @@ async function listForRecipient(email) {
   try {
     const listing = await store.list({ prefix: recipientPrefix(email) });
     const keys = (listing.blobs || []).map((b) => b.key);
-    const out = [];
-    for (const k of keys) {
-      try {
-        const r = await store.get(k, { type: 'json' });
-        if (r && r.template) out.push(r);
-      } catch (e) { /* skip one unreadable entry rather than lose the history */ }
-    }
+    // skipErrors, because one unreadable entry must not lose the history —
+    // the one caller in this codebase that wants that, and it says why.
+    const out = (await blobs.readMany(store, keys, { skipErrors: true }))
+      .filter((r) => r && r.template);
     return out.sort((a, b) => {
       if (a.sentAt !== b.sentAt) return a.sentAt < b.sentAt ? 1 : -1;
       return String(a.id) < String(b.id) ? 1 : -1;
