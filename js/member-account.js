@@ -190,8 +190,13 @@
                       + 'ברגע שיתפנה מקום נשלח מייל לכל הממתינים, והמקום יינתן למי שיירשם ראשון.',
       registerWaitDone: 'הצטרפתם לרשימת ההמתנה. נשלח מייל ברגע שיתפנה מקום.',
       waitingLead: 'ברשימת ההמתנה',
-      waitingWhy: 'הפעילות היתה מלאה, ולכן שמרנו את מקומכם בתור. לא בוצע חיוב ולא נשמר מקום. '
-                + 'ברגע שיתפנה מקום נשלח מייל לכל הממתינים, והמקום יינתן למי שיירשם ראשון.',
+      waitingWhy: 'לא חויבתם. כשיתפנה מקום נשלח מייל לכל הממתינים, '
+                + 'והמקום יינתן לראשון שיירשם.',
+      waitingOpenLead: 'התפנה מקום',
+      waitingOpenWhy: 'שלחנו מייל לכל הממתינים, אז כדאי לתפוס אותו עכשיו. '
+                    + 'מיד אחר כך אפשר לשלם כאן.',
+      takePlace: 'לתפוס את המקום',
+      takePlaceDone: 'המקום שלכם. אפשר להשלים את התשלום כאן.',
       leaveWait: 'יציאה מרשימת ההמתנה',
       leaveWaitConfirm: 'לצאת מרשימת ההמתנה?',
       leaveWaitDone: 'יצאתם מרשימת ההמתנה.',
@@ -354,9 +359,13 @@
                       + 'and it goes to the first person to take it.',
       registerWaitDone: 'You are on the waiting list. We will email you as soon as a place opens.',
       waitingLead: 'On the waiting list',
-      waitingWhy: 'The activity was full, so we have kept your place in the queue. Nothing has '
-                + 'been charged and no place is being held. As soon as one opens we email '
-                + 'everybody waiting, and it goes to the first person to take it.',
+      waitingWhy: 'You have not been charged. When a place opens we email everyone waiting, '
+                + 'and the first to take it gets it.',
+      waitingOpenLead: 'A place has opened',
+      waitingOpenWhy: 'Everyone waiting has been emailed, so take it now to keep it. '
+                    + 'You can pay here straight afterwards.',
+      takePlace: 'Take the place',
+      takePlaceDone: 'The place is yours. You can pay for it here.',
       leaveWait: 'Leave the waiting list',
       leaveWaitConfirm: 'Leave the waiting list?',
       leaveWaitDone: 'You have left the waiting list.',
@@ -513,9 +522,13 @@
                       + 'тому, кто запишется первым.',
       registerWaitDone: 'Вы в списке ожидания. Мы напишем, как только появится место.',
       waitingLead: 'В списке ожидания',
-      waitingWhy: 'Мест не было, и мы сохранили вашу очередь. Оплата не списана и место не '
-                + 'забронировано. Как только оно освободится, мы напишем всем, кто ждёт, и оно '
-                + 'достанется тому, кто запишется первым.',
+      waitingWhy: 'Оплата не списана. Как только освободится место, мы напишем всем, кто ждёт, '
+                + 'и оно достанется тому, кто займёт его первым.',
+      waitingOpenLead: 'Освободилось место',
+      waitingOpenWhy: 'Мы написали всем, кто ждёт, поэтому займите его сейчас. '
+                    + 'Оплатить можно здесь же сразу после.',
+      takePlace: 'Занять место',
+      takePlaceDone: 'Место ваше. Оплатить можно здесь.',
       leaveWait: 'Выйти из списка ожидания',
       leaveWaitConfirm: 'Выйти из списка ожидания?',
       leaveWaitDone: 'Вы вышли из списка ожидания.',
@@ -2450,12 +2463,60 @@
     // owed €7. What they came to this page for is the state and the way out of
     // it, so that is the whole card.
     if (r.status === 'waitlisted') {
+      // ⚠ AND THERE WAS NO WAY TO TAKE THE PLACE FROM THIS SCREEN.
+      //
+      // The queue has always been claimable — `openRegistration()` reads a
+      // waiting record and converts it, because "claiming is not an action" and
+      // a family who was queueing and is now registering IS claiming. And the
+      // place-open email's own comment said it pointed here "because that is
+      // where the button that takes the place is". There was no such button.
+      // The only control on this card was Leave the waiting list, so the one
+      // thing the email invites somebody to do could not be done where it sent
+      // them — reported as "it should be simply: I accept, I click, and I get
+      // the payment button".
+      //
+      // A place free for THIS registration's group, never for the activity.
+      // Under the equal-hours rule the other group having room is not this
+      // family's place, and offering it would be a button that loses every time.
+      var mine = null;
+      if (act && act.groups && r.groupId) {
+        mine = act.groups.filter(function (g) { return g.groupId === r.groupId; })[0] || null;
+      }
+      var openNow = !!act && (mine ? !mine.full : !act.full);
+
       return section(T.costTitle, [
         el('div', { class: 'acc-waiting' }, [
-          el('p', { class: 'acc-waiting-lead' }, [el('span', { text: T.waitingLead })]),
-          el('p', { class: 'acc-waiting-body', text: T.waitingWhy })
+          el('p', { class: 'acc-waiting-lead' },
+             [el('span', { text: openNow ? T.waitingOpenLead : T.waitingLead })]),
+          el('p', { class: 'acc-waiting-body',
+                    text: openNow ? T.waitingOpenWhy : T.waitingWhy })
         ]),
         actions([
+          // The primary, and only while there is something to take. A dead
+          // button under "a place has opened" would be worse than no button.
+          openNow ? el('button', { type: 'button', class: 'btn-primary', text: T.takePlace,
+            onclick: function (e) {
+              var done = busy(e.currentTarget);
+              // ⚠ `waitlist: false` ON PURPOSE. Everybody waiting was emailed at
+              // the same moment, so losing the race is an ORDINARY outcome — and
+              // with the flag true the server would quietly re-queue them and the
+              // screen would look like the claim had worked. False means it is
+              // refused and said out loud, and the redraw puts the button away.
+              post(REGS, { action: 'submit', slug: act.slug,
+                           participantId: r.participantId, groupId: r.groupId || null,
+                           waitlist: false }).then(function (res) {
+                done();
+                // ⚠ REDRAW FIRST, SAY SECOND, ON BOTH PATHS. renderActivity()
+                // replaces the notice node on its way in, so saying it first
+                // writes into something discarded inside one repaint — the bug
+                // this file already carries a warning about, two screens over.
+                // Caught here by the suite rather than by a family who pressed a
+                // button and was told nothing at all.
+                var msg = res.ok ? T.takePlaceDone : failure(res);
+                onDone();
+                say(res.ok ? 'ok' : 'err', msg);
+              });
+            } }) : null,
           el('button', { type: 'button', class: 'btn-secondary', text: T.leaveWait,
             onclick: function () {
               confirmAction({ question: T.leaveWaitConfirm, yes: T.leaveWait }, function () {

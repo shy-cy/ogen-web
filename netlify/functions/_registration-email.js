@@ -205,7 +205,7 @@ function waitingMessage(reg, account, when) {
   when = when ? dayAndMonth(when, l) || when : null;
   const html = shell(l, T.heading,
     [esc(T.body(child, act, when || null)), esc(T.next)],
-    { href: activityHref(reg, l), label: T.button });
+    { href: registrationHref(reg, l), label: T.button });
   return { to: account.email, subject: T.subject(child, act), html: html, text: strip(html) };
 }
 
@@ -213,6 +213,18 @@ function waitingMessage(reg, account, when) {
 // that is where the button that takes the place is. The waiting-list
 // acknowledgement above points at the public page instead: nothing can be done
 // there yet, and a link to a page offering no action reads as a broken button.
+//
+// ⚠ AND FOR A RELEASE IT DID NOT. This comment said `registrationHref` and the
+// code said `activityHref` — so the one message whose whole job is "come and
+// take this place" sent a family to the PUBLIC page, which cannot know who is
+// reading it and offers a Register button that starts the flow again. Twice
+// wrong, because activityHref() resolves through `activitySlugAtSubmission`,
+// which this project says everywhere is AUDIT ONLY: after a rename it opens the
+// wrong page or none.
+//
+// The claim button it was describing did not exist either, which is why nothing
+// caught the mismatch — the comment was right about where the button belongs and
+// there was no button anywhere. Both halves are built now.
 function placeOpenMessage(reg, account, when) {
   const l = lang(((account || {}).profile || {}).preferredLanguage);
   const T = PLACE_OPEN[l];

@@ -2602,6 +2602,56 @@ telling a family *"this group is full"* would describe a structure the page has
 never shown them. `registerFull` is **deleted** rather than left unused, and the
 string-table test is what insisted on that.
 
+⚠ **AND THE EMAIL SAID "TAKE THE PLACE" AND SENT PEOPLE WHERE THERE WAS NO
+BUTTON.** Reported as *"it should be simply: I accept the invite or join the
+course — you click on it and you get the payment button"*, looking at a
+waiting-list card whose only control was **Leave the waiting list**.
+
+Three faults, each hiding the next:
+
+- **The card had no claim button.** The queue has always been claimable —
+  `openRegistration()` reads a waiting record and converts it, because *claiming
+  is not an action* and a family who was queueing and is now registering **is**
+  claiming. The mechanism worked; the door was never drawn.
+- **The email pointed at the public page.** `placeOpenMessage()` carried a
+  comment saying it points at the registration page *"because that is where the
+  button that takes the place is"* — and called `activityHref()`. The one message
+  whose whole job is *come and take this place* sent a family to a static page
+  that cannot know who is reading it.
+- **And it resolved through the frozen slug**, which this file says everywhere is
+  audit only: after a rename it opens the wrong page or none.
+
+Nothing caught the mismatch because **the comment was right about where the
+button belonged and there was no button anywhere to compare it against** —
+reading each side proved each side self-consistent, the same failure as the
+dialog that was backwards about money.
+
+The card offers **Take the place** as its primary now, and the email links to it.
+Four details:
+
+- ⚠ **The place is this registration's GROUP's, never the activity's.** Under the
+  equal-hours rule the other group having room is a different day, place and
+  teacher, and a button offered on it loses every time. With no group to choose,
+  the activity is the honest answer.
+- ⚠ **It posts `submit` with `waitlist: false`.** Everybody waiting was emailed
+  at the same moment, so losing the race is an **ordinary** outcome — and with
+  the flag true the server would quietly re-queue them and the screen would look
+  like the claim had worked. False means it is refused, said out loud, and the
+  card redrawn so the button that just lost is not left there to press again.
+- **The button is shown only while there is something to take.** A dead button
+  under *a place has opened* is worse than no button.
+- **The screen's words are the email's words**, pinned by a test in all three
+  languages: a family reads *Take the place* in an inbox and has to find it on a
+  page, and two tables holding that string is two places it can be reworded.
+
+**And the waiting copy said two opposite things.** *"We have kept your place in
+the queue"* and *"no place is being held"*, two sentences apart, under a heading
+asking what it costs. It is *"You have not been charged. When a place opens we
+email everyone waiting, and the first to take it gets it."* — and the cause is
+dropped rather than reworded: *the activity was full* is past tense about
+something that may now be a **group**, and a family who pressed *Join the waiting
+list* a moment ago does not need telling why they are on it.
+
 **The admin gets a list, not a sixth kind of queue row.** Nothing in a queue row
 applies to somebody waiting — no place to approve, nothing to reject, no money
 owed, no deadline running — so it is its own table under the queue, in join
