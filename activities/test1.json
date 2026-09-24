@@ -8,14 +8,17 @@
   "robots": "noindex",
   "type": "course",
   "registration": {
-    "autoApprove": false,
+    "autoApprove": true,
     "pendingExpiryDays": null,
-    "registrationFeeCutoffDate": "2026-09-23",
+    "registrationFeeCutoffDate": "2026-09-09",
     "cancellationPolicy": {
       "mode": "flat",
-      "cancellationCutoffDate": "2026-09-24"
+      "cancellationCutoffDate": "2026-09-27"
     },
-    "defaultBasis": null
+    "defaultBasis": {
+      "startDate": "2026-09-23",
+      "sessionCount": 1
+    }
   },
   "seriesId": "act-cb06dd7ab63bdaeb",
   "title": {
@@ -89,12 +92,12 @@
     }
   ],
   "sponsors": [],
-  "isoUpdated": "2026-09-24T11:39:10.824Z",
+  "isoUpdated": "2026-09-24T12:01:03.005Z",
   "isoCreated": "2026-09-23T06:45:32.398Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
   "activityId": "act-cb06dd7ab63bdaeb",
-  "lastPublishedAt": "2026-09-24T11:39:10.824Z",
+  "lastPublishedAt": "2026-09-24T12:01:03.005Z",
   "groups": [
     {
       "groupId": "g-default",
