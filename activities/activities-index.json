@@ -227,7 +227,7 @@
   {
     "slug": "test8",
     "activityId": "act-ecb73beba7893406",
-    "seriesId": "act-ecb73beba7893406",
+    "seriesId": "act-ca412442b8698dcf",
     "type": "course",
     "status": "open",
     "langs": [
@@ -247,6 +247,6 @@
     },
     "cardImage": "/images/activities/test8-card-d4b8b680.png",
     "testActivity": true,
-    "isoUpdated": "2026-09-24T19:39:43.456Z"
+    "isoUpdated": "2026-09-24T19:39:53.104Z"
   }
 ]
