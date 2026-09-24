@@ -4130,6 +4130,43 @@ waived; with no fee on the activity there is nothing to have been waived, and it
 says nothing at all. `feeIncluded` is deleted rather than left as dead copy in
 three languages.
 
+⚠ **AND THE SURVIVING HALF WAS DETACHED FROM THE FIGURE IT CONTRADICTED.**
+Reported as *"the registration fee cost 50 EUR — should be crossed, and under
+the Registration fee, write that it has been paid already."* The card read:
+
+```
+Registration fee    € 50
+Cost per semester   € 55   (4 sessions × 1 lesson)
+the registration fee has already been paid
+Paid                €0.00
+Still to pay        €55.00
+```
+
+Every figure true and the card unreadable. **50 + 55 above "still to pay 55" is
+an arithmetic error to anybody looking at it**, and the one line that resolves it
+sat three rows down, after the term, attached to neither the row it was about nor
+the number it contradicted. Same family as the four figures above it: nothing
+wrong, nothing believable.
+
+The fee row's figure is **struck through** and the reason sits **on that row,
+under its label**. ⚠ **Both halves or neither** — a struck figure with no words is
+a family guessing whether they are being charged, and the words with no strike
+leave the sum wrong; decoration is never the message here. The line is
+`--navy` at 10.8:1 rather than the italic `--camel` of the `.acc-note` beside it,
+because this is the reason a figure is not being charged rather than a qualifier
+on one, and `--camel` is 2.3:1 and a background token.
+
+The words shrank with the move: *"the registration fee has already been paid"*
+under a label reading **Registration fee** says it twice, so it is **already
+paid** / `כבר שולמו` / `уже оплачен`. It carries **no scope** — not "this year" —
+which matters since the waiver now crosses academic years for a linked term.
+
+⚠ **The standalone line survives for one case**: an activity unpublished after
+somebody registered has no price rows at all, so there is no fee row to attach
+to, and a family would otherwise read *Still to pay €55* with nothing saying why
+it is not €105. `waivedShown` is what decides, so the fallback cannot fire twice.
+
+
 ### ⚠ A dialog about money said the opposite of what happened
 
 `_credit.js` answers *what would cancelling do* twice, and both answers are

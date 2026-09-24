@@ -238,7 +238,7 @@
       buyValid: 'תוקף', buyDays: 'ימים',
       paySession: 'תשלום על המפגש', payingSession: 'פותח תשלום…',
       registerDone: 'ההרשמה בוצעה. הפרטים והתשלום נמצאים בעמוד ההרשמה.',
-      owes: 'לתשלום', paid: 'שולם', feeAlready: 'דמי ההרשמה כבר שולמו',
+      owes: 'לתשלום', paid: 'שולם', feeAlready: 'כבר שולמו',
       places: 'מקומות פנויים', unlimited: 'ללא הגבלה',
       payLink: { expired: 'קישור התשלום פג או כבר אינו בתוקף. אפשר להתחבר ולשלם כאן.',
                  'not-approved': 'לא ניתן לשלם על ההרשמה הזו כרגע.',
@@ -401,7 +401,7 @@
       buyValid: 'valid', buyDays: 'days',
       paySession: 'Pay for this session', payingSession: 'Opening payment…',
       registerDone: 'Registered. The details and the payment are on the registration page.',
-      owes: 'To pay', paid: 'Paid', feeAlready: 'registration fee already paid',
+      owes: 'To pay', paid: 'Paid', feeAlready: 'already paid',
       places: 'places left', unlimited: 'no limit',
       payLink: { expired: 'That payment link has expired or is no longer valid. You can sign in and pay here.',
                  'not-approved': 'This registration cannot be paid for at the moment.',
@@ -564,7 +564,7 @@
       buyValid: 'срок', buyDays: 'дней',
       paySession: 'Оплатить это занятие', payingSession: 'Открываем оплату…',
       registerDone: 'Запись оформлена. Подробности и оплата — на странице записи.',
-      owes: 'К оплате', paid: 'Оплачено', feeAlready: 'регистрационный взнос уже оплачен',
+      owes: 'К оплате', paid: 'Оплачено', feeAlready: 'уже оплачен',
       places: 'свободных мест', unlimited: 'без ограничения',
       payLink: { expired: 'Ссылка на оплату истекла или больше не действует. Вы можете войти и оплатить здесь.',
                  'not-approved': 'Эту запись сейчас нельзя оплатить.',
@@ -2550,13 +2550,37 @@
     // duplicate — the rate is already on the facts card above, from the same
     // builder that puts it on the public page.
     var rows = r.type === 'dropin' ? [] : ((act && act.priceRows) || []);
+
+    // ⚠ THE WAIVED FEE IS STRUCK THROUGH, AND SAYS SO ON ITS OWN ROW.
+    //
+    // The card printed "Registration fee €50" at full price and then, three rows
+    // down and after the term, a bare line reading "the registration fee has
+    // already been paid" — so the figures on screen did not add up. €50 and €55
+    // above "Still to pay €55.00" is an arithmetic error to anybody reading it,
+    // and the sentence that resolves it was detached from the row it was about
+    // and from the number it contradicted.
+    //
+    // ⚠ THE STRIKE IS NOT THE MESSAGE. Decoration alone is never the message on
+    // this site — a struck figure with no words is a family guessing whether
+    // they are being charged — so the words move onto the row too, directly
+    // under the label, and the line-through is what makes the sum read right at
+    // a glance. Either half alone is worse than both.
+    var waived = r.feeCharged === false && !!r.registrationFee;
+    var waivedShown = false;
     var kids = rows.map(function (row) {
+      var off = waived && row.key === 'fee';
+      if (off) waivedShown = true;
       return el('div', { class: 'acc-money' }, [
         el('span', {}, [
           el('span', { text: row.label }),
-          row.note ? el('span', { class: 'acc-note', text: row.note }) : null
+          row.note ? el('span', { class: 'acc-note', text: row.note }) : null,
+          // Under the label, because that is the thing it qualifies. --navy
+          // rather than the italic --camel `.acc-note` beside it: this is not a
+          // qualifier on a figure, it is the reason a figure is not being
+          // charged, and --camel is 2.3:1 and a background token.
+          off ? el('span', { class: 'acc-waived-why', text: T.feeAlready }) : null
         ]),
-        el('b', { text: row.value })
+        el('b', { class: off ? 'is-waived' : null, text: row.value })
       ]);
     });
     // ⚠ ONLY THE WAIVER, AND ONLY WHEN THERE IS A FEE TO WAIVE.
@@ -2571,7 +2595,11 @@
     // is 300 and not 350, and it is the one thing about the fee a family cannot
     // work out from the figures in front of them. With no fee on the activity
     // there is nothing to have been waived, so it says nothing at all.
-    if (r.feeCharged === false && r.registrationFee) {
+    // ⚠ AND IT STILL HAS SOMEWHERE TO GO WHEN THERE IS NO ROW TO PUT IT ON. An
+    // activity can be unpublished after somebody registered, in which case there
+    // are no price rows at all — and a family would then read "Still to pay €55"
+    // with nothing saying why it is not €105.
+    if (waived && !waivedShown) {
       kids.push(el('p', { class: 'acc-meta', text: T.feeAlready }));
     }
     // The figures. On a drop-in they come from the EVENINGS — summed on the

@@ -431,5 +431,103 @@ const css = read('shared.css');
   H.ok(/\.acc-table \.acc-date-why\{/.test(fs.readFileSync(path.join(R, 'shared.css'), 'utf8')),
     '⚠ which shared.css has a rule for — a class nobody styled is a layout nobody designed');
 
+  // =========================================================================
+  // ⚠ 5. A FEE AT FULL PRICE THAT NOBODY IS CHARGING.
+  //
+  // The fifth of the same shape, reported the same way: "the registration fee
+  // cost 50 EUR — should be crossed, and under the Registration fee, write that
+  // it has been paid already."
+  //
+  // The card printed
+  //
+  //     Registration fee   € 50
+  //     Cost per semester  € 55   (4 sessions × 1 lesson)
+  //     the registration fee has already been paid
+  //     Paid               €0.00
+  //     Still to pay       €55.00
+  //
+  // Every figure true and the card unreadable: 50 + 55 above "still to pay 55"
+  // is an arithmetic error to anybody looking at it, and the one line that
+  // resolves it sat three rows down, after the term, detached from both the row
+  // it was about and the number it contradicted.
+  //
+  // ⚠ BOTH HALVES OR NEITHER. A struck figure with no words is a family guessing
+  // whether they are being charged; the words with no strike leave the sum
+  // wrong. So this executes the row builder and asks for both.
+  console.log('\n[5. a fee nobody is charging is struck through AND says so]');
+
+  function costRows(reg, priceRows, lang) {
+    const dom = D.makeDom({ lang: lang });
+    const box = dom.node('div');
+    const T = strings(lang);
+    const slice = (a, b) => ui.slice(ui.indexOf(a), ui.indexOf(b));
+    const ctx = vm.createContext({ document: dom.document, T: T });
+    vm.runInContext(
+      slice('  function el(tag, attrs, kids) {', '  function clear(') + 'this.el = el;', ctx);
+    // Lifted verbatim from costBlock(), so the test cannot drift from it.
+    const body = slice('    var waived = r.feeCharged === false', '    // ⚠ AND IT STILL HAS');
+    vm.runInContext('var r = ' + JSON.stringify(reg) + ';\n' +
+                    'var rows = ' + JSON.stringify(priceRows) + ';\n' +
+                    body + '\nthis.out = kids; this.waivedShown = waivedShown;', ctx);
+    ctx.out.forEach((n) => box.appendChild(n));
+    return { text: box.textContent, nodes: ctx.out, shown: ctx.waivedShown, box: box };
+  }
+
+  const PRICE_ROWS = [
+    { key: 'fee', label: 'Registration fee', note: '', value: '\u20ac 50' },
+    { key: 'term', label: 'Cost per semester', note: '(4 sessions \u00d7 1 lesson)', value: '\u20ac 55' }
+  ];
+  const WAIVED = { type: 'course', feeCharged: false, registrationFee: 50 };
+  const CHARGED = { type: 'course', feeCharged: true, registrationFee: 50 };
+
+  const off = costRows(WAIVED, PRICE_ROWS, 'en');
+  H.ok(off.shown, 'the waiver lands on a row rather than being pushed below the card');
+  // The strike, on the fee and on nothing else.
+  const struck = (r) => r.nodes.map((n) =>
+    n.childNodes.filter((c) => c.tagName === 'B')[0]).filter((b) => b &&
+      (b.attributes.class || '').indexOf('is-waived') !== -1);
+  H.eq(struck(off).length, 1, '⚠ exactly one figure is struck through');
+  H.eq(struck(off)[0].textContent, '\u20ac 50', 'and it is the FEE, not the term');
+  // ⚠ And the words, on the same row, under the label.
+  const feeRow = off.nodes[0];
+  H.ok(feeRow.textContent.indexOf(strings('en').feeAlready) !== -1,
+    '⚠ with the reason on that same row — decoration alone is never the message');
+  H.ok(off.nodes[1].textContent.indexOf(strings('en').feeAlready) === -1,
+    'and not on the term, which IS being charged');
+  H.ok(!/registration fee already paid/i.test(off.text),
+    'the line stopped repeating the label directly above it');
+
+  const on = costRows(CHARGED, PRICE_ROWS, 'en');
+  H.eq(struck(on).length, 0, 'a fee that IS charged is not struck');
+  H.ok(on.text.indexOf(strings('en').feeAlready) === -1, 'and says nothing about being paid');
+  H.ok(!on.shown, 'nor is anything pushed below the card');
+
+  // A drop-in has no fee row to hang it on and no fee to waive.
+  const dropin = costRows({ type: 'dropin', feeCharged: false, registrationFee: 0 }, [], 'en');
+  H.eq(dropin.nodes.length, 0, 'a drop-in card draws no price rows at all');
+  H.ok(!dropin.shown, 'and nothing claims a fee was waived');
+
+  // ⚠ THE FALLBACK. An activity can be unpublished after somebody registered, so
+  // there are no price rows — and a family would read "Still to pay €55" with
+  // nothing saying why it is not €105.
+  const gone = costRows(WAIVED, [], 'en');
+  H.ok(!gone.shown,
+    '⚠ with no fee row to attach to, waivedShown stays false — which is what ' +
+    'makes costBlock() fall back to the standalone line rather than saying nothing');
+
+  ['he', 'ru'].forEach((l) => {
+    const d = costRows(WAIVED, PRICE_ROWS, l);
+    H.eq(struck(d).length, 1, l + ': the fee is struck');
+    H.ok(d.nodes[0].textContent.indexOf(strings(l).feeAlready) !== -1,
+      l + ': and the reason is on its row, in ' + l);
+  });
+
+  // The class has a rule, or it is a layout nobody designed — the same check the
+  // evenings table gets one section up, and the same bug it was written for.
+  const sheet = fs.readFileSync(path.join(R, 'shared.css'), 'utf8');
+  H.ok(/\.acc-money b\.is-waived\{[^}]*line-through/.test(sheet),
+    '⚠ shared.css actually strikes it through');
+  H.ok(/\.acc-waived-why\{/.test(sheet), 'and styles the line under the label');
+
   H.done();
 })();

@@ -147,8 +147,22 @@ console.log('\n[the fee line stopped saying something untrue]');
 // and on a drop-in with no registration fee it described a charge that does not
 // exist. The half worth keeping is the waiver, which is the one thing about the
 // fee a family cannot work out from the figures in front of them.
-H.ok(/if \(r\.feeCharged === false && r\.registrationFee\)/.test(ui),
+H.ok(/var waived = r\.feeCharged === false && !!r\.registrationFee;/.test(ui),
   'the line appears only when a fee was actually waived');
+// ⚠ AND IT IS NOW ON THE FEE'S OWN ROW, with the figure struck through. The card
+// printed "Registration fee €50" at full price and put the sentence three rows
+// down, after the term — so €50 + €55 sat above "Still to pay €55.00" and the
+// line that resolves it was detached from both the row and the number.
+H.ok(/row\.key === 'fee'/.test(ui),
+  'and it is attached to the fee row rather than floated below the card');
+H.ok(/class: off \? 'is-waived' : null/.test(ui),
+  'which also strikes the figure through, so the sum reads right at a glance');
+// Both halves, because either alone is worse: a struck figure with no words is a
+// family guessing whether they are being charged.
+H.ok(/acc-waived-why/.test(ui) && /\.acc-money b\.is-waived\{[^}]*line-through/.test(
+  require('fs').readFileSync(require('path').join(__dirname, '..', 'shared.css'), 'utf8')),
+  '⚠ and the words and the strike travel together — decoration alone is never ' +
+  'the message, and a sentence with no strike leaves the arithmetic wrong');
 H.ok(!/feeIncluded/.test(ui),
   'and the string that restated the row is deleted rather than left as dead copy ' +
   'in three languages');

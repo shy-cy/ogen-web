@@ -1479,6 +1479,20 @@ td .acc-actions{ gap:14px; }
 .acc-money:last-child{ border-block-end:0; }
 .acc-money b{ font-variant-numeric:tabular-nums; white-space:nowrap; }
 .acc-money.is-sum b{ font-size:18px; }
+/* ⚠ A WAIVED FEE, AND THE TWO HALVES TRAVEL TOGETHER.
+   The card showed "Registration fee €50" at full price with the sentence that
+   explains it three rows below, after the term — so the figures did not add up
+   on screen and the line resolving that was detached from both the row and the
+   number. The strike makes the sum read right at a glance; the words under the
+   label are what actually say it, because decoration alone is never the message
+   here and a struck figure with no words is a family guessing whether they are
+   being charged. Remove either and the other is worse than nothing.
+   --navy at 10.8:1, never --camel, which is 2.3:1 and is a background token —
+   the same trap the listing card's tag labels and the credit dialog's reason
+   line were both fixed out of. Not italic: `.acc-note` beside it already is,
+   and this is a reason rather than a qualifier on a figure. */
+.acc-money b.is-waived{ text-decoration:line-through; color:var(--muted-warm); font-weight:400; }
+.acc-waived-why{ display:block; font-size:13.5px; color:var(--navy); }
 /* The pay button is an ACTION under a list of figures, not one more figure in
    it. Level with the last row it read as part of the list; this is the gap that
    says the reading stops and the doing starts. */
