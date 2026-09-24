@@ -25,6 +25,7 @@
 
 const crypto = require('crypto');
 const { requireStore, optionalStore, readMany, deleteMany } = require('./_blobs');
+const participants = require('./_participant-store');
 
 const LINKS = 'guardian-links';
 const INVITES = 'guardian-invites';
@@ -278,9 +279,42 @@ async function acceptInvite(token, account) {
   return link;
 }
 
+// ⚠ WHO THIS ACCOUNT GUARDS, AS A SCREEN WANTS IT — ONE IMPLEMENTATION.
+//
+// Two screens ask this: the family list on /account/details, and the "who is
+// registering?" select on the register panel. They were two copies of the same
+// walk in two functions, which is how the same account comes to be offered its
+// people in one order on one screen and another order on the next — and the
+// register select is picked from by position, so a disagreement there is a
+// family registering the wrong child.
+//
+// The link is read alongside the participant, not just its existence: it
+// carries `isSelf`, which is what lets a screen say "that is you".
+async function listForAccount(accountId) {
+  const ids = await participantIdsFor(accountId);
+  // Together rather than one after another, and Promise.all over a map rather
+  // than pushing as they land, so the order does not reshuffle between loads.
+  const out = (await Promise.all(ids.map(async (id) => {
+    const [p, link] = await Promise.all([
+      participants.getParticipant(id), getLink(id, accountId)
+    ]);
+    if (!p) return null;
+    return Object.assign(participants.publicParticipant(p), {
+      // Age is derived on read, never stored — a written-down age is wrong from
+      // the day after it is written.
+      age: participants.ageAt(p.dateOfBirth),
+      isPrimary: p.primaryAccountId === accountId,
+      isSelf: !!(link && link.isSelf)
+    });
+  }))).filter(Boolean);
+  out.sort((a, b) => String(a.firstName).localeCompare(String(b.firstName)));
+  return out;
+}
+
 module.exports = {
   LINKS, INVITES, MAX_GUARDIANS, INVITE_TTL_MS, ADDED_VIA,
   guardiansOf, participantIdsFor, isGuardian, getLink, addLink, removeLink, removeAllLinks,
+  listForAccount,
   getInvite, invitesFor, createInvite, acceptInvite, revokeInvite, saveInvite, isLive,
   _keys: { linkKey, invKey }
 };

@@ -93,8 +93,14 @@ H.ok(/prof\.firstName \|\| ''/.test(src),
 const family = read('netlify/functions/account-family.js');
 H.ok(/isSelf: body\.isSelf === true/.test(family),
   'the server takes it strictly — anything but true is somebody else');
-H.ok(/isSelf: !!\(link && link\.isSelf\)/.test(family),
+// The walk that answers "who does this account guard" lives in _guardian-store
+// now, because the register panel asks the identical question and two copies of
+// it is two screens offering one family its people in two different orders.
+const guardianStore = read('netlify/functions/_guardian-store.js');
+H.ok(/isSelf: !!\(link && link\.isSelf\)/.test(guardianStore),
   'and reports it back per participant, read from THIS account\'s link');
+H.ok(/guardians\.listForAccount\(me\.accountId\)/.test(family),
+  'and account-family reads it from there rather than walking the links itself');
 
 const store = read('netlify/functions/_guardian-store.js');
 H.ok(/isSelf: isSelf === true/.test(store), 'it is stored on the link record');

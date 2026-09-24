@@ -240,7 +240,7 @@ const justBefore = (iso) => Date.parse(iso + 'T06:00:00Z');
   const noa = made.body.participant.participantId;
 
   const panel = await H.call(api.handler,
-    { action: 'activity', token: token, slug: 'term', lang: 'en' });
+    { action: 'registerPanel', token: token, slug: 'term', lang: 'en' });
   H.eq(panel.status, 200, 'the register panel loads');
   const quoted = panel.body.activity.cancellationTerms;
   H.ok(quoted && quoted.length, 'and carries the terms, before anybody has pressed anything');
@@ -273,7 +273,7 @@ const justBefore = (iso) => Date.parse(iso + 'T06:00:00Z');
     'and never the one an admin set afterwards');
   // The panel, which has no registration to be held to, moves with the activity.
   const panel2 = await H.call(api.handler,
-    { action: 'activity', token: token, slug: 'term', lang: 'en' });
+    { action: 'registerPanel', token: token, slug: 'term', lang: 'en' });
   H.ok(panel2.body.activity.cancellationTerms.some((s) => /16 December 2026/.test(s)),
     'while somebody registering today is quoted today\'s policy');
 

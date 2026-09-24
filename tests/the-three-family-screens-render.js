@@ -115,7 +115,11 @@ const ANSWERS = {
     { date: '2026-10-20', left: 5, capacity: 20, full: false, status: null,
       owedCents: null, paidCents: null, cancellation: null }
   ] }),
-  activity: () => ({ ok: true, activity: { activityId: 'act-1', slug: 'hebrew', type: 'course',
+  // One call: the activity and the family list together — see the registerPanel
+  // note in account-registrations.js.
+  registerPanel: () => ({ ok: true,
+    participants: PARTICIPANTS.map((p) => Object.assign({}, p)),
+    activity: { activityId: 'act-1', slug: 'hebrew', type: 'course',
     title: { en: 'Hebrew for kids' }, left: 4, capacity: 14, taken: 10, groups: null, full: false,
     cancellationTermsTitle: 'Cancellation terms',
     cancellationTerms: ['You can cancel this registration up to 28 October 2026.',

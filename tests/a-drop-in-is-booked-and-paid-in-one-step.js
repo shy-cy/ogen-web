@@ -82,7 +82,20 @@ const ANSWERS = {
   listParticipants: () => ({ ok: true, participants: PARTICIPANTS }),
   list: () => ({ ok: true, registrations: [] }),
   balance: () => ({ ok: true, balanceCents: 0, entries: [] }),
-  activity: (b) => ({ ok: true, activity: b.slug === 'folk' ? DROPIN : COURSE }),
+  // ⚠ ONE CALL: the activity, the family list, and — on a drop-in — the evenings
+  // for the participant the select opens on. Three round trips before this, on
+  // the first signed-in screen an activity page sends anybody to.
+  registerPanel: (b) => {
+    const out = { ok: true, activity: b.slug === 'folk' ? DROPIN : COURSE,
+                  participants: PARTICIPANTS };
+    if (b.slug === 'folk') {
+      out.sessionsFor = PARTICIPANTS[0].participantId;
+      out.mayBook = true;
+      out.registrationStatus = 'approved';
+      out.sessions = SESSIONS;
+    }
+    return out;
+  },
   sessions: () => ({ ok: true, mayBook: true, registrationStatus: 'approved', sessions: SESSIONS }),
   bundles: () => ({
     ok: true,

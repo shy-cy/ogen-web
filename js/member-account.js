@@ -1427,16 +1427,16 @@
   function renderRegister(where, slug) {
     clear(where);
     where.appendChild(section(T.registerTitle, [skeleton('panel')]));
-    Promise.all([
-      post(REGS, { action: 'activity', slug: slug }),
-      post(FAMILY, { action: 'listParticipants' })
-    ]).then(function (r) {
-      var act = r[0], fam = r[1];
+    // ⚠ ONE CALL. This was the activity and the family list together, and then a
+    // third fetch for the evenings once the select existed — three waits on the
+    // first signed-in screen an activity page sends anybody to. The server
+    // answers all of it from one read of the activity; see `registerPanel`.
+    post(REGS, { action: 'registerPanel', slug: slug }).then(function (act) {
       clear(where);
       if (!act.ok) return where.appendChild(section(T.registerTitle,
         [el('p', { class: 'acc-notice is-err', text: failure(act) })]));
       var a = act.data.activity;
-      var people = (fam.data && fam.data.participants) || [];
+      var people = act.data.participants || [];
       var title = T.registerTitle + ' · ' + pick(a.title);
 
       if (!people.length) {
@@ -1471,7 +1471,7 @@
         ]));
       }
 
-      if (a.perSession) registerPerSession(where, a, people, slug, title);
+      if (a.perSession) registerPerSession(where, a, people, slug, title, act.data);
       else registerTerm(where, a, people, slug, title);
     });
   }
@@ -1633,7 +1633,7 @@
   // person rather than baked into the panel — a participant who already booked
   // the 22nd must not be offered it again and charged twice. The server refuses
   // that anyway; this is so it is never asked for.
-  function registerPerSession(where, a, people, slug, title) {
+  function registerPerSession(where, a, people, slug, title, seed) {
     var who = peopleSelect(people);
     var dates = el('div', { class: 'acc-dates' });
     var go = el('button', { type: 'submit', class: 'btn-primary', text: T.bookAndPay,
@@ -1700,50 +1700,64 @@
     function load() {
       rows = [];
       clear(dates);
+      // ⚠ THE FIRST DRAW USES WHAT THE PANEL ALREADY ARRIVED WITH, and only when
+      // the payload NAMES the participant the select is on. Seeding by position
+      // would put one child's bookings under another child's name the first time
+      // the list came back in a different order. It is spent once: a reload after
+      // a booking has to ask again, or the table describes the evening before.
+      if (seed && seed.sessionsFor && seed.sessionsFor === who.value) {
+        var first = seed;
+        seed = null;
+        return paint(first);
+      }
       dates.appendChild(skeleton('table'));
       post(REGS, { action: 'sessions', slug: slug, participantId: who.value }).then(function (res) {
         clear(dates);
         if (!res.ok) return dates.appendChild(el('p', { class: 'acc-notice is-err', text: failure(res) }));
-        var list = (res.data.sessions || []).filter(function (s) { return !s.past; });
-        if (!list.length) {
-          go.disabled = true;
-          return dates.appendChild(el('p', { class: 'acc-note', text: T.noDates }));
-        }
-        var firstFree = null;
-        list.forEach(function (s) {
-          var taken = s.status === 'booked' || s.status === 'attended';
-          var off = taken || s.full;
-          var box = el('input', { type: 'checkbox', value: s.date, disabled: off || null,
-                                  onchange: retotal });
-          var why = taken ? T.dateBooked : s.full ? T.dateFull : money(s.priceCents);
-          // ⚠ A LATE PRICE SAYS IT IS ONE, AND NAMES THE ORDINARY ONE.
-          //
-          // The figure came through alone: €10.00 on a picker under a price card
-          // reading €7, with nothing anywhere explaining that a different rate
-          // had been applied. A number that disagrees with the published price
-          // and does not account for itself reads as a mistake — and the family
-          // cannot tell which of the two figures is the error. `priceBasis` has
-          // been in this payload since late pricing was built and nothing read
-          // it; the standard figure travels beside it now, because "late" on its
-          // own is a label and "usually €7.00" is an explanation.
-          var late = !off && s.priceBasis === 'late' && s.standardPriceCents != null;
-          dates.appendChild(el('label', { class: 'acc-date' + (off ? ' is-off' : '') }, [
-            box,
-            el('span', { class: 'acc-date-when', text: longDate(s.date) }),
-            el('span', { class: 'acc-date-what' }, [
-              el('span', { text: why }),
-              late ? el('span', { class: 'acc-date-why',
-                text: T.lateWhy.replace('{price}', money(s.standardPriceCents)) }) : null
-            ])
-          ]));
-          if (!off) { rows.push({ date: s.date, price: s.priceCents || 0, box: box }); if (!firstFree) firstFree = box; }
-        });
-        // THE NEXT ONE IS TICKED. A family arriving from a Register button
-        // usually means the coming session, and a screen with nothing chosen
-        // and a dead button reads as a screen that has not loaded.
-        if (firstFree) firstFree.checked = true;
-        retotal();
+        paint(res.data);
       });
+    }
+
+    function paint(data) {
+      var list = (data.sessions || []).filter(function (s) { return !s.past; });
+      if (!list.length) {
+        go.disabled = true;
+        return dates.appendChild(el('p', { class: 'acc-note', text: T.noDates }));
+      }
+      var firstFree = null;
+      list.forEach(function (s) {
+        var taken = s.status === 'booked' || s.status === 'attended';
+        var off = taken || s.full;
+        var box = el('input', { type: 'checkbox', value: s.date, disabled: off || null,
+                                onchange: retotal });
+        var why = taken ? T.dateBooked : s.full ? T.dateFull : money(s.priceCents);
+        // ⚠ A LATE PRICE SAYS IT IS ONE, AND NAMES THE ORDINARY ONE.
+        //
+        // The figure came through alone: €10.00 on a picker under a price card
+        // reading €7, with nothing anywhere explaining that a different rate
+        // had been applied. A number that disagrees with the published price
+        // and does not account for itself reads as a mistake — and the family
+        // cannot tell which of the two figures is the error. `priceBasis` has
+        // been in this payload since late pricing was built and nothing read
+        // it; the standard figure travels beside it now, because "late" on its
+        // own is a label and "usually €7.00" is an explanation.
+        var late = !off && s.priceBasis === 'late' && s.standardPriceCents != null;
+        dates.appendChild(el('label', { class: 'acc-date' + (off ? ' is-off' : '') }, [
+          box,
+          el('span', { class: 'acc-date-when', text: longDate(s.date) }),
+          el('span', { class: 'acc-date-what' }, [
+            el('span', { text: why }),
+            late ? el('span', { class: 'acc-date-why',
+              text: T.lateWhy.replace('{price}', money(s.standardPriceCents)) }) : null
+          ])
+        ]));
+        if (!off) { rows.push({ date: s.date, price: s.priceCents || 0, box: box }); if (!firstFree) firstFree = box; }
+      });
+      // THE NEXT ONE IS TICKED. A family arriving from a Register button
+      // usually means the coming session, and a screen with nothing chosen
+      // and a dead button reads as a screen that has not loaded.
+      if (firstFree) firstFree.checked = true;
+      retotal();
     }
   }
 

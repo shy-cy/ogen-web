@@ -793,11 +793,48 @@ exports.handler = async (event) => {
   try {
     switch (body.action) {
       // --- what is on offer ------------------------------------------------
-      case 'activity': {
+      // ⚠ THE WHOLE REGISTER PANEL, IN ONE CALL.
+      //
+      // `/account/activity?register=<slug>` is the link every activity page's
+      // Register button points at, so it is the first signed-in screen most
+      // families ever see — and it was THREE round trips deep before it drew
+      // anything: `me`, then `activity` and `listParticipants` together, then
+      // `sessions` for whoever the select landed on. Each of those pays the
+      // function's own floor, and `activity` and `sessions` each read the same
+      // activity file: they are separate invocations, so the ten-second display
+      // cache only helps when one container happens to serve both.
+      //
+      // This is the dashboard's fix one screen over. The three questions are
+      // asked of one invocation, which reads the activity once and answers all
+      // of them. `me` stays separate for the reason it always has — boot() has
+      // to know whether anybody is signed in before it draws a screen.
+      //
+      // The sessions are for the FIRST participant, because that is the one the
+      // select opens on. Changing the select still fetches, which is right: that
+      // is a person asking a new question rather than the page loading.
+      case 'registerPanel': {
         const activity = await publishedForDisplay(body.slug);
         if (!activity) return no(404, 'no-such-activity');
-        const regs = await store.forActivity(activity.activityId);
-        return json(200, { ok: true, activity: activityView(activity, R.capacityReport(activity, regs), lang) });
+        // Nothing here needs anything from the one beside it.
+        const [regs, people] = await Promise.all([
+          store.forActivity(activity.activityId),
+          guardians.listForAccount(me.accountId)
+        ]);
+        const out = {
+          ok: true,
+          activity: activityView(activity, R.capacityReport(activity, regs), lang),
+          participants: people
+        };
+        // ⚠ THE PARTICIPANT IS NAMED BESIDE THE PAYLOAD, never implied by
+        // position. The client seeds its table from this only when the select
+        // agrees, so a list that comes back in a different order than the client
+        // expects costs one fetch rather than showing one child's bookings under
+        // another child's name.
+        if (activity.type === 'dropin' && people.length) {
+          out.sessionsFor = people[0].participantId;
+          Object.assign(out, await sessionsPayload(activity, people[0].participantId, Date.now()));
+        }
+        return json(200, out);
       }
 
       // --- pay-per-session ---------------------------------------------------

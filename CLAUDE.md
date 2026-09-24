@@ -4528,6 +4528,45 @@ other direction. `list` and `balance` are **gone** rather than left beside
 `dashboard` — an action nothing calls is dead copy indistinguishable from one
 whose caller was renamed.
 
+⚠ **AND THE REGISTER PANEL WAS STILL THREE, ON THE SCREEN THAT IS ENTERED
+DIRECTLY.** Reported as *"the website is slow when I try to enter directly to
+the register page like `/account/activity?register=test1`"*, and it is the worst
+place on the site to have missed: that URL is where **every activity page's
+Register button points**, so it is the first signed-in screen most families ever
+see, and arriving at it cold is the ordinary way to arrive.
+
+It was `me`, then `activity` and `listParticipants` together, then `sessions`
+for whoever the person select landed on. Three waits, each paying the function's
+own floor before doing any work — and two of them reading the **same activity
+file**: `activity` and `sessions` are separate invocations, so the ten-second
+display cache only helps when one container happens to serve both, which a page
+load cannot rely on.
+
+`registerPanel` is the same fix the dashboard already had. None of the three
+needs anything from the one before it — the slug is in the URL, the account is
+the session's, and the evenings are for the participant the select opens on,
+which the **server** knows because the server decides that list's order. One
+invocation, one read of the activity, all three answers. `activity` is **deleted**
+rather than left beside it, for the reason `list` and `balance` were.
+
+⚠ **The seeded evenings NAME their participant**, and the client uses them only
+when the name matches the select. Seeding by position is the tempting version
+and it has one failure mode — one child's bookings drawn under another child's
+name, the first time the two lists come back in a different order, with every
+figure on screen internally consistent and nothing erroring. The seed is also
+**spent once**: changing the person, or reloading after a booking, asks again,
+because that is a person asking a new question rather than a page loading.
+
+⚠ **And the family list is now ONE walk**, `listForAccount()` in
+`_guardian-store.js`, read by `/account/details` and by this panel. Two copies
+was two screens offering one family its people in two orders — and this select
+is **picked from by position**, so a disagreement there is a family registering
+the wrong child.
+
+`me` stays separate, for the reason it always has: `boot()` has to know whether
+anybody is signed in before it draws a screen at all. Two calls for the whole
+page, where there were four.
+
 **⚠ And the cache is the part with teeth.** The argument for it was *"this is
 only display data, and the money paths verify everything fresh anyway"* — which
 was **not true when it was made**. One `published()` served ten call sites in

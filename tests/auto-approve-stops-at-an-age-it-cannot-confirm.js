@@ -188,7 +188,7 @@ action: 'signup', email: 'dana@example.com', password: 'password-123', termsAcce
   H.eq(after.ageRange.max, 10, 'the range they were judged against is still 6-10');
   H.eq(after.groupName.en, 'Beginners', 'and a receipt still says the group they chose');
   // The live record moved, which is the whole point of checking.
-  const live = await H.call(regs.handler, { action: 'activity', token: dana.token, slug: 'auto-named' });
+  const live = await H.call(regs.handler, { action: 'registerPanel', token: dana.token, slug: 'auto-named' });
   H.eq(live.body.activity.groups[0].name.en, 'Level 1', 'while the activity itself has genuinely changed');
 
   // ⚠ AND ONE GROUP IS NOT A CHOICE. auto-course has a single group, so the
@@ -201,7 +201,7 @@ action: 'signup', email: 'dana@example.com', password: 'password-123', termsAcce
   // "is a choice being offered" were the same question until the day every
   // activity got at least one group, and then they silently were not. The same
   // line also made `full` permanently false on a one-group activity.
-  const sole = await H.call(regs.handler, { action: 'activity', token: dana.token, slug: 'auto-course' });
+  const sole = await H.call(regs.handler, { action: 'registerPanel', token: dana.token, slug: 'auto-course' });
   H.eq(sole.body.activity.groups, null,
     'a one-group activity offers no group to choose between');
 

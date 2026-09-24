@@ -328,7 +328,7 @@ const css = read('shared.css');
       slice('  function el(tag, attrs, kids) {', '  function clear(') +
       'this.el = el;', ctx);
     // The row, lifted verbatim from load() so the test cannot drift from it.
-    const row = slice('          var why = taken ?', '          if (!off) { rows.push(');
+    const row = slice('        var why = taken ?', '        if (!off) { rows.push(');
     vm.runInContext('var s = ' + JSON.stringify(session) + ', taken = false, off = false, box = null;\n' +
                     row, ctx);
     return box.textContent;

@@ -61,7 +61,7 @@ MUST_BE_FRESH.forEach((a) => {
 });
 
 console.log('\n[and only the read-only ones are cached]');
-const MAY_BE_CACHED = ['activity', 'sessions', 'bundles', 'registration'];
+const MAY_BE_CACHED = ['registerPanel', 'sessions', 'bundles', 'registration'];
 MAY_BE_CACHED.forEach((a) => {
   H.eq(READS[a], 'cached', a + ' may use the cached read — it renders and writes nothing');
 });
