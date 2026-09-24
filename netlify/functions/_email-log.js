@@ -67,6 +67,16 @@ const TEMPLATES = {
   // a second cancellation. It carries a figure as well, and a figure re-read out
   // of context is the one thing in this table that could be acted on wrongly.
   'registration-cancelled': { label: 'Registration cancelled', resend: false },
+  // The waiting list. Neither is resendable, and the second one emphatically:
+  // "a place has opened" re-delivered once it has gone sends a family to a
+  // register button that will refuse them, which is worse than never writing.
+  // The first describes a standing state rather than a moment, and a family who
+  // has since been given a place would read it as having lost one.
+  'registration-waiting': { label: 'On the waiting list', resend: false },
+  'registration-place-open': { label: 'A place has opened', resend: false },
+  // Not resendable: a second copy of "the group has changed" reads as a second
+  // move, and the family would go looking for a third group.
+  'registration-moved': { label: 'Group changed', resend: false },
   'registration-paid': { label: 'Payment received', resend: false }
 };
 

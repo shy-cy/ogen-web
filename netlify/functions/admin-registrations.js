@@ -548,10 +548,33 @@ exports.handler = async (event) => {
         next.groupId = body.groupId;
         next.frozen = Object.assign({}, next.frozen, { groupName: target.name || null });
         await store.saveRegistration(next);
+
+        // ⚠ AND THE FAMILY IS TOLD, which for a release they were not.
+        //
+        // This is the only change an admin can make to a registration that
+        // alters what the family has to DO — the groups can meet on a different
+        // day, at a different hour, in a different room, with a different
+        // teacher — and it was the one change that wrote to nobody. The names
+        // travel as their {he,en,ru} bags rather than picked, because the
+        // language of this request is the language of the ADMIN'S screen and
+        // the message is written in the language of the ACCOUNT.
+        //
+        // Live rows only. A cancelled or expired registration is not a class
+        // anybody is attending, so a note about which group it is filed under
+        // would be news about nothing. The client already refuses to draw the
+        // select on one; this is the same rule server-side, where it counts.
+        //
+        // After the save, and never blocking it: the move stands whether or not
+        // the message goes, exactly as an approval does. `emailed` says which.
+        let emailed = null;
+        if (R.LIVE_STATUSES.indexOf(next.status) !== -1) {
+          const account = await accounts.getAccount(reg.accountId);
+          if (account) emailed = await mail.sendMoved(next, account, from, target.name || null);
+        }
         await recordAudit(session, 'registrations.moveGroup',
           body.participantId + '__' + activity.activityId, 'ok',
           { detail: reg.frozen.participantName + ' \u00B7 ' + moved });
-        return json(200, { ok: true, registration: next });
+        return json(200, { ok: true, registration: next, emailed: emailed });
       }
 
       // --- the register, for a pay-per-session activity -----------------------

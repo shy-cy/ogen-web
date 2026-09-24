@@ -61,10 +61,16 @@ const activityHref = (reg, l) => {
 // question, which was several screens down. The hash scrolls the cost card
 // into view; a reader who wanted the rest scrolls up, which is the cheaper
 // mistake.
-const registrationHref = (reg, l) =>
+//
+// `hash` is '#pay' for every message that is partly about money, and is passed
+// as '' by the one that is not: a group change is about when and where the
+// class meets, and scrolling that message's reader past the facts to the cost
+// card would answer a question they did not ask.
+const registrationHref = (reg, l, hash) =>
   pathFor(l, '/account/activity') +
   '?p=' + encodeURIComponent(reg.participantId || '') +
-  '&a=' + encodeURIComponent(reg.activityId || '') + '#pay';
+  '&a=' + encodeURIComponent(reg.activityId || '') +
+  (hash === undefined ? '#pay' : hash);
 
 // --- your child is registered ----------------------------------------------
 //
@@ -336,6 +342,88 @@ const CANCELLED = {
     button: 'Другие занятия'
   }
 };
+
+// --- the group has changed --------------------------------------------------
+//
+// ⚠ A MOVE BETWEEN GROUPS IS NEWS, AND IT USED TO BE SILENT.
+//
+// `moveGroup` was built so that correcting a child's group would not have to go
+// through cancel-and-re-register — which writes a credit, sends a cancellation
+// email and re-freezes the price at today's figure, all to fix a dropdown. It
+// saved the record, wrote the history and told nobody, and that gap is exactly
+// the shape a cancellation had before it got a message: every other change to a
+// registration writes to the family, and the one that changes which room a
+// child walks into on Tuesday did not.
+//
+// It is the only thing about a registration an admin can change that alters
+// what the family has to DO. The groups under the equal-hours rule can meet on
+// different days, at a different hour, in a different place, with a different
+// teacher — so the message says that out loud and points at the page carrying
+// the new group's own facts, rather than restating them here where they would
+// be a second copy able to drift.
+//
+// It says nothing about a decision and nothing about our queue: a move is a
+// fact, so there is no draft to review the way a rejection and a cancellation
+// have one. What there IS to say about money is that there is nothing to say —
+// one `fullPrice` buys the same teaching whichever group a family is in, and a
+// family told their child has changed class will ask.
+
+const MOVED = {
+  he: {
+    subject: (child, act, to) => `${child} עבר/ה לקבוצת ${to} · ${act}`,
+    heading: 'שינוי קבוצה',
+    body: (child, act, from, to) => from
+      ? `${child} הועבר/ה מקבוצת ${from} לקבוצת ${to} ב${act}.`
+      : `${child} שובץ/ה לקבוצת ${to} ב${act}.`,
+    next: 'הימים, השעות, המקום והמורים יכולים להיות שונים בין הקבוצות. הפרטים של הקבוצה החדשה מופיעים בעמוד ההרשמה.',
+    money: 'המחיר לא השתנה ולא בוצע חיוב נוסף.',
+    talk: 'אם זה נעשה בטעות, השיבו להודעה הזו ונתקן.',
+    button: 'לפרטי ההרשמה'
+  },
+  en: {
+    subject: (child, act, to) => `${child} has moved to ${to} · ${act}`,
+    heading: 'The group has changed',
+    body: (child, act, from, to) => from
+      ? `${child} has moved from ${from} to ${to} in ${act}.`
+      : `${child} has been placed in ${to} in ${act}.`,
+    next: 'Groups can meet on different days, at a different hour, in a different place and with different teachers. The new group\u2019s details are on the registration page.',
+    money: 'The price has not changed and nothing further has been charged.',
+    talk: 'If this was a mistake, reply to this message and we will put it right.',
+    button: 'Open the registration'
+  },
+  ru: {
+    subject: (child, act, to) => `${child} переведён(а) в группу ${to} · ${act}`,
+    heading: 'Группа изменена',
+    body: (child, act, from, to) => from
+      ? `${child} переведён(а) из группы ${from} в группу ${to} — ${act}.`
+      : `${child} зачислен(а) в группу ${to} — ${act}.`,
+    next: 'Дни, время, место и преподаватели у групп могут отличаться. Данные новой группы есть на странице записи.',
+    money: 'Стоимость не изменилась, дополнительных списаний нет.',
+    talk: 'Если это произошло по ошибке, ответьте на это письмо — мы исправим.',
+    button: 'Открыть запись'
+  }
+};
+
+// ⚠ THE GROUP NAMES ARRIVE AS {he,en,ru} BAGS AND ARE PICKED HERE, for the same
+// reason `when` is an ISO date above: the caller is a request handler, whose
+// language is the language of the SCREEN an admin is looking at, and an email's
+// is the language of the ACCOUNT it is going to. A handler that picked would
+// send a Russian family a Hebrew message naming an English group name.
+//
+// `from` is null on a registration taken while the activity was still pooled —
+// there is no group it came out of, so the sentence says where it landed
+// instead of naming a group nobody was ever in.
+function movedMessage(reg, account, fromName, toName) {
+  const l = lang(((account || {}).profile || {}).preferredLanguage);
+  const T = MOVED[l];
+  const child = childOf(reg), act = titleOf(reg, l);
+  const from = pick(fromName, l) || '';
+  const to = pick(toName, l) || '';
+  const html = shell(l, T.heading,
+    [esc(T.body(child, act, from || null, to)), esc(T.next), esc(T.money), esc(T.talk)],
+    { href: registrationHref(reg, l, ''), label: T.button });
+  return { to: account.email, subject: T.subject(child, act, to), html: html, text: strip(html) };
+}
 
 // --- nobody answered in time -----------------------------------------------
 //
@@ -704,6 +792,16 @@ const sendPlaceOpen = (reg, account, when) =>
     email.send(placeOpenMessage(reg, account, when),
       { template: 'registration-place-open', lang: langOf(account) }));
 
+// NO DRAFT, unlike the rejection and the cancellation. Those two are reviewed
+// because approval carries no reason code and money is about to move, so an
+// admin has something to word. A move has nothing to word: the two group names
+// are the whole of it, and a panel asking somebody to approve a sentence they
+// cannot usefully change is a step that teaches them to press through.
+const sendMoved = (reg, account, fromName, toName) =>
+  email.settle('registration-moved', account.email, () =>
+    email.send(movedMessage(reg, account, fromName, toName),
+      { template: 'registration-moved', lang: langOf(account) }));
+
 const sendPaid = (reg, account, paidCents, outstandingCents) =>
   email.settle('registration-paid', account.email, async () =>
     email.send(paidMessage(reg, account, paidCents, outstandingCents,
@@ -713,9 +811,10 @@ const sendPaid = (reg, account, paidCents, outstandingCents) =>
 module.exports = {
   payUrlFor,
   sendReceived, sendApproved, sendRejected, sendExpired, sendCancelled,
-  sendWaiting, sendPlaceOpen,
+  sendWaiting, sendPlaceOpen, sendMoved,
   receivedMessage, approvedMessage, rejectedMessage, expiredMessage, rejectedDraft,
   cancelledMessage, cancelledDraft, waitingMessage, placeOpenMessage,
-  RECEIVED, APPROVED, REJECTED, EXPIRED, CANCELLED, WAITING, PLACE_OPEN,
+  movedMessage,
+  RECEIVED, APPROVED, REJECTED, EXPIRED, CANCELLED, WAITING, PLACE_OPEN, MOVED,
   paidMessage, sendPaid
 };

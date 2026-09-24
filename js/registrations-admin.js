@@ -247,7 +247,14 @@
             sel.value = r.groupId || '';
             return message('err', (res.data && res.data.error) || 'That did not work');
           }
-          message('ok', 'Moved · ' + r.name);
+          // WHETHER THE FAMILY WAS TOLD, not just whether the row moved. A
+          // move changes which room a child walks into, so an admin left
+          // believing a message went when it did not would let a family arrive
+          // at the old group. The move stands either way.
+          message(res.data.emailed === false ? 'err' : 'ok',
+            res.data.emailed === false
+              ? 'Moved \u00B7 ' + r.name + ' \u2014 BUT THE EMAIL DID NOT GO. Tell them another way.'
+              : 'Moved \u00B7 ' + r.name + ' \u00B7 the family has been emailed');
           // The whole queue, not the one row: the capacity line above the table
           // counts both groups and would otherwise disagree with the select
           // that just changed.

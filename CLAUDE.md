@@ -5289,6 +5289,38 @@ frozen at all. It names **both** groups now: the frozen one on the way out and
 the activity's current one on the way in, which is correct rather than
 inconsistent.
 
+⚠ **AND THE FAMILY IS TOLD, which for a release they were not.** The record
+saved, the history named both groups, the audit line was written, and nothing
+reached the family &mdash; reported as *"I moved one person who registered to
+another group, but no email notification was sent."* It is the same gap a
+cancellation had before it got a message, and worse in one respect: every other
+change to a registration is about whether there is a place, and this one is
+about **which room a child walks into**. Under the equal-hours rule two groups
+may meet on a different day, at a different hour, in a different place, with
+different teachers, so a silent move is a family arriving at the old group on
+the old day.
+
+Four things carry it. The group names travel to `movedMessage()` as their
+`{he,en,ru}` **bags**, not picked &mdash; the handler's language is the language
+of the *admin's screen* and the message is written in the language of the
+*account*, the same trap the waiting-list messages had with a date. It is sent
+only on a **live** row, decided server-side: filing a cancelled registration
+differently is news about nothing. It goes **after** the save and never blocks
+it, and `emailed` rides back so the screen can say *"the family has been
+emailed"* or, loudly, that it did not go. And there is **no draft to review**
+&mdash; a rejection and a cancellation are reviewed because approval carries no
+reason code and money is about to move; a move has nothing to word, and a panel
+asking somebody to approve a sentence they cannot usefully change is a step that
+teaches them to press through.
+
+The message says what the family has to act on: the groups can meet differently,
+the new group's details are on the registration page, the price has not changed
+and nothing further has been charged. Its link is the one message about a live
+registration that carries **no `#pay`** &mdash; every other one is partly about
+money and scrolls to the cost card; this one is about when and where, and the
+facts are at the top of that page. `registrationHref()` takes the hash as an
+argument rather than gaining a second copy.
+
 ⚠ **A cancellation that left no trace, and the payload had it all along.**
 
 A family registered, cancelled, and registered again for the same activity, and
