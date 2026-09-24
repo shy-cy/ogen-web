@@ -150,6 +150,31 @@
     "isoUpdated": "2026-09-24T13:08:17.737Z"
   },
   {
+    "slug": "test10",
+    "activityId": "act-7a206ec6baafac83",
+    "seriesId": "act-7a206ec6baafac83",
+    "type": "dropin",
+    "status": "open",
+    "langs": [
+      "he",
+      "en",
+      "ru"
+    ],
+    "title": {
+      "he": "טסט 10",
+      "en": "Test 10",
+      "ru": "Test 10"
+    },
+    "summary": {
+      "he": "",
+      "en": "",
+      "ru": ""
+    },
+    "cardImage": null,
+    "testActivity": true,
+    "isoUpdated": "2026-09-24T21:31:14.084Z"
+  },
+  {
     "slug": "test2",
     "activityId": "act-ca412442b8698dcf",
     "seriesId": "act-ca412442b8698dcf",

@@ -1,0 +1,199 @@
+{
+  "slug": "test10",
+  "status": "open",
+  "motif": "ring",
+  "corner": "tl",
+  "cardImage": null,
+  "shareImage": null,
+  "robots": "noindex",
+  "testActivity": true,
+  "type": "dropin",
+  "registration": {
+    "autoApprove": true,
+    "pendingExpiryDays": null,
+    "registrationFeeCutoffDate": "2026-09-17",
+    "cancellationPolicy": {
+      "mode": "flat",
+      "cancellationCutoffDate": null
+    },
+    "defaultBasis": {
+      "startDate": "2026-10-01",
+      "sessionCount": 8
+    },
+    "sessionCancelHours": null
+  },
+  "seriesId": "act-7a206ec6baafac83",
+  "title": {
+    "he": "טסט 10",
+    "en": "Test 10",
+    "ru": "Test 10"
+  },
+  "summary": {
+    "he": "",
+    "en": "",
+    "ru": ""
+  },
+  "about": {
+    "he": "",
+    "en": "",
+    "ru": ""
+  },
+  "metaTitle": {
+    "he": "",
+    "en": "",
+    "ru": ""
+  },
+  "metaDescription": {
+    "he": "",
+    "en": "",
+    "ru": ""
+  },
+  "facts": {
+    "groupSize": {
+      "overrideText": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      }
+    },
+    "price": {
+      "registrationFee": null,
+      "fullPrice": null,
+      "perHourOverride": null,
+      "perSessionPrice": null,
+      "showPerLesson": false,
+      "lateDropIn": {
+        "enabled": false,
+        "hoursBefore": null,
+        "price": null
+      },
+      "bundles": [
+        {
+          "bundleId": "b-mu8kaf7nkjz4",
+          "entries": 4,
+          "pricePerEntry": 5,
+          "validityDays": 60
+        }
+      ]
+    }
+  },
+  "groups": [
+    {
+      "groupId": "g-mug1of87x4mq",
+      "name": {
+        "he": "טסט 10",
+        "en": "Test 10",
+        "ru": "Test 10"
+      },
+      "capacity": 1,
+      "teacherIds": [],
+      "facts": {
+        "ages": {
+          "min": 2,
+          "max": 200
+        },
+        "schedule": {
+          "frequency": "weekly",
+          "sessions": [
+            {
+              "day": 1,
+              "time": "13:00"
+            }
+          ]
+        },
+        "duration": {
+          "startDate": "2026-10-01",
+          "endDate": "2027-01-01",
+          "sessionCount": 8,
+          "sessionMinutes": 45,
+          "sessionDates": [
+            {
+              "date": "2026-10-05",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-10-12",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-10-19",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-10-26",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-11-02",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-11-09",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-11-16",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-11-23",
+              "status": "scheduled"
+            }
+          ]
+        },
+        "instructionLanguage": {
+          "codes": [
+            "ru"
+          ],
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "prerequisites": {
+          "level": "beginner",
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "location": {
+          "text": {
+            "he": "לימסול",
+            "en": "Limassol",
+            "ru": "Лимассол"
+          }
+        },
+        "address": {
+          "text": {
+            "he": "PASIDI",
+            "en": "PASIDI",
+            "ru": "PASIDI"
+          }
+        }
+      }
+    }
+  ],
+  "factVisibility": {
+    "ages": "public",
+    "schedule": "public",
+    "duration": "public",
+    "groupSize": "public",
+    "instructionLanguage": "public",
+    "prerequisites": "public",
+    "location": "public",
+    "address": "members",
+    "price": "public"
+  },
+  "faq": [],
+  "teachers": [],
+  "sponsors": [],
+  "isoUpdated": "2026-09-24T21:31:14.084Z",
+  "isoCreated": "2026-09-24T21:31:14.084Z",
+  "lastEditedBy": "michal@ogen.cy",
+  "lastEditedByName": "Michal",
+  "activityId": "act-7a206ec6baafac83",
+  "lastPublishedAt": "2026-09-24T21:31:14.084Z"
+}
