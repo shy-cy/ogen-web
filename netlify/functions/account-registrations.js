@@ -980,12 +980,27 @@ exports.handler = async (event) => {
 
         const wanted = Array.isArray(body.sessionDates) ? body.sessionDates.map(String) : [];
         const dates = wanted.filter((d, i) => wanted.indexOf(d) === i).sort();
-        if (!dates.length) return no(400, 'choose-a-date', { reason: 'no-dates' });
-        if (dates.length > checkout.MAX_SESSION_LINES) {
+        // ⚠ A FULL EVENING IS CHOOSABLE, AND CHOOSING IT IS HOW YOU JOIN ITS
+        // QUEUE. It used to be a dimmed row with a disabled box, which is the
+        // full GROUP option's mistake one screen over: on a drop-in the evening
+        // IS the thing a family picks, so "the other Tuesday has room" is not an
+        // answer to somebody who can only come on the Monday. There was a way
+        // through only when EVERY evening was full, which meant the commonest
+        // shape — one popular date in an otherwise open term — had none.
+        //
+        // These arrive as their own list rather than as a flag per date: the
+        // client is hostile by assumption, and a request naming which dates it
+        // wants a SEAT on is a request that can be refused for exactly those.
+        // Asking to queue is asking for less, so it cannot buy itself anything.
+        const asked = Array.isArray(body.waitDates) ? body.waitDates.map(String) : [];
+        const waitFor = asked.filter((d, i) => asked.indexOf(d) === i && dates.indexOf(d) === -1)
+          .sort();
+        if (!dates.length && !waitFor.length) return no(400, 'choose-a-date', { reason: 'no-dates' });
+        if (dates.length + waitFor.length > checkout.MAX_SESSION_LINES) {
           return no(400, 'too-many-dates', { reason: 'too-many' },
                     { max: checkout.MAX_SESSION_LINES });
         }
-        for (const d of dates) {
+        for (const d of dates.concat(waitFor)) {
           const bad = attendance.validate(activity, d, Date.now());
           if (bad) return no(400, bad);
         }
@@ -1026,19 +1041,36 @@ exports.handler = async (event) => {
           const cap = R.capacityForDate(activity, all, d);
           if (cap.left != null && cap.left <= 0) refused.push({ date: d, reason: 'full' });
         });
+        // The queue half is judged on the same two things and then on the room,
+        // which decides which list it lands in rather than whether it is refused.
+        const queueFor = [];
+        const alsoBook = [];
+        waitFor.forEach((d) => {
+          if (credit.past(d, now)) return refused.push({ date: d, reason: 'past' });
+          if (mine[d] && R.holdsASeat(mine[d])) return refused.push({ date: d, reason: 'already-booked' });
+          const cap = R.capacityForDate(activity, all, d);
+          // ⚠ A PLACE OPENED BETWEEN THE SCREEN AND THE PRESS. That is BETTER
+          // than what was asked for, so it is taken rather than queued for — and
+          // never the other way round: a date asked for as a seat that has since
+          // filled is still refused above, because quietly filing a family in a
+          // queue they did not ask for is a surprise about a child's place.
+          if (cap.left == null || cap.left > 0) alsoBook.push(d);
+          else queueFor.push(d);
+        });
         if (refused.length) {
           return no(409, 'dates-gone', { reason: 'unavailable', refused: refused });
         }
+        const toBook = dates.concat(alsoBook).sort();
 
         // Entries are allocated across the WHOLE selection in one pass — see
         // allocateEntries. A family with three entries left choosing five dates
         // pays for two of them, and the other three are already bought.
         const held = await bundleStore.forParticipant(participant.participantId, activity.activityId);
-        const spend = allocateEntries(held, dates);
+        const spend = allocateEntries(held, toBook);
 
         const bookedAt = new Date(now).toISOString();
         const booked = [];
-        for (const d of dates) {
+        for (const d of toBook) {
           const from = spend[d] || null;
           const att = attendance.newAttendance({
             activity: activity, participantId: participant.participantId,
@@ -1056,6 +1088,25 @@ exports.handler = async (event) => {
         // Every booking is safely written, so the entries can be marked spent.
         await commitEntries(spend, me.accountId);
 
+        // ⚠ THE QUEUE JOINS COME AFTER THE SEATS AND BEFORE THE CHARGE. They
+        // hold nothing, owe nothing and freeze no price — late pricing means the
+        // only honest moment to fix a price is when a place is actually taken —
+        // so nothing here can fail in a way that costs a family money. Written
+        // through the same newAttendance() and the same status bookSession uses,
+        // because a queue joined on the way in and a queue joined from the
+        // registration page are one thing.
+        const queued = [];
+        for (const d of queueFor) {
+          const wait = attendance.newAttendance({
+            activity: activity, participantId: participant.participantId,
+            accountId: me.accountId, groupId: reg.groupId, sessionDate: d, waiting: true
+          });
+          if (mine[d]) wait.history = (mine[d].history || []).concat(wait.history);
+          await attendance.saveAttendance(wait);
+          await mail.sendWaiting(reg, me, d);
+          queued.push(d);
+        }
+
         const rows = booked.map((a) => ({
           date: a.sessionDate, owedCents: a.payment.owedCents, priceBasis: a.frozen.priceBasis
         }));
@@ -1064,8 +1115,8 @@ exports.handler = async (event) => {
         // nothing to pay for and nothing to open, and saying so beats sending a
         // family to a payment page for €0.00.
         if (!owing.length) {
-          return json(200, { ok: true, booked: rows, url: null, nothingDue: true,
-                             activityId: activity.activityId });
+          return json(200, { ok: true, booked: rows, waiting: queued, url: null,
+                             nothingDue: true, activityId: activity.activityId });
         }
 
         let session;
@@ -1077,10 +1128,10 @@ exports.handler = async (event) => {
           // in the direction that costs a family their place — they would book
           // again and hold two. The refusal is about the payment only, and their
           // own page carries the button to try it again.
-          return json(200, { ok: true, booked: rows, url: null, paymentFailed: true,
-                             activityId: activity.activityId });
+          return json(200, { ok: true, booked: rows, waiting: queued, url: null,
+                             paymentFailed: true, activityId: activity.activityId });
         }
-        return json(200, { ok: true, booked: rows, url: session.url,
+        return json(200, { ok: true, booked: rows, waiting: queued, url: session.url,
                            activityId: activity.activityId });
       }
 

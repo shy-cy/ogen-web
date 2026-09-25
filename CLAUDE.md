@@ -2605,13 +2605,10 @@ Three missing doors, each defensible alone:
 - **There was no branch for a `waiting` row**, so a family already in an evening's
   queue could neither leave it nor take the seat when it opened. The pill was
   drawn and nothing else.
-- and with **every** evening full, the register panel had nothing tickable, a
-  disabled pay button and no sentence — a dead end on the screen every activity
-  page's Register button lands on. ⚠ Queueing needs an **approved registration**
-  behind it (`bookSession` refuses without one, because the registration is the
-  "may come" decision and an admin makes it once), so the way through is not a
-  second booking endpoint: it offers `submit`, which on a drop-in charges
-  nothing, and the page becomes the registration where each evening's queue is.
+- and the **register panel** — the screen every activity page's Register button
+  lands on — dimmed a full evening and disabled its box, so the one row with
+  something new to offer was again the one row with no control. See below: the
+  first fix here was the wrong shape, and it had to be reported twice.
 
 And two faults underneath them:
 
@@ -2631,6 +2628,64 @@ And two faults underneath them:
 is no second table of words to keep in step. One pill rule covers both, because
 waiting for a term and waiting for one evening are the same fact about a family:
 nothing is being held.
+
+⚠ **AND THE PANEL'S FIX CAUGHT THE RARE SHAPE AND MISSED THE ORDINARY ONE.**
+
+Reported a second time, plainly: *"I cannot test the drop in waiting list, as
+it's not working"* — on an activity with one evening marked `מלא`, a dimmed box
+beside it, and free evenings underneath.
+
+The first answer was a branch for **every** evening being full: hide the pay
+button, say so, and offer `submit`, because queueing needs an approved
+registration behind it and registering costs nothing on a drop-in. Every word of
+that reasoning is right and the **condition was wrong**. A term where nothing at
+all has room is rare; one popular Monday among free Tuesdays is what actually
+happens, and it had no door — the panel drew a full row, disabled, and a pay
+button for the other dates. A family who can only come on the Monday was told to
+go away by a screen that would have taken their name.
+
+That is the **disabled full-group option's mistake**, arriving one screen over
+and one release later. On a drop-in the **evening** is the thing a family picks,
+so *"the other Tuesday has room"* is no answer at all.
+
+⚠ **A FULL EVENING IS TICKABLE, AND TICKING IT IS HOW YOU JOIN ITS QUEUE** —
+word for word the sentence the course side settled on. Six details carry it:
+
+- **The tick says what it means before it is pressed**, in the same `.acc-date-why`
+  slot a late price explains itself in: *ticking this joins the waiting list.
+  Nothing is charged.* A tick that quietly means something else is the surprise
+  the full-group option was rebuilt to avoid.
+- **The button says which of the two things it is about to do.** With only full
+  evenings ticked there is nothing to pay and nothing to open, so it is
+  `registerWaitGo` — the course queue's own word — rather than *Register and pay
+  · €0.00*. Mixed, it keeps the running total, because the bookable evenings
+  really are being paid for.
+- **A queue join adds nothing to the total.** It holds no seat, owes nothing and
+  freezes no price: late pricing means the only honest moment to fix a price is
+  when a place is actually taken.
+- **The pre-ticked evening is the next one WITH ROOM**, never a full one.
+  Pre-ticking a queue join puts somebody in a queue they never asked about.
+- ⚠ **TWO LISTS, NOT A FLAG PER DATE.** `bookAndPay` takes `sessionDates` and
+  `waitDates`. A request naming which evenings it wants a **seat** on is a
+  request the server can refuse for exactly those — and asking to queue is asking
+  for **less**, so a hostile client cannot buy itself a place with either list.
+- ⚠ **THE RACE RESOLVES ONE WAY ONLY.** A date asked for as a seat that has
+  since filled is still refused, 409 `dates-gone`, because quietly filing a
+  family in a queue they did not ask for is a surprise about a child's place. A
+  date asked for as a **queue** that has since opened is simply **booked** — that
+  is better than what was asked for. The server checks the room again either
+  way; the client's two lists are what it showed the family, never the verdict.
+
+The queue joins are written **after the seats and before the charge**, through
+the same `newAttendance({ waiting: true })` and the same `sendWaiting` message
+`bookSession` uses — a queue joined on the way in and a queue joined from the
+registration page are one thing. They hold nothing and owe nothing, so nothing
+in that step can fail in a way that costs a family money.
+
+The every-evening-full branch is **deleted**, and `allEveningsFull` with it: a
+full evening is now a row like any other, so the branch has nothing left to
+catch and an unreferenced string in three languages is dead copy the string-table
+test refuses.
 
 ⚠ **CLAIMING IS NOT AN ACTION.** Whether somebody is taking a place off the list
 is read from the record that is already there — a family who was queueing and is

@@ -192,9 +192,14 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
     'a past date is never offered');
   const boxes = D.byTag(dom.mount, 'input');
   const off = boxes.filter((b) => b.getAttribute('disabled') != null);
-  H.eq(off.length, 3, 'three cannot be taken: attended, already booked, and full');
+  // ⚠ TWO, NOT THREE. A FULL EVENING IS CHOOSABLE, because choosing it is how
+  // you join its queue — see a-full-evening-can-still-take-your-name.js. What is
+  // genuinely not takeable is an evening this participant already holds.
+  H.eq(off.length, 2, 'two cannot be taken: the one attended and the one already booked');
   H.ok(has(dom, 'already booked'), 'and one says so');
-  H.ok(has(dom, 'full'), 'and one says it is full');
+  H.ok(has(dom, 'full'), 'and the full one still says it is full');
+  H.ok(has(dom, 'ticking this joins the waiting list'),
+    'and says what ticking it would mean, before it is ticked');
   H.ok(has(dom, '€12.00'), 'the rest carry their price');
   // The price comes from the same function that freezes it at booking, with the
   // same bookedAt — so a screen quoting the standard price cannot be followed by
@@ -203,27 +208,39 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
 
   console.log('\n[the next available date is ticked, and the button carries the total]');
   const live = boxes.filter((b) => b.getAttribute('disabled') == null);
-  H.eq(live.length, 2, 'two dates can be chosen');
-  H.ok(live[0].checked === true, 'the first of them starts ticked — a family arriving ' +
-    'from a Register button usually means the next session, and a dead button reads as a dead screen');
-  H.ok(live[1].checked === false, 'and only that one');
+  H.eq(live.length, 3, 'three dates can be chosen — the full one among them');
+  const box = (d) => live.filter((b) => b.getAttribute('value') === d)[0];
+  H.eq(live.filter((b) => b.checked).length, 1, 'exactly one starts ticked');
+  H.ok(box('2026-10-27').checked === true,
+    '⚠ the next date WITH ROOM — a family arriving from a Register button usually ' +
+    'means the next session, and a dead button reads as a dead screen. Never the ' +
+    'full one: pre-ticking a queue join puts somebody in a queue they never asked about');
+  H.ok(box('2026-10-20').checked === false, 'so the full date is offered and not chosen');
   const btn = D.byTag(dom.mount, 'button').filter((b) => /Register and pay/.test(b.textContent))[0];
   H.ok(btn, 'the button says what pressing it does');
   H.eq(btn.textContent, 'Register and pay · €12.00', 'with the total on it');
   H.ok(btn.getAttribute('disabled') == null, 'and it is live');
 
   console.log('\n[ticking a second date re-totals it]');
-  live[1].click();
+  box('2026-11-03').click();
   H.eq(btn.textContent, 'Register and pay · €27.00', '12.00 + 15.00');
-  live[0].click();
+  box('2026-10-27').click();
   H.eq(btn.textContent, 'Register and pay · €15.00', 'and unticking takes it back off');
-  live[1].click();
+  // ⚠ AND A FULL EVENING ADDS NOTHING TO THE TOTAL. It holds no seat, owes
+  // nothing and freezes no price — late pricing means the only honest moment to
+  // fix a price is when a place is actually taken.
+  box('2026-10-20').click();
+  H.eq(btn.textContent, 'Register and pay · €15.00', 'a queue join is not a purchase');
+  box('2026-11-03').click();
+  H.eq(btn.textContent, 'Join the waiting list',
+    'and with nothing left to pay for, the button says the other thing it does');
+  box('2026-10-20').click();
   H.eq(btn.getAttribute('disabled'), 'true', 'nothing chosen disables the button rather than ' +
     'offering a payment of nothing');
 
   console.log('\n[submitting books and pays in ONE call, then leaves for Stripe]');
-  live[0].click();
-  live[1].click();
+  box('2026-10-27').click();
+  box('2026-11-03').click();
   sent.length = 0;
   D.byTag(dom.mount, 'form')[0].submit();
   await settle();
@@ -232,6 +249,7 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
   H.eq(call.slug, 'folk', 'naming the activity');
   H.eq(call.participantId, 'p-1', 'and who is coming');
   H.eq((call.sessionDates || []).join(','), '2026-10-27,2026-11-03', 'and every date chosen');
+  H.eq((call.waitDates || []).length, 0, 'with nothing in the queue list, since none is full');
   H.ok(!sent.some((b) => b.action === 'submit' || b.action === 'bookSession'),
     'and nothing goes through the term path');
   H.eq(dom.window.location.href, 'https://checkout.stripe.com/c/pay/xyz',

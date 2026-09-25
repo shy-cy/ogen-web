@@ -225,36 +225,77 @@ const labelled = (dom, text) => D.byTag(dom.mount, 'button')
     'and an admin makes it once');
 
   // =========================================================================
-  console.log('\n[every evening full is no longer a dead end on the register panel]');
+  //
+  // ⚠ AND THE REGISTER PANEL ONLY HAD A DOOR WHEN *EVERY* EVENING WAS FULL.
+  //
+  // Reported as "I cannot test the drop in waiting list, as it's not working",
+  // on test 10: one evening marked מלא with a dimmed, disabled box, and no way
+  // to queue for it. The first fix caught the rare shape — a term where NOTHING
+  // has room — and missed the ordinary one, a popular Monday among free
+  // Tuesdays. That is the full GROUP option's mistake arriving one screen over:
+  // on a drop-in the evening IS the thing a family picks, so "the other Tuesday
+  // has room" is no answer to somebody who can only come on the Monday.
+  //
+  // A full evening is a row like any other now, and ticking it is how you join
+  // its queue — the same sentence the course side settled on.
+  console.log('\n[a full evening is tickable, because ticking it is how you queue]');
   sent.length = 0;
   const panel = await screen({ view: 'activity', lang: 'en', search: '?register=folk',
     payload: sessionsPayload([evening({ full: true, left: 0 }),
                               evening({ date: '2026-10-13', full: true, left: 0 })]) });
-  H.ok(has(panel, 'Every evening is full at the moment'),
-    '⚠ it SAYS SO. Before this there was a column of dimmed rows, a disabled pay ' +
-    'button and no sentence — nothing to press and nothing to read');
-  const reg = labelled(panel, 'Register');
-  H.ok(reg, 'and offers the way through');
-  H.ok(!labelled(panel, 'Book and pay'),
-    'while the pay button is taken away rather than left dead beside it');
-  sent.length = 0;
-  reg.click();
-  await settle();
-  const sub = sent.filter((b) => b.action === 'submit')[0];
-  H.ok(sub, '⚠ which is `submit` — queueing needs an approved registration behind it, ' +
-    'and a drop-in registration owes nothing, so this charges nothing');
-  H.ok(!sent.some((b) => b.action === 'bookAndPay'),
-    'and no Checkout is opened for a seat nobody has');
+  const boxes = D.byTag(panel.mount, 'input').filter((i) => i.type === 'checkbox');
+  H.eq(boxes.length, 2, 'both evenings are drawn');
+  H.eq(boxes.filter((b) => b.disabled).length, 0,
+    '⚠ and NEITHER is disabled — a dimmed box is what made this unreachable');
+  H.eq(boxes.filter((b) => b.checked).length, 0,
+    'and nothing is pre-ticked: putting somebody in a queue they never asked ' +
+    'about is not a convenience');
+  H.ok(has(panel, 'ticking this joins the waiting list'),
+    '⚠ said BEFORE the press. A tick that quietly means something else is the ' +
+    'surprise the full-group option was rebuilt to avoid');
 
-  console.log('\n[while one free evening still registers and pays in one step]');
+  console.log('\n[and the button says which of the two things it is about to do]');
+  boxes[0].click();
+  const go = D.byTag(panel.mount, 'button').filter((b) => b.getAttribute('type') === 'submit')[0];
+  H.eq(go.textContent, 'Join the waiting list',
+    '⚠ the course queue\'s own word, not "Register and pay · €0.00" — which would ' +
+    'be a surprise about a child\'s place in the one place this site refuses one');
+  H.eq(go.disabled, false, 'and it is live');
+
+  console.log('\n[and it asks for a queue, in its own list]');
+  sent.length = 0;
+  D.byTag(panel.mount, 'form')[0].submit();
+  await settle();
+  const ask = sent.filter((b) => b.action === 'bookAndPay')[0];
+  H.ok(ask, 'it is the one-step action, not a second endpoint');
+  H.eq((ask.sessionDates || []).length, 0, 'no seat is asked for');
+  H.eq((ask.waitDates || []).join(','), '2026-10-06',
+    '⚠ TWO LISTS, not a flag per date. A request naming which evenings it wants ' +
+    'a SEAT on can be refused for exactly those, and asking to queue is asking ' +
+    'for less — so nothing here can buy itself a place');
+
+  console.log('\n[⚠ and the reported shape: one full evening among free ones]');
   sent.length = 0;
   const mixed = await screen({ view: 'activity', lang: 'en', search: '?register=folk',
     payload: sessionsPayload([evening({ full: true, left: 0 }),
                               evening({ date: '2026-10-13' })]) });
-  H.ok(!has(mixed, 'Every evening is full'),
-    'the sentence is absent when something is bookable');
-  H.ok(labelled(mixed, 'Register and pay · €7.00'),
-    'and the ordinary one-step flow is untouched, carrying its running total');
+  const mboxes = D.byTag(mixed.mount, 'input').filter((i) => i.type === 'checkbox');
+  H.eq(mboxes.filter((b) => b.disabled).length, 0, 'the full one is still choosable');
+  H.eq(mboxes[1].checked, true,
+    'and the next evening WITH ROOM is the one pre-ticked, never the full one');
+  const mgo = D.byTag(mixed.mount, 'button').filter((b) => b.getAttribute('type') === 'submit')[0];
+  H.eq(mgo.textContent, 'Register and pay · €7.00',
+    'the ordinary one-step flow is untouched, carrying its running total');
+  mboxes[0].click();
+  H.eq(mgo.textContent, 'Register and pay · €7.00',
+    '⚠ and a queue join adds NOTHING to the total — it holds no seat, owes ' +
+    'nothing and freezes no price');
+  sent.length = 0;
+  D.byTag(mixed.mount, 'form')[0].submit();
+  await settle();
+  const both = sent.filter((b) => b.action === 'bookAndPay')[0];
+  H.eq((both.sessionDates || []).join(','), '2026-10-13', 'the free evening is booked');
+  H.eq((both.waitDates || []).join(','), '2026-10-06', 'and the full one is queued for');
 
   // =============================================================== server ====
   console.log('\n[executed: the server queues, and lets go]');
@@ -273,7 +314,7 @@ const labelled = (dom, text) => D.byTag(dom.mount, 'button')
   });
   const mods = H.loadWithStubs({ blobs, github,
     modules: ['_registration-store', '_session-attendance', '_credit-ledger', 'account-auth',
-              'account-family', 'account-registrations'] });
+              'account-family', 'account-registrations', '_stripe'] });
   const store = mods['_registration-store'];
   const attendance = mods['_session-attendance'];
   const ledger = mods['_credit-ledger'];
@@ -392,6 +433,75 @@ const labelled = (dom, text) => D.byTag(dom.mount, 'button')
   const minutes = (Date.parse(held) - Date.now()) / 60000;
   H.ok(minutes > 0 && minutes <= R2.CLAIM_MINUTES + 1,
     'of ' + R2.CLAIM_MINUTES + ' minutes, not days (' + Math.round(minutes) + ')');
+
+  // =========================================================================
+  console.log('\n[executed: registering and queueing in the one step]');
+  //
+  // ⚠ THE REGISTER PANEL IS THE WAY IN, and until now a full evening could not
+  // be asked for from it at all. bookAndPay refused the whole request if any
+  // chosen date was full, which is right for a date somebody asked for a SEAT on
+  // and wrong for one they asked to WAIT for.
+  mods['_stripe']._internal.setClient({
+    checkout: { sessions: { create: async () => (
+      { id: 'cs_1', url: 'https://checkout.stripe.com/c/pay/cs_1' }) } }
+  });
+  // Somebody with no registration yet — which is the whole point: the panel is
+  // where a family arrives from an activity page's Register button.
+  async function newcomer(name) {
+    const up = await H.signUp(auth, blobs, { email: name + '@example.com',
+      emailVerifiedAt: new Date().toISOString(),
+      profile: { firstName: name, preferredLanguage: 'en' } });
+    const made = await H.call(family.handler, { action: 'createParticipant', token: up.body.token,
+      participant: { firstName: name, lastName: 'Levi', dateOfBirth: '2016-04-02' } });
+    return { token: up.body.token, pid: made.body.participant.participantId,
+             accountId: up.body.account.accountId };
+  }
+
+  // DATE is full again: Bea claimed the seat Ann gave back, two blocks up.
+  const eve = await newcomer('eve');
+  mail.length = 0;
+  const joined = await H.call(api.handler, { action: 'bookAndPay', token: eve.token,
+    slug: 'folk', participantId: eve.pid, sessionDates: [], waitDates: [DATE], lang: 'en' });
+  H.eq(joined.status, 200,
+    '⚠ a request for nothing but a queue is not "choose a date" — it IS a choice');
+  H.eq((joined.body.waiting || []).join(','), DATE, 'and it says which evening she is waiting on');
+  H.eq(joined.body.url, null, 'no Checkout: a queue join is not a purchase');
+  const hers = await attendance.getAttendance(eve.pid, dropin.activityId, DATE);
+  H.eq(hers.status, 'waiting', 'the record is the same `waiting` bookSession writes');
+  H.eq(hers.payment.owedCents, 0, 'owing nothing');
+  H.ok(!hers.frozen.priceCents,
+    '⚠ and with NO price frozen — late pricing means the only honest moment to fix ' +
+    'a price is when a place is actually taken');
+  H.eq(mail.length, 1, 'and she is written to, by the same message the other door sends');
+  // The registration underneath exists, which is what the queue hangs off: a
+  // family should never have to know it is there.
+  const under = await store.getRegistration(eve.pid, dropin.activityId);
+  H.ok(under && under.status === 'approved',
+    'the registration was opened on the way through, and approved');
+
+  console.log('\n[⚠ a seat asked for and since gone is still refused]');
+  const fay = await newcomer('fay');
+  const taken = await H.call(api.handler, { action: 'bookAndPay', token: fay.token,
+    slug: 'folk', participantId: fay.pid, sessionDates: [DATE], lang: 'en' });
+  H.eq(taken.status, 409,
+    '⚠ NOT quietly filed in the queue. Asking for a seat and being put in a line ' +
+    'instead is a surprise about a child\'s place, which is the one thing this ' +
+    'flow refuses to spring on anybody');
+  H.eq((taken.body.refused || [])[0].reason, 'full', 'and says why');
+
+  console.log('\n[⚠ while a queue asked for on an evening with room is simply taken]');
+  const free = dates.filter((d) => d !== DATE && d !== other && !credit.past(d, Date.now()))[0];
+  H.ok(free, 'the fixture has a third evening with room (' + free + ')');
+  const gil = await newcomer('gil');
+  const better = await H.call(api.handler, { action: 'bookAndPay', token: gil.token,
+    slug: 'folk', participantId: gil.pid, sessionDates: [], waitDates: [free], lang: 'en' });
+  H.eq(better.status, 200, 'it goes through');
+  H.eq((better.body.waiting || []).length, 0, 'and he is in no queue');
+  const seat = await attendance.getAttendance(gil.pid, dropin.activityId, free);
+  H.eq(seat.status, 'booked',
+    '⚠ a place opened between the screen and the press, and that is BETTER than ' +
+    'what was asked for — so it is taken. Never the other way round');
+  H.ok(better.body.url, 'and the evening is charged for, like any other booking');
 
   H.done();
 })();

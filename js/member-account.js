@@ -157,8 +157,9 @@
       sessionsTitle: 'המפגשים', dateCol: 'תאריך', statusCol: 'סטטוס',
       book: 'הרשמה למפגש', cancelSession: 'ביטול מפגש',
       cancelSessionConfirm: 'לבטל את המפגש הזה?',
-      allEveningsFull: 'כל המפגשים מלאים כרגע. אפשר להירשם, ואז להצטרף לרשימת ההמתנה '
-        + 'של כל מפגש בנפרד. לא מתבצע חיוב.',
+      dateFullWait: 'סימון מצרף לרשימת ההמתנה. אין חיוב.',
+      bookedWaiting: 'נרשמתם. על המפגשים המלאים אתם ברשימת ההמתנה — כשמתפנה מקום '
+        + 'נשלח מייל לכל הממתינים, והמקום יינתן לראשון שיתפוס אותו.',
       sessionStatus: { booked: 'רשום/ה', attended: 'הגיע/ה', waiting: 'ברשימת המתנה',
                        'no-show': 'לא הגיע/ה', cancelled: 'בוטל' },
 
@@ -334,8 +335,9 @@
       sessionsTitle: 'Sessions', dateCol: 'Date', statusCol: 'Status',
       book: 'Book', cancelSession: 'Cancel this session',
       cancelSessionConfirm: 'Cancel this session?',
-      allEveningsFull: 'Every evening is full at the moment. Register, and you can then '
-        + 'join the waiting list for each one. Nothing is charged.',
+      dateFullWait: 'ticking this joins the waiting list. Nothing is charged.',
+      bookedWaiting: 'Registered. You are on the waiting list for the full evenings — when a '
+        + 'place opens we email everyone waiting, and it goes to whoever takes it first.',
       sessionStatus: { booked: 'Booked', attended: 'Attended', waiting: 'On the waiting list',
                        'no-show': 'Did not come', cancelled: 'Cancelled' },
 
@@ -499,8 +501,9 @@
       sessionsTitle: 'Занятия', dateCol: 'Дата', statusCol: 'Статус',
       book: 'Записаться', cancelSession: 'Отменить занятие',
       cancelSessionConfirm: 'Отменить это занятие?',
-      allEveningsFull: 'Все занятия сейчас заполнены. Можно записаться, а затем встать '
-        + 'в очередь на каждое занятие отдельно. Списаний нет.',
+      dateFullWait: 'отметка ставит вас в очередь. Списаний нет.',
+      bookedWaiting: 'Вы записаны. На заполненные занятия вы в очереди — когда место '
+        + 'освободится, мы напишем всем ожидающим, и оно достанется тому, кто успеет первым.',
       sessionStatus: { booked: 'Записан(а)', attended: 'Посетил(а)', waiting: 'В очереди',
                        'no-show': 'Не пришёл(ла)', cancelled: 'Отменено' },
 
@@ -1732,16 +1735,24 @@
 
     var form = el('form', { onsubmit: function (e) {
       e.preventDefault();
-      var chosen = rows.filter(function (row) { return row.box.checked; })
-                       .map(function (row) { return row.date; });
-      if (!chosen.length) return say('err', T.pickAtLeastOne);
+      var ticked = rows.filter(function (row) { return row.box.checked; });
+      if (!ticked.length) return say('err', T.pickAtLeastOne);
+      // ⚠ TWO LISTS, NOT A FLAG PER DATE. A request naming which evenings it
+      // wants a SEAT on is a request the server can refuse for exactly those —
+      // and asking to queue is asking for less, so nothing here can buy itself
+      // a place. Which list a date is in is what the screen showed the family,
+      // and the server checks the room again before it believes either.
+      var chosen = ticked.filter(function (row) { return !row.full; })
+                         .map(function (row) { return row.date; });
+      var waitFor = ticked.filter(function (row) { return row.full; })
+                          .map(function (row) { return row.date; });
       go.disabled = true;
       go.textContent = T.payOpening;
       post(REGS, { action: 'bookAndPay', slug: slug, participantId: who.value,
-                   sessionDates: chosen }).then(function (res) {
+                   sessionDates: chosen, waitDates: waitFor }).then(function (res) {
         if (!res.ok) {
           go.disabled = false;
-          go.textContent = T.bookAndPay;
+          retotal();
           // A refusal naming dates is worth re-reading the list for: what
           // changed is on the screen the family is looking at.
           if (res.data && res.data.reason === 'unavailable') { load(); return say('err', T.datesGone); }
@@ -1757,6 +1768,7 @@
           text: T.chooseSessions })]);
         var note = d.awaitingApproval ? T.awaitingOk
                  : d.paymentFailed ? T.bookedUnpaid
+                 : (d.waiting && d.waiting.length) ? T.bookedWaiting
                  : T.bookedFree;
         where.appendChild(section(null, [
           el('p', { class: 'acc-notice is-ok', text: note }), link
@@ -1779,10 +1791,22 @@
     // of. A separate "Total" line beside a button reading only "Pay" asks a
     // reader to connect two things that could have been one.
     function retotal() {
-      var sum = 0, n = 0;
-      rows.forEach(function (row) { if (row.box.checked) { sum += row.price; n++; } });
+      var sum = 0, n = 0, paying = 0;
+      rows.forEach(function (row) {
+        if (!row.box.checked) return;
+        n++;
+        if (!row.full) { sum += row.price; paying++; }
+      });
       go.disabled = !n;
-      go.textContent = n ? T.bookAndPay + ' · ' + money(sum) : T.bookAndPay;
+      // ⚠ THE BUTTON SAYS WHICH OF THE TWO THINGS IT IS ABOUT TO DO. With only
+      // full evenings ticked there is nothing to pay and nothing to open, so a
+      // button reading "Register and pay · €0.00" would be a surprise about a
+      // child's place in the one place this site refuses to have one. It is the
+      // course queue's own word, so a family reads one sentence whichever queue
+      // they join.
+      go.textContent = !n ? T.bookAndPay
+        : !paying ? T.registerWaitGo
+        : T.bookAndPay + ' · ' + money(sum);
     }
 
     function load() {
@@ -1807,24 +1831,31 @@
     }
 
     function paint(data) {
-      // load() clears `dates` on its way in and `go` lives outside it, so the
-      // one thing that has to be undone by hand is the button being taken away
-      // by the every-evening-full branch below.
-      go.removeAttribute('hidden');
       var list = (data.sessions || []).filter(function (s) { return !s.past; });
       if (!list.length) {
         go.disabled = true;
         return dates.appendChild(el('p', { class: 'acc-note', text: T.noDates }));
       }
       var firstFree = null;
-      var anyFull = false;
       list.forEach(function (s) {
-        var taken = s.status === 'booked' || s.status === 'attended';
-        var off = taken || s.full;
-        if (s.full && !taken) anyFull = true;
+        var taken = s.status === 'booked' || s.status === 'attended'
+                 || s.status === 'waiting';
+        // ⚠ A FULL EVENING IS TICKABLE, because ticking it is how you join its
+        // queue. It was dimmed and disabled, which is the full GROUP option's
+        // mistake arriving one screen over: on a drop-in the evening IS the
+        // thing a family picks, so "the other Tuesday has room" is no answer to
+        // somebody who can only come on the Monday. There was a way through only
+        // when EVERY evening was full — so the commonest shape, one popular date
+        // in an otherwise open term, had none at all, and the family was left
+        // looking at a row marked full with nothing to press.
+        //
+        // What is genuinely not tickable is an evening this participant already
+        // holds: booked, attended, or already in its queue.
+        var off = taken;
         var box = el('input', { type: 'checkbox', value: s.date, disabled: off || null,
                                 onchange: retotal });
-        var why = taken ? T.dateBooked : s.full ? T.dateFull : money(s.priceCents);
+        var why = taken ? (s.status === 'waiting' ? T.sessionStatus.waiting : T.dateBooked)
+                : s.full ? T.dateFull : money(s.priceCents);
         // ⚠ A LATE PRICE SAYS IT IS ONE, AND NAMES THE ORDINARY ONE.
         //
         // The figure came through alone: €10.00 on a picker under a price card
@@ -1835,17 +1866,29 @@
         // been in this payload since late pricing was built and nothing read
         // it; the standard figure travels beside it now, because "late" on its
         // own is a label and "usually €7.00" is an explanation.
-        var late = !off && s.priceBasis === 'late' && s.standardPriceCents != null;
+        var late = !off && !s.full && s.priceBasis === 'late' && s.standardPriceCents != null;
+        // ⚠ SAID BEFORE THE PRESS, in the same slot the late price explains
+        // itself in. A tick that quietly means something else is exactly the
+        // surprise the full-group option was rebuilt to avoid, and "full" on its
+        // own is a state rather than an offer.
+        var why2 = late ? T.lateWhy.replace('{price}', money(s.standardPriceCents))
+                 : (!off && s.full) ? T.dateFullWait : null;
         dates.appendChild(el('label', { class: 'acc-date' + (off ? ' is-off' : '') }, [
           box,
           el('span', { class: 'acc-date-when', text: longDate(s.date) }),
           el('span', { class: 'acc-date-what' }, [
             el('span', { text: why }),
-            late ? el('span', { class: 'acc-date-why',
-              text: T.lateWhy.replace('{price}', money(s.standardPriceCents)) }) : null
+            why2 ? el('span', { class: 'acc-date-why', text: why2 }) : null
           ])
         ]));
-        if (!off) { rows.push({ date: s.date, price: s.priceCents || 0, box: box }); if (!firstFree) firstFree = box; }
+        if (!off) {
+          rows.push({ date: s.date, price: s.full ? 0 : (s.priceCents || 0),
+                      full: !!s.full, box: box });
+          // THE NEXT ONE WITH ROOM IS TICKED, never a full one: arriving from a
+          // Register button usually means the coming session, and pre-ticking a
+          // queue join would put somebody in a queue they never asked about.
+          if (!firstFree && !s.full) firstFree = box;
+        }
       });
       // THE NEXT ONE IS TICKED. A family arriving from a Register button
       // usually means the coming session, and a screen with nothing chosen
@@ -1853,40 +1896,12 @@
       if (firstFree) firstFree.checked = true;
       retotal();
 
-      // ⚠ EVERY EVENING FULL WAS A DEAD END. Nothing is tickable, so the pay
-      // button stays disabled, and a family reading a column of dimmed "full"
-      // rows has nothing to press and nothing telling them what to do. That is
-      // the same complaint as the waiting list being unreachable — a door that
-      // was never drawn — one step earlier in the flow.
-      //
-      // ⚠ QUEUEING NEEDS A REGISTRATION BEHIND IT. bookSession refuses without
-      // an approved one, deliberately: the registration is the "may come"
-      // decision and an admin makes it once. So the way through is not a second
-      // booking endpoint, it is to register first — which on a drop-in owes
-      // nothing and charges nothing — and every full evening then offers its own
-      // queue on the page this one becomes. One call that already exists, rather
-      // than a new flow that takes money for a seat nobody has.
-      if (!rows.length && anyFull) {
-        go.setAttribute('hidden', 'hidden');
-        var waitGo = el('button', { type: 'button', class: 'btn-primary', text: T.registerGo,
-          onclick: function (e) {
-            var doneBtn = busy(e.currentTarget);
-            post(REGS, { action: 'submit', slug: slug, participantId: who.value })
-              .then(function (res) {
-                doneBtn();
-                var r = res.ok && res.data && res.data.registration;
-                if (!r) return say('err', failure(res));
-                // The same handover the course form makes: the page becomes the
-                // registration it just created, which is where the queues are.
-                rewriteQuery('p=' + encodeURIComponent(r.participantId) +
-                             '&a=' + encodeURIComponent(r.activityId));
-                renderActivity();
-                say('ok', T.registerDone);
-              });
-          } });
-        dates.appendChild(el('p', { class: 'acc-note', text: T.allEveningsFull }));
-        dates.appendChild(waitGo);
-      }
+      // ⚠ THERE IS NO "every evening is full" BRANCH ANY MORE, and that is the
+      // point of the change above. It was the only way through a full drop-in
+      // and it fired on the one shape that is rare — a term where NOTHING has
+      // room — while the ordinary shape, one popular Monday among free Tuesdays,
+      // had no door at all. A full evening is now a row like any other, so every
+      // one of them can be joined and the branch has nothing left to catch.
     }
   }
 

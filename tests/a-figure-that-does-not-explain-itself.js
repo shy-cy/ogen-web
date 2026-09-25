@@ -328,7 +328,7 @@ const css = read('shared.css');
       slice('  function el(tag, attrs, kids) {', '  function clear(') +
       'this.el = el;', ctx);
     // The row, lifted verbatim from load() so the test cannot drift from it.
-    const row = slice('        var why = taken ?', '        if (!off) { rows.push(');
+    const row = slice('        var why = taken ?', '        if (!off) {\n');
     vm.runInContext('var s = ' + JSON.stringify(session) + ', taken = false, off = false, box = null;\n' +
                     row, ctx);
     return box.textContent;
@@ -342,6 +342,14 @@ const css = read('shared.css');
   H.ok(/€10\.00/.test(en), 'the late price is shown: ' + en);
   H.ok(/late booking/.test(en), '⚠ and says it is a late booking');
   H.ok(/€7\.00/.test(en), 'naming what it usually costs, which is the actual explanation');
+  // ⚠ AND THE SAME SLOT CARRIES THE OTHER THING A ROW CAN MEAN. A full evening
+  // is tickable now, because ticking it is how you join its queue, and a tick
+  // that quietly means something else is the surprise this whole file is about.
+  const fullRow = pickerText(Object.assign({}, std, { full: true }), 'en');
+  H.ok(/ticking this joins the waiting list/.test(fullRow),
+    'a full evening says what ticking it would do: ' + fullRow);
+  H.ok(!/late booking/.test(fullRow),
+    'and quotes no price, late or otherwise — a queue join freezes none');
   H.ok(!/late booking/.test(pickerText(std, 'en')),
     'and an ordinary evening says nothing — a note on every row is a note nobody reads');
 
