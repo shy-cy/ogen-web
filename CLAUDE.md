@@ -4238,6 +4238,53 @@ is standing on when the thought occurs. There is a `See all activities` /
 `לכל הפעילויות` / `Все занятия` link at the foot of the registrations card in
 both states, in the reader's own tree.
 
+### ⚠ A form offered to somebody who is already registered
+
+Reported as *"I'm already registered to this activity. Why is it still open for
+me to register again?"* — the register panel drew the participant select with
+the registered child in it, a live **Register** button under it, and nothing
+anywhere saying so.
+
+**The server was right and had always been right.** `openRegistration()` opens
+with `if (existing && holdsASpot(existing)) return { reg: existing, already:
+true }`, and `submit` turns that into a **409**. Nothing is created, nothing is
+re-priced at today's price, and the frozen terms do not move.
+
+⚠ **WHICH MAKES IT A FORM THAT COULD ONLY EVER LOSE** — word for word the shape
+this area already refuses one screen up, where the address gate does not draw
+the form at all *"because a filled-in form that always loses is worse than no
+form"*. The rule existed; this screen had simply never been asked the question.
+
+So the panel says it **before** the press, in the two places a family looks:
+
+- **on the option**, because the option is what they choose with — the same rule
+  the group select learned when the places count moved onto it, and for the same
+  reason a full group is labelled rather than disabled;
+- **instead of the button**, not beside it. A disabled Register under a notice
+  is that same losing form with a grey coat on. The useful action is the
+  registration they already have, so the button is **replaced** by the link to
+  it, where what is paid, what is left and how to cancel all live.
+
+The select stays live, and that is the point of putting the mark on the option:
+the sibling on the same account may well not be registered, which is usually why
+somebody opened the screen at all. It follows the select, because *registered* is
+a property of the child rather than of the page — the same `syncFullness()`
+idiom the waiting block already uses for the group.
+
+⚠ **AND IT IS DERIVED, never the stored status.** `holdsASpot()` is what capacity
+counts, so a **lapsed** pending hold frees the family to register again on exactly
+the schedule it frees the place, and `cancelled`, `rejected` and `expired` hold
+nothing at all — which is what makes registering again after a refusal work. It
+costs no request: the registrations were already read for the capacity line.
+
+⚠ **And one refusal in `_family-errors.js` still said "request".** The `pending`
+case read *"There is already a request for this participant, waiting for an
+answer"* / `ממתינה לאישור` — the one vocabulary this system removed everywhere
+else, surviving the sweep by living in the refusal table rather than on a screen.
+`pending` and `approved` both read **registered** to a family, so it says that.
+It keeps its own **code**, because the two states are genuinely different to the
+client, and says one thing to the family, because they are not.
+
 ⚠ **AND THE REGISTER PANEL IS NOT ON THE DASHBOARD AT ALL.** It was, drawn from
 `?register=<slug>`, and sitting at the top of a page headed "My family" it read
 as the place registration lives — which is the thing the link above exists to
@@ -5049,10 +5096,56 @@ accurate one. `past-cutoff` is the case that would otherwise be described wrongl
 by a deadline sentence: it is the one place the fee's threshold and the course's
 come apart.
 
-Nothing is added when there **is** credit: the figure explains itself, and a
-sentence under it answers a question nobody asked. The reason line is quieter
-than the one above it and deliberately **not** italic — the note already carries
-the emphasis, and two italic lines in a row is a paragraph nobody reads.
+The reason line is quieter than the one above it and deliberately **not**
+italic — the note already carries the emphasis, and two italic lines in a row is
+a paragraph nobody reads.
+
+### ⚠ And a credit SMALLER than what was paid has to say why too
+
+The paragraph here used to end *"nothing is added when there **is** credit: the
+figure explains itself, and a sentence under it answers a question nobody
+asked."* It was already carrying one exception bolted on beside it
+(`feeHeldElsewhere`), and between them they show the **rule was too broad**
+rather than the exception odd.
+
+Reported as *"cancellation in full refund can be done by the 30th. Why do I get
+only half?"*, on a dialog reading **€150.00** under a card saying **€350.00
+paid**, and a terms footnote listing four rules:
+
+| | |
+|---|---|
+| cancel by 30 September | earns credit |
+| before the first session | the **whole** activity cost |
+| after it has begun | **half** |
+| the registration fee | credited until 30 September |
+
+**Every figure was right.** The activity had begun, so flat credited half the
+course; the fee was withheld because a linked term is still live. But the only
+sentence on the screen was the one about the fee, so the reader did what anybody
+would and anchored on the **date** they could see — which is the *fee's* cutoff,
+governing the half that was not moving. Two independent thresholds, both printed,
+and the dialog named neither.
+
+`whyLessCredit()` is the sibling of `whyNoCredit()`, and four things carry it:
+
+- **Keys, never sentences.** The words are the client's, in three languages; a
+  code with no key renders as nothing, which is this same bug in a different
+  costume, so a test asserts every key the server can emit has a sentence in all
+  three tables.
+- ⚠ **An ARRAY, because two halves can shrink at once** — the course halved
+  *and* the fee past its own date. Reporting one would leave the arithmetic
+  still not adding up, which is the whole complaint.
+- ⚠ **The fee half is decided from the SPLIT, not inferred from the gap.**
+  `creditFor()` now returns `paidFeeCents` and `paidCourseCents` — the figures
+  `basisFor()` has written to the **ledger** since Phase 5, because an entry has
+  to itemise, while the screen asking the family to confirm had neither. With
+  both halves shrinking there is no way to read one out of the difference, and a
+  sentence about a fee on a registration that never paid one would be inventing
+  a deduction.
+- **Nothing is said when the whole of what was paid comes back.** That is the
+  case the original rule was written for and it still holds; a zero stays
+  `whyNothing`'s, because two mechanisms describing one zero is two sentences
+  that can contradict each other.
 
 Two tests, in the suite named for the dialog that once said the opposite of what
 happened: every reason is built from a **real record** and read out of the

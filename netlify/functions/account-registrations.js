@@ -405,6 +405,58 @@ function whyNoCredit(c, credit, paidCents) {
   return 'past-cutoff';
 }
 
+// ⚠ AND A FIGURE SMALLER THAN WHAT WAS PAID HAS TO SAY SO TOO.
+//
+// creditNote() in the client opens by stating the opposite rule — "nothing is
+// added when there IS credit: the figure explains itself" — and that rule was
+// already carrying one exception (`feeHeldElsewhere`) bolted on beside it. This
+// is the second, and between them they show the rule was simply too broad: €150
+// under €350 paid does not explain itself, and the person who commissioned the
+// screen asked exactly that. Reported as "cancellation in full refund can be
+// done by the 30th, why do I get only half?" — the fee's own cutoff date read as
+// the course's rule, which is the misreading the silence invites.
+//
+// Keys, never sentences: the words are the client's, in three languages, and a
+// code the client has no key for renders as nothing — which is the same bug in a
+// different costume, so a test pins that every value here has one.
+//
+// An ARRAY, because two halves can shrink at once: the course is halved because
+// the activity has begun AND the yearly fee is not coming back because its own
+// date has passed. Reporting one would leave the arithmetic still not adding up.
+function whyLessCredit(c, credit, paidCents) {
+  // The zero is whyNoCredit()'s, and a credit that gives back everything paid
+  // has nothing missing to account for.
+  if (!(credit > 0) || !(paidCents > credit)) return [];
+  const out = [];
+  if (c.reason === 'flat') out.push('flat');
+  if (c.reason === 'prorated') out.push('prorated');
+  // The fee half. Decided from the SPLIT rather than inferred from the gap: with
+  // both halves shrinking at once there is no way to read one figure out of the
+  // difference, and a sentence about the fee shown on a registration that never
+  // paid one would be inventing a deduction.
+  //
+  // `feeHeldElsewhere` is excluded because it has its own line, and the two are
+  // mutually exclusive by construction anyway — creditFor() sets that flag only
+  // when the fee's own date has NOT passed.
+  if (c.paidFeeCents > 0 && !(c.feeCredit > 0) && !c.feeHeldElsewhere) out.push('fee-closed');
+  return out;
+}
+
+// Which of this account's people already hold a registration for this activity,
+// and whether what they hold is a place or a spot in a queue. Two different
+// answers: one is "you are in", the other is "you are waiting", and a panel that
+// said the same about both would be wrong for half its readers.
+function heldBy(people, regs, now) {
+  const out = {};
+  (people || []).forEach((p) => {
+    const reg = (regs || []).filter((r) => r.participantId === p.participantId)[0];
+    if (!reg) return;
+    if (R.holdsASpot(reg, now)) out[p.participantId] = { status: reg.status, waiting: false };
+    else if (R.isWaiting(reg)) out[p.participantId] = { status: reg.status, waiting: true };
+  });
+  return out;
+}
+
 function cancellationView(c, paidCents) {
   if (!c) return null;
   const credit = c.credit !== undefined ? c.credit : c.total;
@@ -421,9 +473,11 @@ function cancellationView(c, paidCents) {
     // evening's is the whole of it.
     credit: credit,
     reason: c.reason || null,
-    // Null whenever there IS credit — the figure is its own explanation, and a
-    // sentence under it would be explaining something nobody asked about.
+    // Null whenever there IS credit — that zero is the one a sentence is owed.
     whyNothing: whyNoCredit(c, credit, paidCents),
+    // ⚠ AND WHY IT IS SMALLER THAN WHAT WAS PAID, when it is. Empty whenever the
+    // whole of what was paid comes back, which needs no account of itself.
+    whyLess: whyLessCredit(c, credit, paidCents),
     // ⚠ THIS ONE IS SHOWN EVEN WHEN THERE IS CREDIT, which is the exception to
     // the line above and the whole point of it. A family who paid €350 and is
     // offered €300 back is looking at a figure that does NOT explain itself,
@@ -739,7 +793,30 @@ exports.handler = async (event) => {
         const out = {
           ok: true,
           activity: activityView(activity, R.capacityReport(activity, regs), lang),
-          participants: people
+          participants: people,
+          // ⚠ WHO ON THIS ACCOUNT ALREADY HOLDS ONE, which the panel had no
+          // way of knowing and therefore offered a form to everybody.
+          //
+          // Nothing was ever damaged by pressing it: openRegistration() opens
+          // with `if (existing && holdsASpot(existing)) return { reg: existing,
+          // already: true }`, and `submit` turns that into a 409 — nothing is
+          // created and nothing is re-priced at today's price.
+          //
+          // ⚠ WHICH MAKES IT A FORM THAT COULD ONLY EVER LOSE, and that is the
+          // shape this file already refuses one screen up: the address gate does
+          // not draw the form at all rather than drawing it and being refused,
+          // "because a filled-in form that always loses is worse than no form".
+          // The same answer applies here, and the button is REPLACED by the link
+          // to the registration the family already has — which is the thing they
+          // were actually looking for.
+          //
+          // It costs no request: `regs` is already in hand for the capacity
+          // report. And it is DERIVED, never the stored status — holdsASpot()
+          // is what capacity counts, so a lapsed pending hold lets the family
+          // register again on exactly the schedule it frees the place. A
+          // cancelled or rejected record is not held either, which is what makes
+          // registering again after a refusal work at all.
+          registered: heldBy(people, regs, Date.now())
         };
         // ⚠ THE PARTICIPANT IS NAMED BESIDE THE PAYLOAD, never implied by
         // position. The client seeds its table from this only when the select

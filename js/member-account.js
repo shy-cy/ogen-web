@@ -186,9 +186,25 @@
         'fee-held': 'כל מה ששולם על ההרשמה הזו הוא דמי ההרשמה, הנגבים פעם בשנה עבור הפעילות '
                   + 'הזו — ועדיין קיימת הרשמה פעילה למחזור אחר, ולכן הם נשארים בתוקף.'
       },
+      // ⚠ לא מה שלא הוחזר — למה מה שהוחזר קטן ממה ששולם.
+      whyLess: {
+        'flat': 'הפעילות כבר התחילה, ולכן מזוכה מחצית מעלות הפעילות.',
+        'prorated': 'הפעילות כבר התחילה, ולכן מזוכים רק המפגשים שעוד לא התקיימו.',
+        'fee-closed': 'דמי ההרשמה אינם מזוכים: המועד האחרון לזיכוי שלהם כבר עבר.'
+      },
       registerFullLead: 'הפעילות מלאה כרגע.',
       groupFullLead: 'הקבוצה הזו מלאה כרגע.',
       registerWaitGo: 'הצטרפות לרשימת המתנה',
+      // ⚠ כבר רשום/ה. נקבה וזכר בלוכסן, כמו כל שאר המקומות באתר שמדברים
+      // על אדם — רשום/ה, משתתף/ת, נרשם/ת.
+      registerHeldIn: 'כבר רשום/ה',
+      registerHeldWait: 'כבר ברשימת המתנה',
+      registerHeldLead: function (name, waiting) {
+        return waiting ? name + ' כבר ברשימת ההמתנה לפעילות הזו'
+                       : name + ' כבר רשום/ה לפעילות הזו';
+      },
+      registerHeldBody: 'אין צורך לעשות כלום כאן. בדף ההרשמה רשום מה שולם, מה נותר לתשלום ואיך לבטל.',
+      registerHeldGo: 'למעבר להרשמה',
       registerWaitBody: 'אין מקום פנוי כרגע. אפשר להצטרף לרשימת ההמתנה ללא תשלום. '
                       + 'ברגע שיתפנה מקום נשלח מייל לכל הממתינים, והמקום יינתן למי שיירשם ראשון.',
       registerWaitDone: 'הצטרפתם לרשימת ההמתנה. נשלח מייל ברגע שיתפנה מקום.',
@@ -363,9 +379,23 @@
                   + 'charged once a year for this activity — and another term is still '
                   + 'registered, so it stays paid.'
       },
+      whyLess: {
+        'flat': 'The activity has already begun, so half of the activity cost is credited.',
+        'prorated': 'The activity has already begun, so only the sessions still to come are credited.',
+        'fee-closed': 'The registration fee is not credited: the date for crediting it has passed.'
+      },
       registerFullLead: 'This activity is full at the moment.',
       groupFullLead: 'This group is full at the moment.',
       registerWaitGo: 'Join the waiting list',
+      registerHeldIn: 'already registered',
+      registerHeldWait: 'already on the waiting list',
+      registerHeldLead: function (name, waiting) {
+        return waiting ? name + ' is already on the waiting list for this activity'
+                       : name + ' is already registered for this activity';
+      },
+      registerHeldBody: 'Nothing further is needed here. Their registration page has what is paid, '
+        + 'what is left and how to cancel.',
+      registerHeldGo: 'Open the registration',
       registerWaitBody: 'There is no place free at the moment. You can join the waiting list, '
                       + 'which costs nothing. As soon as a place opens we email everybody waiting, '
                       + 'and it goes to the first person to take it.',
@@ -530,9 +560,23 @@
                   + 'взимается один раз в год за это занятие, а другой семестр остаётся '
                   + 'оформленным, поэтому взнос сохраняется.'
       },
+      whyLess: {
+        'flat': 'Занятие уже началось, поэтому возвращается половина стоимости занятия.',
+        'prorated': 'Занятие уже началось, поэтому засчитываются только предстоящие занятия.',
+        'fee-closed': 'Регистрационный взнос не возвращается: срок его возврата истёк.'
+      },
       registerFullLead: 'Сейчас на занятии нет мест.',
       groupFullLead: 'В этой группе сейчас нет мест.',
       registerWaitGo: 'В список ожидания',
+      registerHeldIn: 'уже записан(а)',
+      registerHeldWait: 'уже в списке ожидания',
+      registerHeldLead: function (name, waiting) {
+        return waiting ? name + ' уже в списке ожидания на это занятие'
+                       : name + ' уже записан(а) на это занятие';
+      },
+      registerHeldBody: 'Здесь больше ничего делать не нужно. На странице записи указано, что оплачено, '
+        + 'что осталось и как отменить.',
+      registerHeldGo: 'Открыть запись',
       registerWaitBody: 'Свободных мест сейчас нет. Можно встать в список ожидания — это бесплатно. '
                       + 'Как только место освободится, мы напишем всем, кто ждёт, и оно достанется '
                       + 'тому, кто запишется первым.',
@@ -865,6 +909,19 @@
     var lines;
     if (cancellation.credit > 0) {
       lines = [T.confirmCredit + ' ' + money(cancellation.credit)];
+      // ⚠ AND WHY IT IS NOT ALL OF IT. The rule this function opens with — a
+      // figure explains itself — was already carrying one exception below, and
+      // it turned out to be the rule that was too broad rather than the
+      // exception that was odd. €150 under €350 paid explains nothing, and it
+      // was reported as exactly that: "full refund can be done by the 30th, why
+      // do I get only half?" — the fee's own cutoff read as the course's rule.
+      //
+      // The server decided which reasons apply, from the same object the figure
+      // came out of; this renders them. Empty when the whole of what was paid
+      // comes back, which is the case that genuinely needs no sentence.
+      (cancellation.whyLess || []).forEach(function (k) {
+        if (T.whyLess[k]) lines.push(T.whyLess[k]);
+      });
     } else {
       var why = T.whyNothing[cancellation.whyNothing];
       lines = why ? [T.confirmNoCredit, why] : [T.confirmNoCredit];
@@ -1513,18 +1570,26 @@
       }
 
       if (a.perSession) registerPerSession(where, a, people, slug, title, act.data);
-      else registerTerm(where, a, people, slug, title);
+      else registerTerm(where, a, people, slug, title, act.data.registered || {});
     });
   }
 
   // Who is coming. One list for both shapes, because "Noa Levi" and "Michal
   // Shinitzky (me)" are the same kind of thing — a person this account may
   // register.
-  function peopleSelect(people) {
+  // ⚠ AND IT SAYS WHO IS ALREADY IN, on the option rather than after the press.
+  //
+  // The same rule the group select learned: the room goes on the option, because
+  // the option is what a family chooses with. A list of children with nothing to
+  // tell them apart, above a live Register button, is a screen that will be
+  // pressed for somebody who is already registered — which is what happened.
+  function peopleSelect(people, held) {
     var who = el('select', {});
     people.forEach(function (c) {
+      var mine = (held || {})[c.participantId];
+      var tag = !mine ? '' : ' \u2014 ' + (mine.waiting ? T.registerHeldWait : T.registerHeldIn);
       who.appendChild(el('option', { value: c.participantId,
-        text: full(c) + (c.isSelf ? ' (' + T.me + ')' : '') }));
+        text: full(c) + (c.isSelf ? ' (' + T.me + ')' : '') + tag }));
     });
     return who;
   }
@@ -1560,10 +1625,11 @@
   // all three. It is the one number on the register panel a family acts on.
   function placesLeft(n) { return T.placesLeft(n); }
 
-  function registerTerm(where, a, people, slug, title) {
+  function registerTerm(where, a, people, slug, title, held) {
     // The address check used to live here and is one level up, above the branch
     // that chooses between this and registerPerSession — one rule for both.
-    var who = peopleSelect(people);
+    var who = peopleSelect(people, held);
+    var alreadyIn = function () { return (held || {})[who.value] || null; };
 
     // ⚠ A FULL GROUP IS CHOOSABLE, BECAUSE CHOOSING IT IS HOW YOU JOIN ITS QUEUE.
     //
@@ -1650,6 +1716,24 @@
     var wait = null, waitLead = null;
     var go = el('button', { type: 'submit', class: 'btn-primary',
                             text: isFull ? T.registerWaitGo : T.registerGo });
+
+    // ⚠ ALREADY REGISTERED, SAID INSTEAD OF A BUTTON RATHER THAN BESIDE ONE.
+    //
+    // A disabled Register under a notice would be the filled-in form that always
+    // loses, which this file rejects one screen up for the address gate. The
+    // useful action here is not a press at all — it is the registration they
+    // already have, which is where what is paid, what is left and how to cancel
+    // all live. So the button is REPLACED by the link to it.
+    //
+    // The select stays live, because the other child on this account may well
+    // not be registered, and that is the reason somebody opened this screen.
+    var heldLead = el('span', { text: '' });
+    var heldLink = el('a', { class: 'acc-link', href: '#', text: T.registerHeldGo });
+    var heldBox = el('div', { class: 'acc-waiting', hidden: 'hidden' }, [
+      el('p', { class: 'acc-waiting-lead' }, [heldLead]),
+      el('p', { class: 'acc-waiting-body', text: T.registerHeldBody }),
+      el('p', { class: 'acc-waiting-body' }, [heldLink])
+    ]);
     var form = el('form', { onsubmit: function (e) {
       e.preventDefault();
       var done = busy(go);
@@ -1706,6 +1790,7 @@
       ]),
       el('div', { class: 'acc-field' }, [el('label', { text: T.registerWho }), who]),
       groupSel ? el('div', { class: 'acc-field' }, [el('label', { text: T.registerGroup }), groupSel]) : null,
+      heldBox,
       go
     ]);
 
@@ -1740,6 +1825,28 @@
       else wait.setAttribute('hidden', 'hidden');
       if (waitLead) waitLead.childNodes[0].textContent = leadText();
     };
+
+    // ⚠ IT FOLLOWS THE SELECT, exactly as the waiting block follows the group
+    // one, and for the same reason: what is on offer changes with the choice.
+    // Registered is not a property of the screen, it is a property of the child.
+    var syncWho = function () {
+      var mine = alreadyIn();
+      if (!mine) {
+        heldBox.setAttribute('hidden', 'hidden');
+        go.removeAttribute('hidden');
+        return;
+      }
+      heldBox.removeAttribute('hidden');
+      go.setAttribute('hidden', 'hidden');
+      var name = who.options[who.selectedIndex]
+        ? who.options[who.selectedIndex].textContent.split(' \u2014 ')[0] : '';
+      heldLead.textContent = T.registerHeldLead(name, mine.waiting);
+      heldLink.setAttribute('href',
+        url('/account/activity', 'p=' + encodeURIComponent(who.value) +
+                                 '&a=' + encodeURIComponent(a.activityId)));
+    };
+    who.addEventListener('change', syncWho);
+    syncWho();
 
     showTerms(a.cancellationTerms || groupTerms());
     if (groupSel) {

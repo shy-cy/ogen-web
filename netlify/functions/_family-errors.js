@@ -345,10 +345,19 @@ const MESSAGES = {
     en: 'This participant already has a place in this activity.',
     ru: 'У этого участника уже есть место в этом занятии.'
   },
+  // ⚠ IT SAID "a request, waiting for an answer", which is the ONE vocabulary
+  // this system removed everywhere else. `pending` and `approved` both read
+  // REGISTERED to a family — the pill, the confirmation and the email all say so
+  // — because being told a decision is pending reads as a decision that might go
+  // either way over something they consider settled. This message survived the
+  // sweep by living in the refusal table rather than on a screen.
+  //
+  // It keeps its own code, because the two states are genuinely different to the
+  // CLIENT, and says the same thing to the family, because they are not.
   'already-registered-waiting': {
-    he: 'כבר קיימת הרשמה למשתתף/ת הזה/זו, והיא ממתינה לאישור.',
-    en: 'There is already a request for this participant, waiting for an answer.',
-    ru: 'Для этого участника уже есть заявка, ожидающая ответа.'
+    he: 'המשתתף/ת הזה/זו כבר רשום/ה לפעילות הזו.',
+    en: 'This participant is already registered for this activity.',
+    ru: 'Этот участник уже записан на это занятие.'
   },
   'already-in-status': {
     he: (p) => `ההרשמה הזו כבר ${p.status}.`,

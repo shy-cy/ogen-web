@@ -343,6 +343,19 @@ function creditFor(reg, now, opts) {
     feeCredit: feeCredit,
     courseCredit: courseCredit,
     total: feeCredit + courseCredit,
+    // ⚠ WHAT WAS PAID, SPLIT THE WAY THE CREDIT WAS, because a figure smaller
+    // than what a family handed over has to be able to say which half shrank.
+    // basisFor() has carried these to the LEDGER since Phase 5 — an entry has to
+    // itemise — and the screen asking the family to confirm had neither, so
+    // "€150" sat under "€350 paid" explaining nothing. Reported as "cancellation
+    // in full refund can be done by the 30th, why do I get only half?", which is
+    // the fee's date being read as the course's rule.
+    //
+    // Returned rather than recomputed at the caller: splitPaid() takes the frozen
+    // fee and the tri-state feeCharged flag, and a second caller getting either
+    // wrong is a screen disagreeing with the ledger about the same euros.
+    paidFeeCents: fee,
+    paidCourseCents: course,
     feeHeldElsewhere: feeHeldElsewhere,
     reason: !hasStarted(starts, now) ? 'not-started'
           : C.mode === 'prorated' ? 'prorated'

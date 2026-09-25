@@ -61,7 +61,8 @@ function noteMaker(strings) {
 const T = { confirmCredit: 'CREDITED', confirmNoCredit: 'NOTHING BACK',
             whyNothing: { 'nothing-paid': 'NOTHING PAID', 'too-late': 'TOO LATE',
                           'started': 'STARTED', 'per-session': 'PER SESSION',
-                          'past-cutoff': 'PAST CUTOFF', 'closed': 'CLOSED' } };
+                          'past-cutoff': 'PAST CUTOFF', 'closed': 'CLOSED' },
+            whyLess: { 'flat': 'HALF', 'prorated': 'REMAINING', 'fee-closed': 'FEE CLOSED' } };
 const creditNote = noteMaker(T);
 
 (async () => {
@@ -357,6 +358,97 @@ const creditNote = noteMaker(T);
     'a genuine zero is taken as a zero, not as a missing value');
   H.ok(/c\.mayCancel !== undefined \? c\.mayCancel/.test(api),
     'and the same for a genuine false');
+
+  // --------------------------------------------------------------------------
+  console.log('\n[\u26a0 and a credit SMALLER than what was paid says why]');
+  //
+  // The rule creditNote() opens with — "nothing is added when there IS credit:
+  // the figure explains itself" — was already carrying one exception bolted on
+  // beside it (feeHeldElsewhere), and this is the second. Between them they show
+  // the rule was too broad: €150 under €350 paid explains nothing.
+  //
+  // Reported as "cancellation in full refund can be done by the 30th, why do I
+  // get only half?" — which is the FEE'S own cutoff date being read as the
+  // COURSE'S rule. The two thresholds are independent, the terms footnote lists
+  // both, and the dialog named neither.
+  const paidInFull = async (over) => {
+    const r = JSON.parse(JSON.stringify(fresh));
+    r.status = 'approved';
+    r.payment = Object.assign({}, r.payment, { paidCents: 35000 });
+    r.frozen = JSON.parse(JSON.stringify(r.frozen));
+    r.frozen.type = 'course';
+    r.frozen.price.registrationFee = 50;
+    r.frozen.price.feeCharged = true;
+    r.frozen.cancellation.cancellationCutoffDate = null;
+    r.frozen.cancellation.mode = 'flat';
+    Object.assign(r.frozen.cancellation, over || {});
+    await store.saveRegistration(r);
+    return row();
+  };
+
+  // 1. THE REPORTED SHAPE. The activity has begun, so flat credits half of the
+  //    300 course; the fee's own date has passed, so none of the 50 comes back.
+  //    150 out of 350, and BOTH halves are now accounted for.
+  let v = await paidInFull({ sessionStartsAt: [Date.parse('2020-01-05T16:00:00Z')],
+                             registrationFeeCutoffDate: '2020-01-01' });
+  H.eq(v.cancellation.credit, 15000, 'half the course and none of the fee');
+  H.eq((v.cancellation.whyLess || []).join(','), 'flat,fee-closed',
+    '\u26a0 BOTH reasons, because both halves shrank \u2014 one alone still would not add up');
+  H.eq(creditNote(v.cancellation).join(' | '), 'CREDITED \u20ac150.00 | HALF | FEE CLOSED',
+    'and the dialog says all of it');
+
+  // 2. The course halved, the fee still creditable: one reason, not two. A
+  //    sentence about a fee that IS coming back would be inventing a deduction.
+  v = await paidInFull({ sessionStartsAt: [Date.parse('2020-01-05T16:00:00Z')],
+                         registrationFeeCutoffDate: null });
+  H.eq(v.cancellation.credit, 20000, 'half the course plus the whole fee');
+  H.eq((v.cancellation.whyLess || []).join(','), 'flat', 'only the half that actually shrank');
+
+  // 3. Prorated says what prorated does, rather than borrowing flat's sentence.
+  v = await paidInFull({ mode: 'prorated', registrationFeeCutoffDate: null,
+                         sessionStartsAt: [Date.parse('2020-01-05T16:00:00Z'),
+                                           Date.parse('2099-01-05T16:00:00Z')] });
+  H.ok((v.cancellation.whyLess || []).indexOf('prorated') !== -1,
+    'a prorated term names its own rule: ' + (v.cancellation.whyLess || []).join(','));
+  H.ok((v.cancellation.whyLess || []).indexOf('flat') === -1, 'and not the other one');
+
+  // 4. The fee alone, on a course that has not begun: the course comes back in
+  //    full and only the fee is missing.
+  v = await paidInFull({ sessionStartsAt: [Date.parse('2099-01-05T16:00:00Z')],
+                         registrationFeeCutoffDate: '2020-01-01' });
+  H.eq(v.cancellation.credit, 30000, 'the whole course, none of the fee');
+  H.eq((v.cancellation.whyLess || []).join(','), 'fee-closed', 'and the fee is what is explained');
+
+  // 5. \u26a0 AND WHEN EVERYTHING COMES BACK, NOTHING IS SAID. That is the case the
+  //    original rule was written for and it still holds: a figure equal to what
+  //    was paid answers its own question, and a sentence under it would be
+  //    explaining a deduction that did not happen.
+  v = await paidInFull({ sessionStartsAt: [Date.parse('2099-01-05T16:00:00Z')],
+                         registrationFeeCutoffDate: null });
+  H.eq(v.cancellation.credit, 35000, 'everything paid comes back');
+  H.eq((v.cancellation.whyLess || []).length, 0, 'and there is nothing to account for');
+  H.eq(creditNote(v.cancellation).length, 1, 'so the dialog is one line');
+
+  // 6. A zero is still whyNothing's, never whyLess's. Two mechanisms describing
+  //    one zero is two sentences contradicting each other.
+  v = await paidInFull({ cancellationCutoffDate: '2020-01-01' });
+  H.eq(v.cancellation.credit, 0, 'past the hard cutoff there is no credit');
+  H.eq((v.cancellation.whyLess || []).length, 0, 'and whyLess stands down');
+  H.eq(v.cancellation.whyNothing, 'closed', 'leaving the zero to the function that owns it');
+
+  // \u26a0 EVERY KEY THE SERVER CAN EMIT HAS A SENTENCE IN ALL THREE LANGUAGES.
+  // A code with no key renders as nothing, which is this same bug wearing a
+  // different costume — the dialog going quiet about money.
+  const lessKeys = (api.match(/out\.push\('([a-z-]+)'\)/g) || [])
+    .map((m) => m.replace(/.*'([a-z-]+)'.*/, '$1'));
+  H.eq(lessKeys.sort().join(','), 'fee-closed,flat,prorated', 'the server emits three keys');
+  ['he', 'en', 'ru'].forEach((lang) => {
+    const table = ui.slice(ui.indexOf(lang + ': {'));
+    const block = table.slice(table.indexOf('whyLess: {'), table.indexOf('whyLess: {') + 900);
+    lessKeys.forEach((k) => {
+      H.ok(block.indexOf("'" + k + "'") !== -1, lang + ' has a sentence for ' + k);
+    });
+  });
 
   H.done();
 })();
