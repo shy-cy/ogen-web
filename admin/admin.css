@@ -485,6 +485,48 @@ h2 > button.help,h3 > button.help{vertical-align:2px;}
 .queue .acts button.go{background:var(--olive);border-color:var(--olive);color:#fff;}
 .queue .acts button.no{border-color:#e0cfc8;color:var(--danger);}
 
+/* ---- the row's controls, as glyphs -----------------------------------------
+   Four labelled buttons wrapped to two lines on every row, so a table opened to
+   SCAN for the rows that need something doing was half as tall again as it had
+   to be, and the labels were the same four words repeated down the page.
+
+   ⚠ The word is not gone, only off screen: every one carries `aria-label`, a
+   `data-tip` tooltip on hover AND on keyboard focus, and `title` for a touch
+   device that has neither. This admin has twice paid for a control nobody could
+   read — the invite button labelled with a description, and the (i) rule that
+   exists because a hint nobody can reach is a hint nobody has. */
+.queue .acts button.icon{
+  width:32px; height:32px; padding:0; display:grid; place-items:center;
+  border-radius:7px; position:relative;
+}
+.queue .acts button.icon svg{ width:17px; height:17px; display:block; }
+/* The two that decide keep their colour; the two that open a panel do not. */
+.queue .acts button.icon.go{ background:var(--olive); border-color:var(--olive); color:#fff; }
+.queue .acts button.icon.no{ border-color:#e0cfc8; color:var(--danger); }
+.queue .acts button.icon.no:hover:not(:disabled){ background:var(--danger); border-color:var(--danger); color:#fff; }
+
+/* The tooltip. Native `title` waits about a second and cannot be styled, and
+   this row is scanned rather than read — so the word arrives at once. It is
+   `position:absolute` against the button and the table is not clipped, so it
+   is not fighting an overflow the way the (i) popover had to. */
+.queue .acts button[data-tip]::after{
+  content:attr(data-tip);
+  position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%);
+  background:var(--ink); color:#fff; font-size:11px; font-weight:600;
+  letter-spacing:.02em; line-height:1.35; text-align:center;
+  width:max-content; max-width:230px; white-space:normal;
+  padding:5px 9px; border-radius:5px; pointer-events:none;
+  opacity:0; transition:opacity .12s ease; z-index:5;
+}
+/* ⚠ FOCUS AS WELL AS HOVER. A control only a mouse can explain is unreadable to
+   anybody tabbing through the queue. */
+.queue .acts button[data-tip]:hover::after,
+.queue .acts button[data-tip]:focus-visible::after{ opacity:1; }
+.queue .acts button[data-tip]:disabled::after{ opacity:0; }
+@media (prefers-reduced-motion: reduce){
+  .queue .acts button[data-tip]::after{ transition:none; }
+}
+
 /* ---- the evenings on a drop-in --------------------------------------------
    ⚠ AN EVENING IS THE UNIT HERE, the way a group is the unit on a course, and
    this screen used to count registrations against the size of the room and call

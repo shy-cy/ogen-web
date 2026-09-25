@@ -2865,9 +2865,46 @@ list* a moment ago does not need telling why they are on it.
 **The admin gets a list, not a sixth kind of queue row.** Nothing in a queue row
 applies to somebody waiting — no place to approve, nothing to reject, no money
 owed, no deadline running — so it is its own table under the queue, in join
-order, with no controls on it. A "give this one a place" button would be a second,
+order.
+
+⚠ **AND IT HAS EXACTLY ONE CONTROL, WHICH THIS FILE SAID IT WOULD NOT HAVE.**
+The sentence here used to end *"a give this one a place button would be a second,
 quieter rule running beside the announced race, and the two would disagree the
-first time anybody used it.
+first time anybody used it."* The reasoning is right; the conclusion was not, and
+the case that shows it is the ordinary one: a place opens, everybody waiting is
+emailed, and **nobody claims it**. Somebody phones instead. Somebody is not
+reading email. The race is what happens when families act — it was never meant to
+be the only thing that can happen, and with no control at all the only route was
+to ask a family to go and press a button, or, if they could not, nothing.
+
+⚠ **SO IT IS THE SAME ACT, NOT A SECOND RULE**, and that is what stops the two
+disagreeing. **Give a place** goes through `openRegistration()` — the very
+function a family claiming their own place goes through — so the terms are
+re-frozen at today's price, the fee waiver and the age check are re-decided, the
+room is checked again, and the hold is `CLAIM_HOURS` rather than the ordinary
+window. That is why the function was lifted out of `account-registrations.js`
+into **`_registration-open.js`**, which both handlers require: written a second
+time in the admin, every one of those could have been got subtly wrong in a way
+that only surfaces when two families compare receipts. Requiring the guardian
+handler from the admin was the other option and is worse — it drags Stripe,
+Checkout, the bundle store and the mailer into a handler with ten seconds.
+
+⚠ **AND IT IS REFUSED WHEN THE GROUP IS FULL**, by `openRegistration()` rather
+than by a check beside the button — with `waitlist: false`, so a full group
+answers 409 instead of quietly putting the family back in the queue they are
+already in, which would look on screen exactly like the place having been given.
+An admin handing out a place that does not exist is the disabled full-group
+option's mistake from the other side, and it puts a family in a room with no
+chair. Over capacity is something that **happens**, from two submissions in the
+same half-second; it is not something to offer a button for. The client greys the
+button from **that group's** room, never the activity's, and the server decides
+again.
+
+It sits behind `approve`, because it is an approval: it decides that a family may
+come. And it is a **word rather than a glyph**, on the one table here whose other
+controls are icons — icons earn their place on four controls repeated down every
+row of a queue; this is one control on a table that has never had any, doing
+something nobody expects to be possible.
 
 **Leaving the queue is not a cancellation** and deliberately does not go through
 `cancelAndCredit()`: nothing was owed, paid or held, so there is no credit to work
@@ -5982,6 +6019,44 @@ Four things it shows that are easy to get wrong:
 - **Whether the yearly fee was billed on this term**, beside the amount. An
   admin looking at a €300 next to a €350 should not have to open the other term
   to find out why.
+
+### ⚠ The four row controls are glyphs, and the word is not gone
+
+Four labelled buttons wrapped to two lines on every row, so a table whose whole
+job is **scanning for the rows that need something doing** was half as tall again
+as it had to be, and the labels were the same four words repeated down the page.
+
+This admin has twice paid for a control nobody could read — the invite button
+labelled with a description, and the (i) rule itself, which exists because a hint
+nobody can reach is a hint nobody has. So only the **on-screen** word is traded
+away, and it survives in three places, each for a reader the others miss:
+`aria-label`, so a screen reader announces the action rather than "button"; a
+styled `data-tip` tooltip on **hover and on keyboard focus**, because a control
+only a mouse can explain is unreadable to anybody tabbing through; and `title`,
+which is all a touch device with no hover has.
+
+The glyphs are Lucide paths built with **`createElementNS`** — an `<svg>` made
+with `createElement` is an `HTMLUnknownElement` and draws nothing, the same trap
+the family area's waiting tick met. Cancel is a **slashed circle rather than a
+second cross**: rejecting and cancelling are different acts, and two crosses
+would say they are one.
+
+⚠ **AND THE TOOLTIP SAYS WHAT SEPARATES THEM.** Asked plainly — *"what is the
+difference between cancel and reject?"* — by the person who commissioned this
+screen. If they cannot tell, an admin working a queue at eight in the morning
+cannot either, and one of the two writes an irreversible line in a ledger:
+
+| | |
+|---|---|
+| **Reject** | *we could not take them.* The request never became a place, so nothing is owed and nothing is credited. It is on the `approve` axis, reversible (`rejected → approved`), and its message is the one an admin may rewrite before it goes — approval carries no reason code, so the generated words cannot explain themselves. ⚠ A **paid** registration cannot be rejected: `paidRefusal()` sends it to cancel instead, because rejecting would leave us holding money with nothing in the record saying we owe it back. |
+| **Cancel** | *a place they had ends.* It writes a credit through the append-only ledger, emails a figure, and **cannot be undone** — only compensated with another entry. It is its own permission axis for exactly that reason, and `cancelled → anything` is refused. |
+
+The distinction lives on the control rather than behind an (i) because there is
+no (i) on a table row, and because it is precisely what would read the same on an
+empty activity as on a full one — which is this admin's own rule for what a
+tooltip is **for**. `aria-label` stays the bare verb: a screen reader announces
+what a control does, and the sentence after it is an explanation rather than a
+name.
 
 ### ⚠ And the table narrows, while the capacity line does not
 

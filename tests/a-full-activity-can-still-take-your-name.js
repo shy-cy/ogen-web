@@ -226,6 +226,79 @@ process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
   H.eq(queue.body.capacity.taken, 1, 'and the capacity line still counts places, not names');
 
   // =========================================================================
+  console.log('\n[⚠ and a place can be GIVEN, not only raced for]');
+  //
+  // This file used to say the waiting list gets no controls at all, because "a
+  // give this one a place button would be a second, quieter rule running beside
+  // the announced race, and the two would disagree the first time somebody used
+  // it." The reasoning is right and the conclusion was not, and the case that
+  // shows it is the ordinary one: a place opens, everybody is emailed, nobody
+  // claims it, and somebody phones instead. The race is what happens when
+  // families act. It was never meant to be the only thing that can happen.
+  //
+  // ⚠ IT IS THE SAME ACT, NOT A SECOND RULE. It goes through the very function
+  // a family claiming their own place goes through — which is why that function
+  // was lifted out of account-registrations.js into a module both handlers
+  // require. The two cannot disagree because there is only one of them.
+
+  // Dana is on the list and the one place is Yael's, so there is nothing to give.
+  const noRoom = await H.call(adminRegs.handler, { action: 'givePlace', token: admin.token,
+    slug: 'one-place', participantId: dana.pid, activityId: course.activityId });
+  H.eq(noRoom.status, 409,
+    '⚠ refused while the group is full — an admin handing out a place that does ' +
+    'not exist is the disabled full-group option\'s mistake from the other side, ' +
+    'and it would put a family in a room with no chair');
+  H.eq(noRoom.body.full, true, 'and says which kind of refusal it is');
+  H.eq((await store.getRegistration(dana.pid, course.activityId)).status, 'waitlisted',
+    'with nothing written: she is still exactly where she was');
+
+  // Yael gives the place back. Everybody waiting is emailed, as always — and
+  // nobody comes for it, which is the case this button exists for.
+  await H.call(regs.handler, { action: 'cancel', token: yael.token,
+    participantId: yael.pid, activityId: course.activityId });
+
+  const gaveWatch = since();
+  const gave = await H.call(adminRegs.handler, { action: 'givePlace', token: admin.token,
+    slug: 'one-place', participantId: dana.pid, activityId: course.activityId });
+  H.eq(gave.status, 200, 'now it goes through');
+  H.eq(gave.body.registration.status, 'approved', 'and she has the place');
+
+  const given = await store.getRegistration(dana.pid, course.activityId);
+  H.eq(given.status, 'approved', 'on the record, not only in the answer');
+  H.eq(given.expirySource, 'waitlist-claim',
+    '⚠ THE SAME SHORT HOLD a family claiming their own place gets — unpaid holds ' +
+    'are the whole reason the queue exists, so a place handed over cannot carry ' +
+    'the ordinary open-ended window');
+  H.eq(given.expiryDays, R.CLAIM_HOURS / 24,
+    'measured in hours (' + R.CLAIM_HOURS + '), not the ordinary forty-five days');
+  H.eq(given.waitingSince, null,
+    '⚠ and the terms are re-frozen NOW. Joining a queue is not agreeing to a ' +
+    'price, so a family who waited from September is quoted today\'s');
+  H.ok(given.frozen && given.frozen.price,
+    'which means a whole frozen block, rebuilt — not the one from the day she queued');
+
+  // `to` arrives as an array from _email.js, which is why this concats.
+  const told = gaveWatch().filter((m) => [].concat(m.to)[0] === 'dana@example.com');
+  H.ok(told.length >= 1, 'and the family is written to: ' + (told[0] || {}).subject);
+
+  // ⚠ ASKED OF THE RECORD, NOT OF THE REQUEST. Pressing it twice, or pressing it
+  // on somebody who got there first, must not open a second registration.
+  const twice = await H.call(adminRegs.handler, { action: 'givePlace', token: admin.token,
+    slug: 'one-place', participantId: dana.pid, activityId: course.activityId });
+  H.eq(twice.status, 409, 'a second press is refused');
+  H.ok(/not waiting/.test(twice.body.error || ''), 'because that row is not waiting any more');
+
+  // The same axis as approving, because it IS approving: it decides that a
+  // family may come. A role that may read the queue and not decide on it cannot.
+  const reader = await H.installSession(blobs, H.superAdminSession({
+    token: 'reader', email: 'reader@ogen.cy', role: 'reader', roleName: 'Queue reader',
+    permissions: { registrations: { access: true, approve: false, cancel: false } }
+  }));
+  const refusedRole = await H.call(adminRegs.handler, { action: 'givePlace', token: reader.token,
+    slug: 'one-place', participantId: yael.pid, activityId: course.activityId });
+  H.eq(refusedRole.status, 403, 'a role without `approve` is refused');
+
+  // =========================================================================
   console.log('\n[an evening, where the queue has minutes rather than days]');
 
   // A drop-in fills up one evening at a time — the room holds one on Tuesday,

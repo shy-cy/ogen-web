@@ -27,6 +27,25 @@
 // would inherit that and file rows with nothing to pay under "owes money", so
 // the bucket is derived from the figures.
 //
+// It carries two more things asked for in the same breath as the filters, and
+// both are about the same table:
+//
+// ⚠ THE FOUR ROW BUTTONS ARE GLYPHS NOW, and the word is not gone — only off
+// screen. Four labelled buttons wrapped to two lines on every row of a table
+// whose whole job is scanning. But this admin has twice paid for a control
+// nobody could read (the invite button labelled with a description; the (i) rule
+// itself), so every one carries `aria-label`, a styled tooltip on hover AND on
+// keyboard focus, and `title` for a touch device that has neither.
+//
+// ⚠ AND THE WAITING LIST HAS AN ACTION, which this project had written down as
+// a thing it would not build: "a give this one a place button would be a second,
+// quieter rule running beside the announced race". The reasoning is right; the
+// conclusion was not. A place opens, everybody waiting is emailed, nobody
+// claims it, and somebody phones instead — and with no control the only answer
+// was to ask them to go and press a button. It is the SAME act rather than a
+// second rule: it goes through the function a family claiming their own place
+// goes through.
+//
 // Like the family area before it, this screen is over a thousand lines of client
 // code that NOTHING HAD EVER EXECUTED — every suite touching it read it as text.
 // Reading proves the source is self-consistent. It cannot prove that pressing a
@@ -92,7 +111,8 @@ const REGS = [
         status: 'approved', groupId: null, groupName: null })
 ];
 const WAITING = [
-  { participantId: 'p-7', name: 'Roni Adler', accountEmail: 'roni@example.com',
+  { participantId: 'p-7', activityId: 'act-1', name: 'Roni Adler',
+    accountEmail: 'roni@example.com',
     accountId: 'a-7', stillExists: true, groupId: 'g-adv', groupName: { en: 'Advanced' },
     waitingSince: '2026-09-10T09:00:00Z',
     ageFlagAtSubmission: { age: 9, inRange: true, min: 6, max: 12 } }
@@ -123,7 +143,8 @@ function boot(opts) {
     activities: () => ({ ok: true, data: { activities: [
       { slug: 'hebrew', title: { en: 'Hebrew for kids' }, status: 'open' },
       { slug: 'drama', title: { en: 'Drama club' }, status: 'open' }] } }),
-    queue: (b) => ({ ok: true, data: b.slug === 'drama' ? SECOND : QUEUE })
+    queue: (b) => ({ ok: true, data: b.slug === 'drama' ? SECOND : (opts.queue || QUEUE) }),
+    givePlace: () => ({ ok: true, data: { ok: true, emailed: true } })
   };
   dom.window.AdminSession = {
     requireSession: () => true,
@@ -298,6 +319,94 @@ function choose(sel, value) {
   H.eq(D.byClass(dom.byId('queue'), 'filters').length, 0,
     'with nothing left to offer, the bar is not drawn at all — no threshold, no ' +
     'judgement about how long a list has to be');
+
+  // =========================================================================
+  console.log('\n[the row controls are glyphs, and every one still says what it is]');
+  const back = boot();
+  await settle();
+  const acts = D.byClass(back.byId('queue'), 'acts')[0];
+  const icons = D.byTag(acts, 'button');
+  H.eq(icons.length, 4, 'four controls on a row, on one line rather than two');
+  icons.forEach((b) => {
+    H.ok(/\bicon\b/.test(b.className), 'drawn as a glyph: ' + b.getAttribute('aria-label'));
+    H.eq(b.textContent, '', 'with no text node, which is what made the row two lines tall');
+    // ⚠ THREE PLACES, and each covers a reader the others do not.
+    const label = b.getAttribute('aria-label');
+    H.ok(label && label.length > 3, 'an aria-label, so a screen reader says more than "button"');
+    const tip = b.getAttribute('data-tip');
+    H.ok(tip && tip.indexOf(label) === 0, 'a tooltip that opens with the same verb');
+    H.eq(b.getAttribute('title'), tip,
+      'and a title, which is all a touch device with no hover has');
+  });
+  H.eq(icons.map((b) => b.getAttribute('aria-label')).join(', '),
+    'Approve, Reject, Cancel, Payments and credit', 'named in the order they were');
+  // The glyph is drawn, not typed. ⚠ createElementNS: an <svg> made with
+  // createElement is an HTMLUnknownElement and draws nothing at all.
+  const svg = D.byTag(icons[0], 'svg')[0];
+  H.ok(svg, 'there is a picture in it');
+  H.eq(svg.namespaceURI, 'http://www.w3.org/2000/svg',
+    '⚠ in the SVG namespace — createElement would have made a node that renders nothing');
+  H.ok(D.byTag(icons[2], 'circle').length === 1,
+    'and cancel is a slashed circle rather than a second cross: rejecting and ' +
+    'cancelling are different acts, and two crosses would say they are one');
+
+  // ⚠ AND THE TOOLTIP SAYS WHAT THAT DIFFERENCE IS. Asked plainly — "what is
+  // the difference between cancel and reject?" — by the person who commissioned
+  // this screen. If they cannot tell, an admin working a queue cannot either, and
+  // one of the two writes an irreversible line in a ledger.
+  const tipFor = (i) => icons[i].getAttribute('data-tip');
+  H.ok(/nothing is owed and nothing is credited/.test(tipFor(1)),
+    'reject says no money moves: ' + tipFor(1));
+  H.ok(/credit/.test(tipFor(2)) && /cannot be undone/.test(tipFor(2)),
+    'cancel says a credit is written and cannot be undone: ' + tipFor(2));
+  H.ok(tipFor(1) !== tipFor(2), 'and the two do not read the same');
+
+  console.log('\n[and the tooltip answers a keyboard, not only a mouse]');
+  const css2 = read('admin/admin.css');
+  const tip = css2.slice(css2.indexOf('.queue .acts button[data-tip]::after'),
+                         css2.indexOf('@media (prefers-reduced-motion'));
+  H.ok(/:hover::after/.test(tip), 'it opens on hover');
+  H.ok(/:focus-visible::after/.test(tip),
+    '⚠ and on focus — a control only a mouse can explain is unreadable to ' +
+    'anybody tabbing through the queue');
+
+  console.log('\n[⚠ the waiting list has a way to give somebody the place]');
+  const wait = D.byTag(back.byId('queue'), 'table')[1];
+  H.ok(wait, 'the waiting list is still its own table, not a sixth kind of queue row');
+  const give = D.byTag(wait, 'button')[0];
+  H.ok(give, '⚠ and it has a control at all, which it never had');
+  H.eq(give.textContent, 'Give a place',
+    '⚠ A WORD, not a glyph. Icons earn their place on four controls repeated ' +
+    'down every row; this is one control on a table that has never had any, and ' +
+    'it does something nobody expects to be possible');
+  // Roni waits on g-adv, which has 8 left in the fixture.
+  H.eq(give.disabled, false, 'live while that group has room');
+
+  console.log('\n[and it is that GROUP\'s room, never the activity\'s]');
+  // g-adv full, g-beg wide open: the activity has places and this family cannot
+  // have one. Under the equal-hours rule the other group is a different day, a
+  // different room and a different teacher.
+  const tight = JSON.parse(JSON.stringify(QUEUE));
+  tight.capacity.named[1].left = 0;
+  tight.capacity.left = 8;
+  const dom2 = boot({ queue: tight });
+  await settle();
+  const give2 = D.byTag(D.byTag(dom2.byId('queue'), 'table')[1], 'button')[0];
+  H.eq(give2.disabled, true,
+    '⚠ disabled, though the ACTIVITY has eight places — offering it would be the ' +
+    'disabled full-group option\'s mistake from the other side, and it would put ' +
+    'a family in a room with no chair');
+  H.ok(/full/.test(give2.getAttribute('title') || ''), 'and says why: ' + give2.getAttribute('title'));
+
+  console.log('\n[pressing it asks the server, naming the row and the activity]');
+  posted.length = 0;
+  give.click();
+  await settle();
+  const ask = posted.filter((b) => b.action === 'givePlace')[0];
+  H.ok(ask, 'it posts givePlace');
+  H.eq(ask.participantId, 'p-7', 'naming who');
+  H.eq(ask.activityId, 'act-1', 'and which activity');
+  H.eq(ask.slug, 'hebrew', 'by slug too, because the server reads the published record');
 
   console.log('\n[and every class the bar puts on the screen is styled]');
   const css = read('admin/admin.css');

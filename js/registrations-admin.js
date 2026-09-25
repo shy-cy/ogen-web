@@ -264,29 +264,105 @@
     return sel;
   }
 
+  // ⚠ THE ROW'S CONTROLS ARE GLYPHS, AND THE WORD IS NOT OPTIONAL.
+  //
+  // Four labelled buttons wrapped to two lines on every row, so a table opened to
+  // scan for the rows that need something doing was half as tall again as it had
+  // to be, and the labels were the same four words repeated down the page.
+  //
+  // ⚠ BUT THIS ADMIN HAS LEARNED TWICE WHAT AN UNREADABLE CONTROL COSTS — the
+  // invite button labelled with a description, and the (i) rule that exists
+  // because a hint nobody can reach is a hint nobody has. An icon with no word
+  // anywhere is that mistake in its purest form. So the word is always present
+  // in three places and only the ON-SCREEN one is traded away:
+  //
+  //   · `aria-label`, so a screen reader announces the action and not "button";
+  //   · `data-tip`, a styled tooltip on hover AND on keyboard focus — focus
+  //     rather than hover alone, because a control only a mouse can explain is
+  //     unreadable to somebody tabbing through it;
+  //   · `title`, which is what a touch device with no hover falls back to.
+  //
+  // The glyphs are drawn rather than typed: a check, a cross, a slashed circle
+  // and a coin. Lucide paths, like everything else on this site, and built with
+  // createElementNS — an <svg> made with createElement is an HTMLUnknownElement
+  // and draws nothing at all.
+  var GLYPH = {
+    // check
+    approve: 'M20 6 9 17l-5-5',
+    // x
+    reject: 'M18 6 6 18M6 6l12 12',
+    // ban — a slashed circle, not a second cross: rejecting and cancelling are
+    // different acts and two crosses would say they are the same one.
+    cancel: 'M4.9 4.9l14.2 14.2',
+    // circle-dollar
+    money: 'M12 6v12M15 9.5a2.5 2.5 0 0 0-2.5-2h-1a2 2 0 1 0 0 4h1a2 2 0 1 1 0 4h-1A2.5 2.5 0 0 1 9 14.5'
+  };
+  function glyph(name) {
+    var NS = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2.2');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    svg.setAttribute('aria-hidden', 'true');
+    if (name === 'cancel' || name === 'money') {
+      var c = document.createElementNS(NS, 'circle');
+      c.setAttribute('cx', '12'); c.setAttribute('cy', '12');
+      c.setAttribute('r', name === 'cancel' ? '9' : '9.5');
+      svg.appendChild(c);
+    }
+    var path = document.createElementNS(NS, 'path');
+    path.setAttribute('d', GLYPH[name]);
+    svg.appendChild(path);
+    return svg;
+  }
+  // ⚠ THE TOOLTIP NAMES THE ACTION AND THEN SAYS WHAT SEPARATES IT.
+  //
+  // Asked plainly: "what is the difference between cancel and reject?" If the
+  // person who commissioned this screen cannot tell, an admin working a queue at
+  // eight in the morning cannot either — and the two are a decision about a
+  // place and a decision about money. Rejecting says we could not take them and
+  // moves nothing; cancelling ends a place that existed, writes a credit through
+  // a ledger that cannot be edited, and emails a figure.
+  //
+  // The distinction lives here rather than in the label because a label has to
+  // fit on a row; it lives on the control rather than behind an (i) because
+  // there is no (i) on a table row and this is what would read the same on an
+  // empty activity as on a full one, which is exactly the rule for what a
+  // tooltip is FOR.
+  //
+  // `aria-label` stays the bare verb: a screen reader announces what a control
+  // DOES, and the sentence after it is an explanation rather than a name.
+  function iconButton(name, label, why, tone, off, onclick) {
+    var tip = why ? label + ' \u00b7 ' + why : label;
+    return el('button', {
+      type: 'button', class: 'icon' + (tone ? ' ' + tone : ''),
+      'aria-label': label, 'data-tip': tip, title: tip,
+      disabled: off || null, onclick: onclick
+    }, [glyph(name)]);
+  }
+
   function actions(r) {
     var live = r.status === 'pending' || r.status === 'approved';
     var decidable = ['pending', 'approved', 'rejected', 'expired'].indexOf(r.status) !== -1;
-    var acts = [];
-
-    acts.push(el('button', {
-      class: 'go', disabled: !S.canApprove || !decidable || r.status === 'approved' || null,
-      onclick: function () { act('approve', r, 'Approved'); }, text: 'Approve'
-    }));
-    acts.push(el('button', {
-      disabled: !S.canApprove || !decidable || r.status === 'rejected' || null,
-      onclick: function () { review('reject', r); }, text: 'Reject'
-    }));
-    // Cancel is its own axis because it moves money — it writes a credit a
-    // family can spend and cannot be undone, only compensated.
-    acts.push(el('button', {
-      class: 'no', disabled: !S.canCancel || !live || null,
-      onclick: function () { review('cancel', r); }, text: 'Cancel'
-    }));
-    acts.push(el('button', {
-      onclick: function () { openAccount(r); }, text: 'Money'
-    }));
-    return el('div', { class: 'acts' }, acts);
+    return el('div', { class: 'acts' }, [
+      iconButton('approve', 'Approve', 'they have the place', 'go',
+        !S.canApprove || !decidable || r.status === 'approved',
+        function () { act('approve', r, 'Approved'); }),
+      iconButton('reject', 'Reject', 'we could not take them. No place was ever held, ' +
+        'so nothing is owed and nothing is credited', null,
+        !S.canApprove || !decidable || r.status === 'rejected',
+        function () { review('reject', r); }),
+      // Cancel is its own axis because it moves money — it writes a credit a
+      // family can spend and cannot be undone, only compensated.
+      iconButton('cancel', 'Cancel', 'a place they had ends. Any credit is written ' +
+        'to their account and cannot be undone', 'no', !S.canCancel || !live,
+        function () { review('cancel', r); }),
+      iconButton('money', 'Payments and credit', null, null, false,
+        function () { openAccount(r); })
+    ]);
   }
 
   // ---------- narrowing the table ----------
@@ -571,13 +647,37 @@
   // rule that was chosen — so a "give this one a place" button here would be a
   // second, quieter rule running beside it, and the two would disagree the first
   // time somebody used it.
+  // Whether there is a place to give THIS row — its own group's, never the
+  // activity's. Cosmetic, like every check on this side: the server asks
+  // openRegistration() again and refuses if the room has gone in between.
+  function roomFor(r) {
+    var cap = (S.queue && S.queue.capacity) || {};
+    var g = (cap.named || []).filter(function (x) { return x.groupId === r.groupId; })[0];
+    if (r.groupId && g) return g.capacity == null || g.left > 0;
+    return cap.capacity == null || cap.left > 0;
+  }
+
+  function givePlace(r) {
+    send({ action: 'givePlace', slug: S.slug,
+           participantId: r.participantId, activityId: r.activityId })
+      .then(function (res) {
+        if (!res.ok) return message('err', (res.data && res.data.error) || 'That did not work');
+        message(res.data.emailed === false ? 'err' : 'ok',
+          res.data.emailed === false
+            ? r.name + ' has the place — BUT THE EMAIL DID NOT GO. Tell them another way.'
+            : r.name + ' has the place, and the family has been emailed.');
+        loadQueue(S.slug);
+      });
+  }
+
   function renderWaiting(box, list) {
     list = list || [];
     if (!list.length) return;
-    var head = el('tr', {}, ['Waiting', 'Age', 'Group', 'Since'].map(function (h) {
+    var head = el('tr', {}, ['Waiting', 'Age', 'Group', 'Since', ''].map(function (h) {
       return el('th', { text: h });
     }));
     var rows = list.map(function (r) {
+      var room = roomFor(r);
       return el('tr', {}, [
         el('td', { class: 'who' }, [
           el('b', { text: r.name }),
@@ -586,7 +686,23 @@
         ]),
         el('td', {}, [ageCell(r)]),
         el('td', {}, [el('span', { text: r.groupName ? titleOf(r.groupName, r.groupId) : '—' })]),
-        el('td', {}, [el('span', { text: shortDate((r.waitingSince || '').slice(0, 10)) })])
+        el('td', {}, [el('span', { text: shortDate((r.waitingSince || '').slice(0, 10)) })]),
+        // ⚠ A WORD, NOT A GLYPH, and that is not an inconsistency with the table
+        // above. Icons earn their place on four controls repeated down every row
+        // of a queue; this is one control on a table that has never had any, and
+        // it does something nobody expects to be possible. A capability nobody
+        // can find is a capability nobody has — learned twice on this admin.
+        el('td', {}, [el('div', { class: 'acts' }, [
+          el('button', {
+            class: 'go', disabled: !S.canApprove || !r.stillExists || !room || null,
+            title: !S.canApprove ? 'Your role may open the queue but not decide on it'
+                 : !r.stillExists ? 'That participant no longer exists'
+                 : !room ? 'That group is full — there is no place to give'
+                 : 'Opens the registration, re-freezes the terms at today\'s price and '
+                   + 'emails the family. The hold is hours, not weeks.',
+            onclick: function () { givePlace(r); }, text: 'Give a place'
+          })
+        ])])
       ]);
     });
     box.appendChild(el('div', { class: 'label-row', style: 'margin-top:26px;' }, [

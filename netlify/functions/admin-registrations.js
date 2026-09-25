@@ -33,6 +33,7 @@ const credit = require('./_credit');
 const ledger = require('./_credit-ledger');
 const spend = require('./_spend-credit');
 const { cancelAndCredit } = require('./_registration-cancel');
+const { openRegistration } = require('./_registration-open');
 const attendance = require('./_session-attendance');
 const groups = require('./_activity-groups');
 const facts = require('./_activity-facts');
@@ -294,6 +295,89 @@ exports.handler = async (event) => {
           capacity: R.capacityReport(activity, all),
           registrations: rows
         });
+      }
+
+      // ⚠ GIVING SOMEBODY A PLACE OFF THE WAITING LIST.
+      //
+      // This file used to say, in the comment above the waiting list, that the
+      // admin gets "a list, not a sixth kind of queue row", with NO controls on
+      // it — because "a give this one a place button would be a second, quieter
+      // rule running beside the announced race, and the two would disagree the
+      // first time somebody used it."
+      //
+      // That reasoning is still true and the conclusion was wrong, and the case
+      // that shows it is the ordinary one: a place opens, everybody waiting is
+      // emailed, and nobody claims it. Somebody phones instead. Somebody is not
+      // reading email. The race is what happens when families act; it was never
+      // meant to be the only thing that can happen, and with no control at all
+      // the only route was to ask the family to go and press a button — or, if
+      // they could not, nothing.
+      //
+      // ⚠ SO IT IS THE SAME ACT, NOT A SECOND RULE. It goes through
+      // openRegistration(), which is what a family claiming their own place goes
+      // through: the terms are re-frozen at today's price, the fee waiver and
+      // the age check are re-decided, the room is checked again, and the hold is
+      // CLAIM_HOURS rather than the ordinary window. That is the whole reason
+      // that function was lifted into its own module. The two cannot disagree
+      // because there is only one of them.
+      //
+      // ⚠ AND IT IS REFUSED WHEN THE GROUP IS FULL, by openRegistration rather
+      // than by a check here. An admin handing out a place that does not exist
+      // is the disabled full-group option's mistake from the other side, and it
+      // would put a family in a room with no chair. Over capacity is something
+      // that HAPPENS, from two families submitting in the same half-second; it
+      // is not something to offer a button for.
+      case 'givePlace': {
+        if (!canApprove(session)) {
+          return json(403, { error: 'Your role may open the queue but not decide on it' });
+        }
+        const activity = await published(body.slug);
+        if (!activity) return json(404, { error: 'No such activity.' });
+        const reg = await store.getRegistration(body.participantId, activity.activityId);
+        if (!reg) return json(404, { error: 'No such registration.' });
+        // Asked of the RECORD, not of the request. A row that has already been
+        // given a place — by this button a moment ago, or by the family getting
+        // there first — must not be opened a second time.
+        if (!R.isWaiting(reg)) {
+          return json(409, { error: 'That registration is ' + reg.status + ', not waiting.' });
+        }
+        const participant = await participants.getParticipant(reg.participantId);
+        if (!participant) return json(404, { error: 'That participant no longer exists.' });
+
+        const opened = await openRegistration({
+          activity: activity, participant: participant, accountId: reg.accountId,
+          groupId: reg.groupId || null,
+          // ⚠ FALSE, WHICH IS THE WHOLE POINT. `waitlist` says what to do if
+          // there is no room, and here the answer is to refuse and say so — with
+          // it true the family would be quietly put back in the queue they are
+          // already in and the screen would look like the place had been given.
+          waitlist: false
+        });
+        if (opened.status) {
+          return json(opened.status, {
+            error: opened.key === 'activity-full'
+              ? 'That group is full — there is no place to give.'
+              : 'That registration cannot be opened (' + opened.key + ').',
+            full: opened.key === 'activity-full'
+          });
+        }
+        const next = opened.reg;
+
+        // Best effort and after the write, like every other message here. Which
+        // one is decided the same way `submit` decides it, because it is the
+        // same two outcomes: a place, or a place a person still has to confirm.
+        let emailed = null;
+        const account = await accounts.getAccount(next.accountId);
+        if (account) {
+          emailed = next.status === 'approved'
+            ? await mail.sendApproved(next, account)
+            : await mail.sendReceived(next, account,
+                                      (activity.registration || {}).sessionCancelHours);
+        }
+        await recordAudit(session, 'registrations.givePlace',
+          next.participantId + '__' + next.activityId, 'ok',
+          { detail: next.frozen.participantName + ' \u00b7 off the waiting list' });
+        return json(200, { ok: true, registration: await row(next), emailed: emailed });
       }
 
       // WHAT THE REFUSAL WILL SAY, BEFORE IT SAYS IT.
