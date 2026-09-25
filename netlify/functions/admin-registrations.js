@@ -372,7 +372,10 @@ exports.handler = async (event) => {
           // the one decision here that does not feel like one. It is the same
           // mechanism as a cancellation to everything that counts: holdsASpot()
           // stopped counting the record the moment `rejected` was written.
-          if (status === 'rejected') await waitlist.placeOpened(body.activityId);
+          if (status === 'rejected') {
+            await waitlist.placeOpened(body.activityId,
+              out.payload.registration.groupId || null);
+          }
           await recordAudit(session, 'registrations.' + body.action,
             body.participantId + '__' + body.activityId, 'ok',
             { detail: out.payload.registration.frozen.participantName +
@@ -497,7 +500,7 @@ exports.handler = async (event) => {
           { detail: reg.frozen.participantName +
                     (done.entry ? ' · credited ' + done.entry.amountCents + 'c' : ' · no credit') +
                     (body.note ? ' · ' + body.note : '') });
-        await waitlist.placeOpened(body.activityId);
+        await waitlist.placeOpened(body.activityId, reg.groupId || null);
         return json(200, {
           ok: true, registration: done.registration, credit: done.credit, entry: done.entry,
           sessions: done.sessions, emailed: emailed

@@ -437,6 +437,71 @@ function movedMessage(reg, account, fromName, toName) {
   return { to: account.email, subject: T.subject(child, act, to), html: html, text: strip(html) };
 }
 
+// --- the terms moved under a registration that already existed -------------
+//
+// ⚠ THE ONE MESSAGE ABOUT SOMETHING A FAMILY ALREADY AGREED TO.
+//
+// Every other message here reports something the family did, or something we
+// decided about it. This one reports that WE changed the deal — the cancellation
+// cutoff, or the date the registration fee stops coming back — on a registration
+// that was taken under the old dates. It exists because that change was asked to
+// apply to the people already registered rather than only to new ones; see
+// _registration-fallout.js for the rule and for what it costs.
+//
+// ⚠ IT DOES NOT CLAIM THE CHANGE IS AN IMPROVEMENT. A cutoff can move either
+// way, and a message that says "you now have longer" would be false half the
+// time, in the half where a family has lost something. So it says the dates may
+// be earlier or later and puts them in front of the reader — the terms block
+// under the button is built from the registration's UPDATED frozen block, which
+// is the same block the family's own page now reads.
+//
+// No draft to review, for the same reason a group move has none: the two dates
+// are the whole of it, and there is nothing an admin could usefully reword.
+
+const TERMS_CHANGED = {
+  he: {
+    subject: (child, act) => `עדכון בתנאי הביטול · ${act}`,
+    heading: 'תנאי הביטול התעדכנו',
+    body: (child, act) => `עדכנו את תנאי הביטול של ${act}, והתנאים החדשים חלים מעכשיו גם על ההרשמה של ${child}.`,
+    next: 'התנאים המעודכנים מופיעים למטה וגם בעמוד ההרשמה. כדאי לקרוא אותם — התאריכים יכולים להיות מוקדמים או מאוחרים מאלה שהיו.',
+    money: 'המחיר לא השתנה ולא בוצע חיוב נוסף.',
+    talk: 'אם השינוי משנה משהו עבורכם, השיבו להודעה הזו ונדבר.',
+    button: 'לפרטי ההרשמה'
+  },
+  en: {
+    subject: (child, act) => `Updated cancellation terms · ${act}`,
+    heading: 'The cancellation terms have changed',
+    body: (child, act) => `We have updated the cancellation terms for ${act}, and the new terms now apply to ${child}'s registration as well.`,
+    next: 'The updated terms are below and on the registration page. They are worth reading — the dates may be earlier or later than the ones you had.',
+    money: 'The price has not changed and nothing further has been charged.',
+    talk: 'If this changes anything for you, reply to this message and we will talk it through.',
+    button: 'Open the registration'
+  },
+  ru: {
+    subject: (child, act) => `Изменение условий отмены · ${act}`,
+    heading: 'Условия отмены изменились',
+    body: (child, act) => `Мы обновили условия отмены для ${act}, и новые условия теперь действуют и для записи ${child}.`,
+    next: 'Обновлённые условия приведены ниже и на странице записи. Их стоит прочитать — даты могут оказаться как более ранними, так и более поздними, чем прежде.',
+    money: 'Стоимость не изменилась, дополнительных списаний нет.',
+    talk: 'Если это что-то меняет для вас, ответьте на это письмо — обсудим.',
+    button: 'Открыть запись'
+  }
+};
+
+function termsChangedMessage(reg, account, sessionCancelHours) {
+  const l = lang(((account || {}).profile || {}).preferredLanguage);
+  const T = TERMS_CHANGED[l];
+  const child = childOf(reg), act = titleOf(reg, l);
+  // NO `#pay`. Every other message about a live registration is partly about
+  // money and scrolls to the cost card; this one is about the rules, and the
+  // terms footnote is under it — the same argument the group move makes.
+  const html = shell(l, T.heading,
+    [esc(T.body(child, act)), esc(T.next), esc(T.money), esc(T.talk)],
+    { href: registrationHref(reg, l, ''), label: T.button },
+    termsBlock(reg, l, sessionCancelHours));
+  return { to: account.email, subject: T.subject(child, act), html: html, text: strip(html) };
+}
+
 // --- nobody answered in time -----------------------------------------------
 //
 // THE APOLOGY IS OURS, and the copy has to say so. It is tempting to write "your
@@ -814,6 +879,11 @@ const sendMoved = (reg, account, fromName, toName) =>
     email.send(movedMessage(reg, account, fromName, toName),
       { template: 'registration-moved', lang: langOf(account) }));
 
+const sendTermsChanged = (reg, account, sessionCancelHours) =>
+  email.settle('registration-terms-changed', account.email, () =>
+    email.send(termsChangedMessage(reg, account, sessionCancelHours),
+      { template: 'registration-terms-changed', lang: langOf(account) }));
+
 const sendPaid = (reg, account, paidCents, outstandingCents) =>
   email.settle('registration-paid', account.email, async () =>
     email.send(paidMessage(reg, account, paidCents, outstandingCents,
@@ -823,10 +893,10 @@ const sendPaid = (reg, account, paidCents, outstandingCents) =>
 module.exports = {
   payUrlFor,
   sendReceived, sendApproved, sendRejected, sendExpired, sendCancelled,
-  sendWaiting, sendPlaceOpen, sendMoved,
+  sendWaiting, sendPlaceOpen, sendMoved, sendTermsChanged,
   receivedMessage, approvedMessage, rejectedMessage, expiredMessage, rejectedDraft,
   cancelledMessage, cancelledDraft, waitingMessage, placeOpenMessage,
-  movedMessage,
-  RECEIVED, APPROVED, REJECTED, EXPIRED, CANCELLED, WAITING, PLACE_OPEN, MOVED,
+  movedMessage, termsChangedMessage,
+  RECEIVED, APPROVED, REJECTED, EXPIRED, CANCELLED, WAITING, PLACE_OPEN, MOVED, TERMS_CHANGED,
   paidMessage, sendPaid
 };

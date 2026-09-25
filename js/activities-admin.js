@@ -2798,6 +2798,47 @@
       });
   }
 
+  // Did anything about the fallout go wrong? A partial failure has to colour the
+  // whole notice, because "Published" in olive with a failure sentence inside it
+  // is a notice an admin reads the first three words of.
+  function falloutBad(f) {
+    if (!f) return false;
+    if (f.error) return true;
+    return !!(((f.terms || {}).failed || []).length || ((f.room || {}).failed || []).length);
+  }
+
+  function falloutLine(f) {
+    if (!f) return '';
+    if (f.error) {
+      return '<br><br>⚠ The pages are published, but applying this to the ' +
+        'registrations already taken failed: ' + esc(f.error) + ' — publish again to ' +
+        'finish it. Nothing has been half-written: both halves are re-run from scratch.';
+    }
+    var out = [];
+    var t = f.terms || {}, r = f.room || {};
+    if (t.moved && !t.changed) {
+      out.push('The cutoff dates changed, and no registration was affected.');
+    } else if (t.changed) {
+      // The count, and the fact that it was sent, because this is the one thing
+      // on the screen an admin cannot undo.
+      out.push('⚠ ' + t.changed + ' registration' + (t.changed === 1 ? '' : 's') +
+        ' now follow' + (t.changed === 1 ? 's' : '') + ' the new cutoff dates, and ' +
+        t.emailed + ' famil' + (t.emailed === 1 ? 'y has' : 'ies have') + ' been emailed.');
+    }
+    (r.groups || []).forEach(function (g) {
+      var where = g.name ? groupLabel(g) : 'the class';
+      out.push('Places opened in ' + esc(where) + ' — ' + g.waiting +
+        ' on the waiting list ' + (g.waiting === 1 ? 'was' : 'were') + ' told.');
+    });
+    if (r.told === 0 && (r.groups || []).length) {
+      out.push('Nobody was waiting for the group that reopened.');
+    }
+    ((t.failed || []).concat(r.failed || [])).forEach(function (m) {
+      out.push('⚠ Failed: ' + esc(m) + ' — publish again to retry.');
+    });
+    return out.length ? '<br><br>' + out.join('<br>') : '';
+  }
+
   function doPublish(overwrite) {
     message('');
     if (!requireSlug()) return;
@@ -2834,7 +2875,15 @@
         var done = 'Published. <a href="' + res.data.commit.url + '" target="_blank" rel="noopener">View the commit</a>. ' +
           'Netlify takes about a minute to deploy, then: ' +
           res.data.liveUrls.map(function (u) { return '<a href="' + u + '" target="_blank" rel="noopener">' + u + '</a>'; }).join(' · ');
-        load(S.slug).then(function () { message('ok', done); });
+        // ⚠ WHAT THE PUBLISH DID TO THE FAMILIES, said on screen. This is not an
+        // explanation — it is what is true right now about this publish — so it
+        // stays visible rather than going behind an (i). Rewriting terms somebody
+        // already agreed to and mailing them about it must never be something an
+        // admin finds out about later, or from a family.
+        var extra = falloutLine(res.data.fallout);
+        load(S.slug).then(function () {
+          message(falloutBad(res.data.fallout) ? 'err' : 'ok', done + extra);
+        });
       });
   }
 

@@ -105,7 +105,7 @@ async function runRegistrations(now) {
   const all = await store.allRegistrations();
   const lapsed = all.filter((r) => R.hasLapsed(r, at));
   const expired = [];
-  const freed = new Set();
+  const freed = new Map();
 
   for (const reg of lapsed) {
     const next = R.transition(reg, {
@@ -128,13 +128,17 @@ async function runRegistrations(now) {
     // nothing about capacity was waiting on this job — but nobody had been TOLD,
     // and a queue nobody is told about is a queue that never moves. It is the
     // one place a freed place has no human action behind it to announce it.
-    freed.add(next.activityId);
+    // ⚠ KEYED BY GROUP, not by activity. Three holds lapsing in Beginners are
+    // one round of messages to that queue, and say nothing to Advanced.
+    freed.set(next.activityId + '\u0000' + (next.groupId || ''),
+              { activityId: next.activityId, groupId: next.groupId || null });
   }
 
   // After the whole pass, so three lapsed holds on one activity are one round of
   // messages rather than three.
-  for (const activityId of freed) {
-    try { await waitlist.placeOpened(activityId); } catch (e) { /* never blocks a sweep */ }
+  for (const f of freed.values()) {
+    try { await waitlist.placeOpened(f.activityId, f.groupId); }
+    catch (e) { /* never blocks a sweep */ }
   }
   return { checked: all.length, expired: expired.length, keys: expired,
            toldWaiting: freed.size, at: new Date(at).toISOString() };

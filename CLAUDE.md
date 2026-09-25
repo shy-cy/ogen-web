@@ -2493,7 +2493,9 @@ page in front of it, deliberately, so the family area stays a rendering job.
 netlify/functions/
   _registration.js        what a registration IS, and every rule needing no storage; PURE
   _registration-store.js  ogen-registrations; reg-<participantId>__<activityId>
-  _registration-email.js  the four messages, in three languages
+  _registration-email.js  every message a registration sends, in three languages
+  _registration-fallout.js  what publishing an activity does to the registrations
+                          already on it: a moved cutoff, and a raised capacity
   _registration-sweep.js  run() the nightly pass (both halves, schedule only);
                           runRegistrations() the admin's narrower "run now"
   registration-sweep.js   the scheduled entry point — see netlify.toml
@@ -2596,12 +2598,32 @@ open-ended hold.
 
 **Where a freed place is announced from**: a family's cancellation, an admin's
 cancellation, a rejection (easy to forget — it is the one decision that does not
-feel like one), a cancelled evening, and the nightly sweep's expiry pass. That
-last is the only freeing with no human action behind it, and without it a lapsed
-hold would free a place nobody was ever told about. ⚠ A **lapsed claim** reopens
+feel like one), a cancelled evening, the nightly sweep's expiry pass, and ⚠ **a
+group's capacity being raised** — see **Publishing an activity reaches the
+registrations already on it**, which is the only one of the six that happens on
+the activities form rather than in the registrations domain. The sweep is the only
+freeing with no human action behind it, and without it a lapsed hold would free a
+place nobody was ever told about. ⚠ A **lapsed claim** reopens
 a place silently — nothing fires at a derived moment — and the next natural event
 re-announces it. On a course that is the sweep; on an evening minutes before a
 class, it simply reopens.
+
+⚠ **AND EVERY ONE OF THEM IS ANNOUNCED PER GROUP.** `placeOpened(activityId,
+groupId)` tells the queue for **that group**, and for a release it told the whole
+activity's. Under the equal-hours rule two groups may meet on a different day, at
+a different hour, in a different place, with different teachers — so a place freed
+in Beginners is not a place for a family waiting on Advanced. Sent activity-wide
+they were told to come and take it, pressed **Take the place**, and were refused,
+because the claim posts `submit` with **their** `groupId`, which is still full.
+That is the disabled full-group option's mistake from the other side: telling a
+family about a place somewhere they cannot go.
+
+⚠ A waiting record with **no** group is told whatever opened. Those were taken
+while the activity was pooled and nobody asked them to choose, so there is no
+group to compare, and reading that blank as "not this one" would silence whoever
+has been waiting longest. Absent resolves towards the family, as every other blank
+in this system does. Called with no `groupId` at all it is activity-wide, which is
+what a single-group activity wants.
 
 ⚠ **AND FOR A RELEASE IT WAS UNREACHABLE ON EVERY MULTI-GROUP ACTIVITY.**
 Reported as *"Where is the waiting list feature??"*, looking at an activity with
@@ -2728,6 +2750,135 @@ released after"* on the Registration panel overrides it per activity. On an
 activity that fills fast, a week is the right number, and it helps whether or not
 anybody is queueing.
 
+### ⚠ Publishing an activity reaches the registrations already on it
+
+```
+netlify/functions/
+  _registration-fallout.js   what a publish does to the people already registered
+```
+
+Publishing was a page-rendering job: validate, render three languages, commit,
+rebuild the listing. Two of the things an admin changes on that form are not page
+content at all — they are facts about the people already registered — and neither
+one reached them. Both were reported in one message.
+
+**1. A changed cutoff date now governs the registrations already taken.**
+
+Asked for as *"if we change the cut-off date it should be a new update to the
+rules, and those that registered before should get an email that updates them on
+this change"* — after an admin moved a cancellation cutoff, watched the family's
+page go on showing the old date, and read it as staleness.
+
+It was not staleness, and **that the freeze was deliberate is exactly what made it
+confusing**: the activity said 30 September, the family's page said 24 September,
+and both were correct. What did not exist was any way to make the change apply on
+purpose, or any screen saying that it had not.
+
+⚠ **IT MOVES IN BOTH DIRECTIONS, AND THAT WAS A DECISION RATHER THAN A DEFAULT.**
+A **later** cutoff gives a family more time than they agreed to, which nobody will
+object to. An **earlier** one takes credit rights away from somebody who has
+already accepted the old terms — and under EU unfair-terms law (93/13/EEC as
+implemented in Cyprus, already discussed under **What the clause does not do**) a
+non-negotiated consumer term changed unilaterally after acceptance is liable to be
+unenforceable **against the consumer**, whatever this code writes. The narrower
+rule — apply it only where it helps them, and show the admin how many families are
+on older terms — was put and declined, so the direction is not filtered.
+
+What the code does instead is make it impossible to do quietly:
+
+- every affected family is **emailed**, in the language of their account;
+- the dates they used to hold stay in that registration's own **history**, because
+  *"the record says 6 October"* is not an answer to somebody who was quoted 28
+  October;
+- the publish response and the **audit line** both name how many records moved.
+
+⚠ **ONLY THE TWO CUTOFF DATES.** The frozen block also carries the mode and the
+whole session list, and neither is touched — the mode is what `creditFor()`
+branches on and the list is the **denominator** of a prorated credit, so rewriting
+either would re-price a term nobody re-agreed to. A test switches the activity
+from flat to prorated and excludes a session **in the same publish** as the cutoff
+change, and asserts the family still holds flat and still holds four sessions.
+Without that the assertion is vacuous, which is how the first draft passed with
+the rule reverted.
+
+⚠ **AND THE TRIGGER IS THE STORED FIELD, NOT THE RESOLVED DATE.**
+`resolveCutoffs()` computes a default off the group's calendar when nobody set
+one, so comparing resolved dates would read an excluded holiday or a postponed
+start as a policy change and mail every family several times a term. That is the
+same silent re-evaluation `basisChanged()` exists to refuse. So an admin has to
+have edited the field — or pressed **Recompute**, which writes the field — and
+the value then **applied** is the resolved one, **per group**, so clearing a date
+back to `null` correctly hands each group its own computed default. Two groups
+sold the same hours across four meetings and six get two different dates, which is
+the whole reason the freeze is per group.
+
+Only `pending` and `approved` move, read from `LIVE_STATUSES` rather than listed,
+so a seventh status inherits the rule. A **waitlisted** record is rebuilt the
+moment a place is actually taken and a **cancelled** one's terms are spent; mailing
+either about a cancellation deadline would describe something they do not hold.
+
+⚠ **THE COMPARISON IS AGAINST WHAT WAS PUBLISHED, NEVER THE WORKING COPY.**
+`currentRecord()` lets a **draft** supersede the published file, so an admin who
+changes a cutoff, presses **Save**, then presses **Publish** — the ordinary way
+this site is edited — hands the publish path a `previous` that already carries the
+new date. Compared against that, nothing has moved and nobody is told. The
+families' terms were frozen against what was *published*, so that is what the
+change is measured from. It costs **no extra request**: `allPublished()` inside
+`generate()` was already reading this slug's record and filtering it out to
+rebuild the derived files, so the value is captured there and stripped off the
+response before it reaches the browser. A source-level test cannot see this one —
+it is asserted by driving the real handler through save-then-publish.
+
+**2. Raising a group's capacity opens places, and the queue is now told.**
+
+Asked in the same message: *"if a group has a limit of 3 and we have 2 on the
+waiting list, we change the cap to 5 — what happens? 2 new spaces should appear
+and the email should fire, same as when a client cancels their seat."*
+
+The places appeared the instant the publish landed, because **capacity is counted
+and never decremented** — that half has always worked. The announcement did not.
+
+⚠ **IT ASKS `hasRoom()` TWICE, NOT WHETHER THE NUMBER WENT UP.** Both reports are
+built from **one** read of the registrations with the old capacity and the new, so
+the only thing that can differ between them is what was just published. A cap
+raised from 3 to 4 with five people registered is **still full**, and a comparison
+of capacities would announce a place that does not exist. A brand-new group
+"reopens" by this test and correctly tells nobody, because no waiting record
+carries its id.
+
+**Both halves are best effort, after the commit, and loud when they fail.** The
+files are in git by then and cannot be taken back, so nothing here may throw the
+publish away — and a failure is **named** on the admin's screen rather than
+swallowed, because silence would leave somebody believing families had been told.
+Both are **idempotent by construction** — the terms compare frozen against
+resolved, the announcement compares room against room — so a failed pass is
+finished by the next publish rather than left half applied. An ordinary publish
+(a reworded summary, a new photograph) reads no registrations at all.
+
+⚠ **It is required lazily, inside the publish branch.** It pulls in the
+registration store, the account store and the mailer, and a publish has ten
+seconds and needs none of them otherwise.
+
+**The seventh message.** `TERMS_CHANGED` in `_registration-email.js` is the only
+one about something a family **already agreed to**. It renders the rules through
+`_cancellation-terms.js` like every other terms footnote, built from the
+**updated** block, so the inbox and the screen cannot describe two policies. ⚠ It
+**does not claim the change is an improvement** — a cutoff moves either way, and
+*"you now have longer"* would be false for half its readers — so it says the dates
+may be earlier or later and puts them in front of the reader. There is **no draft
+to review**, for the same reason a group move has none: the two dates are the
+whole of it and there is nothing an admin could usefully reword.
+
+⚠ **And the test that guarded the terms words had to change shape.** It asserted
+`_registration-email.js` contained none of the strings `Cancellation terms`,
+`תנאי ביטול`, `Условия отмены` — a proxy that was wrong in both directions. It
+missed every **rule** (the file could have restated "cancel before the first
+session and the whole fee comes back" in three languages and passed) and it fired
+on a message whose entire subject is that the cancellation terms have **changed**,
+which cannot be headed without naming them. **A heading about the terms is not a
+copy of the terms.** It now builds every sentence `termsFor()` can produce, in all
+three languages, and asserts none of them appears in the file — 54 today.
+
 **`expiresAt` is stamped at submission**, with `expiryDays` and `expirySource`
 beside it. Computing `submittedAt + N` on read would make every change
 retroactive — lowering the number would expire a batch of live registrations the
@@ -2756,7 +2907,12 @@ record an admin edits daily.** It captures the inputs to the decision — name,
 date of birth, the age range as it read, the price, the group's *name*, and the
 cancellation terms from `freezeCancellation()` — so a price edit in March cannot
 rewrite what a family agreed to in January, and a group renamed from "Advanced"
-to "Level 3" cannot rewrite what they chose. `activitySlugAtSubmission` is audit
+to "Level 3" cannot rewrite what they chose. ⚠ **The two cutoff DATES are the one
+exception, and it was asked for** — publishing a changed cutoff now moves them onto
+the registrations already taken, and emails those families. Nothing else in the
+block moves: not the price, not the group name, not the mode, not the frozen
+session list. See **Publishing an activity reaches the registrations already on
+it**. `activitySlugAtSubmission` is audit
 only; if it later disagrees with the activity's slug, that is a rename working.
 
 **One record per participant per activity**, keyed `reg-<participantId>__<activityId>`.
@@ -2816,8 +2972,8 @@ time — it only ever rewrites what the derived rule already released.
 
 **The expiry email apologises.** The thing that expired is a request *we* did not
 answer, so "your request expired" — which reads as the family having let
-something lapse — is the wrong sentence. Five messages in
-`_registration-email.js`, and only the confirmation is resendable: a family
+something lapse — is the wrong sentence. **Only the confirmation is resendable**
+out of the ten messages in `_registration-email.js`: a family
 legitimately loses "you have a place", whereas re-delivering a refusal a
 fortnight later is the clearest case in that table of a resend doing harm.
 
@@ -4516,6 +4672,13 @@ rebuilt from the live activity would quietly re-quote the new policy at the old
 family — that rule broken by the one screen written to explain it. A test moves
 the activity's cutoffs afterwards and asserts the family still reads the date
 they agreed to while somebody registering today is quoted today's.
+
+⚠ **THAT IS A RULE ABOUT READING, AND IT IS UNCHANGED.** What changed is that a
+**publish** may now write the two cutoff dates onto the block — deliberately,
+loudly, and with an email — so the figure a family reads is still whatever the
+block says and never a live lookup. The mode is still frozen for good, which is
+what keeps the sentence above literally true about flat and prorated. See
+**Publishing an activity reaches the registrations already on it**.
 
 Four details carry the rest:
 

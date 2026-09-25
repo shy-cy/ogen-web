@@ -38,12 +38,20 @@ H.ok(/message\(''\)/.test(load), 'load() still clears the box on its way in');
 console.log('\n[so every action that reloads reports afterwards]');
 ['doPublish', 'doUnpublish'].forEach((name) => {
   const fn = body(name);
-  H.ok(/load\(S\.slug\)\.then\(function \(\) \{ message\('ok'/.test(fn),
+  // ⚠ CHECKED BY ORDER, NOT BY THE LITERAL CALL. This used to match
+  // `load(S.slug).then(function () { message('ok'` character for character, and
+  // broke the day doPublish started CHOOSING its level — it reports 'err' when
+  // re-terming the registrations already taken partly failed, which is a louder
+  // version of the same confirmation and exactly as much inside the .then. The
+  // bug this suite exists for is about WHERE the message is written; pinning the
+  // argument tested something else and failed on a change that was not it.
+  const thenAt = fn.indexOf('load(S.slug).then(');
+  H.ok(thenAt !== -1, name + ' reloads, and reports from inside the .then');
+  H.ok(/message\(/.test(fn.slice(thenAt)),
        name + ' reports success inside load()\'s .then, not before it');
-  // And not the old shape: a bare load() after the message.
-  const okAt = fn.indexOf("message('ok'");
-  const loadAt = fn.indexOf('load(S.slug)');
-  H.ok(okAt > loadAt, name + ' mentions the reload before the confirmation, not after');
+  // And not the old shape: a confirmation written before the reload that erases it.
+  H.ok(!/message\('ok'/.test(fn.slice(0, thenAt)),
+       name + ' writes no confirmation before the reload that would erase it');
   H.ok(!/message\('ok'[\s\S]*\n\s*load\(S\.slug\);/.test(fn),
        name + ' does not fall back to the erased-message shape');
 });

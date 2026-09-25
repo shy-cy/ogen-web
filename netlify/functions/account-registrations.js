@@ -1711,7 +1711,10 @@ exports.handler = async (event) => {
         // ⚠ AFTER THE WRITE, AND IT CANNOT FAIL THE ACTION. The place is already
         // free — capacity is counted, so it opened the instant `cancelled` was
         // written — and this only tells the people who asked to be told.
-        await waitlist.placeOpened(reg.activityId);
+        // The GROUP's place, never the activity's: the other group having room
+        // is a different day, place and teacher, and telling its queue about
+        // this one offers them something they would be refused.
+        await waitlist.placeOpened(reg.activityId, reg.groupId || null);
 
         return json(200, {
           ok: true, registration: done.registration, credit: done.credit,

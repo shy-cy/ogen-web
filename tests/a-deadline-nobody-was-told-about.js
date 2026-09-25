@@ -300,8 +300,42 @@ const justBefore = (iso) => Date.parse(iso + 'T06:00:00Z');
   const emailSrc = fs.readFileSync(H.fnPath('_registration-email'), 'utf8');
   H.ok(/require\('\.\/_cancellation-terms'\)/.test(emailSrc),
     'the email reads the same module the screen does');
-  H.ok(!/Cancellation terms|תנאי ביטול|Условия отмены/.test(emailSrc),
-    'and holds no copy of the words itself');
+  // ⚠ AND THE CHECK IS THE SENTENCES, NOT THE TITLE.
+  //
+  // It used to be `!/Cancellation terms|תנאי ביטול|Условия отмены/` against the
+  // whole file, which is a proxy for the real property and was wrong in both
+  // directions. It missed every RULE — the file could have restated "cancel
+  // before the first session and the whole fee comes back" in three languages and
+  // passed — and it fired on the seventh message, whose entire subject is that
+  // the cancellation terms have CHANGED and which cannot be headed without
+  // naming them. A heading about the terms is not a copy of the terms.
+  //
+  // So: the block takes both halves from the module, and not one sentence the
+  // module produces appears anywhere in this file.
+  const block = emailSrc.slice(emailSrc.indexOf('function termsBlock('));
+  const blockBody = block.slice(0, block.indexOf('\nfunction '));
+  H.ok(/terms\.titleFor\(l\)/.test(blockBody), 'the block takes its title from the module');
+  H.ok(/terms\.termsFor\(/.test(blockBody), 'and its lines from the module');
+  const SPECS = [
+    { type: 'course', cancellation: { mode: 'flat', cancellationCutoffDate: '2026-10-28',
+      registrationFeeCutoffDate: '2026-09-09' }, hasFee: true },
+    { type: 'course', cancellation: { mode: 'prorated', cancellationCutoffDate: 'none',
+      registrationFeeCutoffDate: 'none' }, hasFee: true },
+    { type: 'course', cancellation: { mode: 'flat' }, hasFee: false, closed: true },
+    { type: 'dropin', sessionCancelHours: 24 },
+    { type: 'dropin', sessionCancelHours: null }
+  ];
+  let checked = 0;
+  ['he', 'en', 'ru'].forEach((l) => {
+    SPECS.forEach((spec) => {
+      terms.termsFor(spec, l).forEach((line) => {
+        checked++;
+        H.ok(emailSrc.indexOf(line) === -1,
+          'no copy of a terms sentence in the email table (' + l + '): ' + line.slice(0, 34) + '…');
+      });
+    });
+  });
+  H.ok(checked > 30, 'and every sentence the module can produce was looked for (' + checked + ')');
 
   H.done();
 })();

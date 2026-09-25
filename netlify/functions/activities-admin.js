@@ -786,7 +786,8 @@ async function generate(input, { commit, session, message, previous }) {
 
   // Rebuild the derived files from the full published set, with this record
   // swapped in.
-  const others = (await allPublished()).filter((a) => a.slug !== activity.slug);
+  const published = await allPublished();
+  const others = published.filter((a) => a.slug !== activity.slug);
   const full = isPublic(activity) ? others.concat([activity]) : others;
   files.push(...buildDerivedFiles(full));
 
@@ -816,6 +817,21 @@ async function generate(input, { commit, session, message, previous }) {
     return result;
   }
 
+  // ⚠ WHAT WAS ON THE SITE BEFORE THIS PUBLISH, which is NOT `previous`.
+  //
+  // `previous` is the working copy, and a draft supersedes the published file —
+  // see currentRecord(). So an admin who changes a cutoff, presses Save, then
+  // presses Publish hands this function a `previous` that already carries the new
+  // date, and a comparison against it says nothing moved. The families' terms
+  // were frozen against what was PUBLISHED, so that is what the change has to be
+  // measured from.
+  //
+  // It costs no extra request: allPublished() above already reads this slug's own
+  // record and then filters it out to rebuild the derived files.
+  //
+  // Underscored, and stripped by the caller, so it never travels to the browser.
+  result._publishedBefore = published.filter((a) => a.slug === activity.slug)[0] || null;
+
   result.commit = await commitToBranch({
     files,
     deletes,
@@ -824,6 +840,20 @@ async function generate(input, { commit, session, message, previous }) {
     authorEmail: session && session.email
   });
   return result;
+}
+
+// One line for the audit trail. Rewriting terms a family agreed to and mailing
+// them about it is the most consequential thing a publish can do, and `ok` beside
+// a commit sha says nothing about it.
+function falloutAudit(fallout) {
+  if (!fallout) return null;
+  if (fallout.error) return 'fallout failed: ' + fallout.error;
+  const bits = [];
+  const t = fallout.terms || {}, r = fallout.room || {};
+  if (t.changed) bits.push(t.changed + ' re-termed, ' + t.emailed + ' emailed');
+  if (r.groups && r.groups.length) bits.push(r.told + ' told of ' + r.groups.length + ' reopened group(s)');
+  (t.failed || []).concat(r.failed || []).forEach((f) => bits.push('FAILED ' + f));
+  return bits.length ? bits.join(' · ') : null;
 }
 
 // Does the generated calendar actually reach the stated end date? Returns a
@@ -1030,14 +1060,38 @@ exports.handler = async (event) => {
         }
         merged.lastPublishedAt = merged.isoUpdated;
 
-        const out = await generate(merged, {
+        const { _publishedBefore: publishedBefore, ...out } = await generate(merged, {
           commit: true, session, previous: record,
           message: `Publish activity: ${slug} (${merged.status})\n\nvia Ogen admin by ${session.name} <${session.email}>`
         });
         // git is now the source of truth for this slug.
         await dropDraft(slug);
-        await recordAudit(session, 'publish', slug, overwritten ? 'overwrite' : 'ok', { commit: out.commit.sha });
-        return json(200, { ok: true, ...out, baseUpdatedAt: merged.isoUpdated });
+
+        // ⚠ AND THE PUBLISH REACHES THE PEOPLE ALREADY REGISTERED.
+        //
+        // Two things on this form are facts about them rather than page content:
+        // a cutoff date, which now governs the registrations already taken, and a
+        // group's capacity, which opens places the waiting list has to hear
+        // about. See _registration-fallout.js for both rules and for the cost of
+        // the first one.
+        //
+        // ⚠ REQUIRED LAZILY, and after the commit. It pulls in the registration
+        // store, the account store and the mailer, none of which an ordinary
+        // publish needs; and the files are in git by now, so nothing here may
+        // throw the publish away. A failure is NAMED rather than swallowed —
+        // silence would leave an admin believing families were told — and both
+        // halves are idempotent, so the next publish finishes the job.
+        let fallout = null;
+        try {
+          fallout = await require('./_registration-fallout')
+            .afterPublish(merged, publishedBefore);
+        } catch (err) {
+          fallout = { error: err.message };
+        }
+
+        await recordAudit(session, 'publish', slug, overwritten ? 'overwrite' : 'ok',
+          { commit: out.commit.sha, detail: falloutAudit(fallout) });
+        return json(200, { ok: true, ...out, fallout: fallout, baseUpdatedAt: merged.isoUpdated });
       }
 
       case 'unpublish': {

@@ -162,6 +162,7 @@ function loadWithStubs({ github, blobs, modules }) {
     '_email-log', 'account-auth',
     '_participant-store', '_guardian-store', 'account-family', 'admin-family',
     '_registration', '_registration-store', '_registration-email',
+    '_waitlist', '_registration-fallout',
     '_registration-sweep', '_registration-cancel', '_credit', '_credit-ledger',
     '_session-attendance', 'account-registrations', 'admin-registrations',
     'registration-sweep', '_pay-link', '_checkout', 'pay-link', '_stripe' ].forEach((m) => {

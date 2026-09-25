@@ -42,9 +42,30 @@ async function tell(reg, when) {
   return true;
 }
 
-// A place has opened on a COURSE. Everybody waitlisted for that activity hears.
-async function placeOpened(activityId) {
-  const waiting = (await store.forActivity(activityId)).filter(R.isWaiting);
+// A place has opened on a COURSE. Everybody waitlisted for THAT GROUP hears.
+//
+// ⚠ THE GROUP IS THE UNIT HERE TOO, and leaving it out made this message a
+// promise most of its readers could not keep. Under the equal-hours rule two
+// groups may meet on a different day, at a different hour, in a different place,
+// with different teachers — so a place freed in Beginners is not a place for a
+// family waiting on Advanced. Announced activity-wide, they were told to come and
+// take it, pressed the button, and were refused: the claim posts `submit` with
+// THEIR groupId, which is still full. That is the same mistake the disabled
+// full-group option made from the other side — telling a family about a place
+// somewhere they cannot go.
+//
+// ⚠ A WAITING RECORD WITH NO GROUP IS TOLD WHATEVER OPENED. Those were taken
+// while the activity was pooled and nobody asked them to choose, so there is no
+// group to compare; reading a blank as "not this one" would silence exactly the
+// people who have been waiting longest. Absent resolves towards the family, as
+// every other blank in this system does.
+//
+// With no groupId passed at all the announcement is activity-wide, which is what
+// a single-group activity wants and what the caller that genuinely has no group
+// can say honestly.
+async function placeOpened(activityId, groupId) {
+  const waiting = (await store.forActivity(activityId)).filter(R.isWaiting)
+    .filter((r) => !groupId || !r.groupId || r.groupId === groupId);
   let told = 0;
   for (const reg of waiting) if (await tell(reg, null)) told++;
   return { told: told, waiting: waiting.length };
