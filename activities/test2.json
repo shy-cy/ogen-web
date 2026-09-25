@@ -10,10 +10,10 @@
   "registration": {
     "autoApprove": false,
     "pendingExpiryDays": null,
-    "registrationFeeCutoffDate": "2026-10-07",
+    "registrationFeeCutoffDate": "2026-09-24",
     "cancellationPolicy": {
       "mode": "flat",
-      "cancellationCutoffDate": "2026-10-07"
+      "cancellationCutoffDate": "2026-09-24"
     },
     "defaultBasis": {
       "startDate": "2025-09-23",
@@ -179,11 +179,11 @@
     }
   ],
   "sponsors": [],
-  "isoUpdated": "2026-09-25T07:47:06.259Z",
+  "isoUpdated": "2026-09-25T07:50:14.107Z",
   "isoCreated": "2026-09-23T14:41:49.374Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
   "activityId": "act-ca412442b8698dcf",
-  "lastPublishedAt": "2026-09-25T07:47:06.259Z",
+  "lastPublishedAt": "2026-09-25T07:50:14.107Z",
   "testActivity": true
 }
