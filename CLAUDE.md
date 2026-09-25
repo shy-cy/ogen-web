@@ -2760,6 +2760,41 @@ telling a family *"this group is full"* would describe a structure the page has
 never shown them. `registerFull` is **deleted** rather than left unused, and the
 string-table test is what insisted on that.
 
+⚠ **AND THE COUNT ABOVE IT STILL ANSWERED FOR THE WHOLE ACTIVITY.** The panel
+printed *"1 places left"* over a select whose chosen group was full and a block
+reading *"this group is full at the moment"*. Reported as *"it's clear to me why
+it says 1 space is left, but to the client it doesn't."*
+
+Neither figure was wrong. **The aggregate was** — in exactly the way the union
+age range is: *"6-13"* across a 6-9 group and a 10-13 one means a nine-year-old
+has somewhere to go, not that they may join either. Under the equal-hours rule
+two groups can meet on a different day, at a different hour, in a different
+place, with different teachers, so a place in one is **not** a place for a family
+who can only come to the other. A sum of rooms nobody can pick between answers a
+question nobody asked, on the screen where they are picking one.
+
+So the number goes where it is true: **onto the option**. The select is the one
+control a family chooses with, and it now says of each group both things at
+once — which have room, and how much: *Beginners, up to 3 students — full —
+waiting list* beside *Advanced, up to 5 students — 2 places left*. That is a
+list of what is free **and** a per-group answer, in the place the choice is
+made, rather than two blocks that have to agree.
+
+⚠ **AND THE ACTIVITY-WIDE LINE IS DROPPED ONCE THERE IS A CHOICE.** Same rule
+the listing card follows when two groups meet on different days: it drops the
+schedule tag rather than printing one group's line at everybody, because a card
+that says nothing beats a card that is confidently wrong. With **one** group
+there is nothing to pick and nothing to contradict, so the line is exactly as it
+was — and it is the only place the figure appears, since no select is drawn.
+
+⚠ **AND "1 places left" WAS LIVE.** A counted noun cannot be a bare string here:
+the three languages do not agree on how many forms there are, let alone which
+one a number takes. Russian has three and picks the **singular for 21** and the
+many form for **11**, so a naive `n === 1` and a naive `n % 10` are each wrong in
+their own direction. Each table owns its own rule, the same way each owns its
+own words, rather than one helper approximating all three — and a test reads
+1, 3, 4, 5, 11 and 21 out of the rendered screen in all three languages.
+
 ⚠ **AND THE EMAIL SAID "TAKE THE PLACE" AND SENT PEOPLE WHERE THERE WAS NO
 BUTTON.** Reported as *"it should be simply: I accept the invite or join the
 course — you click on it and you get the payment button"*, looking at a

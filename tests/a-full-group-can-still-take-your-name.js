@@ -75,6 +75,13 @@ const TWO_GROUPS = {
 };
 // One group and no choice: `full` IS the activity's answer here, and the old
 // behaviour was right in this case — which is why nobody found the other one.
+// One group with one place: "1 places left" was on the live site, and the count
+// is the one number on that screen a family acts on.
+const sole = (left) => ({
+  activityId: 'act-4', slug: 'solo', type: 'course', perSession: false,
+  title: { en: 'Solo' }, status: 'open',
+  capacity: 6, taken: 6 - left, left: left, full: left <= 0, groups: null
+});
 const SOLE_FULL = {
   activityId: 'act-3', slug: 'solo', type: 'course', perSession: false,
   title: { en: 'Solo' }, status: 'open',
@@ -151,9 +158,33 @@ const shown = (dom, cls) => D.byClass(dom.mount, cls)
   H.ok(/full/i.test(opts[1].attributes.text || opts[1]._text || ''),
     'the full group says so on its own row');
   H.ok(!/this activity is full/i.test(dom.mount.textContent),
-    '⚠ and NOTHING on the screen claims the activity is full — it is not, and ' +
-    'the line above counts the places still free');
-  H.ok(has(dom, '2 places left'), 'which is still there and still true');
+    '⚠ and NOTHING on the screen claims the activity is full — it is not');
+
+  // ⚠ AND THE ACTIVITY-WIDE COUNT IS GONE FROM THIS SCREEN.
+  //
+  // It used to sit above the form: "2 places left", true, and directly over a
+  // select whose chosen group was full and a block reading "this group is full
+  // at the moment". Reported as "it's clear to me why it says 1 space is left,
+  // but to the client it doesn't."
+  //
+  // Neither figure was wrong. The AGGREGATE was, in the same way the union age
+  // range is: "6-13" across a 6-9 group and a 10-13 one means a nine-year-old
+  // has somewhere to go, not that they may join either. Under the equal-hours
+  // rule two groups can meet on a different day, in a different place, with
+  // different teachers — so a place in one is not a place for a family who can
+  // only come to the other, and a sum of rooms they cannot pick between answers
+  // a question nobody asked.
+  H.eq(D.byClass(dom.mount, 'acc-intro').length, 0,
+    '⚠ no activity-wide places line once there is a choice — the same rule the ' +
+    'listing card follows when two groups meet on different days: it drops the ' +
+    'schedule tag rather than printing one group\'s line at everybody');
+  // It went where it is true: the one control a family chooses with, which now
+  // says of each group both things at once — which have room, and how much.
+  const optText = (o) => o.attributes.text || o._text || '';
+  H.ok(/2 places left/.test(optText(opts[0])),
+    'the group with room carries its own count: ' + optText(opts[0]));
+  H.ok(!/places left/.test(optText(opts[1])),
+    'and the full one carries no count at all, only what pressing it does: ' + optText(opts[1]));
 
   console.log('\n[and the button follows the group, before the press rather than after]');
   H.eq(button(dom).textContent, 'Register',
@@ -315,6 +346,37 @@ const shown = (dom, cls) => D.byClass(dom.mount, cls)
                                             participantId: a3.id, groupId: 'g-2', lang: 'en' });
   H.eq(third.status, 200, 'and the group with room still gives out its place');
   H.eq(third.body.waiting, false, 'as a place, not a queue');
+
+  // =========================================================================
+  console.log('\n[⚠ and the count is counted, in three grammars]');
+  //
+  // "1 places left" shipped. `places` is the counted form and cannot serve a
+  // count of one in any of the three languages — and Russian needs a third form
+  // for 2-4, which is why this is a function and not two keys. It is the one
+  // number on this screen a family acts on, so it should not read as machine
+  // output.
+  //
+  // With ONE group there is nothing to pick and nothing to contradict, so the
+  // line is exactly where it always was — and it is the only place the figure
+  // appears, since no select is drawn.
+  const roomText = async (left, lang) => {
+    const d = await screen({ view: 'activity', lang: lang, search: '?register=solo',
+                             activity: sole(left) });
+    const line = D.byClass(d.mount, 'acc-intro')[0];
+    return line ? line.textContent : '';
+  };
+  H.eq(await roomText(1, 'en'), '1 place left', 'one place is one place');
+  H.eq(await roomText(4, 'en'), '4 places left', 'and four are four');
+  H.eq(await roomText(1, 'ru'), '1 \u0441\u0432\u043e\u0431\u043e\u0434\u043d\u043e\u0435 \u043c\u0435\u0441\u0442\u043e', 'Russian singular');
+  H.eq(await roomText(3, 'ru'), '3 \u0441\u0432\u043e\u0431\u043e\u0434\u043d\u044b\u0445 \u043c\u0435\u0441\u0442\u0430',
+    '⚠ and the 2-4 form, which neither Hebrew nor English has');
+  H.eq(await roomText(5, 'ru'), '5 \u0441\u0432\u043e\u0431\u043e\u0434\u043d\u044b\u0445 \u043c\u0435\u0441\u0442', 'and the many form above it');
+  H.eq(await roomText(21, 'ru'), '21 \u0441\u0432\u043e\u0431\u043e\u0434\u043d\u043e\u0435 \u043c\u0435\u0441\u0442\u043e',
+    'twenty-one takes the singular, which is the rule that catches a naive n === 1');
+  H.eq(await roomText(11, 'ru'), '11 \u0441\u0432\u043e\u0431\u043e\u0434\u043d\u044b\u0445 \u043c\u0435\u0441\u0442',
+    'and eleven does not, which is the rule that catches a naive n % 10');
+  H.ok((await roomText(1, 'he')).indexOf('\u05de\u05e7\u05d5\u05dd \u05d0\u05d7\u05d3') !== -1,
+    'and the Hebrew singular is a sentence rather than a number and a plural noun');
 
   H.done();
 })();

@@ -247,7 +247,8 @@
       paySession: 'תשלום על המפגש', payingSession: 'פותח תשלום…',
       registerDone: 'ההרשמה בוצעה. הפרטים והתשלום נמצאים בעמוד ההרשמה.',
       owes: 'לתשלום', paid: 'שולם', feeAlready: 'כבר שולמו',
-      places: 'מקומות פנויים', unlimited: 'ללא הגבלה',
+      placesLeft: function (n) { return n === 1 ? 'מקום אחד פנוי' : n + ' מקומות פנויים'; },
+      unlimited: 'ללא הגבלה',
       payLink: { expired: 'קישור התשלום פג או כבר אינו בתוקף. אפשר להתחבר ולשלם כאן.',
                  'not-approved': 'לא ניתן לשלם על ההרשמה הזו כרגע.',
                  'nothing-due': 'אין יתרה לתשלום בהרשמה הזו.',
@@ -413,7 +414,8 @@
       paySession: 'Pay for this session', payingSession: 'Opening payment…',
       registerDone: 'Registered. The details and the payment are on the registration page.',
       owes: 'To pay', paid: 'Paid', feeAlready: 'already paid',
-      places: 'places left', unlimited: 'no limit',
+      placesLeft: function (n) { return n + (n === 1 ? ' place left' : ' places left'); },
+      unlimited: 'no limit',
       payLink: { expired: 'That payment link has expired or is no longer valid. You can sign in and pay here.',
                  'not-approved': 'This registration cannot be paid for at the moment.',
                  'nothing-due': 'There is nothing outstanding on this registration.',
@@ -579,7 +581,16 @@
       paySession: 'Оплатить это занятие', payingSession: 'Открываем оплату…',
       registerDone: 'Запись оформлена. Подробности и оплата — на странице записи.',
       owes: 'К оплате', paid: 'Оплачено', feeAlready: 'уже оплачен',
-      places: 'свободных мест', unlimited: 'без ограничения',
+      // Three forms, and the rule is not "n === 1": 21 takes the singular and 11
+      // does not. Written out here rather than approximated, because a number a
+      // family acts on should not read as machine output.
+      placesLeft: function (n) {
+        var t = n % 10, h = n % 100;
+        if (t === 1 && h !== 11) return n + ' свободное место';
+        if (t >= 2 && t <= 4 && (h < 12 || h > 14)) return n + ' свободных места';
+        return n + ' свободных мест';
+      },
+      unlimited: 'без ограничения',
       payLink: { expired: 'Ссылка на оплату истекла или больше не действует. Вы можете войти и оплатить здесь.',
                  'not-approved': 'Эту запись сейчас нельзя оплатить.',
                  'nothing-due': 'По этой записи нет задолженности.',
@@ -1541,6 +1552,14 @@
     return box;
   }
 
+  // ⚠ "1 places left" WAS ON THE LIVE SITE. A counted noun cannot be a bare
+  // string here: the three languages do not even agree on how many forms there
+  // are, let alone which one a number takes — Russian has three and picks the
+  // singular for 21 and the many form for 11. So each table owns its own rule,
+  // the same way each owns its own words, rather than one helper approximating
+  // all three. It is the one number on the register panel a family acts on.
+  function placesLeft(n) { return T.placesLeft(n); }
+
   function registerTerm(where, a, people, slug, title) {
     // The address check used to live here and is one level up, above the branch
     // that chooses between this and registerPerSession — one rule for both.
@@ -1569,12 +1588,32 @@
     if (a.groups) {
       groupSel = el('select', {});
       a.groups.forEach(function (g) {
+        // ⚠ AND THE ROOM IS ON THE OPTION, BECAUSE THE ROOM IS THE GROUP'S.
+        //
+        // The panel printed the ACTIVITY's count above the form — "1 places
+        // left" — over a select whose chosen group was full, and the block under
+        // it then said "this group is full at the moment". Both true, and read
+        // together they are a contradiction: reported as "it's clear to me why
+        // it says 1 space is left, but to the client it doesn't".
+        //
+        // Neither number was wrong. The AGGREGATE was, in the same way the union
+        // age range is: "6-13" across a 6-9 group and a 10-13 one means a
+        // nine-year-old has somewhere to go, not that they may join either. Under
+        // the equal-hours rule two groups can meet on a different day, in a
+        // different place, with different teachers — so a place in one is not a
+        // place for a family who can only come to the other, and an activity-wide
+        // count answers a question nobody asked.
+        //
+        // So it goes where it is true. The select is the one control a family
+        // uses to choose, and it now says of each group both things at once:
+        // which have room, and how much.
+        var room = g.full ? T.groupFull : g.left != null ? placesLeft(g.left) : null;
         groupSel.appendChild(el('option', {
           // ⚠ NOT `registerFull`, which says the ACTIVITY is full. That string
           // sat on a group row directly under a line counting the places still
           // free, which is two statements on one screen contradicting each
           // other. This names what is full and what pressing it will do.
-          value: g.groupId, text: g.label + (g.full ? ' — ' + T.groupFull : '')
+          value: g.groupId, text: g.label + (room ? ' — ' + room : '')
         }));
       });
     }
@@ -1710,12 +1749,21 @@
       });
     }
 
-    where.appendChild(section(title, [
-      el('p', { class: 'acc-intro',
-                text: a.left == null ? T.unlimited : a.left + ' ' + T.places }),
-      form,
-      note
-    ]));
+    // ⚠ AND THE ACTIVITY-WIDE COUNT IS DROPPED ONCE THERE IS A CHOICE. It is
+    // the sum of rooms a family cannot pick between, so on the screen where they
+    // are picking one it is at best noise and at worst — the reported case — a
+    // flat contradiction of the block directly under it. Same rule the listing
+    // card follows when two groups meet on different days: it drops the schedule
+    // tag rather than printing one group's line at everybody, because a card
+    // that says nothing beats a card that is confidently wrong.
+    //
+    // With one group there is nothing to pick and nothing to contradict, so the
+    // line is exactly as it was — and it is the only place the number appears,
+    // since no select is drawn.
+    var roomLine = groupSel ? null
+      : el('p', { class: 'acc-intro',
+                  text: a.left == null ? T.unlimited : placesLeft(a.left) });
+    where.appendChild(section(title, [roomLine, form, note]));
   }
 
   // ⚠ ONE SCREEN: WHO, WHICH DATES, PAY.
