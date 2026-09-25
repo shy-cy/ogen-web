@@ -131,11 +131,26 @@ const facts = require(H.fnPath('_activity-facts'));
   H.ok(/[Ѐ-ӿ]/.test(E.text('session-has-passed', 'ru')), 'Russian has Cyrillic in it');
 
   console.log('\n[and the screen stops offering it]');
-  const cell = ui.slice(ui.indexOf('function eveningAction'), ui.indexOf('function eveningAction') + 4000);
+  // ⚠ THE WHOLE FUNCTION, not a fixed 4000 bytes of it. This sliced by byte count
+  // and broke the day eveningAction grew the two branches that draw an evening's
+  // waiting list — the checks it looks for were still there and had simply moved
+  // past the window. A test that measures in bytes fails on length rather than on
+  // behaviour.
+  const fnAt = ui.indexOf('function eveningAction');
+  const cell = ui.slice(fnAt, ui.indexOf('\n  function ', fnAt + 1));
+  H.ok(cell.length > 1000 && cell.length < 20000, 'found eveningAction whole');
   H.ok(/s\.past/.test(cell),
     'the table reads the `past` flag the payload has always sent');
-  H.ok(/!data\.mayBook \|\| s\.full \|\| s\.past/.test(cell),
-    'in the same breath as the other two reasons there is nothing to press');
+  H.ok(/!data\.mayBook \|\| s\.past/.test(cell),
+    'in the same breath as the other reason there is nothing to press');
+  // ⚠ AND `full` LEFT THAT LINE ON PURPOSE. It used to sit beside `past` and
+  // return null, which is what made an evening's queue unreachable: a full
+  // evening is now the one that HAS something to press. Past is still nothing —
+  // a class that has happened cannot be queued for either.
+  H.ok(/if \(s\.full\) \{/.test(cell) && /waitlist: true/.test(cell),
+    'while a full evening offers its waiting list instead of nothing');
+  H.ok(cell.indexOf('s.past') < cell.indexOf('if (s.full) {'),
+    'and past is refused BEFORE the queue is offered, so a gone evening is not queueable');
 
   H.done();
 })();

@@ -157,7 +157,9 @@
       sessionsTitle: 'המפגשים', dateCol: 'תאריך', statusCol: 'סטטוס',
       book: 'הרשמה למפגש', cancelSession: 'ביטול מפגש',
       cancelSessionConfirm: 'לבטל את המפגש הזה?',
-      sessionStatus: { booked: 'רשום/ה', attended: 'הגיע/ה',
+      allEveningsFull: 'כל המפגשים מלאים כרגע. אפשר להירשם, ואז להצטרף לרשימת ההמתנה '
+        + 'של כל מפגש בנפרד. לא מתבצע חיוב.',
+      sessionStatus: { booked: 'רשום/ה', attended: 'הגיע/ה', waiting: 'ברשימת המתנה',
                        'no-show': 'לא הגיע/ה', cancelled: 'בוטל' },
 
       creditTitle: 'יתרת זיכוי',
@@ -332,7 +334,9 @@
       sessionsTitle: 'Sessions', dateCol: 'Date', statusCol: 'Status',
       book: 'Book', cancelSession: 'Cancel this session',
       cancelSessionConfirm: 'Cancel this session?',
-      sessionStatus: { booked: 'Booked', attended: 'Attended',
+      allEveningsFull: 'Every evening is full at the moment. Register, and you can then '
+        + 'join the waiting list for each one. Nothing is charged.',
+      sessionStatus: { booked: 'Booked', attended: 'Attended', waiting: 'On the waiting list',
                        'no-show': 'Did not come', cancelled: 'Cancelled' },
 
       creditTitle: 'Credit',
@@ -495,7 +499,9 @@
       sessionsTitle: 'Занятия', dateCol: 'Дата', statusCol: 'Статус',
       book: 'Записаться', cancelSession: 'Отменить занятие',
       cancelSessionConfirm: 'Отменить это занятие?',
-      sessionStatus: { booked: 'Записан(а)', attended: 'Посетил(а)',
+      allEveningsFull: 'Все занятия сейчас заполнены. Можно записаться, а затем встать '
+        + 'в очередь на каждое занятие отдельно. Списаний нет.',
+      sessionStatus: { booked: 'Записан(а)', attended: 'Посетил(а)', waiting: 'В очереди',
                        'no-show': 'Не пришёл(ла)', cancelled: 'Отменено' },
 
       creditTitle: 'Кредит',
@@ -1801,15 +1807,21 @@
     }
 
     function paint(data) {
+      // load() clears `dates` on its way in and `go` lives outside it, so the
+      // one thing that has to be undone by hand is the button being taken away
+      // by the every-evening-full branch below.
+      go.removeAttribute('hidden');
       var list = (data.sessions || []).filter(function (s) { return !s.past; });
       if (!list.length) {
         go.disabled = true;
         return dates.appendChild(el('p', { class: 'acc-note', text: T.noDates }));
       }
       var firstFree = null;
+      var anyFull = false;
       list.forEach(function (s) {
         var taken = s.status === 'booked' || s.status === 'attended';
         var off = taken || s.full;
+        if (s.full && !taken) anyFull = true;
         var box = el('input', { type: 'checkbox', value: s.date, disabled: off || null,
                                 onchange: retotal });
         var why = taken ? T.dateBooked : s.full ? T.dateFull : money(s.priceCents);
@@ -1840,6 +1852,41 @@
       // and a dead button reads as a screen that has not loaded.
       if (firstFree) firstFree.checked = true;
       retotal();
+
+      // ⚠ EVERY EVENING FULL WAS A DEAD END. Nothing is tickable, so the pay
+      // button stays disabled, and a family reading a column of dimmed "full"
+      // rows has nothing to press and nothing telling them what to do. That is
+      // the same complaint as the waiting list being unreachable — a door that
+      // was never drawn — one step earlier in the flow.
+      //
+      // ⚠ QUEUEING NEEDS A REGISTRATION BEHIND IT. bookSession refuses without
+      // an approved one, deliberately: the registration is the "may come"
+      // decision and an admin makes it once. So the way through is not a second
+      // booking endpoint, it is to register first — which on a drop-in owes
+      // nothing and charges nothing — and every full evening then offers its own
+      // queue on the page this one becomes. One call that already exists, rather
+      // than a new flow that takes money for a seat nobody has.
+      if (!rows.length && anyFull) {
+        go.setAttribute('hidden', 'hidden');
+        var waitGo = el('button', { type: 'button', class: 'btn-primary', text: T.registerGo,
+          onclick: function (e) {
+            var doneBtn = busy(e.currentTarget);
+            post(REGS, { action: 'submit', slug: slug, participantId: who.value })
+              .then(function (res) {
+                doneBtn();
+                var r = res.ok && res.data && res.data.registration;
+                if (!r) return say('err', failure(res));
+                // The same handover the course form makes: the page becomes the
+                // registration it just created, which is where the queues are.
+                rewriteQuery('p=' + encodeURIComponent(r.participantId) +
+                             '&a=' + encodeURIComponent(r.activityId));
+                renderActivity();
+                say('ok', T.registerDone);
+              });
+          } });
+        dates.appendChild(el('p', { class: 'acc-note', text: T.allEveningsFull }));
+        dates.appendChild(waitGo);
+      }
     }
   }
 
@@ -3059,6 +3106,50 @@
       // buttons.
       return actions(acts);
     }
+    // ⚠ AN EVENING'S QUEUE HAD NO DOOR EITHER, which is the same bug as the full
+    // group one screen over and was reported the same way: "no waiting list for
+    // drop in". The server has been complete since Phase 7 — `bookSession` takes
+    // a `waitlist` flag, queues on a full evening, mails the family, and
+    // `holdsASeat()` gives a claimer MINUTES rather than weeks — and the row for
+    // a full evening returned null, so there was nothing to press.
+    //
+    // Two rows to draw, and the second is the one that makes the queue worth
+    // joining.
+    if (s.status === 'waiting') {
+      var waitActs = [];
+      // ⚠ OFFERED ONLY WHILE THERE IS A SEAT TO TAKE. A dead "take the place"
+      // under a full evening is worse than no button — and `bookSession` reads
+      // the claim off the record rather than off the request, so this is an
+      // ordinary booking that the server recognises as a claim and holds for
+      // minutes rather than for the open-ended window.
+      if (!s.full && !s.past) {
+        waitActs.push(el('button', { type: 'button', class: 'acc-link', text: T.takePlace,
+          onclick: function (e) {
+            var doneBtn = busy(e.currentTarget);
+            post(REGS, { action: 'bookSession', participantId: r.participantId,
+                         slug: act.slug, sessionDate: s.date }).then(function (b) {
+              doneBtn();
+              var msg = b.ok ? T.takePlaceDone : failure(b);
+              // The redraw replaces the node this message would be written into,
+              // so it is said AFTER — the bug this file warns about twice.
+              redraw();
+              say(b.ok ? 'ok' : 'err', msg);
+            });
+          } }));
+      }
+      waitActs.push(el('button', { type: 'button', class: 'acc-link is-danger', text: T.leaveWait,
+        onclick: function () {
+          confirmAction({ question: T.leaveWaitConfirm, yes: T.leaveWait }, function () {
+            post(REGS, { action: 'cancelSession', participantId: r.participantId,
+                         activityId: r.activityId, sessionDate: s.date }).then(function (c) {
+              var msg = c.ok ? T.leaveWaitDone : failure(c);
+              redraw();
+              say(c.ok ? 'ok' : 'err', msg);
+            });
+          });
+        } }));
+      return actions(waitActs);
+    }
     if (s.status === 'attended' || s.status === 'no-show') return null;
     // ⚠ AND NOT AN EVENING THAT HAS ALREADY HAPPENED. `past` has been in this
     // payload since the screen was built and nothing read it, so the table
@@ -3068,7 +3159,24 @@
     //
     // The register PANEL has always dropped them, which is why it took a report
     // to find: one list, filtered in one place and not the other.
-    if (!data.mayBook || s.full || s.past) return null;
+    if (!data.mayBook || s.past) return null;
+    // ⚠ A FULL EVENING TAKES YOUR NAME rather than offering nothing. The words
+    // are the course queue's own — one table of copy, so a family reads the same
+    // sentence whichever queue they join, and there is nothing to keep in step.
+    if (s.full) {
+      return el('button', { type: 'button', class: 'acc-link', text: T.registerWaitGo,
+        onclick: function (e) {
+          var doneBtn = busy(e.currentTarget);
+          post(REGS, { action: 'bookSession', participantId: r.participantId,
+                       slug: act.slug, sessionDate: s.date, waitlist: true })
+            .then(function (b) {
+              doneBtn();
+              var msg = b.ok ? T.waitingWhy : failure(b);
+              redraw();
+              say(b.ok ? 'ok' : 'err', msg);
+            });
+        } });
+    }
     return el('button', { type: 'button', class: 'acc-link', text: T.book,
       onclick: function () {
         post(REGS, { action: 'bookSession', participantId: r.participantId,

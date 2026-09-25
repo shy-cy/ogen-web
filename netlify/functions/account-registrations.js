@@ -1400,6 +1400,32 @@ exports.handler = async (event) => {
           body.participantId, body.activityId, body.sessionDate);
         if (!att) return no(404, 'no-such-booking');
         if (att.status === 'cancelled') return json(200, { ok: true, session: att });
+
+        // ⚠ LEAVING AN EVENING'S QUEUE IS NOT A CANCELLATION, and for a release
+        // it was refused as one. The guard below allowed only `booked`, so a
+        // family waiting for a full Tuesday who pressed "leave the waiting list"
+        // was told *that evening has already happened* — a refusal about a
+        // different thing entirely, on the one action a queue has to offer.
+        //
+        // Nothing was held, nothing was owed and no price was ever frozen, so
+        // there is no credit to work out and no ledger line to write. ⚠ AND
+        // seatOpened() MUST NOT FIRE: no seat was given up, so announcing one
+        // would tell every other family waiting that a place had opened when
+        // none had. Same reason the course-level "leave the waiting list" does
+        // not go through cancelAndCredit().
+        //
+        // Marked cancelled rather than deleted, so an admin can see a family who
+        // waited, left, and came back.
+        if (att.status === 'waiting') {
+          const left = attendance.transition(att, {
+            status: 'cancelled', by: me.accountId, note: 'left the waiting list'
+          });
+          await attendance.saveAttendance(left);
+          return json(200, { ok: true, session: left, waitingLeft: true,
+                             credit: { credit: 0, reason: 'was-waiting' }, entry: null,
+                             balance: await ledger.balanceFor(me.accountId) });
+        }
+
         if (att.status !== 'booked') {
           return no(409, 'evening-already-happened');
         }
