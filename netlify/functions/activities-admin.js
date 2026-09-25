@@ -43,6 +43,7 @@ const SESSIONS = require('./_activity-sessions');
 const REG = require('./_activity-registration');
 const BUNDLE = require('./_bundle');
 const GROUPS = require('./_activity-groups');
+const SERIES = require('./_activity-series');
 const { GROUP_FACTS } = GROUPS;
 
 // How many day+time rows a frequency asks for. 'custom' means "as many as the
@@ -265,6 +266,48 @@ async function allPublished() {
   // number twenty used to be waiting on read number nineteen for no reason.
   const records = await mapConcurrent(index, CONCURRENCY, (entry) => getPublished(entry.slug));
   return records.filter(Boolean);
+}
+
+// Every record a series head could be. Published pages AND drafts, because the
+// form's series picker offers both — a spring term is usually created while the
+// autumn one is still a draft.
+//
+// ⚠ A DRAFT SUPERSEDES ITS PUBLISHED COPY, the same way currentRecord() decides
+// it: the draft is the newer edit, so a fee an admin has just typed on the head
+// is the one a term saved a moment later must inherit. Reading the published
+// file there would hand the term a figure the head itself has stopped showing.
+async function seriesCandidates() {
+  const [published, drafts] = await Promise.all([allPublished(), listDrafts()]);
+  const bySlug = new Map();
+  published.forEach((a) => { if (a && a.slug) bySlug.set(a.slug, a); });
+  drafts.forEach((a) => { if (a && a.slug) bySlug.set(a.slug, a); });
+  return Array.from(bySlug.values());
+}
+
+// The merge, plus the one field a record does not own by itself.
+//
+// ⚠ ONE HELPER RATHER THAN THREE CALL SITES. saveDraft, preview and publish all
+// merged and none of them could have inherited anything, so the rule would have
+// had to be remembered three times — and the one that forgot would be the one
+// where an admin types a fee and it sticks. A test pins that nothing else in
+// this file calls mergeByPermission directly.
+//
+// The candidate set is read ONLY when it can matter. An unlinked activity —
+// which is every activity on this site today — asks nothing and pays nothing.
+async function mergeFor(record, incoming, session) {
+  const merged = mergeByPermission(record, incoming, session);
+  const series = SERIES.isLinkedTerm(merged)
+    ? SERIES.applyFee(merged, await seriesCandidates())
+    : { inherits: false };
+  return { merged, series };
+}
+
+// Thrown in the shape validate() throws, so the one channel the client already
+// reads for a refusal carries this one too.
+function refuse(message) {
+  const err = new Error(message);
+  err.validation = [message];
+  throw err;
 }
 
 // The working copy: a draft supersedes the published file, because it is the
@@ -788,6 +831,19 @@ async function generate(input, { commit, session, message, previous }) {
   // swapped in.
   const published = await allPublished();
   const others = published.filter((a) => a.slug !== activity.slug);
+
+  // ⚠ THE OTHER DIRECTION OF THE INHERITED FEE, and it costs no extra request.
+  //
+  // A linked term re-reads its head's fee on every one of its own saves, so the
+  // copy can only go stale one way: the HEAD's fee is edited and a term is not
+  // saved afterwards. That term's page then goes on printing the old figure and
+  // charging a newcomer it, with nothing erroring.
+  //
+  // Named rather than fixed here: rewriting another activity's record inside
+  // this publish would commit a page nobody asked to publish, and generate()
+  // already runs close to the ten seconds Netlify allows. Two clicks that are
+  // visible beat a silent write.
+  const seriesStale = SERIES.staleMessage(activity, SERIES.staleTerms(activity, published));
   const full = isPublic(activity) ? others.concat([activity]) : others;
   files.push(...buildDerivedFiles(full));
 
@@ -808,7 +864,8 @@ async function generate(input, { commit, session, message, previous }) {
     langs: present,
     files: files.map((f) => ({ path: f.path, encoding: f.encoding, bytes: f.content.length })),
     deletes,
-    liveUrls: present.map((l) => `https://www.ogen.cy${pathFor(activity.slug, l)}`)
+    liveUrls: present.map((l) => `https://www.ogen.cy${pathFor(activity.slug, l)}`),
+    seriesStale
   };
   // Only preview needs the data URLs; sending megabytes back on a publish that
   // has already written the files would be pure waste.
@@ -938,6 +995,11 @@ exports.handler = async (event) => {
             // is itself part of a series joins the series rather than starting a
             // third one.
             activityId: a.activityId || null, seriesId: a.seriesId || a.activityId || null,
+            // ⚠ AND ITS REGISTRATION FEE, so the form can show the figure a term
+            // is about to inherit the moment the picker moves rather than after a
+            // save. Cosmetic like every client-side check here: the server
+            // resolves it again from the record and its answer is the one stored.
+            registrationFee: SERIES.feeOf(a),
             title: a.title, langs: langsPresent(a),
             // So the picker can mark it. A test activity is invisible everywhere
             // it is supposed to be invisible, which makes the admin's own list
@@ -952,6 +1014,7 @@ exports.handler = async (event) => {
           bySlug.set(a.slug, {
             slug: a.slug, status: a.status, where: 'draft',
             activityId: a.activityId || null, seriesId: a.seriesId || a.activityId || null,
+            registrationFee: SERIES.feeOf(a),
             title: a.title, langs: langsPresent(a),
             testActivity: !!a.testActivity,
             isoUpdated: a.isoUpdated || null,
@@ -975,7 +1038,11 @@ exports.handler = async (event) => {
 
       case 'preview': {
         const { record } = await currentRecord(String(body.activity && body.activity.slug || ''));
-        const merged = mergeByPermission(record, body.activity || {}, session);
+        const { merged, series } = await mergeFor(record, body.activity || {}, session);
+        // Refused on preview exactly as at publish: a preview that renders a fee
+        // publish would not is a preview that lies, which is the one thing
+        // preview-matches-publish forbids.
+        if (series.problem) refuse(series.problem);
         const out = await generate(merged, { commit: false, session });
         return json(200, { ok: true, dryRun: true, ...out });
       }
@@ -1019,7 +1086,8 @@ exports.handler = async (event) => {
         const slug = String(incoming.slug || '');
         if (!SLUG_RE.test(slug)) return json(400, { error: 'Bad slug' });
         const { record } = await assertFresh(slug, body.baseUpdatedAt, { overwrite: body.overwrite });
-        const merged = stamp(mergeByPermission(record, incoming, session));
+        const { merged: draftRecord, series } = await mergeFor(record, incoming, session);
+        const merged = stamp(draftRecord);
         merged.status = 'draft';
         await putDraft(merged);
         await recordAudit(session, 'save-draft', slug, body.overwrite ? 'overwrite' : 'ok');
@@ -1041,6 +1109,10 @@ exports.handler = async (event) => {
         let warnings = [];
         try { validate(JSON.parse(JSON.stringify(merged))); }
         catch (err) { warnings = err.validation || [err.message]; }
+        // A draft saves whatever is in it, this one included — and is told. The
+        // same string publish refuses with, so the two cannot drift into two
+        // accounts of one rule.
+        if (series.problem) warnings.push(series.problem);
         return json(200, { ok: true, slug, baseUpdatedAt: merged.isoUpdated,
                            activity: merged, warnings: warnings });
       }
@@ -1054,7 +1126,9 @@ exports.handler = async (event) => {
         if (!SLUG_RE.test(slug)) return json(400, { error: 'Bad slug' });
 
         const { record, overwritten } = await assertFresh(slug, body.baseUpdatedAt, { overwrite: body.overwrite });
-        const merged = stamp(mergeByPermission(record, incoming, session));
+        const { merged: toPublish, series } = await mergeFor(record, incoming, session);
+        if (series.problem) refuse(series.problem);
+        const merged = stamp(toPublish);
         if (merged.status === 'draft') {
           return json(400, { error: 'Set a status other than Draft to publish. Draft activities are never committed.' });
         }
@@ -1176,7 +1250,7 @@ exports._internal = {
   // same reason preview does: a publish that renders through different code is
   // a publish that can differ from the one an admin would have made.
   generate, allPublished, getPublished,
-  validate, mergeByPermission, assertFresh, extractImages, decodeImage,
+  validate, mergeByPermission, mergeFor, seriesCandidates, assertFresh, extractImages, decodeImage,
   sanitiseRich, RICH_KEYS,
   currentRecord, langObject, FIELD_SCHEMA, Conflict, SLUG_RE
 };

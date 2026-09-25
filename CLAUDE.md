@@ -1640,6 +1640,8 @@ netlify/functions/
   _activity-sessions.js  the session calendar: which dates an activity meets on; PURE
   _activity-registration.js  registration SETTINGS on an activity — no person, no
                          store, no gate. See the naming warning at its top; PURE
+  _activity-series.js    what makes two terms one activity, and the one field
+                         that has to follow from it; PURE
   _credit.js             what a cancellation credits; reads one registration and
                          one timestamp, and nothing else; PURE
   _family-errors.js      every refusal a family can be shown, in three
@@ -3369,6 +3371,85 @@ not its activityId, so a third term pointed at the second joins the series rathe
 than starting a third one. It is structure, so a Russian-only role cannot move an
 activity into another's series and change what a family is billed. It rides in
 `indexEntry()` beside `activityId`.
+
+### ⚠ A series has ONE registration fee, and every term was typing its own
+
+`feeApplies()` waives the fee correctly and has done since the waiver was built,
+which is exactly why this survived: nothing on any screen looked wrong. But the
+fee itself is a **field on each record**, and every term drew its own box — so
+the one yearly fee of a series had as many values as the series had terms, and
+which of them a family paid was decided by **which term they happened to walk in
+through**:
+
+| | |
+|---|---|
+| autumn 50, spring 80, joins in autumn | pays **50**, the spring is waived |
+| autumn 50, spring 80, joins in spring | pays **80**, the autumn is waived |
+
+Two families, one series, one "yearly fee", two figures — and each term's public
+price card printed its own as though it were the answer. Nobody typed anything
+twice and neither number is wrong on its own: **it is the pair that is wrong**,
+and no screen could show it, because each form draws one activity. That is the
+same shape as the two facts that printed their structured list and a restatement
+of it underneath, and as the recompute notice that compared a date against
+nothing.
+
+So the fee belongs to the **series**, and a series' owner is its **head** — the
+record whose `activityId` *is* its `seriesId`. `_activity-series.js` owns the
+rule; it is pure, opens no store and asks no clock, and is handed the candidate
+records. Every other term carries a copy the server writes on **every save**,
+and its form shows that copy read-only with the (i) naming where it came from.
+
+⚠ **A STORED COPY RATHER THAN A LOOKUP, on purpose.**
+`facts.price.registrationFee` is read by `priceRows()` — which is **pure, takes
+one activity**, and feeds the published page, the listing card and the family
+area's facts card — and by `owedCentsFor()` and the frozen block. Writing the
+resolved figure onto the record keeps every one of those right with **no change
+to any of them**; resolving at read time would mean threading a second record
+through four call sites in three handlers, two of which are pure and take one
+activity by contract. That is the written-twice trap this codebase keeps meeting.
+
+⚠ **ONE HELPER, NOT THREE CALL SITES.** `preview`, `saveDraft` and `publish` all
+called `mergeByPermission` and none of them could inherit anything, so the rule
+would have had to be remembered three times — and the one that forgot would be
+the one where an admin types a fee and it sticks. `mergeFor()` is the merge plus
+this, and a test pins that `mergeByPermission` is **defined once and called
+once**, so a fourth write path added next year inherits the rule rather than
+having to remember it.
+
+Four details carry the rest:
+
+- ⚠ **The linked test reads the STORED `seriesId`, never `seriesOf()`.** The
+  difference is a record with no `activityId` yet — a new activity an admin has
+  just pointed at another term. `seriesOf()` falls back to the record's own
+  (absent) id, so the fee would be typed-as-entered on **preview** and inherited
+  on **publish** one save later. That is precisely the asymmetry
+  `preview-matches-publish` exists to forbid, and it is bite-checked.
+- ⚠ **A DRAFT HEAD SUPERSEDES ITS PUBLISHED COPY**, the same way
+  `currentRecord()` decides it. A fee just typed on the autumn and saved is what
+  the spring picks up; reading the published file there would hand the term a
+  figure the head itself has stopped showing.
+- **A missing head is refused, not papered over.** Point a term at an activity
+  since deleted and there is nothing to inherit from — so keeping the typed
+  number would be the original bug, silently. `saveDraft` warns and `preview` and
+  `publish` refuse, with **one string**, which is the same split `validate()`
+  already makes.
+- ⚠ **The copy can only go stale one way**, because a term re-reads the head on
+  every one of its own saves: the **head's** fee is edited and a term is not
+  saved afterwards. `staleTerms()` is that direction, read inside `generate()`
+  where the published set is already in hand, so it costs no request — and the
+  head's publish **names the terms and both figures** rather than rewriting them.
+  Fixing them there would commit a page nobody asked to publish, and `generate()`
+  already runs close to the ten seconds Netlify allows. Two visible clicks beat a
+  silent write.
+
+⚠ **AND ONLY THE FEE.** Both of the near neighbours are pinned by tests, because
+"inherit the price fields" is exactly the tidy-up that would break them:
+
+| | |
+|---|---|
+| `fullPrice` | **not** inherited. A semester is priced per semester, which is the whole reason two records exist rather than one. |
+| `registrationFeeCutoffDate` | **not** inherited. It is the deadline for getting **this** registration's fee back, and a newcomer joining in the spring answers to the spring's own calendar. Inheriting it would let one term's dates govern another term's families — the thing resolving the cutoffs **per group** exists to prevent. |
 
 **What counts as "already charged" depends on whether the prior registration is
 live or finished**, and collapsing the two left a hole:

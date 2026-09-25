@@ -377,6 +377,36 @@
   // Choosing a term that already belongs to a series joins that series rather
   // than starting a third one — otherwise a third term pointed at the second
   // would produce two series for one course and the waiver would match neither.
+  // ⚠ THE REGISTRATION FEE BELONGS TO THE SERIES, NOT TO THE TERM.
+  //
+  // One yearly fee, charged once per participant per activity — so a series
+  // running autumn and spring has ONE figure, and a box on each term is a box
+  // that can hold two. Whichever term a family walked in through then decided
+  // what the "yearly" fee was, and each term's price card printed its own as if
+  // it were the answer. See _activity-series.js for the whole of it.
+  //
+  // Both of these are cosmetic, like every check on this side: the server
+  // resolves the head again from the stored records and its answer is what gets
+  // written. What they buy is that an admin is not invited to type a number that
+  // is about to be overwritten.
+  function linkedTerm(rec) {
+    var series = rec && rec.seriesId;
+    if (!series) return false;
+    return !rec.activityId || series !== rec.activityId;
+  }
+
+  // The candidate that OWNS the series — the one whose own id is the series id.
+  // Matched by id, never by slug or by position in the list.
+  function seriesHead(rec) {
+    if (!linkedTerm(rec)) return null;
+    var series = rec.seriesId;
+    var found = null;
+    (S.activities || []).forEach(function (a) {
+      if (a.activityId && a.activityId === series) found = a;
+    });
+    return found;
+  }
+
   function seriesPicker(rec) {
     var own = rec.activityId || null;
     var sel = el('select', { id: 'f-series', disabled: !S.schema.langs.every(canEdit) || null });
@@ -395,7 +425,28 @@
         selected: rec.seriesId && rec.seriesId === series || null
       }));
     });
-    sel.addEventListener('change', function () { S.dirty = true; });
+    // ⚠ MOVING THIS LOCKS OR UNLOCKS THE REGISTRATION FEE, so the panel that
+    // holds it is redrawn — and the form is read into the model FIRST, merged
+    // rather than assigned, which is the undrawn-field trap the type select
+    // documents at length further up. Without the redraw an admin points a term
+    // at another activity and goes on typing into a fee box whose value the next
+    // save discards.
+    sel.addEventListener('change', function () {
+      S.dirty = true;
+      var read = readFacts();
+      S.record.facts = keepUndrawnFacts(S.record.facts, read.facts);
+      S.record.factVisibility = read.factVisibility;
+      S.record.registration = keepUndrawnRegistration(S.record.registration, readRegistration());
+      S.record.seriesId = sel.value || null;
+      var head = seriesHead(S.record);
+      if (head) {
+        S.record.facts = S.record.facts || {};
+        S.record.facts.price = S.record.facts.price || {};
+        S.record.facts.price.registrationFee =
+          head.registrationFee == null ? null : head.registrationFee;
+      }
+      renderFacts();
+    });
     // ⚠ IT SAYS HOW, NOT ONLY WHAT. QA read this hint and asked "how do I
     // create a second term? Is this a new activity that I connect to another
     // activity?" — which is exactly the question it left open. A picker that
@@ -949,6 +1000,46 @@
     return el('div', {}, [el('label', { for: id, text: label }), input]);
   }
 
+  // The registration fee, which is the series's rather than this term's.
+  //
+  // On a head — which is every activity until somebody links one — this is an
+  // ordinary number box. On a linked term it is DISABLED and shows the inherited
+  // figure, with the (i) naming where it comes from: a filled-in box an admin may
+  // not edit has to say why, or it reads as a broken form.
+  //
+  // Disabled rather than absent, deliberately. The figure is what a newcomer
+  // joining at THIS term pays, so it is a fact about this activity and belongs on
+  // its own Price panel; hiding it would mean an admin could not see the fee of
+  // the term they are looking at.
+  function feeField(value) {
+    if (!linkedTerm(S.record)) {
+      return numField('fact-price-registrationFee', 'Registration fee (€)', value);
+    }
+    var head = seriesHead(S.record);
+    var title = (head && head.title
+      && (head.title.he || head.title.en || head.title.ru)) || (head && head.slug) || null;
+    var hint = title
+      ? 'Inherited from ' + title + ', which this is a term of. One yearly fee per '
+        + 'participant per activity, so a series has one figure — edit it there, then save '
+        + 'this term to bring it across. The semester price stays this term’s own.'
+      : 'This is marked as a term of another activity, but that activity cannot be found, so '
+        + 'there is nothing to inherit the fee from. Point it at a term that exists, or set it '
+        + 'back to its own activity.';
+    // Built rather than handed to numField, because the (i) belongs beside the
+    // LABEL. withHelp() wraps whatever it is given in a .label-row flex row, so
+    // passing the whole field would put the badge after the input — and the
+    // cascade note in CLAUDE.md is about exactly this wrapper: a label reached
+    // through `>` has to be reached through .label-row, which is why the label is
+    // what goes inside it.
+    var id = 'fact-price-registrationFee';
+    var input = el('input', { type: 'number', id: id, min: '0', disabled: true });
+    var shown = head ? head.registrationFee : value;
+    input.value = (shown === 0 || shown) ? shown : '';
+    return el('div', {}, [
+      withHelp(el('label', { for: id, text: 'Registration fee (€)' }), hint),
+      input
+    ]);
+  }
   function checkField(id, label, value, hint) {
     var input = el('input', { type: 'checkbox', id: id });
     input.checked = value === true;
@@ -1519,7 +1610,7 @@
       var isDropin = currentType() === 'dropin';
       body = el('div', {}, [
         el('div', { class: 'fact-grid' }, [
-          numField('fact-price-registrationFee', 'Registration fee (€)', fact.registrationFee),
+          feeField(fact.registrationFee),
           isDropin
             ? numField('fact-price-perSessionPrice', 'Price per session (€)', fact.perSessionPrice)
             : numField('fact-price-fullPrice', 'Full course price (€)', fact.fullPrice),
@@ -2006,7 +2097,15 @@
       out = { overrideText: readLangField(p + '-groupSize-overrideText') };
     } else if (d.kind === 'price') {
       out = {
-        registrationFee: readNum(p + '-price-registrationFee'),
+        // ⚠ THE STORED VALUE ON A LINKED TERM, never the box. The box is
+        // disabled and shows the head's figure, so reading it back would usually
+        // be harmless — and would be wrong the once, when S.activities holds a
+        // stale head fee and the read-back writes it over the record as though an
+        // admin had typed it. The server resolves it again either way; sending
+        // back what we were given is the honest half.
+        registrationFee: linkedTerm(S.record)
+          ? (((S.record.facts || {}).price || {}).registrationFee)
+          : readNum(p + '-price-registrationFee'),
         perHourOverride: readNum(p + '-price-perHourOverride'),
         showPerLesson: readBool(p + '-price-showPerLesson')
       };
@@ -2881,6 +2980,13 @@
         // already agreed to and mailing them about it must never be something an
         // admin finds out about later, or from a family.
         var extra = falloutLine(res.data.fallout);
+        // ⚠ AND WHAT IT DID TO THE OTHER TERMS OF THIS SERIES — or rather what
+        // it did NOT do. The registration fee belongs to the series, and a linked
+        // term picks it up when that term is saved, so publishing a changed fee on
+        // the head leaves the others printing the old figure until somebody opens
+        // them. On screen rather than behind an (i), for the same reason the
+        // fallout line is: it is true of this publish and of no other.
+        if (res.data.seriesStale) extra += ' — ⚠ ' + esc(res.data.seriesStale);
         load(S.slug).then(function () {
           message(falloutBad(res.data.fallout) ? 'err' : 'ok', done + extra);
         });
