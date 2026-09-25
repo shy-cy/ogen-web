@@ -74,7 +74,7 @@
         "en": "Beginners",
         "ru": "Для начинающих"
       },
-      "capacity": 5,
+      "capacity": 4,
       "teacherIds": [],
       "facts": {
         "ages": {
@@ -249,10 +249,10 @@
   "faq": [],
   "teachers": [],
   "sponsors": [],
-  "isoUpdated": "2026-09-25T08:00:35.009Z",
+  "isoUpdated": "2026-09-25T10:11:31.264Z",
   "isoCreated": "2026-09-24T16:23:27.123Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
   "activityId": "act-ecb73beba7893406",
-  "lastPublishedAt": "2026-09-25T08:00:35.009Z"
+  "lastPublishedAt": "2026-09-25T10:11:31.264Z"
 }
