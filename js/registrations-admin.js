@@ -18,7 +18,7 @@
 (function () {
   var API = '/api/admin-registrations';
   var S = { activities: [], slug: null, queue: null, register: null, date: null,
-            canApprove: false, canCancel: false };
+            canApprove: false, canCancel: false, filter: null };
   // Written out rather than shown as a code: "ru" beside a draft is something an
   // admin has to decode, and this line is the whole warning.
   var LANG_NAME = { he: 'Hebrew', en: 'English', ru: 'Russian' };
@@ -289,6 +289,178 @@
     return el('div', { class: 'acts' }, acts);
   }
 
+  // ---------- narrowing the table ----------
+  //
+  // Asked for as "it would be convenient if we can filter the view according to
+  // group / status / payment status -- what else?".
+  //
+  // This screen is opened to FIND THE ROWS THAT NEED SOMETHING DOING, which is
+  // the reason it is a table rather than cards, and on an activity with forty
+  // families that job is scrolling. The three asked for are here; two more earn
+  // their place, and both are about the same job:
+  //
+  //  - a NAME OR EMAIL box, which is the filter an admin actually reaches for,
+  //    because the commonest way this screen is opened is a parent on the phone;
+  //  - AGE FLAGGED, because that amber marker is the only advisory thing on the
+  //    row and it is the reason an auto-approving activity left somebody
+  //    pending. It is the one filter that answers "what is waiting for me".
+  //
+  // Three rules hold it together:
+  //
+  // ⚠ IT IS THE TABLE THAT NARROWS, NEVER THE CAPACITY LINE. The line above
+  // counts the room and every record in it, and a filtered count sitting in it
+  // would be a true number answering a different question -- which is exactly the
+  // "4 of 3 places · Over capacity" bug this screen already learned once. So the
+  // bar sits BELOW the capacity line, and it says how many of how many it is
+  // showing, in its own words, where the filters are.
+  //
+  // ⚠ A CONTROL APPEARS ONLY WHEN IT CAN CHANGE WHAT IS SHOWN. The options are
+  // built from the rows in hand -- with their counts, so the select is also a
+  // summary -- and a select offering "All" plus one thing is not offered at all.
+  // That needs no threshold and no judgement about how big a list has to be
+  // before filtering it is worth a row of controls.
+  //
+  // ⚠ AND THEY RESET WHEN THE ACTIVITY CHANGES. A group filter from one
+  // activity means nothing on the next, and a stale one carried across the
+  // picker would draw an empty table on an activity that is full -- which reads
+  // as "nobody has registered", the one sentence this screen must not say when
+  // it is not true. See loadQueue.
+  //
+  // Everything here is in the browser, over rows that are already in hand: a
+  // round trip per keystroke would be a second implementation of every rule
+  // below, server-side, for a list a community centre can hold in one response.
+  function newFilter() { return { q: '', group: '', status: '', pay: '', flagged: false }; }
+
+  function searchable(r) {
+    return ((r.name || '') + ' ' + (r.accountEmail || '') + ' ' + (r.accountId || '')).toLowerCase();
+  }
+  function isFlagged(r) { return ((r.ageFlagAtSubmission || {}).inRange) === false; }
+
+  // ⚠ DERIVED, NOT `payment.status`. That field is stamped 'owed' when the
+  // record is written and stays there on a registration that owes nothing at all
+  // -- which is why the roster can show "€0.00 / €0.00 OWED". Filtering on it
+  // would inherit that, and put rows with nothing to pay under "owes money".
+  function payBucket(r) {
+    var p = r.payment || {};
+    if (!(p.owedCents > 0)) return 'none';
+    return (p.owedCents - (p.paidCents || 0)) > 0 ? 'owes' : 'settled';
+  }
+  var PAY_LABEL = { owes: 'Owes money', settled: 'Settled', none: 'Nothing to pay' };
+  // The order the queue is worked in, not alphabetical.
+  var STATUS_ORDER = ['pending', 'approved', 'waiting', 'rejected', 'expired', 'cancelled'];
+
+  function inGroup(r, want) {
+    if (!want) return true;
+    return want === '-' ? !r.groupId : r.groupId === want;
+  }
+  function passes(r) {
+    var f = S.filter;
+    if (f.q && searchable(r).indexOf(f.q) === -1) return false;
+    if (!inGroup(r, f.group)) return false;
+    if (f.flagged && !isFlagged(r)) return false;
+    if (f.status && f.status !== r.status) return false;
+    if (f.pay && payBucket(r) !== f.pay) return false;
+    return true;
+  }
+  // The waiting list answers three of the five questions and not the other two.
+  // Somebody waiting holds nothing and owes nothing, so a PAYMENT filter is a
+  // question about money this list has no answer to -- it stands the list down
+  // rather than guessing one. `waiting` is an option in the status select for
+  // the same reason it is a status on the record: filtering to it is how you ask
+  // to see only the queue.
+  function passesWaiting(r) {
+    var f = S.filter;
+    if (f.pay) return false;
+    if (f.status && f.status !== 'waiting') return false;
+    if (f.q && searchable(r).indexOf(f.q) === -1) return false;
+    if (!inGroup(r, f.group)) return false;
+    if (f.flagged && !isFlagged(r)) return false;
+    return true;
+  }
+
+  function tally(list, of) {
+    var out = {};
+    list.forEach(function (r) { var k = of(r); out[k] = (out[k] || 0) + 1; });
+    return out;
+  }
+  // "All" plus the options actually present, each carrying its count -- so the
+  // control is a summary of the activity as well as a way to narrow it.
+  function pick(label, value, opts, onPick) {
+    if (opts.length < 2) return null;
+    var sel = el('select', { 'aria-label': label,
+      onchange: function (e) { onPick(e.currentTarget.value); } });
+    [{ v: '', t: label }].concat(opts).forEach(function (o) {
+      var op = el('option', { value: o.v, text: o.t });
+      if (o.v === value) op.setAttribute('selected', 'selected');
+      sel.appendChild(op);
+    });
+    sel.value = value;
+    return sel;
+  }
+
+  function filterBar(regs, waiting, repaint) {
+    var f = S.filter;
+    var everyone = regs.concat(waiting);
+    var controls = [];
+
+    // Group: only where there is a choice to make. A pooled activity, or one
+    // with a single group, has nothing to pick between.
+    var named = (S.queue && S.queue.capacity && S.queue.capacity.named) || [];
+    if (named.length > 1) {
+      var byGroup = tally(everyone, function (r) { return r.groupId || '-'; });
+      var gopts = named.map(function (g) {
+        return { v: g.groupId, t: titleOf(g.name, g.groupId) + ' (' + (byGroup[g.groupId] || 0) + ')' };
+      });
+      // Registrations taken before the groups were named belong to no row and
+      // say so, here as in the capacity line above.
+      if (byGroup['-']) gopts.push({ v: '-', t: 'Not assigned (' + byGroup['-'] + ')' });
+      controls.push(pick('All groups', f.group, gopts, function (v) { f.group = v; repaint(); }));
+    }
+
+    var byStatus = tally(regs, function (r) { return r.status; });
+    if (waiting.length) byStatus.waiting = waiting.length;
+    var sopts = STATUS_ORDER.filter(function (k) { return byStatus[k]; })
+      .map(function (k) { return { v: k, t: k.charAt(0).toUpperCase() + k.slice(1) + ' (' + byStatus[k] + ')' }; });
+    controls.push(pick('Any status', f.status, sopts, function (v) { f.status = v; repaint(); }));
+
+    var byPay = tally(regs, payBucket);
+    var popts = ['owes', 'settled', 'none'].filter(function (k) { return byPay[k]; })
+      .map(function (k) { return { v: k, t: PAY_LABEL[k] + ' (' + byPay[k] + ')' }; });
+    controls.push(pick('Any payment', f.pay, popts, function (v) { f.pay = v; repaint(); }));
+
+    var flaggedCount = everyone.filter(isFlagged).length;
+    if (flaggedCount) {
+      var box = el('input', { type: 'checkbox', id: 'filter-flagged',
+        onchange: function (e) { f.flagged = !!e.currentTarget.checked; repaint(); } });
+      box.checked = f.flagged;
+      controls.push(el('label', { class: 'filter-check', for: 'filter-flagged' },
+        [box, el('span', { text: 'Age flagged (' + flaggedCount + ')' })]));
+    }
+
+    // ⚠ THE BOX IS BUILT ONCE AND KEPT. Only the rows below are redrawn on a
+    // keystroke -- rebuilding the bar would take the focus out of the input
+    // somebody is typing into, one character in.
+    var q = null;
+    if (everyone.length > 1) {
+      q = el('input', { type: 'search', 'aria-label': 'Find a name or email',
+        placeholder: 'Name or email',
+        oninput: function (e) { f.q = String(e.currentTarget.value || '').trim().toLowerCase(); repaint(); } });
+      q.value = f.q;
+    }
+
+    controls = controls.filter(Boolean);
+    if (!q && !controls.length) return null;
+
+    var count = el('span', { class: 'filter-count' });
+    var clear = el('button', { type: 'button', class: 'filter-clear', text: 'Clear',
+      onclick: function () { S.filter = newFilter(); renderQueue(); } });
+    var bar = el('div', { class: 'filters' },
+      [q].concat(controls).concat([count, clear]));
+    bar._count = count;
+    bar._clear = clear;
+    return bar;
+  }
+
   function renderQueue() {
     var q = S.queue;
     $('queue-panel').hidden = false;
@@ -313,13 +485,55 @@
     // room, which is the pairing that made this screen wrong in the first place.
     if (q.activity.type === 'dropin' && S.date) return renderEvening(box);
 
-    if (!q.registrations.length) {
+    var regs = q.registrations || [];
+    var waiting = q.waiting || [];
+    if (!regs.length && !waiting.length) {
       box.appendChild(el('p', { class: 'hint', text: 'Nobody has registered for this activity yet.' }));
-      return renderWaiting(box);
+      return;
     }
+    // The bar is drawn ONCE and the rows below it are what gets redrawn. Rebuild
+    // the bar on a keystroke and the search box loses the focus it is being
+    // typed into.
+    var rowsBox = el('div', {});
+    var bar = filterBar(regs, waiting, function () { paintRows(bar, rowsBox, regs, waiting); });
+    if (bar) box.appendChild(bar);
+    box.appendChild(rowsBox);
+    paintRows(bar, rowsBox, regs, waiting);
+  }
+
+  function paintRows(bar, box, regs, waiting) {
+    box.innerHTML = '';
+    var f = S.filter;
+    var on = !!(f.q || f.group || f.status || f.pay || f.flagged);
+    var show = regs.filter(passes);
+    var wait = waiting.filter(passesWaiting);
+
+    if (bar) {
+      // ⚠ SAID HERE AND NOT IN THE CAPACITY LINE. That line counts the room
+      // and every record against it; a filtered figure in it would be a true
+      // number answering a different question, which is the pairing this screen
+      // was already reported for once.
+      var parts = [show.length + ' of ' + regs.length +
+                   ' registration' + (regs.length === 1 ? '' : 's')];
+      if (waiting.length) parts.push(wait.length + ' of ' + waiting.length + ' waiting');
+      bar._count.textContent = 'Showing ' + parts.join(' · ');
+      bar._clear.hidden = !on;
+    }
+
+    if (!show.length) {
+      // ⚠ NEVER "nobody has registered" WHILE A FILTER IS ON. It is the one
+      // sentence this screen must not say when it is not true, and a narrowed
+      // table is the easiest way to make it a lie.
+      box.appendChild(el('p', { class: 'hint', text: on
+        ? (wait.length ? 'No registrations match — only the waiting list below.'
+                       : 'Nothing matches these filters.')
+        : 'Nobody has registered for this activity yet.' }));
+      return renderWaiting(box, wait);
+    }
+
     var head = el('tr', {}, ['Participant', 'Age', 'Group', 'Status', 'Requested', 'Paid / owed', '']
       .map(function (h) { return el('th', { text: h }); }));
-    var rows = q.registrations.map(function (r) {
+    var rows = show.map(function (r) {
       return el('tr', {}, [
         el('td', { class: 'who' }, [
           el('b', { text: r.name }),
@@ -341,7 +555,7 @@
     box.appendChild(el('table', { class: 'queue' }, [
       el('thead', {}, [head]), el('tbody', {}, rows)
     ]));
-    renderWaiting(box);
+    renderWaiting(box, wait);
   }
 
   // ⚠ A LIST, NOT A SECOND QUEUE, and it is drawn below the table rather than
@@ -357,8 +571,8 @@
   // rule that was chosen — so a "give this one a place" button here would be a
   // second, quieter rule running beside it, and the two would disagree the first
   // time somebody used it.
-  function renderWaiting(box) {
-    var list = (S.queue && S.queue.waiting) || [];
+  function renderWaiting(box, list) {
+    list = list || [];
     if (!list.length) return;
     var head = el('tr', {}, ['Waiting', 'Age', 'Group', 'Since'].map(function (h) {
       return el('th', { text: h });
@@ -991,7 +1205,13 @@
     // Switching activity forgets which evening was open — the dates belong to
     // the activity, so carrying one across would ask for a date the new one does
     // not meet on.
-    if (slug !== S.slug) { S.date = null; S.register = null; }
+    // ⚠ AND IT FORGETS THE FILTERS, for a sharper version of the same reason.
+    // A group belongs to an activity, so a group filter carried across the
+    // picker matches nothing on the next one \u2014 and an empty table reads as an
+    // activity nobody has registered for. The one thing this screen must never
+    // say wrongly is the thing a stale filter would make it say.
+    if (slug !== S.slug) { S.date = null; S.register = null; S.filter = newFilter(); }
+    if (!S.filter) S.filter = newFilter();
     S.slug = slug;
     // So a reload comes back to the activity you were on rather than to the
     // first row of the list. See js/admin-url.js for why it replaces the

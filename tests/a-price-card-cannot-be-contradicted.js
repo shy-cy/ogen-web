@@ -26,11 +26,32 @@
 // how a card which never mentioned the second rate survived both fixes: each
 // screen explained the figure IT was charging, and none of them explained the
 // activity. This is the fix at the source.
+//
+// ⚠ 4. AND THEN THE CARD THAT STATES BOTH RATES PRINTED THEM AS ONE RUN-ON
+// LINE, on the family's own registration page.
+//
+// factText() renders the price as a single pre-line string, which is the right
+// shape for a caller with no room for rows -- and .acc-fact has room. So the
+// card was headed "Price", labelled "Price" underneath (the duplication the
+// public page's group headings exist to avoid), and the qualifier sat INSIDE the
+// label: "Late booking (within 24 hours of the session) - 10 €". The figure it
+// belongs to was pushed to the far end of a wrapping line, so the one card a
+// family reads to compare two rates was the one card whose rates did not line
+// up. Reported as "Late booking - 10 €, and put the (within 24 hours) under, in
+// smaller italic -- it will align better."
+//
+// The rows were in the payload the whole time, from the same priceRows() the
+// public page reads. The last section here EXECUTES the card rather than reading
+// it, and compares what it renders against formatPrice() -- the two are one
+// sentence laid out differently, and a test that read the source would only ever
+// have proved the source is self-consistent.
 
 const H = require('./_helpers');
 const F = require('./_fixtures');
+const D = require('./_dom');
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 const R = path.join(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(R, p), 'utf8');
@@ -38,6 +59,52 @@ const read = (p) => fs.readFileSync(path.join(R, p), 'utf8');
 process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
 
 const facts = require(H.fnPath('_activity-facts'));
+
+// --- the family's registration page, actually drawn -------------------------
+//
+// The smallest thing that puts an activity's facts card on a screen: one
+// approved course registration, and whatever facts the case under test hands in.
+const ACCOUNT = { accountId: 'a-1', email: 'michal@example.com',
+                  emailVerifiedAt: '2026-01-01T00:00:00Z',
+                  profile: { firstName: 'Michal', preferredLanguage: 'en' } };
+const REG = { participantId: 'p-1', activityId: 'act-7', slug: 'hebrew', type: 'course',
+              participantName: 'Noa Levi', status: 'approved', groupId: null,
+              title: { en: 'Hebrew for kids' }, holdsASpot: true,
+              owedCents: 30000, paidCents: 0, creditedCents: 0, feeCharged: true,
+              payment: { owedCents: 30000, paidCents: 0, creditedCents: 0 },
+              cancellation: { guardianMayCancel: true, total: 0 } };
+
+async function card(activityBits) {
+  const activity = Object.assign({
+    activityId: 'act-7', slug: 'hebrew', type: 'course', title: { en: 'Hebrew for kids' },
+    status: 'open', full: false, capacity: null, taken: 0, left: null,
+    groups: [], facts: [], priceRows: [], sessionRows: []
+  }, activityBits);
+  const table = {
+    me: () => ({ ok: true, account: ACCOUNT, expiresAt: Date.now() + 1e7 }),
+    registration: () => ({ ok: true, registration: REG, activity: activity, balanceCents: 0 })
+  };
+  const dom = D.makeDom({ view: 'activity', lang: 'en', search: '?p=p-1&a=act-7',
+    fetch: function (endpoint, init) {
+      const body = JSON.parse(init.body);
+      const fn = table[body.action];
+      const out = fn ? fn(body) : { ok: true };
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(out) });
+    } });
+  dom.window.localStorage.setItem('ogenMemberSession', JSON.stringify({
+    token: 't', firstName: 'Michal', email: ACCOUNT.email, expiresAt: Date.now() + 1e7 }));
+  const ctx = vm.createContext({
+    window: dom.window, document: dom.document, console: console,
+    location: dom.window.location,
+    Intl: Intl, Date: Date, Math: Math, JSON: JSON, Object: Object, Array: Array,
+    String: String, Number: Number, RegExp: RegExp, Promise: Promise, setTimeout: setTimeout,
+    encodeURIComponent: encodeURIComponent, decodeURIComponent: decodeURIComponent
+  });
+  vm.runInContext(read('js/member-session.js'), ctx, { filename: 'js/member-session.js' });
+  vm.runInContext(read('js/member-account.js'), ctx, { filename: 'js/member-account.js' });
+  await new Promise((r) => setTimeout(r, 40));
+  return dom;
+}
 
 (async () => {
   // ======================================================= the price card ====
@@ -151,6 +218,76 @@ const facts = require(H.fnPath('_activity-facts'));
     'while a full evening offers its waiting list instead of nothing');
   H.ok(cell.indexOf('s.past') < cell.indexOf('if (s.full) {'),
     'and past is refused BEFORE the queue is offered, so a gone evening is not queueable');
+
+  // ============================================ the family's own price card ==
+  //
+  // Executed, not read. Both halves of the bug are invisible in source: whether
+  // the heading and the label say the same word, and whether the qualifier ends
+  // up on the figure's line, are facts about what renders.
+  console.log('\n[the family card renders the price as rows, not one run-on line]');
+  const late = { perSessionPrice: 7, lateDropIn: { enabled: true, price: 10, hoursBefore: 24 } };
+  const ROWS = facts.priceRows(late, 'en', null);
+  const ONE_STRING = facts.formatPrice(late, 'en', null);
+  H.ok(/\(within 24 hours of the session\) - /.test(ONE_STRING),
+    'the one-string form still glues the qualifier to the label — that is what it is for');
+
+  const dom = await card({
+    // The payload as account-registrations.js builds it: the fact carries the
+    // one-string value AND the rows travel beside it. The card had both and used
+    // the wrong one.
+    facts: [{ key: 'price', heading: 'Price',
+              facts: [{ key: 'price', label: 'Price', value: ONE_STRING }] }],
+    priceRows: ROWS
+  });
+  const block = D.byClass(dom.mount, 'acc-price')[0];
+  H.ok(block, 'the price fact rendered as a rows block');
+
+  const rowNodes = D.byClass(dom.mount, 'acc-price-row');
+  H.eq(rowNodes.length, ROWS.length, 'one line per priced row (' + ROWS.length + ')');
+  // Guarded, so losing the rows reads as failing assertions rather than as a
+  // stack trace three lines further down.
+  const line = (i) => (rowNodes[i] || { textContent: '' }).textContent;
+  H.eq(line(0), 'Cost per session - ' + ROWS[0].value,
+    'the ordinary rate is label and figure on one line');
+
+  const notes = D.byClass(dom.mount, 'acc-price-note');
+  H.eq(notes.length, 1, 'exactly one qualifier, on the one row that has one');
+  const note = notes[0] || { textContent: '', tagName: '' };
+  H.eq(note.textContent, ROWS[1].note, 'and it is the window: ' + ROWS[1].note);
+  H.eq(note.tagName, 'EM', 'as an <em>, so it is italic without a class having to say so');
+  // ⚠ THE LINE IT QUALIFIES MUST NOT CARRY IT. That is the whole report.
+  H.ok(line(1).indexOf('Late booking - ' + ROWS[1].value) === 0,
+    'the late rate reads "Late booking - ' + ROWS[1].value + '" and the window is underneath');
+
+  console.log('\n[and the card no longer says Price under a heading saying Price]');
+  const head = D.byTag(dom.mount, 'h3').filter((h) => h.textContent === 'Price')[0];
+  H.ok(head, 'the group is still headed Price');
+  H.eq(D.byTag(dom.mount, 'b').filter((b) => b.textContent === 'Price').length, 0,
+    '⚠ and nothing inside it repeats the heading — the rule the public page ' +
+    'renders its rows for, arriving on the one screen that had not got it');
+
+  console.log('\n[the two forms are one sentence, not two]');
+  // Drift check. The separator is written in both places — the server joins for
+  // a caller with no room, the client joins for one with room — so the rendered
+  // lines, less the qualifier that moved, must be the string form exactly.
+  const noteText = ROWS[1].note;
+  const rendered = rowNodes
+    .map((n) => n.textContent.replace(noteText, '').replace(/\s+$/, ''))
+    .join('\n');
+  H.eq(rendered, ONE_STRING.replace(' ' + noteText, ''),
+    'what the card prints is formatPrice() with the qualifier moved and nothing else changed');
+
+  console.log('\n[an activity with no structured numbers still prints its sentence]');
+  // legacyText: factText() fell back to the words an admin typed, priceRows is
+  // empty, and there is nothing to lay out in rows. The label comes back with
+  // it, because without rows the heading is the only thing naming the fact.
+  const words = await card({
+    facts: [{ key: 'price', heading: 'Price',
+              facts: [{ key: 'price', label: 'Price', value: 'Ask at the desk' }] }],
+    priceRows: []
+  });
+  H.eq(D.byClass(words.mount, 'acc-price').length, 0, 'no rows block');
+  H.ok(words.mount.textContent.indexOf('Ask at the desk') !== -1, 'and the sentence survives');
 
   H.done();
 })();

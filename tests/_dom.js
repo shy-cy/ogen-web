@@ -13,6 +13,13 @@
 // what this one script actually uses and throws on anything else, so it cannot
 // quietly diverge into a bad imitation of a browser: the day the script needs
 // something new, this file says so rather than returning undefined.
+//
+// It runs js/registrations-admin.js too now — the admin's Roster, which was in
+// the same state the family area was in: over a thousand lines nothing had ever
+// executed. That took three things and no more: `innerHTML = ''`, a reflected
+// `hidden`, and a getElementById that answers for the ids a caller declares
+// rather than for one hardcoded mount. Each is spelled out below with what it
+// refuses.
 
 function makeDom(opts) {
   opts = opts || {};
@@ -87,10 +94,35 @@ function makeDom(opts) {
         if (v) n.attributes.disabled = 'true';
         else delete n.attributes.disabled;
       },
+      // Reflected, like `disabled` and for the same reason: the admin screens
+      // show and hide whole panels by writing `panel.hidden = false`, and a
+      // plain JS property would leave a test reading `hidden` on a panel a
+      // browser is showing.
+      get hidden() { return n.attributes.hidden != null; },
+      set hidden(v) {
+        if (v) n.attributes.hidden = 'hidden';
+        else delete n.attributes.hidden;
+      },
       get textContent() {
         return n._text + n.childNodes.map((c) => c.textContent).join('');
       },
       set textContent(v) { n.childNodes.length = 0; n._text = String(v); },
+      // ⚠ EMPTYING ONLY. Every `innerHTML` in these two scripts is `= ''`,
+      // which is a redraw clearing its own container. Parsing markup is the line
+      // this shim exists not to cross — and a setter that quietly filed the
+      // string as a JS property would leave a container full of stale rows while
+      // the test read a screen it believed had been cleared.
+      set innerHTML(v) {
+        if (String(v) !== '') {
+          throw new Error('this DOM does innerHTML = "" and nothing else: ' + v);
+        }
+        n.childNodes.forEach((c) => { c.parentNode = null; });
+        n.childNodes.length = 0;
+        n._text = '';
+      },
+      get innerHTML() { throw new Error('nothing reads innerHTML; do not start'); },
+      // Nothing to scroll in a shim, and the call is display only.
+      scrollIntoView() {},
       setAttribute(k, v) { n.attributes[k] = String(v); },
       getAttribute(k) { return k in n.attributes ? n.attributes[k] : null; },
       removeAttribute(k) { delete n.attributes[k]; },
@@ -173,6 +205,18 @@ function makeDom(opts) {
   root.setAttribute('id', 'account-mount');
   root.setAttribute('data-view', opts.view || 'account');
 
+  // The ids a page's markup answers for. The family area has exactly one mount,
+  // which is why this was hardcoded; the admin screens are a panel per job and
+  // declare theirs. Anything NOT declared still comes back null, which is what a
+  // browser does for an id the markup does not carry — and is what the admin's
+  // own id check exists to catch.
+  const mounts = {};
+  (opts.ids || []).forEach((id) => {
+    const m = node('div');
+    m.setAttribute('id', id);
+    mounts[id] = m;
+  });
+
   const store = {};
   const window = {
     location: { search: opts.search || '', href: opts.href || '/', hash: '' },
@@ -224,10 +268,12 @@ function makeDom(opts) {
       return n;
     },
     createTextNode: text,
-    getElementById: (id) => (id === 'account-mount' ? root : null)
+    getElementById: (id) => (id === 'account-mount' ? root : (mounts[id] || null))
   };
+  document.body = node('body');
   window.document = document;
-  return { window: window, document: document, mount: root, node: node, _store: store };
+  return { window: window, document: document, mount: root, node: node,
+           byId: (id) => document.getElementById(id), _store: store };
 }
 
 // Every node in a subtree, so an assertion can ask what the screen says without

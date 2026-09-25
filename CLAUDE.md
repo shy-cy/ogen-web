@@ -4578,6 +4578,44 @@ the figure it explains. And it is shown only when the two figures actually
 **differ**: an activity whose late price equals its standard one has nothing to
 explain, and *"usually €7.00"* beside €7.00 is noise dressed as information.
 
+⚠ **AND THE THIRD SCREEN WAS THE PRICE CARD ITSELF, ON THIS PAGE.** The card
+stating both rates — the fix at the source, one section up — reached the family
+area as **one run-on string**: *"Late booking (within 24 hours of the session) -
+10 €"*, under a card headed **Price** and a label also reading **Price**.
+
+`factText()` renders the price as a single pre-line value, which is the right
+shape for a caller with **no room for rows**, and `.acc-fact` has room. Two
+things followed and neither is wrong on its own: the heading and the label said
+the same word, which is the duplication the published page's group headings
+exist to forbid and the exact reason that page renders its rows; and the
+qualifier sat **inside the label**, so the figure it belongs to was pushed to
+the far end of a wrapping line and the one card a family reads to compare two
+rates was the one card whose rates did not line up. Reported as *"Late booking -
+10 €, and put the (within 24 hours of the session) under, in smaller italic — it
+will align better."*
+
+The rows were in the payload the whole time, from the same `priceRows()` the
+published page and the cost card read, so there was nothing new to keep in step.
+The card renders them: one line per row, the qualifier on its own quiet italic
+line under the figure it qualifies, and no label repeating the heading. An
+activity with no structured numbers never reaches it — `priceRows` is empty,
+`factText()` fell back to the sentence an admin typed, and it prints as the
+sentence it is, label and all, because without rows the heading is the only
+thing naming the fact.
+
+⚠ **And the qualifier's colour moved, in both places.** `.fact-note` on the
+published page is 12px italic `--camel`, which is **2.30:1** — this file's own
+list of warm tokens that are backgrounds and fail as foregrounds. `--camel-ink`
+is that hue darkened to **4.67:1 on `--paper`**, computed against the ground the
+letters actually sit on, exactly as the seven status badge colours and
+`#96651F` on the pending pill were. One treatment, both screens.
+
+⚠ **The test EXECUTES the card and compares it with `formatPrice()`.** The
+separator is written twice — the server joins for a caller with no room, the
+client joins for one with room — so what the card prints, less the qualifier
+that moved, must be the string form exactly. Reading either side would only ever
+have proved that side is self-consistent.
+
 **2. The date and the price were printed with nothing between them** —
 `יום חמישי, 24 בספטמבר€10.00` on the live Hebrew page. A **cascade collision**,
 and the instructive kind: `.acc-field label` is (0,1,1) and `.acc-date` is
@@ -5854,6 +5892,67 @@ Four things it shows that are easy to get wrong:
 - **Whether the yearly fee was billed on this term**, beside the amount. An
   admin looking at a €300 next to a €350 should not have to open the other term
   to find out why.
+
+### ⚠ And the table narrows, while the capacity line does not
+
+Asked for as *"it would be convenient if we can filter the view according to
+group / status / payment status — what else?"*. This screen is opened **to find
+the rows that need something doing**, which is the reason it is a table rather
+than cards, and on an activity with forty families that job was scrolling.
+
+The three asked for are there. Two more earn their place and both answer the
+same question: a **name or email box**, which is the filter an admin actually
+reaches for because the commonest way this screen is opened is a parent on the
+phone; and **age flagged**, because that amber marker is the only advisory thing
+on a row and is the reason an auto-approving activity left somebody `pending` —
+it is the one filter that answers *what is waiting for me*.
+
+Four rules carry it:
+
+- ⚠ **IT IS THE TABLE THAT NARROWS, NEVER THE CAPACITY LINE.** That line counts
+  the **room** and every record against it. A filtered figure inside it would be
+  a true number answering a different question, which is precisely the
+  `4 of 3 places · Over capacity` pairing this screen was already reported for.
+  So the bar sits below the line, unfilled where the line is `--stone`, and says
+  *how many of how many* in its own words where the filters are.
+- ⚠ **NEVER "nobody has registered for this activity yet" WHILE A FILTER IS ON.**
+  It is true of an empty activity and a lie about a narrowed one, and it is the
+  one sentence this screen must not get wrong.
+- ⚠ **THE PAYMENT FILTER IS DERIVED, NOT `payment.status`.** That field is
+  stamped `owed` when the record is written and stays there on a registration
+  that owes nothing at all — which is why the live roster prints
+  `€0.00 / €0.00 OWED`. Filtering on it would inherit that and file rows with
+  nothing to pay under *owes money*. The three buckets come from the figures.
+- ⚠ **AND THEY RESET WHEN THE ACTIVITY CHANGES.** A group belongs to an
+  activity, so a group filter carried across the picker matches nothing on the
+  next one — and an empty table there reads as an activity nobody has registered
+  for, which is the first rule broken by the fourth.
+
+Two smaller ones. **A control appears only when it can change what is shown**:
+the options are built from the rows in hand, with their counts so the select is
+also a summary, and a select offering *All* plus one thing is not offered —
+which needs no threshold and no judgement about how long a list has to be.
+And **the bar is built once and only the rows below it are redrawn**, or the
+search box loses the focus it is being typed into one character in.
+
+The **waiting list answers three of the five questions and not the other two**.
+`waiting` is an option in the status select, because it is a status on the
+record and filtering to it is how you ask to see only the queue. A **payment**
+filter stands the list down rather than guessing: somebody waiting holds nothing
+and owes nothing, so they are neither owing nor settled.
+
+All of it is in the browser, over rows already in hand — a round trip per
+keystroke would be a second implementation of every rule above, server-side, for
+a list a community centre fits in one response.
+
+⚠ **And this screen had never been executed by anything**, the state the family
+area was in before `tests/_dom.js`. Every suite touching it read it as text,
+which proves the source is self-consistent and can never prove that pressing a
+select shows fewer rows. The shim runs it now: that took `innerHTML = ''`
+(emptying only — parsing markup is the line it exists not to cross), a reflected
+`hidden`, and a `getElementById` that answers for the ids a caller **declares**
+rather than one hardcoded mount, so an id the page does not carry still comes
+back null.
 
 ⚠ **The Group cell is a control, because correcting one must not move money.**
 A child put in Beginners who belongs in Advanced is ordinary, and there was no

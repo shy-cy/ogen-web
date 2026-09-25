@@ -2495,11 +2495,50 @@
       return el('div', { class: 'acc-fact' }, [
         el('h3', { text: g.heading })
       ].concat(g.facts.map(function (f) {
+        // ⚠ THE PRICE IS ROWS HERE TOO, and for a release it was the one card
+        // on this screen that said everything twice and then ran two facts into
+        // one line.
+        //
+        // factText() renders the price as a single pre-line string -- "Late
+        // booking (within 24 hours of the session) - 10 €" -- which is the form
+        // for a caller with no room for rows, and this card has room. Two things
+        // followed, and neither is wrong on its own:
+        //
+        //  - the card is HEADED "Price" and then labelled "Price" underneath it,
+        //    which is exactly the duplication the public page's group-heading
+        //    rule forbids and exactly why that page renders its rows instead;
+        //  - the qualifier sat inside the label, so the figure it belongs to was
+        //    pushed to the far end of a wrapped line and the column of prices
+        //    stopped lining up. Reported as "Late booking - 10 €, and put the
+        //    (within 24 hours) under, smaller and italic -- it will align
+        //    better".
+        //
+        // The rows are already in the payload, from the same priceRows() the
+        // public page and the cost card read, so there is nothing new to keep in
+        // step: the qualifier becomes its own quiet line and the label stops
+        // repeating the heading above it.
+        if (f.key === 'price' && (act.priceRows || []).length) return priceFact(act.priceRows);
         return el('p', {}, [
           el('b', { text: f.label }),
           el('span', { text: f.value })
         ]);
       })));
+    }));
+  }
+
+  // One line per row, and the qualifier under the line it qualifies.
+  //
+  // The separator is the one `formatPrice()` uses, because this is the same
+  // sentence laid out with room for it rather than a second way of saying it --
+  // a test builds both and compares them. An activity with no structured
+  // numbers never reaches here: factText() fell back to the words an admin
+  // typed, priceRows is empty, and the fact prints as the sentence it is.
+  function priceFact(rows) {
+    return el('p', { class: 'acc-price' }, rows.map(function (r) {
+      return el('span', { class: 'acc-price-row' }, [
+        el('span', { text: r.label + ' - ' + r.value }),
+        r.note ? el('em', { class: 'acc-price-note', text: r.note }) : null
+      ]);
     }));
   }
 

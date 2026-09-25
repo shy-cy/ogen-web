@@ -49,11 +49,19 @@ H.ok(/r\.history/.test(client),
 H.ok(/priorCell\(r\)/.test(client),
   'and puts it on the row');
 
-// ⚠ NOT A SECOND ROW. The rows are built one per registration from
-// q.registrations; anything that mapped history into rows of its own would make
-// the count above the table disagree with the table.
-H.ok(/q\.registrations\.map/.test(client), 'rows are still one per registration');
-H.eq((client.match(/q\.registrations\.map/g) || []).length, 1,
+// ⚠ NOT A SECOND ROW. The rows are built one per registration; anything that
+// mapped history into rows of its own would make the count above the table
+// disagree with the table.
+//
+// It used to be spelled `q.registrations.map` and is now one list, narrowed by
+// one predicate, mapped in one place — the table can be filtered. The rule is
+// the same and it is asked by shape, because pinning the old spelling would fail
+// on a rename and say nothing about a second row builder appearing beside it.
+H.eq((client.match(/q\.registrations \|\| \[\]/g) || []).length, 1,
+  'the rows come from one list');
+H.ok(/var show = regs\.filter\(passes\)/.test(client),
+  'narrowed by one predicate, so what is drawn is a subset and never a rebuild');
+H.eq((client.match(/show\.map\(function \(r\)/g) || []).length, 1,
   'and there is exactly one place that builds them');
 
 // --------------------------------------------------------------------------

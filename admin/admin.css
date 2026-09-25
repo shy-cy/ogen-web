@@ -400,6 +400,56 @@ h2 > button.help,h3 > button.help{vertical-align:2px;}
 .capacity-line .over{color:var(--danger);}
 .capacity-line .group{padding-inline-start:14px;border-inline-start:1px solid #d7cfbb;}
 
+/* ---- narrowing the table ---------------------------------------------------
+   The row of filters, directly under the capacity line and deliberately not
+   part of it. The line above is filled --stone because it is a statement about
+   the activity — the room, and everybody counted against it. This is a set of
+   controls over the table below, and it is unfilled with one hairline under it
+   so the two do not read as one band: a filtered figure inside that line would
+   be a true number answering the room's question, which is the exact pairing
+   this screen was reported for once.
+
+   Nothing here is coloured. Narrowing a list is ordinary work rather than a
+   decision, the same argument the group select on a row is built on, and a row
+   of tinted controls above a table of amber flags and an olive Approve button
+   would be a third kind of emphasis competing with two that mean something. */
+.filters{
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+  padding:0 2px 12px;margin-bottom:14px;border-bottom:1px solid #e3ded1;
+}
+/* The globals size every input and select to the full width of a form field.
+   These sit side by side in a row, so each takes the width of what it holds. */
+.filters select,.filters input[type=search]{
+  width:auto;font-family:inherit;font-size:13px;padding:7px 10px;border-radius:7px;
+  border:1px solid #dcd6c6;background:#fff;color:var(--ink);
+}
+.filters select{cursor:pointer;max-width:220px;}
+.filters input[type=search]{flex:0 1 240px;min-width:150px;}
+.filters input[type=search]:focus,.filters select:focus{
+  outline:none;border-color:var(--olive);box-shadow:0 0 0 3px rgba(91,96,74,.13);
+}
+/* `label` is uppercase olive everywhere else in this admin, because everywhere
+   else it names a field above it. This one sits BESIDE its checkbox and is read
+   as a sentence, so it takes none of that. */
+.filters .filter-check{
+  display:inline-flex;align-items:center;gap:7px;margin:0;cursor:pointer;
+  font-size:13px;font-weight:400;color:var(--ink);text-transform:none;letter-spacing:0;
+}
+.filters .filter-check input[type=checkbox]{width:auto;margin:0;flex:none;cursor:pointer;}
+/* Pushed to the far end: it is what the row produced, not another control. */
+.filters .filter-count{
+  margin-inline-start:auto;font-size:12px;color:var(--muted);
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+/* Shown only while something is on. A Clear on an unfiltered table is a button
+   that does nothing, and this project has learned twice what those cost. */
+.filters .filter-clear{
+  font-family:inherit;font-size:12px;font-weight:700;padding:5px 10px;border-radius:6px;
+  border:1px solid #d7cfbb;background:#fff;color:var(--ink);cursor:pointer;
+}
+.filters .filter-clear:hover{background:var(--stone);}
+.filters .filter-clear[hidden]{display:none;}
+
 .queue{width:100%;border-collapse:collapse;font-size:13px;}
 .queue th{
   text-align:start;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
