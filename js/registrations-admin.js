@@ -18,7 +18,7 @@
 (function () {
   var API = '/api/admin-registrations';
   var S = { activities: [], slug: null, queue: null, register: null, date: null,
-            canApprove: false, canCancel: false, filter: null };
+            canApprove: false, canCancel: false, filter: null, eveFilter: null };
   // Written out rather than shown as a code: "ru" beside a draft is something an
   // admin has to decode, and this line is the whole warning.
   var LANG_NAME = { he: 'Hebrew', en: 'English', ru: 'Russian' };
@@ -136,7 +136,18 @@
       class: 'flag ok',
       text: r.feeCharged ? 'inc. yearly fee' : 'fee already paid ' + (r.feeYear || '')
     })]));
-    if (p.status) bits.push(el('span', { class: 'pill ' + p.status, text: p.status }));
+    // ⚠ DERIVED, NOT `payment.status`. That field is stamped 'owed' when the
+    // record is written and stays there on a row that owes nothing at all —
+    // which is how the live roster came to print "€0.00 / €0.00 OWED", and how
+    // an evening's WAITING row, which owes nothing by definition, was marked as
+    // owing. The filters already read payBucket() for exactly this reason; the
+    // cell beside them was still reading the stored field, so the same table
+    // could file a row under "nothing to pay" and label it OWED.
+    var bucket = payBucket(r);
+    if (bucket !== 'none') {
+      bits.push(el('span', { class: 'pill ' + (bucket === 'owes' ? 'owed' : 'paid'),
+                             text: bucket === 'owes' ? 'owed' : 'paid' }));
+    }
     return el('div', {}, bits);
   }
 
@@ -795,19 +806,111 @@
     });
   }
 
+  // ⚠ `waiting` WAS MISSING, so the pill fell through to `|| r.status` and the
+  // register printed the raw status. The same gap the family area had, where it
+  // reached a Hebrew page as the English word "waiting" — and the tell that this
+  // table had never been designed for a row that holds no seat. A test asserts
+  // every status the server can send has a word here.
   var SEAT = { booked: 'Booked', attended: 'Attended', 'no-show': 'No-show',
-               cancelled: 'Cancelled' };
+               cancelled: 'Cancelled', waiting: 'Waiting' };
+
+  // ⚠ THE EVENING REGISTER FOLLOWS THE QUEUE: the waiting list is its own table,
+  // and the rows narrow.
+  //
+  // Asked for as "the drop-in dashboard should follow the course dashboard —
+  // separate the waiting list and add filters", and both halves were already
+  // decided one screen up. Nothing in a register row applies to somebody
+  // waiting: no seat, nothing owed, no attendance to mark, and not in the room
+  // the count above the table is about. Mixed in, the one row with nothing to do
+  // about it sat between two that had — and was offered Present and No-show
+  // against a seat it does not hold.
+  //
+  // The filters are the queue's, minus the two an evening cannot answer. There
+  // is no GROUP select, because the strip above has already narrowed to one
+  // date and a drop-in's room is the evening's; and no AGE FLAGGED box, because
+  // that flag lives on the registration rather than on a booking. What is left
+  // is what an admin standing in a doorway actually asks: who is this, what
+  // state are they in, and have they paid.
+  // ⚠ KEPT ACROSS DATES, RESET ACROSS ACTIVITIES, and the difference is what the
+  // values MEAN. The queue's group filter is an id belonging to one activity, so
+  // carried across the picker it matches nothing and the empty table reads as an
+  // activity nobody registered for. `booked` and `owes` are true of every
+  // evening, and an admin sweeping a term for who still owes wants them to
+  // survive a chip press. Neither filter survives the picker.
+  function newEveFilter() { return { q: '', status: '', pay: '' }; }
+  var EVE_ORDER = ['booked', 'attended', 'no-show', 'cancelled'];
+
+  function evePasses(r) {
+    var f = S.eveFilter;
+    if (f.q && searchable(r).indexOf(f.q) === -1) return false;
+    if (f.status && f.status !== r.status) return false;
+    if (f.pay && payBucket(r) !== f.pay) return false;
+    return true;
+  }
+  // Somebody waiting holds nothing and owes nothing, so a PAYMENT filter is a
+  // question this list has no answer to — it stands the list down rather than
+  // guessing one, exactly as the course's waiting table does.
+  function evePassesWaiting(r) {
+    var f = S.eveFilter;
+    if (f.pay) return false;
+    if (f.status && f.status !== 'waiting') return false;
+    if (f.q && searchable(r).indexOf(f.q) === -1) return false;
+    return true;
+  }
+
+  function eveningBar(rows, waiting, repaint) {
+    var f = S.eveFilter;
+    var everyone = rows.concat(waiting);
+    var controls = [];
+
+    var byStatus = tally(rows, function (r) { return r.status; });
+    if (waiting.length) byStatus.waiting = waiting.length;
+    var sopts = EVE_ORDER.concat(['waiting']).filter(function (k) { return byStatus[k]; })
+      .map(function (k) {
+        return { v: k, t: (SEAT[k] || k) + ' (' + byStatus[k] + ')' };
+      });
+    controls.push(pick('Any status', f.status, sopts, function (v) { f.status = v; repaint(); }));
+
+    var byPay = tally(rows, payBucket);
+    var popts = ['owes', 'settled', 'none'].filter(function (k) { return byPay[k]; })
+      .map(function (k) { return { v: k, t: PAY_LABEL[k] + ' (' + byPay[k] + ')' }; });
+    controls.push(pick('Any payment', f.pay, popts, function (v) { f.pay = v; repaint(); }));
+
+    // ⚠ BUILT ONCE AND KEPT, like the queue's: rebuilding the bar on a keystroke
+    // takes the focus out of the box somebody is typing into, one character in.
+    var q = null;
+    if (everyone.length > 1) {
+      q = el('input', { type: 'search', 'aria-label': 'Find a name or email',
+        placeholder: 'Name or email',
+        oninput: function (e) { f.q = String(e.currentTarget.value || '').trim().toLowerCase(); repaint(); } });
+      q.value = f.q;
+    }
+
+    controls = controls.filter(Boolean);
+    if (!q && !controls.length) return null;
+
+    var count = el('span', { class: 'filter-count' });
+    var clear = el('button', { type: 'button', class: 'filter-clear', text: 'Clear',
+      onclick: function () { S.eveFilter = newEveFilter(); renderQueue(); } });
+    var bar = el('div', { class: 'filters' }, [q].concat(controls).concat([count, clear]));
+    bar._count = count;
+    bar._clear = clear;
+    return bar;
+  }
 
   function renderEvening(box) {
     var d = S.register;
     var cap = d.capacity;
-    var rows = (d.register || []).slice().sort(function (a, b) {
-      return String(a.name).localeCompare(String(b.name));
-    });
+    var byName = function (a, b) { return String(a.name).localeCompare(String(b.name)); };
+    var rows = (d.register || []).slice().sort(byName);
+    // Join order, not alphabetical: a queue has one order and it is the order
+    // people joined it in. The server already sorted; this keeps the copy.
+    var waiting = (d.waiting || []).slice();
 
-    // The room, on THIS evening. Over capacity is possible here for the reason
-    // it is possible on a course — two bookings arriving together both read one
-    // place left — and it is said plainly rather than pretended impossible.
+    // ⚠ THE ROOM, ON THIS EVENING, AND IT DOES NOT NARROW. The line counts the
+    // room and every booking against it; a filtered figure inside it would be a
+    // true number answering a different question, which is the pairing this
+    // screen was already reported for once.
     box.appendChild(el('div', { class: 'capacity-line' }, [
       el('span', {}, [
         el('b', { class: cap && cap.over ? 'over' : '', text: String(cap ? cap.taken : 0) }),
@@ -818,7 +921,7 @@
       cap && cap.over ? el('span', { class: 'over', text: 'Over capacity' }) : null
     ]));
 
-    if (!rows.length) {
+    if (!rows.length && !waiting.length) {
       box.appendChild(el('div', { class: 'label-row' }, [
         el('p', { class: 'hint', style: 'margin-top:0;', text: 'Nobody has booked this evening yet.' }),
         window.AdminHelp.badge('A registration holds no place on a date \u2014 a family books each '
@@ -827,19 +930,88 @@
       return;
     }
 
-    var head = el('tr', {}, ['Participant', 'Status', 'Paid / owed', '']
-      .map(function (h) { return el('th', { text: h }); }));
+    var rowBox = el('div', {});
+    var bar = eveningBar(rows, waiting, function () { paintEvening(bar, rowBox, rows, waiting); });
+    if (bar) box.appendChild(bar);
+    box.appendChild(rowBox);
+    paintEvening(bar, rowBox, rows, waiting);
+  }
+
+  function paintEvening(bar, box, rows, waiting) {
+    box.innerHTML = '';
+    var show = rows.filter(evePasses);
+    var showWaiting = waiting.filter(evePassesWaiting);
+
+    if (bar) {
+      var total = rows.length + waiting.length;
+      var shown = show.length + showWaiting.length;
+      bar._count.textContent = shown === total
+        ? total + (total === 1 ? ' booking' : ' bookings')
+        : shown + ' of ' + total + ' shown';
+      bar._clear.hidden = shown === total;
+    }
+
+    if (show.length) {
+      var head = el('tr', {}, ['Participant', 'Status', 'Paid / owed', '']
+        .map(function (h) { return el('th', { text: h }); }));
+      box.appendChild(el('table', { class: 'queue' }, [
+        el('thead', {}, [head]),
+        el('tbody', {}, show.map(function (r) {
+          return el('tr', {}, [
+            el('td', { class: 'who' }, [
+              el('b', { text: r.name }),
+              el('span', { text: r.accountEmail || r.accountId })
+            ]),
+            el('td', {}, [el('span', { class: 'pill ' + r.status, text: SEAT[r.status] || r.status })]),
+            el('td', {}, [moneyCell(r)]),
+            el('td', {}, [markCell(r)])
+          ]);
+        }))
+      ]));
+    } else if (rows.length) {
+      // ⚠ NEVER "nobody has booked this evening yet" WHILE A FILTER IS ON. It is
+      // true of an empty evening and a lie about a narrowed one — the one
+      // sentence this screen must not get wrong, and the rule the queue above
+      // already follows.
+      box.appendChild(el('p', { class: 'hint', text: 'No bookings match these filters.' }));
+    }
+
+    eveningWaiting(box, showWaiting, waiting.length);
+  }
+
+  // The queue for ONE evening. Its own table, in join order, with no controls on
+  // it at all — and that is the honest state rather than an omission. A place on
+  // an evening opens when somebody cancels it, and every family waiting is
+  // emailed at once; there is no admin action for handing one out, so there is
+  // no button here pretending otherwise. (The course's "Give a place" goes
+  // through openRegistration(), which is about a TERM and has no per-evening
+  // equivalent built.)
+  function eveningWaiting(box, list, total) {
+    if (!total) return;
+    box.appendChild(el('div', { class: 'label-row', style: 'margin-top:26px;' }, [
+      el('h3', { class: 'field-label', style: 'margin:0;',
+                 text: total + ' waiting for this evening' }),
+      window.AdminHelp.badge('Families who asked for a seat on this evening when it was full. '
+        + 'They hold nothing and owe nothing, and they are not counted in the room above. When '
+        + 'a seat opens \u2014 somebody cancels it \u2014 every one of them is emailed at once and it '
+        + 'goes to whoever takes it first, which on an evening is a window of minutes rather '
+        + 'than weeks.')
+    ]));
+    if (!list.length) {
+      box.appendChild(el('p', { class: 'hint', text: 'None of them match these filters.' }));
+      return;
+    }
     box.appendChild(el('table', { class: 'queue' }, [
-      el('thead', {}, [head]),
-      el('tbody', {}, rows.map(function (r) {
+      el('thead', {}, [el('tr', {}, ['Waiting', 'Since'].map(function (h) {
+        return el('th', { text: h });
+      }))]),
+      el('tbody', {}, list.map(function (r) {
         return el('tr', {}, [
           el('td', { class: 'who' }, [
             el('b', { text: r.name }),
             el('span', { text: r.accountEmail || r.accountId })
           ]),
-          el('td', {}, [el('span', { class: 'pill ' + r.status, text: SEAT[r.status] || r.status })]),
-          el('td', {}, [moneyCell(r)]),
-          el('td', {}, [markCell(r)])
+          el('td', {}, [el('span', { text: shortDate((r.waitingSince || '').slice(0, 10)) })])
         ]);
       }))
     ]));
@@ -857,8 +1029,16 @@
   // A cancelled booking is not markable: the evening was given back, and marking
   // somebody present for a place they do not hold would put them in a room they
   // are not counted in.
+  // ⚠ ASKED THE OTHER WAY ROUND. This listed the one status that is not
+  // markable, and a status added later inherited "markable" by saying nothing —
+  // which is what happened to `waiting`: the evening register offered Present
+  // and No-show against a seat the family does not hold, and marking them would
+  // have put somebody in a room nothing counts them in. The queue leaves this
+  // table now, and the rule is a list of what DOES hold a seat, so the next
+  // status added is refused until somebody says otherwise.
+  var MARKABLE = ['booked', 'attended', 'no-show'];
   function markCell(r) {
-    if (r.status === 'cancelled') return el('span', { class: 'why', text: '\u2014' });
+    if (MARKABLE.indexOf(r.status) === -1) return el('span', { class: 'why', text: '\u2014' });
     if (!S.canApprove) {
       return el('span', { class: 'why', title: 'Your role may open the register but not mark it',
                           text: '\u2014' });
@@ -1326,8 +1506,12 @@
     // picker matches nothing on the next one \u2014 and an empty table reads as an
     // activity nobody has registered for. The one thing this screen must never
     // say wrongly is the thing a stale filter would make it say.
-    if (slug !== S.slug) { S.date = null; S.register = null; S.filter = newFilter(); }
+    if (slug !== S.slug) {
+      S.date = null; S.register = null;
+      S.filter = newFilter(); S.eveFilter = newEveFilter();
+    }
     if (!S.filter) S.filter = newFilter();
+    if (!S.eveFilter) S.eveFilter = newEveFilter();
     S.slug = slug;
     // So a reload comes back to the activity you were on rather than to the
     // first row of the list. See js/admin-url.js for why it replaces the

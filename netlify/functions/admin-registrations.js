@@ -694,6 +694,10 @@ exports.handler = async (event) => {
             name: p ? [p.firstName, p.lastName].filter(Boolean).join(' ') : att.participantId,
             accountId: att.accountId, accountEmail: account ? account.email : null,
             groupId: att.groupId, status: att.status, payment: att.payment,
+            // When they joined the queue for this evening. The order the waiting
+            // table is read in, and it survives the claim, so "waited since
+            // Tuesday" is still true on the booking it became.
+            waitingSince: att.waitingSince || null,
             startsAt: att.frozen.startsAt, history: att.history
           });
         }
@@ -718,7 +722,16 @@ exports.handler = async (event) => {
           // many are in the room on any evening and is deliberately uncapped.
           registered: (await store.forActivity(activity.activityId))
             .filter((r) => R.holdsASpot(r)).length,
-          register: rows
+          // ⚠ THE QUEUE IS ITS OWN LIST, exactly as it is on the course roster,
+          // and for the same reason: nothing in a register row applies to
+          // somebody waiting. They hold no seat, owe nothing, have no attendance
+          // to mark and are not in the room the count above is about. Mixed in,
+          // the one row with nothing to do about it sat between two that had —
+          // with Present and No-show offered against a seat they do not hold.
+          register: rows.filter((r) => r.status !== 'waiting'),
+          // Join order, which is the only order a queue has. Oldest first.
+          waiting: rows.filter((r) => r.status === 'waiting')
+            .sort((a, b) => String(a.waitingSince || '').localeCompare(String(b.waitingSince || '')))
         });
       }
 

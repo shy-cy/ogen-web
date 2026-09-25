@@ -61,7 +61,13 @@ H.eq((client.match(/q\.registrations \|\| \[\]/g) || []).length, 1,
   'the rows come from one list');
 H.ok(/var show = regs\.filter\(passes\)/.test(client),
   'narrowed by one predicate, so what is drawn is a subset and never a rebuild');
-H.eq((client.match(/show\.map\(function \(r\)/g) || []).length, 1,
+// Scoped to paintRows, which is the QUEUE's painter. The evening register below
+// it narrows its own rows the same way and builds its own table; the rule here is
+// that the queue has ONE row builder, not that the file has one `show.map` in it.
+const paintRows = client.slice(client.indexOf('function paintRows(bar, box, regs, waiting) {'),
+                               client.indexOf('function renderWaiting(box, list) {'));
+H.ok(paintRows.length > 200, 'paintRows is where this test expects to find it');
+H.eq((paintRows.match(/show\.map\(function \(r\)/g) || []).length, 1,
   'and there is exactly one place that builds them');
 
 // --------------------------------------------------------------------------

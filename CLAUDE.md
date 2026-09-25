@@ -3794,6 +3794,67 @@ evening. It is now a **control on a screen that exists** rather than a screen
 that does not, and it belongs behind the `cancel` axis rather than `approve`,
 because it moves money.
 
+### ⚠ An evening register is not a queue
+
+Asked for as *"the drop-in dashboard should follow the course dashboard —
+separate the waiting list and add filters"*, looking at an evening showing a
+**WAITING** row between two booked ones, with **Present** and **No-show**
+offered against it and an `OWED` pill beside `€0.00 / €0.00`.
+
+Three faults, and only the first was asked about.
+
+⚠ **1. THE QUEUE WAS IN THE REGISTER.** Nothing in a register row applies to
+somebody waiting — no seat, nothing owed, no attendance to mark, and they are
+not in the room the count above the table is about. The course roster settled
+this once already (*"nothing in a queue row applies to somebody waiting… so it
+is its own table under the queue"*), and the evening register was written
+afterwards without it. It is **split server-side**, like the queue's, so one
+rule has one implementation; the list is in **join order**, which is the only
+order a queue has.
+
+The evening's waiting table has **no controls at all**, and that is the honest
+state rather than an omission: a seat opens when somebody cancels one, everybody
+waiting is emailed, and there is no admin action for handing one out. The
+course's **Give a place** goes through `openRegistration()`, which is about a
+*term* and has no per-evening equivalent built. A button here would be a door to
+nowhere, which this admin has shipped three times.
+
+⚠ **2. PRESENT AND NO-SHOW WERE OFFERED ON A WAITING ROW.** `markCell()` listed
+the one status that is **not** markable (`cancelled`), so `waiting` inherited
+"markable" by saying nothing — and marking somebody present for a seat they do
+not hold puts them in a room `capacityForDate()` does not count them in. It is
+`MARKABLE` now, a list of what **does** hold a seat, so the next status added is
+refused until somebody decides otherwise. That is the same inversion the session
+calendar's tick had, arriving from the other direction.
+
+⚠ **3. `SEAT` HAD NO WORD FOR `waiting`**, so the pill fell through to
+`|| r.status` and printed the raw status — identical to the family area, where
+the same gap reached a Hebrew page as the English word *waiting*, and the tell
+that this table had never been designed for a row holding no seat.
+
+**The filters are the queue's, minus the two an evening cannot answer.** No
+**group** select, because the strip above has already narrowed to one date and a
+drop-in's room is the evening's; no **age flagged** box, because that flag lives
+on the registration rather than on a booking. What is left is what an admin
+standing in a doorway asks: who is this, what state are they in, have they paid.
+The three load-bearing rules are the queue's own — the **capacity line never
+narrows**, a narrowed evening **never says "nobody has booked this evening
+yet"**, and the bar is **built once** so the search box keeps the focus it is
+being typed into.
+
+⚠ **They reset with the ACTIVITY and survive a DATE**, and the difference is
+what the values mean. A group id belongs to one activity, so carried across the
+picker it matches nothing; `booked` and `owes` are true of every evening, and an
+admin sweeping a term for who still owes wants them to survive a chip press.
+
+⚠ **AND THE PAYMENT PILL IS DERIVED NOW, ON BOTH TABLES.** `moneyCell()` read
+`payment.status`, which is stamped `owed` when a record is written and stays
+there on a row that owes nothing — the documented cause of `€0.00 / €0.00 OWED`
+on the live roster, and of a **waiting** row being marked as owing when a queue
+owes nothing by definition. The **filters beside it already derived the bucket
+for exactly this reason**, so one table could file a row under *nothing to pay*
+and label it OWED. One `payBucket()`, read by the cell and by the filter.
+
 ### Cancelling one evening is all or nothing
 
 `registration.sessionCancelHours`, a single number, no modes and no proration —
