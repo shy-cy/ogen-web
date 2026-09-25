@@ -2590,6 +2590,48 @@ produce is an honest payer losing their seat while typing their card number — 
 **never past the session's start**, since holding a seat into the lesson keeps the
 room shut against somebody who could still walk in.
 
+⚠ **AND FOR SEVERAL RELEASES THAT EVENING QUEUE HAD NO DOOR EITHER.** Reported
+as *"no waiting list for drop in"* — the third time this project has shipped a
+capability with nothing to press. Every rule above was built, tested and
+unreachable: the server queues, mails, holds for minutes and announces per date,
+and the client drew **none** of it.
+
+Three missing doors, each defensible alone:
+
+- `eveningAction()` ended `if (!data.mayBook || s.full || s.past) return null`,
+  so **the one row with something new to offer was the one row with no control**.
+  Identical in shape to the full *group* option being `disabled` one screen over,
+  and to the invite button labelled with a description.
+- **There was no branch for a `waiting` row**, so a family already in an evening's
+  queue could neither leave it nor take the seat when it opened. The pill was
+  drawn and nothing else.
+- and with **every** evening full, the register panel had nothing tickable, a
+  disabled pay button and no sentence — a dead end on the screen every activity
+  page's Register button lands on. ⚠ Queueing needs an **approved registration**
+  behind it (`bookSession` refuses without one, because the registration is the
+  "may come" decision and an admin makes it once), so the way through is not a
+  second booking endpoint: it offers `submit`, which on a drop-in charges
+  nothing, and the page becomes the registration where each evening's queue is.
+
+And two faults underneath them:
+
+- ⚠ **`cancelSession` REFUSED A WAITING RECORD AS "already happened".** The guard
+  took only `booked`, so the one action a queue must have answered with a refusal
+  about something else entirely. Leaving is **not** a cancellation — nothing held,
+  nothing owed, no price ever frozen, so there is no credit and no ledger line —
+  and ⚠ **`seatOpened()` must NOT fire**, or everybody else waiting on that
+  evening is invited to take a place nobody gave up. Marked `cancelled` rather
+  than deleted, so an admin can see a family who waited, left and came back.
+- ⚠ **`waiting` had no word in any language.** `T.sessionStatus` held four
+  statuses out of five, so the pill fell through to `|| s.status` and printed the
+  raw English string `waiting` on the Hebrew and Russian pages.
+
+**The copy is the course queue's own** — `registerWaitGo`, `takePlace`,
+`leaveWait` — so a family reads one sentence whichever queue they join and there
+is no second table of words to keep in step. One pill rule covers both, because
+waiting for a term and waiting for one evening are the same fact about a family:
+nothing is being held.
+
 ⚠ **CLAIMING IS NOT AN ACTION.** Whether somebody is taking a place off the list
 is read from the record that is already there — a family who was queueing and is
 now registering *is* claiming, by definition. So there is no claim endpoint to
