@@ -111,6 +111,27 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/activities/beit-midrash"/>
   </url>
   <url>
+    <loc>https://www.ogen.cy/activities/beit-midrash-ayeka</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/activities/beit-midrash-ayeka"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/activities/beit-midrash-ayeka"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru/activities/beit-midrash-ayeka"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/activities/beit-midrash-ayeka"/>
+  </url>
+  <url>
+    <loc>https://www.ogen.cy/en/activities/beit-midrash-ayeka</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/activities/beit-midrash-ayeka"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/activities/beit-midrash-ayeka"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru/activities/beit-midrash-ayeka"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/activities/beit-midrash-ayeka"/>
+  </url>
+  <url>
+    <loc>https://www.ogen.cy/ru/activities/beit-midrash-ayeka</loc>
+    <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/activities/beit-midrash-ayeka"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/activities/beit-midrash-ayeka"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru/activities/beit-midrash-ayeka"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/activities/beit-midrash-ayeka"/>
+  </url>
+  <url>
     <loc>https://www.ogen.cy/activities/bnei-mitzvah-2027</loc>
     <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/activities/bnei-mitzvah-2027"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/activities/bnei-mitzvah-2027"/>
@@ -193,26 +214,5 @@
     <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/activities/intro-into-judaism"/>
     <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru/activities/intro-into-judaism"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/activities/intro-into-judaism"/>
-  </url>
-  <url>
-    <loc>https://www.ogen.cy/activities/beit-midrash-ayeka</loc>
-    <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/activities/beit-midrash-ayeka"/>
-    <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/activities/beit-midrash-ayeka"/>
-    <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru/activities/beit-midrash-ayeka"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/activities/beit-midrash-ayeka"/>
-  </url>
-  <url>
-    <loc>https://www.ogen.cy/en/activities/beit-midrash-ayeka</loc>
-    <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/activities/beit-midrash-ayeka"/>
-    <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/activities/beit-midrash-ayeka"/>
-    <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru/activities/beit-midrash-ayeka"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/activities/beit-midrash-ayeka"/>
-  </url>
-  <url>
-    <loc>https://www.ogen.cy/ru/activities/beit-midrash-ayeka</loc>
-    <xhtml:link rel="alternate" hreflang="he" href="https://www.ogen.cy/activities/beit-midrash-ayeka"/>
-    <xhtml:link rel="alternate" hreflang="en" href="https://www.ogen.cy/en/activities/beit-midrash-ayeka"/>
-    <xhtml:link rel="alternate" hreflang="ru" href="https://www.ogen.cy/ru/activities/beit-midrash-ayeka"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.ogen.cy/activities/beit-midrash-ayeka"/>
   </url>
 </urlset>
