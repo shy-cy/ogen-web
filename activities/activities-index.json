@@ -86,7 +86,7 @@
       "ru"
     ],
     "title": {
-      "he": "חוג עברית לילדים בגילאי 6-10",
+      "he": "חוג עברית לילדים",
       "en": "Hebrew Classes for Children",
       "ru": "Уроки иврита для детей"
     },
@@ -97,7 +97,7 @@
     },
     "cardImage": "/images/activities/hebrew4kids-card-a1f8d75e.jpg",
     "testActivity": false,
-    "isoUpdated": "2026-09-26T07:01:08.445Z"
+    "isoUpdated": "2026-09-26T07:01:44.384Z"
   },
   {
     "slug": "qa-course",
