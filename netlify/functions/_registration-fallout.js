@@ -75,6 +75,7 @@ const groups = require('./_activity-groups');
 const REG = require('./_activity-registration');
 const R = require('./_registration');
 const credit = require('./_credit');
+const LISTING = require('./_activity-listing');
 
 const same = (a, b) => String(a === undefined ? null : a) === String(b === undefined ? null : b);
 
@@ -134,6 +135,34 @@ function olderSchedules(activity, regs) {
       return shapeKey(credit.tiersFrom(frozen)) !== shapeFor(r.groupId);
     }).length;
 }
+
+// ⚠ THE PAYMENT MODE MOVED, AND NOTHING ON ANY RECORD MOVES WITH IT.
+//
+// A listing switched to or from Test changes which Stripe configuration the
+// activity's FUTURE payments run through, and every registration already taken
+// keeps the mode frozen on it — deliberately, because money already taken was
+// real or was not, and a publish cannot make it retrospectively the other. That
+// is the freeze doing its job and it is also invisible: from the form an admin has
+// just changed how this activity is paid for, and the families already on it are
+// the one group the change does not reach.
+//
+// So it is COUNTED AND NAMED, exactly as a rewritten refund schedule is. Nothing
+// is rewritten and nothing is emailed: a family's own payments go on working
+// through the keys they were sold under, which is the correct outcome and not one
+// anybody needs telling about. What an admin needs is to know that switching a
+// live activity to Test does not turn its outstanding debts into rehearsals — and
+// therefore that a rehearsal wants a fresh activity rather than a repurposed one.
+function paymentModeMoved(previous, activity) {
+  if (!previous) return false;
+  return LISTING.paymentModeOf(previous) !== LISTING.paymentModeOf(activity);
+}
+
+// How many live registrations still answer to the mode they were sold in. Read
+// off the FROZEN block, which is the only place the answer is.
+const onOldMode = (activity, regs) => (regs || [])
+  .filter((r) => r && R.LIVE_STATUSES.indexOf(r.status) !== -1)
+  .filter((r) => LISTING.modeOfRecord(r) !== LISTING.paymentModeOf(activity))
+  .length;
 
 // Did an admin touch either field? A first publish has nothing to have moved
 // from, and nothing agreed to move: `previous` is null and the answer is no.
@@ -288,7 +317,8 @@ async function afterPublish(activity, previous, opts) {
   // told how many families are still on the old one, or the choice not to
   // propagate is a choice nobody can see.
   const needsShape = scheduleShapeMoved(previous, activity);
-  if (!needsTerms && !needsRoom && !needsShape) return null;
+  const needsMode = paymentModeMoved(previous, activity);
+  if (!needsTerms && !needsRoom && !needsShape && !needsMode) return null;
   const regs = await store.forActivity(activity.activityId);
   const terms = await applyCutoffChange(activity, previous, regs, opts);
   // Counted AFTER the dates have been carried across, off the records as they now
@@ -297,7 +327,11 @@ async function afterPublish(activity, previous, opts) {
   return {
     terms: terms,
     room: await announceNewRoom(activity, previous, regs, opts),
-    schedule: needsShape ? { older: olderSchedules(activity, fresh) } : null
+    schedule: needsShape ? { older: olderSchedules(activity, fresh) } : null,
+    mode: needsMode
+      ? { from: LISTING.paymentModeOf(previous), to: LISTING.paymentModeOf(activity),
+          kept: onOldMode(activity, fresh) }
+      : null
   };
 }
 
@@ -314,7 +348,7 @@ function roomOpenedPossible(previous, activity) {
 }
 
 module.exports = {
-  afterPublish,
+  afterPublish, paymentModeMoved, onOldMode,
   applyCutoffChange, announceNewRoom,
   storedCutoffs, cutoffFieldsMoved, roomOpened, roomOpenedPossible, reterm,
   shapeKey, scheduleShapeMoved, olderSchedules, writeClosing

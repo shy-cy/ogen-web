@@ -36,6 +36,7 @@ const R = require('./_registration');
 const credit = require('./_credit');
 const ledger = require('./_credit-ledger');
 const spend = require('./_spend-credit');
+const LST = require('./_activity-listing');
 const { cancelAndCredit, cancelOneSession } = require('./_registration-cancel');
 const { openRegistration } = require('./_registration-open');
 const attendance = require('./_session-attendance');
@@ -105,6 +106,11 @@ async function row(reg) {
     decidedBy: reg.decidedBy,
     ageFlagAtSubmission: reg.ageFlag,
     payment: reg.payment,
+    // ⚠ WHICH KIND OF MONEY THIS REGISTRATION'S IS, off its frozen block. The
+    // money panel needs it to ask for the right balance: an account can hold both
+    // a real credit and a rehearsal one, and offering the wrong figure would put a
+    // number on screen that the server is about to refuse to spend.
+    paymentMode: LST.modeOfRecord(reg),
     // Whether the yearly fee was billed on THIS term, and which year it was
     // judged against. An admin looking at a 300 beside a 350 needs to be able to
     // see why without opening the other term.
@@ -738,6 +744,8 @@ exports.handler = async (event) => {
             name: p ? [p.firstName, p.lastName].filter(Boolean).join(' ') : att.participantId,
             accountId: att.accountId, accountEmail: account ? account.email : null,
             groupId: att.groupId, status: att.status, payment: att.payment,
+            // As on a registration row: which balance the money panel may offer.
+            paymentMode: LST.modeOfRecord(att),
             // When they joined the queue for this evening. The order the waiting
             // table is read in, and it survives the claim, so "waited since
             // Tuesday" is still true on the booking it became.
@@ -1146,6 +1154,12 @@ exports.handler = async (event) => {
         });
         next.payment = Object.assign({}, next.payment, {
           paidCents: paid, paidAt: new Date().toISOString(),
+          // ⚠ CASH AT A DESK IS STILL ONE KIND OF MONEY OR THE OTHER, and it is
+          // the evening's own — off its frozen block, never chosen by the admin.
+          // A test activity's register is a rehearsal whether the money arrives by
+          // card or in an envelope, and stamping it live would put pretend takings
+          // in with the real ones on the one screen somebody reconciles.
+          mode: LST.modeOfRecord(att),
           status: next.payment.owedCents != null && paid >= next.payment.owedCents ? 'paid' : 'owed'
         });
         await attendance.saveAttendance(next);
@@ -1180,6 +1194,8 @@ exports.handler = async (event) => {
         next.payment = Object.assign({}, next.payment, {
           paidCents: paid,
           paidAt: new Date().toISOString(),
+          // The registration's own mode, as recordSessionPayment above.
+          mode: LST.modeOfRecord(reg),
           // `owed` until it covers what was billed. Deliberately not "paid" at
           // the first cent: a part payment that reads as settled is a debt
           // nobody chases.
@@ -1255,16 +1271,24 @@ exports.handler = async (event) => {
         const cents = Math.round(Number(body.amountCents));
         if (!(cents > 0)) return json(400, { error: 'An amount is a positive number of cents.' });
         if (!body.note) return json(400, { error: 'An adjustment needs a note saying why.' });
+        // ⚠ THE ONE PLACE A MODE IS CHOSEN RATHER THAN DERIVED, because an
+        // adjustment is attached to an ACCOUNT and to no record — there is no
+        // frozen block to read it off. It defaults to real money, which is what an
+        // adjustment almost always is, so the form has to say otherwise on
+        // purpose; the two balances are never added together, so one written in the
+        // wrong mode shows up as a balance that did not move rather than as money
+        // quietly appearing.
+        const mode = LST.normaliseMode(body.mode);
         const entry = await ledger.append({
           accountId: account.accountId,
           type: body.type === 'debit' ? 'debit' : 'credit',
-          amountCents: cents, reason: 'admin-adjustment',
+          amountCents: cents, reason: 'admin-adjustment', mode: mode,
           note: String(body.note).slice(0, 500), createdBy: session.email
         });
         await recordAudit(session, 'registrations.adjustCredit', account.accountId, 'ok',
-          { detail: entry.type + ' ' + cents + 'c · ' + entry.note });
-        return json(200, { ok: true, entry: entry,
-                           balanceCents: await ledger.balanceFor(account.accountId) });
+          { detail: entry.type + ' ' + cents + 'c · ' + mode + ' · ' + entry.note });
+        return json(200, { ok: true, entry: entry, mode: mode,
+                           balanceCents: await ledger.balanceFor(account.accountId, mode) });
       }
 
       // Reading the ledger is `access`, not `cancel`. Seeing what a family is
@@ -1273,8 +1297,14 @@ exports.handler = async (event) => {
         const account = await accounts.getAccount(body.accountId);
         if (!account) return json(404, { error: 'No such account.' });
         const entries = await ledger.entriesFor(account.accountId);
+        // ⚠ BOTH FIGURES, because an account can hold both and one number would be
+        // a sum nobody is owed. The real balance is the headline; the rehearsal one
+        // travels so the panel can say so when it is not zero, rather than leaving
+        // an admin to wonder why the entries do not add up to the total above them.
         return json(200, { ok: true, accountId: account.accountId, email: account.email,
-                           balanceCents: ledger.balanceOf(entries), entries: entries });
+                           balanceCents: ledger.balanceOf(entries, 'live'),
+                           testBalanceCents: ledger.balanceOf(entries, 'test'),
+                           entries: entries });
       }
 
       // "Run now", because the scheduled function cannot be triggered from a

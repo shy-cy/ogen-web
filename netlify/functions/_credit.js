@@ -40,11 +40,15 @@
 // instants and emits UTC precisely so it does NOT have to know one; resolving a
 // wall-clock time to an instant is the caller's job, and for a credit the caller
 // is this file.
-// The only require in this file, and it is pure: which calendar and which
-// schedule a named group has. It opens no store, reads no clock and does not
-// change the rule this module opens with — one record and one timestamp in, the
-// same figure out a year later.
+// The requires in this file are all PURE. They open no store, read no clock and
+// do not change the rule this module opens with — one record and one timestamp
+// in, the same figure out a year later.
+//
+// Which calendar and which schedule a named group has:
 const groups = require('./_activity-groups');
+// And which Stripe configuration an activity's payments run through, which
+// freezeSession() stamps onto an evening the way it stamps the price:
+const listing = require('./_activity-listing');
 // ⚠ THE FREEZING HALF MAY READ. creditFor() and creditForSession() reach nothing
 // but the frozen record and a timestamp — that is the contract, and a test pins
 // it by name. freezeCancellation() runs at submission, which is exactly when the
@@ -717,6 +721,12 @@ function freezeSession(activity, sessionDate, resolveSessionInstant, opts) {
     type: 'dropin',
     sessionDate: sessionDate,
     startsAt: startsAt,
+    // ⚠ WHOSE MONEY THIS EVENING'S IS, frozen at booking beside its price and for
+    // the same reason. An admin switching the activity to Test in March must not
+    // turn last month's real €7 into a rehearsal — and settleSession() in the
+    // webhook compares this against the mode the payment actually arrived in, so
+    // a test card can never land on an evening that was sold for real.
+    paymentMode: listing.paymentModeOf(activity),
     // Null means "creditable until it starts", and absent must not become 0 —
     // zero hours and no rule are the same answer here, but only by accident, and
     // a later edit to either would separate them.

@@ -27,6 +27,7 @@ const ledger = require('./_credit-ledger');
 const store = require('./_registration-store');
 const attendance = require('./_session-attendance');
 const waitlist = require('./_waitlist');
+const LST = require('./_activity-listing');
 const R = require('./_registration');
 
 const REASON = {
@@ -79,6 +80,12 @@ async function cancelOneSession(att, { by, source, note, historyNote, now }) {
       type: 'credit',
       amountCents: owed.credit,
       reason: REASON[source] || REASON.admin,
+      // ⚠ THE SAME KIND OF MONEY THAT WAS TAKEN. Giving back a rehearsal's €7 as
+      // real credit would make a test activity a way of minting money, and giving
+      // back real money as test credit would lose it. It comes off the frozen
+      // block rather than off the activity, so a listing switched since the
+      // booking cannot change which.
+      mode: LST.modeOfRecord(att),
       relatedRegistrationKey: R.key(att.participantId, att.activityId),
       // Which evening, and what decided the figure. "credited 7.00" against a
       // term somebody has five bookings on answers nothing six weeks later.
@@ -179,6 +186,7 @@ async function cancelAndCredit(reg, { by, source, note, now }) {
       type: 'credit',
       amountCents: total,
       reason: REASON[source] || REASON.admin,
+      mode: LST.modeOfRecord(reg),
       relatedRegistrationKey: R.key(reg.participantId, reg.activityId),
       basis: basis,
       note: note || null,

@@ -367,7 +367,9 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
   const att = mods['_session-attendance'];
   const book = (date, owed) => att.saveAttendance({
     participantId: 'p-1', activityId: 'act-2', sessionDate: date, accountId: 'a-1',
-    status: 'booked', frozen: { type: 'dropin', sessionDate: date },
+    // `paymentMode` is what settle() checks the arriving payment against. A live
+    // evening paid for with a live Checkout is the ordinary case.
+    status: 'booked', frozen: { type: 'dropin', sessionDate: date, paymentMode: 'live' },
     payment: { owedCents: owed, paidCents: 0, currency: 'EUR', status: 'owed' }, history: []
   });
   await book('2026-10-27', 1200);
@@ -378,7 +380,7 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
                 participant_id: 'p-1', activity_id: 'act-2',
                 session_dates: '2026-10-27,2026-11-03', session_amounts: '1200,1500' }
   };
-  await mods['stripe-webhook'].settle(session);
+  await mods['stripe-webhook'].settle(session, 'live');
   let a = await att.getAttendance('p-1', 'act-2', '2026-10-27');
   let b = await att.getAttendance('p-1', 'act-2', '2026-11-03');
   H.eq(a.payment.paidCents, 1200, 'each evening is settled for its OWN amount');
@@ -387,7 +389,7 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
 
   // Running it again must find nothing. Stripe retries, and a double credit here
   // is money a family did not pay showing as paid.
-  await mods['stripe-webhook'].settle(session);
+  await mods['stripe-webhook'].settle(session, 'live');
   a = await att.getAttendance('p-1', 'act-2', '2026-10-27');
   H.eq(a.payment.paidCents, 1200, 'a redelivered event settles nothing twice');
 
@@ -398,7 +400,7 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
     metadata: { organization: 'ogen', ogen_kind: 'session',
                 participant_id: 'p-1', activity_id: 'act-2',
                 session_dates: '2026-11-10,2026-10-27', session_amounts: '1000,1000' }
-  });
+  }, 'live');
   const c = await att.getAttendance('p-1', 'act-2', '2026-11-10');
   H.eq(c.payment.paidCents, 0,
     'money is not split across blobs by a figure nobody checked — that lands it ' +

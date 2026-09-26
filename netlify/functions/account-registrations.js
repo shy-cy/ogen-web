@@ -28,6 +28,7 @@ const R = require('./_registration');
 const credit = require('./_credit');
 const ledger = require('./_credit-ledger');
 const spend = require('./_spend-credit');
+const LST = require('./_activity-listing');
 const { cancelAndCredit, cancelOneSession } = require('./_registration-cancel');
 const attendance = require('./_session-attendance');
 const B = require('./_bundle');
@@ -1454,7 +1455,11 @@ exports.handler = async (event) => {
           return no(403, 'credit-not-yours', { reason: 'not-your-debt' });
         }
 
-        const balance = await ledger.balanceFor(me.accountId);
+        // ⚠ THE BALANCE IN THIS RECORD'S OWN MODE. An account can hold both a
+        // real credit and a rehearsal one; neither can pay the other's debt, so
+        // there is no single figure to ask for. spendCredit() asks the same
+        // question again and caps against the same answer.
+        const balance = await ledger.balanceFor(me.accountId, LST.modeOfRecord(record));
         const cents = spend.spendable(record, balance);
         if (!(cents > 0)) {
           return no(409, balance > 0 ? 'nothing-outstanding' : 'no-credit',
@@ -1505,7 +1510,7 @@ exports.handler = async (event) => {
           await attendance.saveAttendance(left);
           return json(200, { ok: true, session: left, waitingLeft: true,
                              credit: { credit: 0, reason: 'was-waiting' }, entry: null,
-                             balance: await ledger.balanceFor(me.accountId) });
+                             balance: await ledger.balanceFor(me.accountId, LST.modeOfRecord(att)) });
         }
 
         if (att.status !== 'booked') {
@@ -1528,7 +1533,7 @@ exports.handler = async (event) => {
         });
         const next = done.session, owed = done.credit, entry = done.entry;
         return json(200, { ok: true, session: next, credit: owed, entry: entry,
-                           balance: await ledger.balanceFor(me.accountId) });
+                           balance: await ledger.balanceFor(me.accountId, LST.modeOfRecord(att)) });
       }
 
       // --- this account's registrations ------------------------------------
@@ -1590,9 +1595,20 @@ exports.handler = async (event) => {
           // child's name to a screen that does not display it.
           participantCount: ids.length,
           registrations: rows,
-          balanceCents: ledger.balanceOf(entries),
+          // ⚠ THE REAL ONE. The dashboard is about an account rather than about
+          // one activity, so there is no record to take a mode from — and the
+          // figure a family reads on their own front page is the money they
+          // actually have. A rehearsal's credit is a staff artefact on an activity
+          // only reachable by a link they were sent; it shows on THAT page, where
+          // it can be spent, and is not advertised here as though it were theirs.
+          balanceCents: ledger.balanceOf(entries, 'live'),
           currency: ledger.CURRENCY,
-          entries: entries
+          // ⚠ THE LINES BEHIND THAT FIGURE AND NO OTHERS. The card prints a total
+          // and then the entries under it, so sending a rehearsal's lines here
+          // would put rows on screen that do not add up to the number above them —
+          // and make the card the one place on the site where the two kinds of
+          // money appear in one column. A test activity's own page shows its own.
+          entries: entries.filter((e) => LST.normaliseMode(e.mode) === 'live')
         });
       }
 
@@ -1676,7 +1692,9 @@ exports.handler = async (event) => {
           // What this account is holding, so the page that shows a debt can also
           // show the thing that settles it. It was on the dashboard only, which
           // is not where anybody is standing when they owe something.
-          balanceCents: await ledger.balanceFor(me.accountId),
+          // In THIS registration's mode, because this page is where it gets
+          // spent — see useCredit, which caps against the same figure.
+          balanceCents: await ledger.balanceFor(me.accountId, LST.modeOfRecord(reg)),
           perSession: activity && activity.type === 'dropin'
             ? Object.assign(
                 await sessionsPayload(activity, participant.participantId, Date.now()),
@@ -1847,7 +1865,7 @@ exports.handler = async (event) => {
           // released, each with what it earned — so a family sees the per-session
           // credits rather than one figure that came from nowhere.
           sessions: done.sessions,
-          balance: await ledger.balanceFor(me.accountId)
+          balance: await ledger.balanceFor(me.accountId, LST.modeOfRecord(reg))
         });
       }
 

@@ -20,6 +20,7 @@
 
 const { requireStore, optionalStore, readMany } = require('./_blobs');
 const B = require('./_bundle');
+const LST = require('./_activity-listing');
 
 const STORE = 'bundles';
 const PREFIX = 'bun-';
@@ -78,7 +79,8 @@ async function spendableFor(participantId, activityId, sessionDate) {
 // the bundle's price or its window in March cannot change what somebody bought
 // in January — the record carries its own terms and nothing reads the activity
 // to find them again.
-function newBundle({ participantId, activityId, accountId, groupId, bundle, coveredDates, purchasedAt, paymentRef }) {
+function newBundle({ participantId, activityId, accountId, groupId, bundle, coveredDates,
+                     purchasedAt, paymentRef, paymentMode }) {
   const iso = new Date(purchasedAt).toISOString();
   return {
     bundleId: bundle.bundleId,
@@ -95,6 +97,12 @@ function newBundle({ participantId, activityId, accountId, groupId, bundle, cove
       entries: bundle.entries,
       pricePerEntry: bundle.pricePerEntry,
       validityDays: bundle.validityDays,
+      // ⚠ WHICH KIND OF MONEY BOUGHT THIS. A bundle is the one purchase paid for
+      // before its record exists, so the mode travels in the Checkout metadata and
+      // is frozen here on the way back in — and the nightly shortfall credit reads
+      // it, so a rehearsal that could not be honoured is made good in rehearsal
+      // credit rather than in real money.
+      paymentMode: LST.normaliseMode(paymentMode),
       totalCents: B._eur(bundle.pricePerEntry) * bundle.entries,
       // The deadline as an instant, frozen — so a reschedule six weeks later is
       // bounded by the window that was sold rather than by one recomputed from

@@ -281,20 +281,20 @@ const POLICY = {
 
   // ⚠ AND THE LEDGER MOVES BY WHAT WAS PROMISED. A payload agreeing with a
   // dialog proves only that two readers of one bug agree.
-  const before = await ledger.balanceFor(dana.accountId);
+  const before = await ledger.balanceFor(dana.accountId, 'live');
   const done = await H.call(regs.handler, { action: 'cancel', token: dana.token,
     participantId: noa, activityId: autumn.activityId });
   H.eq(done.status, 200, 'the family cancels the autumn term');
-  const moved = (await ledger.balanceFor(dana.accountId)) - before;
+  const moved = (await ledger.balanceFor(dana.accountId, 'live')) - before;
   H.eq(moved, offer.credit, 'and the ledger moved by exactly what the page offered — ' + moved);
   H.eq(done.body.credit.feeCredit, 0, 'with no fee in it');
   H.eq(done.body.entry.basis.feeHeldElsewhere, true, 'and the entry says why, for whoever asks');
 
   // The control, through the same door.
-  const beforeAri = await ledger.balanceFor(dana.accountId);
+  const beforeAri = await ledger.balanceFor(dana.accountId, 'live');
   await H.call(regs.handler, { action: 'cancel', token: dana.token,
     participantId: ari, activityId: autumn.activityId });
-  const movedAri = (await ledger.balanceFor(dana.accountId)) - beforeAri;
+  const movedAri = (await ledger.balanceFor(dana.accountId, 'live')) - beforeAri;
   H.eq(movedAri - moved, 5000,
     '⚠ THE WHOLE BUG IN ONE LINE: one term back is 350, one of two is 300');
 
@@ -342,9 +342,14 @@ const POLICY = {
       }
       const call = code.slice(i, j + 1);
       i = j + 1;
-      // `function creditFor(account)` in _registration-email.js is a different
-      // function that reads a ledger balance. A declaration is not a call site.
-      if (/^creditFor\(account\)/.test(call)) continue;
+      // ⚠ THERE IS NO EXCLUSION HERE ANY MORE, and that is the fix rather than a
+      // relaxation. `function creditFor(account)` in _registration-email.js was a
+      // DIFFERENT function that read a ledger balance, and this scan had to skip
+      // it by matching its exact signature — so the day it gained an argument,
+      // this rule about _credit.js failed on a function in another file. It is
+      // called heldBy() now. Two unrelated functions sharing one name in one
+      // directory is the thing that was wrong; a cleverer skip would only have
+      // hidden it again.
       sites++;
       // ⚠ COUNTED, NOT MATCHED ON THE LITERAL. cancelAndCredit() builds the
       // object once and hands the same one to creditFor() and basisFor(),

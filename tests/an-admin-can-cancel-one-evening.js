@@ -159,7 +159,7 @@ const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm,
   H.eq(res.body.entry.basis.perSession, true, 'marked as a per-evening line');
   H.eq(res.body.session.payment.creditedCents, 1200, 'the booking records what was credited');
   H.eq(res.body.session.payment.status, 'credited', 'and its status moves');
-  H.eq(await ledger.balanceFor(account.accountId), 1200,
+  H.eq(await ledger.balanceFor(account.accountId, 'live'), 1200,
     'the account’s balance is the entry, summed rather than cached');
 
   const regAfter = await regStore.getRegistration('p-1', AID);
@@ -196,7 +196,7 @@ const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm,
   H.eq(res.body.credit.credit, 0, 'and nothing is credited');
   H.eq(res.body.credit.reason, 'too-late', 'for a reason the screen can print');
   H.eq(res.body.entry, null, '⚠ with NO ledger line at all — a zero entry explains nothing');
-  H.eq(await ledger.balanceFor(account.accountId), 1200, 'so the balance is unchanged');
+  H.eq(await ledger.balanceFor(account.accountId, 'live'), 1200, 'so the balance is unchanged');
 
   console.log('\n[the figure on the screen is the figure that is written]');
   const third = await book('p-1', DATES[2], Date.now() + 240 * HOUR, 1200);
@@ -213,13 +213,13 @@ const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm,
   H.eq(res.body.creditCents, 1200, 'and the figure it should have been');
   H.eq((await att.getAttendance('p-1', AID, DATES[2])).status, 'booked',
     '⚠ and NOTHING WAS CANCELLED — the check is before the write, like the optimistic lock');
-  H.eq(await ledger.balanceFor(account.accountId), 1200, 'and no credit was written');
+  H.eq(await ledger.balanceFor(account.accountId, 'live'), 1200, 'and no credit was written');
 
   console.log('\n[booked and nothing else]');
   res = await cancel({ sessionDate: DATES[0], expectCreditCents: 0 });
   H.eq(res.status, 409,
     '⚠ an already cancelled evening is refused — a second pass would credit twice');
-  H.eq(await ledger.balanceFor(account.accountId), 1200, 'and it did not');
+  H.eq(await ledger.balanceFor(account.accountId, 'live'), 1200, 'and it did not');
 
   const waiting = att.newAttendance({
     activity: activity, participantId: 'p-9', accountId: account.accountId,

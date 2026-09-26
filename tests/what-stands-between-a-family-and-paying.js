@@ -253,8 +253,17 @@ H.ok(/metadata: S\.meta\(/.test(checkout), 'metadata goes through S.meta, which 
 H.eq((checkout.match(/S\.meta\(/g) || []).length, 2,
   'twice: on the session AND on payment_intent_data — a session-only tag is ' +
   'invisible on the PaymentIntent a dispute arrives attached to');
-H.ok(/statement_descriptor_suffix: S\.STATEMENT_DESCRIPTOR_SUFFIX/.test(checkout),
-  'and the descriptor suffix is set, or the charge reads as the other organisation');
+// ⚠ THROUGH descriptorSuffixFor(mode) RATHER THAN THE CONSTANT. A statement
+// descriptor is what a CARDHOLDER reads on a bank statement, and a test payment
+// never reaches one — so it is set on a live charge and deliberately left unset on
+// a rehearsal. Asserting the constant was reachable only while there was one mode.
+H.ok(/statement_descriptor_suffix: S\.descriptorSuffixFor\(mode\) \|\| undefined/.test(checkout),
+  'and the descriptor suffix is set for the mode being charged, or the charge ' +
+  'reads as the other organisation');
+H.eq(require(H.fnPath('_stripe')).descriptorSuffixFor('live'), 'Ogen CTR',
+  'live gets the suffix');
+H.eq(require(H.fnPath('_stripe')).descriptorSuffixFor('test'), null,
+  'and a rehearsal gets none — there is no statement for it to appear on');
 H.ok(/participant_id: reg\.participantId/.test(checkout) && /activity_id: reg\.activityId/.test(checkout),
   'the join keys travel with it, so the webhook need not guess');
 

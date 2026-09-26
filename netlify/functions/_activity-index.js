@@ -10,6 +10,9 @@ const {
   LANGS, langsPresent, pick, pathFor, indexPathFor, indexFilePathFor,
   renderActivitiesIndexPage, SITE
 } = require('./_activity-template');
+// Which of the three listing states this activity is in, and what that tells a
+// crawler. One function, so the meta tag and the sitemap cannot disagree.
+const LISTING = require('./_activity-listing');
 
 // Only these ever reach the index, the listing pages or the sitemap.
 // A draft has no files at all, so it can never appear.
@@ -61,20 +64,25 @@ function indexEntry(a) {
     title: a.title,
     summary: a.summary || null,
     cardImage: a.cardImage || null,
-    // ⚠ UNLISTED, AND STILL IN THIS FILE — which looks like a contradiction and
-    // is the whole design. A test activity is left out of the listing pages, the
-    // sitemap and the menu, and it must NOT be left out of here: this index is
-    // how a slug becomes an activityId, which is how the family area opens a
-    // registration panel at all. Dropping the row would make the one thing a
-    // test activity exists for — registering against it by direct link —
-    // impossible.
+    // ⚠ HIDDEN, AND STILL IN THIS FILE — which looks like a contradiction and is
+    // the whole design. An unlisted or test activity is left out of the listing
+    // pages, the sitemap and the menu, and it must NOT be left out of here: this
+    // index is how a slug becomes an activityId, which is how the family area
+    // opens a registration panel at all. Dropping the row would make the one
+    // thing a hidden activity exists for — registering against it by direct link
+    // — impossible.
     //
-    // Publishing the flag costs nothing it protects. The file is public, the row
+    // Publishing the state costs nothing it protects. The file is public, the row
     // names an activity whose page is already served to anyone who asks for the
-    // URL, and the flag is the instruction every reader of this file needs in
-    // order to leave it out. What keeps a test activity out of sight is the
-    // absence of a link to it, not the absence of a fact about it.
-    testActivity: !!a.testActivity,
+    // URL, and the state is the instruction every reader of this file needs in
+    // order to leave it out. What keeps it out of sight is the absence of a link
+    // to it, not the absence of a fact about it.
+    //
+    // ⚠ AND `testActivity` IS GONE FROM HERE RATHER THAN KEPT BESIDE IT. Two
+    // machine-readable statements of one fact are two statements that can
+    // disagree; js/nav.js reads `listing` and falls back to the old key only for
+    // an index file deployed before this change, which one publish replaces.
+    listing: LISTING.listingOf(a),
     isoUpdated: a.isoUpdated || null
   };
 }
@@ -108,11 +116,13 @@ function buildSitemap(activities) {
   // be advertised in the sitemap: the meta tag and the sitemap have to agree, or
   // the sitemap invites a crawler to a page that turns it away. /about already
   // pairs them the same way.
+  // ⚠ ASKED THROUGH robotsFor(), WHICH IS WHAT THE PAGE'S OWN META TAG IS BUILT
+  // FROM. The pairing has to hold across three listing states and the robots
+  // select on top of them, and the only way it cannot drift is for both halves to
+  // read one function: anything the page tells a crawler not to index is
+  // something this file may not advertise.
   const published = (activities || []).filter(isPublic)
-    .filter((a) => a.robots !== 'noindex')
-    // A test activity is never advertised anywhere. noindex and the sitemap have
-    // to agree; here the page says 'noindex, nofollow' and there is no entry.
-    .filter((a) => !a.testActivity);
+    .filter((a) => LISTING.robotsFor(a).indexOf('noindex') === -1);
   if (published.length) {
     blocks.push('  <!-- Activity pages. A draft activity has no files and never appears here. -->');
     published.forEach((a) => {
@@ -147,12 +157,12 @@ function buildDerivedFiles(activities) {
   const published = (activities || []).filter(isPublic);
   // ⚠ THE LISTING IS THE NARROWER LIST, AND THE INDEX IS NOT.
   //
-  // buildIndex() above keeps every published activity, test ones included,
+  // buildIndex() above keeps every published activity, hidden ones included,
   // because that file is a lookup rather than a shop window. These three pages
   // ARE the shop window, and the menu is built from the index by a client that
-  // applies the same filter — see js/nav.js. Two readers, one flag, and the one
+  // applies the same filter — see js/nav.js. Two readers, one field, and the one
   // that resolves ids must not be the one that hides rows.
-  const listed = published.filter((a) => !a.testActivity);
+  const listed = published.filter(LISTING.isListed);
   LANGS.forEach((lang) => {
     files.push({
       path: indexFilePathFor(lang),

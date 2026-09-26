@@ -161,14 +161,26 @@ const INDEX = [
     title: { he: 'הסתיים', en: 'Finished one', ru: 'Завершённое' } },
   { slug: 'he-only', status: 'open', langs: ['he'],
     title: { he: 'רק בעברית' } },
-  // ⚠ IN THE INDEX AND NOT IN THE MENU. A test activity is published for real —
+  // ⚠ IN THE INDEX AND NOT IN THE MENU. A hidden activity is published for real —
   // the page serves, registration and payment run on it — and every route to it
   // is removed. The index keeps the row because it is the lookup that turns a
   // slug into an activityId; the menu is a way of FINDING things, which is the
-  // one thing a test activity must not offer. See
-  // a-test-activity-is-reachable-only-by-its-link.js.
-  { slug: 'test4', status: 'open', langs: ['he', 'en', 'ru'], testActivity: true,
-    title: { he: 'בדיקה', en: 'Test four', ru: 'Тест' } }
+  // one thing it must not offer. See
+  // a-hidden-activity-is-reachable-only-by-its-link.js.
+  { slug: 'test4', status: 'open', langs: ['he', 'en', 'ru'], listing: 'test',
+    title: { he: 'בדיקה', en: 'Test four', ru: 'Тест' } },
+  // An UNLISTED activity is the state that did not exist while this was a
+  // tickbox: a real class, taking real money, simply not advertised. The menu
+  // drops it for exactly the same reason.
+  { slug: 'closed-group', status: 'open', langs: ['he', 'en', 'ru'], listing: 'unlisted',
+    title: { he: 'קבוצה סגורה', en: 'Closed group', ru: 'Закрытая группа' } },
+  // ⚠ AND A ROW WRITTEN BEFORE THE FIELD EXISTED. This suite reads the index the
+  // way the live site does, and the deployed file is whatever the last publish
+  // wrote — so until one runs, every row still says `testActivity` and none says
+  // `listing`. js/nav.js falls back to the old key, and this is what proves it:
+  // without the fallback this row would appear in the public menu.
+  { slug: 'legacy-test', status: 'open', langs: ['he', 'en', 'ru'], testActivity: true,
+    title: { he: 'ותיק', en: 'Legacy test', ru: 'Старый тест' } }
 ];
 
 // The nav wants a #page to inject into and a fetch to read the index with.
@@ -271,6 +283,11 @@ function findById(root, id) {
     'nor one with no page in this language — `langs` is checked, or the link would 404');
   H.eq(texts.filter((t) => /Test four/.test(t)).length, 0,
     'nor a TEST activity, which is in this very index and is reachable only by its own URL');
+  H.eq(texts.filter((t) => /Closed group/.test(t)).length, 0,
+    'nor an UNLISTED one — a real class taking real money, off every route to it');
+  H.eq(texts.filter((t) => /Legacy test/.test(t)).length, 0,
+    '⚠ nor one still carrying the old testActivity flag, which is every row in the ' +
+    'deployed index until the next publish rebuilds it');
   H.eq(texts[0], 'Singing', 'open comes first, because it is the one you can act on now');
   H.ok(texts.indexOf('See all activities') !== -1, 'the way through to the full list is always there');
   H.ok(texts.indexOf('Currently Running') !== -1, 'and Currently Running, because a closed activity is in this index');

@@ -78,6 +78,22 @@
     dirty: false
   };
 
+  // ⚠ WRITTEN TWICE, LIKE MIN_PASSWORD AND THE ACTIVITIES MENU'S STATUS GROUPS,
+  // because a browser cannot require a Netlify function. listingOf() in
+  // _activity-listing.js is the original and the server's answer is the one
+  // stored; this copy exists so the select opens on the right option and the
+  // picker marks the right rows. A test pins the two against each other,
+  // including the `testActivity: true` fallback — a record saved before this
+  // field existed still has to open on Test rather than on Listed, or the first
+  // save of it would quietly publish a rehearsal.
+  var LISTINGS = ['listed', 'unlisted', 'test'];
+  function listingOf(rec) {
+    var named = String((rec && rec.listing) || '');
+    if (LISTINGS.indexOf(named) !== -1) return named;
+    if (rec && rec.testActivity === true) return 'test';
+    return 'listed';
+  }
+
   var $ = function (id) { return document.getElementById(id); };
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
@@ -334,24 +350,48 @@
     box.appendChild(typeSel);
     box.appendChild(select('f-status', 'Status', S.schema.statuses, rec.status || 'draft', STATUS_SELECT));
 
-    // ⚠ A TEST ACTIVITY IS PUBLISHED FOR REAL AND SIMPLY CANNOT BE FOUND.
+    // ⚠ ONE SELECT, THREE STATES, AND IT WAS A TICKBOX. "Test activity" asked one
+    // question and answered two — is this advertised, and is this real money —
+    // because while there was one Stripe configuration the second had only one
+    // answer. An activity nobody should stumble on and an activity whose payments
+    // are pretend are different things, and the first is ordinary: a closed group,
+    // a class filled by word of mouth, a page sent to one family. Under a tickbox
+    // anything hidden had to be a rehearsal.
     //
-    // It sits beside Status rather than under Search & sharing, and beside it
-    // rather than inside it, because it is NOT a status: a rehearsal of
-    // registration and payment has to run through the same open-activity code
-    // every family meets, or it rehearses something else. What it removes is
-    // every route TO the page — the listing, the menu, the sitemap, the
-    // crawler — and nothing else. Draft remains the way to have no page at all.
-    var testBox = el('input', { type: 'checkbox', id: 'f-test' });
-    testBox.checked = rec.testActivity === true;
-    testBox.addEventListener('change', function () { S.dirty = true; });
+    // It sits beside Status rather than under Search & sharing, and it is NOT a
+    // status: all three are published for real and behave exactly like an open
+    // activity, because that is what a closed group and a rehearsal both need.
+    // What changes is every route TO the page, and for Test which keys the money
+    // moves on. Draft remains the way to have no page at all.
+    //
+    // Built out rather than through select() above, because the help badge belongs
+    // beside the LABEL — inside `.label-row`, which is what every `>` rule in
+    // admin.css reaches a field label through. Wrapping the whole field in one
+    // would break the cascade silently, which it has done before.
+    var listSel = el('select', { id: 'f-listing' });
+    var LISTING_LABELS = {
+      listed: 'Listed \u2014 public, in the menu and in search',
+      unlisted: 'Unlisted \u2014 reachable only by its link',
+      test: 'Test \u2014 reachable only by its link, TEST payments'
+    };
+    (S.schema.listings || ['listed']).forEach(function (o) {
+      listSel.appendChild(el('option', {
+        value: o, text: LISTING_LABELS[o] || o,
+        selected: o === listingOf(rec) || null
+      }));
+    });
+    listSel.addEventListener('change', function () { S.dirty = true; });
     box.appendChild(el('div', {}, [
-      withHelp(el('label', { for: 'f-test', class: 'check-row' },
-        [testBox, el('span', { text: 'Test activity \u2014 reachable only by its own link' })]),
-        'Publish it as usual and it behaves exactly like any other activity: the page is live, ' +
-        'registration and payment work. It is left off the activities listing, out of the menu ' +
-        'and out of sitemap.xml, and the page tells search engines not to index it or follow ' +
-        'its links. The only way to it is the URL, so keep that to yourself.')
+      withHelp(el('label', { for: 'f-listing', text: 'Who can find it' }),
+        'All three publish the page for real. Listed is the ordinary activity: on the ' +
+        'activities listing, in the menu, in sitemap.xml. Unlisted is a real activity that is ' +
+        'simply not advertised \u2014 off the listing, out of the menu, out of the sitemap and ' +
+        'not indexed \u2014 but the page is live and its payments take REAL money, so use it for ' +
+        'a closed group or a class filled by word of mouth. Test is the same again except that ' +
+        'every payment runs through the test Stripe configuration: test cards, no real money, ' +
+        'and credit earned on it can only ever be spent on another test activity. Either way ' +
+        'the only route to the page is its URL, so keep that to yourself.'),
+      listSel
     ]));
     box.appendChild(select('f-motif', 'Header motif', S.schema.motifs, rec.motif || 'ring'));
     box.appendChild(select('f-corner', 'Motif corner', S.schema.corners, rec.corner || 'tl', {
@@ -2912,10 +2952,10 @@
     rec.cardImage = S.cardImage !== undefined ? S.cardImage : (S.record.cardImage || null);
     rec.shareImage = S.shareImage !== undefined ? S.shareImage : (S.record.shareImage || null);
     rec.robots = ($('f-robots') && $('f-robots').value) || S.record.robots || 'index';
-    // Structure, like robots. Read from the box rather than carried over from
-    // the record, because unticking it is exactly how an activity stops being a
-    // test one — the same reason the status select is read rather than kept.
-    rec.testActivity = $('f-test') ? $('f-test').checked : !!S.record.testActivity;
+    // Structure, like robots. Read from the box rather than carried over from the
+    // record, because moving it back to Listed is exactly how an activity stops
+    // being hidden — the same reason the status select is read rather than kept.
+    rec.listing = ($('f-listing') && $('f-listing').value) || listingOf(S.record);
     // Blank means "its own activity", and the server turns that into this
     // record's own id. Sent as null rather than omitted, so "the admin unlinked
     // it" and "this form did not draw it" stay different requests.
@@ -3042,7 +3082,11 @@
         }, [
           el('span', { class: 'slug', text: title }),
           // The one screen a test activity is visible on, so it says so here.
-          a.testActivity ? el('span', { class: 'pill test', text: 'test' }) : null,
+          // The admin's own list is the only place a hidden activity can be seen to
+          // exist at all, so it is the one place that has to say which kind.
+          listingOf(a) !== 'listed'
+            ? el('span', { class: 'pill ' + listingOf(a), text: listingOf(a) })
+            : null,
           el('span', { class: 'pill ' + a.status, text: statusPill(a.status) })
         ]));
       });
@@ -3331,6 +3375,25 @@
         'frozen terms, so only the closing date and the fee date are ever moved.');
     } else if (f.schedule) {
       out.push('The refund schedule changed, and no registration was taken under the old one.');
+    }
+    // ⚠ WHICH STRIPE CONFIGURATION THIS ACTIVITY IS PAID THROUGH FROM NOW ON, and
+    // who keeps the other one. Warned rather than merely stated when it has gone
+    // live → test, because that is the direction where an admin may be expecting
+    // to have made a live activity safe to rehearse on and has not: the families
+    // already on it keep taking and giving back real money, which is correct and
+    // is not what the form looks like it just said.
+    var md = f.mode;
+    if (md) {
+      out.push((md.to === 'test' ? '⚠ ' : '') +
+        'Payments on this activity now run through the ' +
+        (md.to === 'test' ? 'TEST' : 'live') + ' Stripe configuration' +
+        (md.kept
+          ? ', and ' + md.kept + ' registration' + (md.kept === 1 ? '' : 's') +
+            ' already taken keep' + (md.kept === 1 ? 's' : '') + ' ' + md.from +
+            ' mode — money already agreed was ' +
+            (md.from === 'live' ? 'real and stays real' : 'a rehearsal and stays one') +
+            ', so a rehearsal wants its own activity rather than this one.'
+          : ' — nobody is registered, so nothing keeps the old one.'));
     }
     (r.groups || []).forEach(function (g) {
       var where = g.name ? groupLabel(g) : 'the class';

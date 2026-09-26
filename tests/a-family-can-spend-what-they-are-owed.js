@@ -90,8 +90,12 @@ H.ok(/body\.sessionDate\s*\n?\s*\? await attendance\.getAttendance/.test(useCred
 
 console.log('\n[and the page that shows a debt also shows the wallet]');
 const ui = read('js/member-account.js');
-H.ok(/balanceCents: await ledger\.balanceFor\(me\.accountId\)/.test(api),
-  'the activity page is told the balance');
+// ⚠ IN THAT REGISTRATION'S OWN PAYMENT MODE. A single balance across both modes
+// is what would let a test activity's credit settle a real term, so the figure
+// this page is handed is the one it is allowed to spend — and the same one
+// spendCredit() caps against.
+H.ok(/balanceCents: await ledger\.balanceFor\(me\.accountId, LST\.modeOfRecord\(reg\)\)/.test(api),
+  'the activity page is told the balance, in this registration\u2019s own payment mode');
 H.ok(/function creditButton\(owing, balance, body, onDone, cls\)/.test(ui), 'and draws a control for it');
 H.ok(/text: T\.useCredit \+ ' · ' \+ money\(Math\.min\(owing, balance\)\)/.test(ui),
   'carrying the FIGURE — "use credit" beside a €7 debt with €20 on the account ' +

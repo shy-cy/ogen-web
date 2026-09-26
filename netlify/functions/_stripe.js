@@ -31,6 +31,21 @@
 
 const ORGANIZATION = 'ogen';
 
+// ⚠ TWO COMPLETE CONFIGURATIONS, AND NOTHING IS SHARED BETWEEN THEM.
+//
+// An activity's listing state decides which one its payments run through — see
+// paymentModeOf() in _activity-listing.js — and "complete" is the word that
+// matters: its own secret key, its own webhook endpoint, its own signing secret.
+// A half-shared pair is the shape that produces a test card charging real money,
+// because the piece that was shared is the piece nobody checked.
+//
+// The mode vocabulary is NOT redeclared here. It belongs to the select that
+// produces it, and two lists of two strings is two lists that can drift.
+const { PAYMENT_MODES, normaliseMode } = require('./_activity-listing');
+
+const SECRET_ENV = { live: 'STRIPE_SECRET_KEY', test: 'STRIPE_TEST_SECRET_KEY' };
+const WEBHOOK_ENV = { live: 'STRIPE_WEBHOOK_SECRET', test: 'STRIPE_TEST_WEBHOOK_SECRET' };
+
 // The dynamic suffix, appended by Stripe to the ACCOUNT'S prefix to form what a
 // cardholder reads: `<prefix>* <suffix>`, capped at 22 characters including the
 // separator.
@@ -46,20 +61,70 @@ const ORGANIZATION = 'ogen';
 // suffix should not be sized to a budget we do not own.
 const STATEMENT_DESCRIPTOR_SUFFIX = 'Ogen CTR';
 
-let cached = null;
-function stripe() {
-  if (cached) return cached;
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) throw new Error('STRIPE_SECRET_KEY is not set');
-  cached = new (require('stripe'))(key);
-  return cached;
+// ⚠ THE SUFFIX IS LIVE-ONLY, and it is the one thing about the two modes that is
+// genuinely asymmetric rather than merely duplicated. A statement descriptor is
+// what a CARDHOLDER READS ON A BANK STATEMENT, and a test payment never reaches
+// one — so on a rehearsal it is a value with no reader. It is also the half of
+// this file that depends on a setting the OTHER organisation owns, and a
+// rehearsal is precisely where we do not want to be exercising that dependency.
+const descriptorSuffixFor = (mode) =>
+  (normaliseMode(mode) === 'live' ? STATEMENT_DESCRIPTOR_SUFFIX : null);
+
+const cached = { live: null, test: null };
+
+// ⚠ THE KEY'S OWN PREFIX IS CHECKED AGAINST THE MODE ASKED FOR, before a single
+// request is made. Stripe keys say which mode they are — `sk_live_…` against
+// `sk_test_…` — so the one misconfiguration that would be catastrophic and silent
+// is also the one that is trivially detectable: a test key pasted into
+// STRIPE_SECRET_KEY would build "live" sessions that are actually test ones, and
+// every real payment on the site would quietly stop arriving. Refusing at
+// construction turns that into a loud failure on the first payment attempt
+// rather than a reconciliation nobody does until a family asks where their money
+// went.
+const KEY_SHAPE = { live: /^[a-z]+_live_/, test: /^[a-z]+_test_/ };
+
+function stripe(mode) {
+  const m = normaliseMode(mode);
+  if (cached[m]) return cached[m];
+  const key = process.env[SECRET_ENV[m]];
+  if (!key) throw new Error(SECRET_ENV[m] + ' is not set');
+  if (!KEY_SHAPE[m].test(key)) {
+    throw new Error(SECRET_ENV[m] + ' does not hold a ' + m + '-mode key');
+  }
+  cached[m] = new (require('stripe'))(key);
+  return cached[m];
 }
 
+// The signing secret for ONE mode's endpoint. Two endpoints, two secrets: the
+// mode of an incoming event is decided by which secret verified it, which is the
+// only statement about it that cannot be forged.
+const webhookSecret = (mode) => process.env[WEBHOOK_ENV[normaliseMode(mode)]] || null;
+
+// ⚠ WHAT STRIPE ITSELF SAYS THE MODE WAS. Every event carries `livemode`, so an
+// endpoint can check that the money it is about to write down is the kind of
+// money it was registered for. Absent reads as live, like every other blank in
+// this pair — a missing flag must never downgrade real money to a rehearsal.
+const modeOfEvent = (event) => (event && event.livemode === false ? 'test' : 'live');
+
+// ⚠ THE ORGANISATION TAG IS WRITTEN IN BOTH MODES, and the reason is worth
+// stating because the brief said a rehearsal does not need it.
+//
+// It is not a statement-descriptor-shaped nicety: it is the ONLY thing that tells
+// an Ogen event from Shirat HaYam's, and a Stripe account is shared in test mode
+// exactly as it is in live mode — the other organisation's developers press test
+// cards too. Dropping the tag on rehearsals would mean isOurs() had to accept
+// untagged events on one endpoint, and "accept untagged" is the single
+// relaxation this file exists to forbid. It costs one metadata key.
+//
+// `ogen_mode` travels beside it so a human reading the Stripe dashboard can see
+// which configuration a session was built for, and so a webhook can refuse a
+// session that was built for the other one.
+//
 // Stripe caps a metadata value at 500 characters and silently keeps whatever
 // fits, so a long value becomes a quietly wrong value. Cut it here rather than
 // discovering it in a reconciliation.
-function meta(extra) {
-  const out = { organization: ORGANIZATION };
+function meta(extra, mode) {
+  const out = { organization: ORGANIZATION, ogen_mode: normaliseMode(mode) };
   Object.keys(extra || {}).forEach((k) => {
     const v = extra[k];
     if (v === undefined || v === null || v === '') return;
@@ -94,13 +159,23 @@ function registrationRef(obj) {
   return { participantId: m.participant_id, activityId: m.activity_id };
 }
 
+// Which configuration a session was BUILT for, off the object itself. Absent is
+// live, for the same reason every other blank here is.
+const modeOfObject = (obj) => normaliseMode(((obj && obj.metadata) || {}).ogen_mode);
+
 module.exports = {
-  ORGANIZATION, STATEMENT_DESCRIPTOR_SUFFIX,
+  ORGANIZATION, STATEMENT_DESCRIPTOR_SUFFIX, PAYMENT_MODES,
+  SECRET_ENV, WEBHOOK_ENV,
   stripe, meta, isOurs, registrationRef,
+  descriptorSuffixFor, webhookSecret, modeOfEvent, modeOfObject, normaliseMode,
   // A test seam, the same one _email.js carries and for the same reason: the
   // code that decides what a family is CHARGED should be runnable without a
   // network and without a key. Static analysis can assert that a descriptor
   // suffix is set; only executing it catches an endpoint that builds a session
   // for the wrong registration.
-  _internal: { setClient: (c) => { cached = c; } }
+  //
+  // ⚠ PER MODE, because a test that installed one fake client for both would be
+  // unable to see a path picking the wrong configuration — which is the whole
+  // thing worth testing here.
+  _internal: { setClient: (c, mode) => { cached[normaliseMode(mode)] = c; } }
 };

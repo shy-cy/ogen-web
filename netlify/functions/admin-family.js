@@ -194,7 +194,11 @@ exports.handler = async (event) => {
           account: Object.assign(accounts.publicAccount(account), { name: displayName(account) }),
           participants: people,
           registrations: regs,
-          balanceCents: ledger.balanceOf(entries),
+          // The REAL balance is the headline, with the rehearsal one beside it so
+          // the entries add up to something on screen. One combined figure would
+          // be a sum nobody is owed — see the roster's ledger panel.
+          balanceCents: ledger.balanceOf(entries, 'live'),
+          testBalanceCents: ledger.balanceOf(entries, 'test'),
           entries: entries
         });
       }

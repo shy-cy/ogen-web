@@ -27,6 +27,10 @@
 
 const crypto = require('crypto');
 const { requireStore, optionalStore, readMany } = require('./_blobs');
+// The mode vocabulary belongs to the select that produces it — an activity's
+// listing state — and is not redeclared here. Two lists of two strings is two
+// lists that can drift, and this one decides whether money is real.
+const { PAYMENT_MODES, normaliseMode } = require('./_activity-listing');
 
 const STORE = 'account-credits';
 const PREFIX = 'cred-';
@@ -55,6 +59,17 @@ function validate(entry) {
   if (!entry || !entry.accountId) throw new Error('A ledger entry needs an account');
   if (TYPES.indexOf(entry.type) === -1) throw new Error('A ledger entry is a credit or a debit');
   if (REASONS.indexOf(entry.reason) === -1) throw new Error(`Unknown ledger reason "${entry.reason}"`);
+  // ⚠ REQUIRED, NOT DEFAULTED, and that is the whole guard against a rehearsal's
+  // credit being spent on a real class. A default would read as `live`, which is
+  // the right answer for every entry written before modes existed and the WRONG
+  // one for every entry a caller forgot — so the caller that cannot say which
+  // kind of money this is writes nothing. It is the clock lesson from _credit.js,
+  // where five call sites omitted an argument that was optional in syntax and not
+  // in meaning; a test scans every append() for a mode.
+  if (PAYMENT_MODES.indexOf(entry.mode) === -1) {
+    throw new Error('A ledger entry says which payment mode its money is: ' +
+                    PAYMENT_MODES.join(' or '));
+  }
   const cents = Math.round(Number(entry.amountCents));
   // Zero is refused rather than ignored. A zero entry is a line in a financial
   // record that means nothing and still has to be explained to whoever reads it
@@ -71,6 +86,12 @@ async function append(entry) {
     type: entry.type,
     amountCents: cents,
     currency: entry.currency || CURRENCY,
+    // ⚠ WHICH KIND OF MONEY. Test-mode credit and real credit sit in the same
+    // store under the same account prefix — separate stores were the other option
+    // and they would split one person's history in two, which is the thing this
+    // ledger exists not to do. What must not mix is the SUMS, and that is
+    // balanceOf()'s job below.
+    mode: entry.mode,
     reason: entry.reason,
     relatedRegistrationKey: entry.relatedRegistrationKey || null,
     // WHY THIS AMOUNT AND NOT ANOTHER. A family credited 150 out of 350 will
@@ -102,14 +123,30 @@ async function entriesFor(accountId) {
 
 // SUMMED, NEVER STORED. Credits add, debits subtract, and the answer is a number
 // that can always be re-derived from the lines above it.
-function balanceOf(entries) {
-  return (entries || []).reduce(
-    (n, e) => n + (e.type === 'credit' ? e.amountCents : -e.amountCents), 0);
+//
+// ⚠ ONE BALANCE PER MODE, AND `mode` IS REQUIRED HERE TOO. A single balance
+// across both is what would let a €50 rehearsal credit settle a real €50 term —
+// so the two are never added together anywhere, and a caller that does not say
+// which one it is asking about is asking a question with no answer. Cross-mode
+// spending is then refused BY CONSTRUCTION rather than by a check somebody has to
+// remember: a live record's spender is handed the live balance, and a test credit
+// is simply not in it.
+//
+// ⚠ AN ENTRY WITH NO MODE IS LIVE. Every entry written before this field existed
+// was written when there was one Stripe key, and that key was the real one.
+function balanceOf(entries, mode) {
+  const want = normaliseMode(mode);
+  if (PAYMENT_MODES.indexOf(mode) === -1) {
+    throw new Error('A balance is per payment mode: ' + PAYMENT_MODES.join(' or '));
+  }
+  return (entries || [])
+    .filter((e) => normaliseMode(e && e.mode) === want)
+    .reduce((n, e) => n + (e.type === 'credit' ? e.amountCents : -e.amountCents), 0);
 }
 
-const balanceFor = async (accountId) => balanceOf(await entriesFor(accountId));
+const balanceFor = async (accountId, mode) => balanceOf(await entriesFor(accountId), mode);
 
 module.exports = {
-  STORE, PREFIX, TYPES, REASONS, CURRENCY,
+  STORE, PREFIX, TYPES, REASONS, CURRENCY, PAYMENT_MODES,
   append, entriesFor, balanceOf, balanceFor, validate
 };

@@ -17,6 +17,7 @@
 // stripe-webhook.js.
 
 const S = require('./_stripe');
+const LST = require('./_activity-listing');
 const facts = require('./_activity-facts');
 const { SITE } = require('./_email-shell');
 
@@ -102,8 +103,16 @@ function withPaid(back, kind) {
 // would let a caller put somebody else's address on a receipt.
 // The one place a Stripe session is built. Everything above decides WHAT is
 // being charged for; this decides how a charge is made, once.
-async function build({ lang, email, lines, back, meta }) {
-  return S.stripe().checkout.sessions.create({
+//
+// ⚠ `mode` IS WHICH STRIPE CONFIGURATION, and it is a required argument rather
+// than a default. It picks the secret key, so it decides whether a card is
+// charged real money — and the caller is the only thing that knows, because it
+// is the only thing holding the record the mode was frozen onto. A default here
+// would be the shape five callers of creditFor() once fell into: optional in
+// syntax and not in meaning, with the omission resolving to the dangerous answer.
+// A test scans every build() call for one.
+async function build({ lang, email, lines, back, meta, mode }) {
+  return S.stripe(mode).checkout.sessions.create({
     mode: 'payment',
     customer_email: email || undefined,
     // Stripe Checkout has no Hebrew; 'auto' falls back to English.
@@ -139,10 +148,14 @@ async function build({ lang, email, lines, back, meta }) {
     // shared with another organisation, so an untagged object is
     // indistinguishable from theirs — and a session-only tag is invisible on
     // the PaymentIntent a dispute arrives attached to.
-    metadata: S.meta(meta),
+    metadata: S.meta(meta, mode),
     payment_intent_data: {
-      statement_descriptor_suffix: S.STATEMENT_DESCRIPTOR_SUFFIX,
-      metadata: S.meta(meta)
+      // ⚠ NOTHING ON A REHEARSAL. descriptorSuffixFor() returns null in test
+      // mode, and `undefined` is how a Stripe field is left unset — a test
+      // payment reaches no bank statement, so there is no cardholder to read
+      // it. See _stripe.js.
+      statement_descriptor_suffix: S.descriptorSuffixFor(mode) || undefined,
+      metadata: S.meta(meta, mode)
     }
   });
 }
@@ -158,6 +171,11 @@ async function createCheckout(reg, lang, email) {
 
   return build({
     lang: lang, email: email,
+    // ⚠ OFF THE RECORD, NEVER OFF THE ACTIVITY. This is reached from /pay, which
+    // has no session and reads no repository at all — and it is the freeze doing
+    // its job either way: a listing switched to Test in March must not turn a
+    // real January debt into a rehearsal on the next payment attempt.
+    mode: LST.modeOfRecord(reg),
     lines: [{ name: title, description: (reg.frozen && reg.frozen.participantName) || undefined,
               amountCents: due }],
     back: back.slice(0, back.indexOf('#')) || back,
@@ -212,6 +230,18 @@ async function createSessionsCheckout(atts, activityTitle, lang, email) {
     throw Object.assign(new Error('Nothing outstanding'), { reason: 'nothing-due' });
   }
 
+  // ⚠ ONE PAYMENT CANNOT STRADDLE THE TWO MODES. Several evenings are one
+  // Checkout session, and a session is created with ONE key — so a list mixing a
+  // rehearsal evening with a real one has no honest answer and is refused rather
+  // than resolved. It can only arise from evenings booked either side of an
+  // admin switching the listing, which the freeze deliberately allows to
+  // coexist; what it does not allow is paying for both at once.
+  const mode = LST.modeOfRecord(list[0]);
+  if (list.some((att) => LST.modeOfRecord(att) !== mode)) {
+    throw Object.assign(new Error('These evenings were not all sold in the same payment mode'),
+      { reason: 'mode-mixed' });
+  }
+
   const title = facts.pick(activityTitle, lang) || 'Ogen';
   const base = lang === 'he' ? '' : '/' + lang;
   const first = list[0];
@@ -220,7 +250,7 @@ async function createSessionsCheckout(atts, activityTitle, lang, email) {
     + '&a=' + encodeURIComponent(first.activityId);
 
   return build({
-    lang: lang, email: email,
+    lang: lang, email: email, mode: mode,
     // The DATE on every line, because a family paying for one evening out of ten
     // needs the receipt to say which. Lines reading only "Folk dancing" are four
     // identical charges on a statement.
@@ -268,7 +298,8 @@ async function createSessionsCheckout(atts, activityTitle, lang, email) {
 // they were shown when they chose it. What they saw is what they get, and the
 // nightly reconcile repairs it afterwards if the calendar really has moved.
 async function createBundleCheckout({ activity, bundle, coveredDates, participantId,
-                                      accountId, purchasedAt, lang, email, participantName }) {
+                                      accountId, groupId, purchasedAt, lang, email,
+                                      participantName }) {
   const perEntry = Math.max(0, Math.round(Number(bundle.pricePerEntry) * 100)) || 0;
   const total = perEntry * bundle.entries;
   if (!(total > 0)) throw Object.assign(new Error('A free bundle is not a purchase'), { reason: 'nothing-due' });
@@ -281,6 +312,11 @@ async function createBundleCheckout({ activity, bundle, coveredDates, participan
 
   return build({
     lang: lang, email: email,
+    // ⚠ FROM THE ACTIVITY, because a bundle has no record to read it off yet —
+    // this is the one purchase that is paid for before it exists. It rides in the
+    // metadata below as well, so settleBundle() can freeze it onto the record it
+    // writes on the way back in.
+    mode: LST.paymentModeOf(activity),
     lines: [{
       name: title,
       // The size of the bundle, because a family holding two receipts needs to

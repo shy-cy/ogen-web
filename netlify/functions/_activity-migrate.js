@@ -23,6 +23,7 @@ const registration = require('./_activity-registration');
 // _activity-groups.js because that module requires nothing, so importing it
 // here cannot make a cycle — see the note at the top of it.
 const groupsModule = require('./_activity-groups');
+const listing = require('./_activity-listing');
 const { GROUP_FACTS, ACTIVITY_FACTS } = groupsModule;
 
 const LANGS = ['he', 'en', 'ru'];
@@ -566,6 +567,19 @@ function migrate(record, options) {
   // means course, which is what every activity written before this field
   // existed was.
   out.type = registration.normaliseType(out.type);
+
+  // WHO CAN FIND THIS ACTIVITY, AND WHOSE MONEY ITS PAYMENTS ARE — one field
+  // where there was a tickbox. `listed | unlisted | test`, structure like
+  // `robots`, and the whole of the migration is the line below: listingOf() reads
+  // `testActivity: true` as `test` and anything else as `listed`, so every record
+  // written before this field existed answers correctly on read and stops
+  // carrying the old key from its next save. The same shape `ctaUrl` took.
+  //
+  // ⚠ IDEMPOTENT, WHICH IS WHAT LETS THIS RUN ON EVERY READ: after one pass the
+  // record names its own state and there is no `testActivity` left to consult, so
+  // the second pass finds what the first wrote.
+  out.listing = listing.listingOf(out);
+  delete out.testActivity;
   // Read from the RAW record, before normaliseFacts() gives every record an
   // (empty) address fact and the question becomes unanswerable.
   //

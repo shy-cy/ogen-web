@@ -64,36 +64,36 @@ process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
   console.log('[the shape of an entry]');
   const A = 'a-testaccount0001';
   await ledger.append({ accountId: A, type: 'credit', amountCents: 12000,
-                        reason: 'admin-adjustment', note: 'goodwill', createdBy: 'michal@ogen.cy' });
+                        reason: 'admin-adjustment', mode: 'live', note: 'goodwill', createdBy: 'michal@ogen.cy' });
   const one = (await ledger.entriesFor(A))[0];
   H.eq(one.amountCents, 12000, 'integer cents, never euros — a float balance drifts and cannot be explained');
   H.eq(one.type, 'credit', 'and the sign lives here, not in the number');
 
   let refused = null;
-  try { await ledger.append({ accountId: A, type: 'credit', amountCents: 0, reason: 'admin-adjustment' }); }
+  try { await ledger.append({ accountId: A, type: 'credit', amountCents: 0, reason: 'admin-adjustment', mode: 'live' }); }
   catch (err) { refused = err.message; }
   H.ok(/positive/.test(refused || ''), 'zero is refused — a line meaning nothing still has to be explained');
   refused = null;
-  try { await ledger.append({ accountId: A, type: 'credit', amountCents: 100, reason: 'goodwill-ish' }); }
+  try { await ledger.append({ accountId: A, type: 'credit', amountCents: 100, reason: 'goodwill-ish', mode: 'live' }); }
   catch (err) { refused = err.message; }
   H.ok(/Unknown ledger reason/.test(refused || ''),
     'and the reason is a closed list, so a typo cannot invent a category');
 
   console.log('\n[two entries in the same millisecond do not overwrite each other]');
   const at = Date.parse('2026-11-01T10:00:00Z');
-  await ledger.append({ accountId: A, type: 'credit', amountCents: 500, reason: 'admin-adjustment', createdAt: at });
-  await ledger.append({ accountId: A, type: 'credit', amountCents: 700, reason: 'admin-adjustment', createdAt: at });
+  await ledger.append({ accountId: A, type: 'credit', amountCents: 500, reason: 'admin-adjustment', mode: 'live', createdAt: at });
+  await ledger.append({ accountId: A, type: 'credit', amountCents: 700, reason: 'admin-adjustment', mode: 'live', createdAt: at });
   H.eq((await ledger.entriesFor(A)).length, 3,
     'the random tail is what saves them — there is no compare-and-swap to fall back on');
 
   console.log('\n[the balance is summed, never stored]');
-  H.eq(await ledger.balanceFor(A), 13200, 'credits add');
-  await ledger.append({ accountId: A, type: 'debit', amountCents: 3200, reason: 'credit-applied' });
-  H.eq(await ledger.balanceFor(A), 10000, 'and debits subtract');
-  H.eq(ledger.balanceOf([]), 0, 'an account with no entries holds nothing, which needs no special case');
+  H.eq(await ledger.balanceFor(A, 'live'), 13200, 'credits add');
+  await ledger.append({ accountId: A, type: 'debit', amountCents: 3200, reason: 'credit-applied', mode: 'live' });
+  H.eq(await ledger.balanceFor(A, 'live'), 10000, 'and debits subtract');
+  H.eq(ledger.balanceOf([], 'live'), 0, 'an account with no entries holds nothing, which needs no special case');
   // Correcting a mistake leaves BOTH lines.
-  await ledger.append({ accountId: A, type: 'debit', amountCents: 10000, reason: 'admin-adjustment', note: 'written back' });
-  H.eq(await ledger.balanceFor(A), 0, 'a correction is the opposite entry');
+  await ledger.append({ accountId: A, type: 'debit', amountCents: 10000, reason: 'admin-adjustment', mode: 'live', note: 'written back' });
+  H.eq(await ledger.balanceFor(A, 'live'), 0, 'a correction is the opposite entry');
   H.eq((await ledger.entriesFor(A)).length, 5, 'and the record still holds every line that led there');
 
   console.log('\n[a cancellation writes one, and the registration records it]');
@@ -190,6 +190,26 @@ action: 'signup', email: 'dana@example.com', password: 'password-123', termsAcce
   H.eq(mine.body.balanceCents, 10000, 'the same number they were told');
   H.eq(mine.body.entries.length, 3, 'and every line behind it');
   H.ok(mine.body.entries.every((e) => e.amountCents > 0), 'all positive, with the sign in the type');
+
+  // ⚠ AND THE FIGURE AND THE LINES UNDER IT ARE THE SAME KIND OF MONEY.
+  //
+  // An account can hold a rehearsal's credit as well as real credit — a test
+  // activity is published for real and its cancellations write real ledger lines
+  // in test mode. The dashboard is about an ACCOUNT rather than about one
+  // activity, so there is no record to take a mode from and the honest headline is
+  // the money they actually have. What must not happen is the card printing that
+  // total and then listing rows that do not add up to it, which is what sending
+  // every entry would do — and it would make this card the one place on the site
+  // where the two kinds of money appear in one column.
+  await ledger.append({ accountId: dana.accountId, type: 'credit', amountCents: 4200,
+                        reason: 'admin-adjustment', mode: 'test', note: 'a rehearsal' });
+  const mixed = await H.call(regs.handler, { action: 'dashboard', token: dana.token });
+  H.eq(mixed.body.balanceCents, 10000,
+    'a rehearsal\u2019s credit does not move the balance a family is shown');
+  H.eq(mixed.body.entries.length, 3, 'and its line is not listed under that balance either');
+  H.ok(mixed.body.entries.every((e) => e.mode !== 'test'),
+    '\u26a0 so the total and the lines under it are the same kind of money — the test ' +
+    'activity\u2019s own page is where its balance is shown, because that is where it can be spent');
 
   console.log('\n[unlinking a guardian who still owes is a question, not a rule]');
   // The admin override exists for lost access and disputes, which is precisely

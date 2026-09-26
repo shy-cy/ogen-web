@@ -105,6 +105,10 @@ const json = (statusCode, payload) => ({
 // index is the default; noindex matches /about — kept out of search results but
 // its links still worth following.
 const ROBOTS = ['index', 'noindex'];
+// Three states in one select, replacing the Test activity tickbox. The list and
+// everything derived from it — the payment mode, the robots meta, what the
+// listing pages and sitemap keep — live in _activity-listing.js.
+const LST = require('./_activity-listing');
 
 const FIELD_SCHEMA = {
   simple: [
@@ -211,6 +215,9 @@ const FIELD_SCHEMA = {
   // see _activity-index.js, because a sitemap listing a page that asks not to be
   // indexed contradicts itself.
   robotsOptions: ROBOTS,
+  // SENT rather than written twice, like the refund schedule's step cap: the
+  // client draws exactly the states the server will accept.
+  listings: LST.LISTINGS,
   langs: LANGS
 };
 
@@ -632,15 +639,21 @@ function mergeByPermission(current, incoming, session) {
     if (incoming.robots !== undefined) {
       out.robots = ROBOTS.indexOf(incoming.robots) !== -1 ? incoming.robots : 'index';
     }
-    // ⚠ A TEST ACTIVITY: published for real, reachable only by its own URL.
+    // ⚠ LISTED / UNLISTED / TEST: published for real, and how findable.
     //
     // Structure for the same reason robots is — whether an activity is on the
     // listing is one answer for all three trees, and a Russian-only role must
-    // not be able to take the Hebrew page off it. It is deliberately NOT a
-    // status: a test activity has to behave exactly like an open one, because
-    // what it exists for is rehearsing registration and payment on the live
-    // site. Only the ways of FINDING it are removed.
-    if (incoming.testActivity !== undefined) out.testActivity = !!incoming.testActivity;
+    // not be able to take the Hebrew page off it. ⚠ AND IT NOW ALSO DECIDES
+    // WHICH STRIPE CONFIGURATION THE ACTIVITY'S PAYMENTS RUN THROUGH, which
+    // makes it the one field on this form a restricted role being able to write
+    // would let it move real money; the `full` gate is what stops that.
+    //
+    // It is deliberately NOT a status: `unlisted` and `test` behave exactly like
+    // an open activity, because what they exist for is a real closed group and a
+    // rehearsal of the real flow. Only the ways of FINDING it are removed.
+    if (incoming.listing !== undefined) {
+      out.listing = LST.LISTINGS.indexOf(incoming.listing) !== -1 ? incoming.listing : 'listed';
+    }
     // Which kind of activity this is, and everything the registration system
     // will read off it. Structure, so a restricted role keeps the stored values
     // below rather than sending them.
@@ -655,7 +668,7 @@ function mergeByPermission(current, incoming, session) {
     out.cardImage = (base && base.cardImage) || null;
     out.shareImage = (base && base.shareImage) || null;
     out.robots = (base && base.robots) || 'index';
-    out.testActivity = !!(base && base.testActivity);
+    out.listing = LST.listingOf(base);
     out.type = REG.normaliseType(base && base.type);
     // ⚠ NOT normaliseRegistration() ANY MORE, AND THE DIFFERENCE IS ONE FIELD.
     //
@@ -1016,6 +1029,15 @@ function falloutAudit(fallout) {
   // people's terms.
   if (fallout.schedule) bits.push((fallout.schedule.older || 0) + ' on an older refund schedule');
   if (r.groups && r.groups.length) bits.push(r.told + ' told of ' + r.groups.length + ' reopened group(s)');
+  // Which Stripe configuration this activity's payments run through from now on,
+  // and how many families keep the one they were sold under. Nothing was rewritten
+  // — that is the freeze — so this is the audit line saying what the publish did
+  // NOT do, the same reason the older-schedule count is here.
+  if (fallout.mode) {
+    bits.push('payments now ' + fallout.mode.to + ' mode (was ' + fallout.mode.from + ')' +
+              (fallout.mode.kept ? ', ' + fallout.mode.kept + ' registration(s) keep ' +
+                                   fallout.mode.from : ''));
+  }
   (t.failed || []).concat(r.failed || []).forEach((f) => bits.push('FAILED ' + f));
   return bits.length ? bits.join(' · ') : null;
 }
@@ -1108,10 +1130,10 @@ exports.handler = async (event) => {
             // resolves it again from the record and its answer is the one stored.
             registrationFee: SERIES.feeOf(a),
             title: a.title, langs: langsPresent(a),
-            // So the picker can mark it. A test activity is invisible everywhere
-            // it is supposed to be invisible, which makes the admin's own list
-            // the only place anybody can see that it exists at all.
-            testActivity: !!a.testActivity,
+            // So the picker can mark it. An unlisted or test activity is invisible
+            // everywhere it is supposed to be invisible, which makes the admin's
+            // own list the only place anybody can see that it exists at all.
+            listing: LST.listingOf(a),
             isoUpdated: a.isoUpdated || null,
             lastEditedByName: a.lastEditedByName || null,
             urls: langsPresent(a).map((l) => pathFor(a.slug, l))
@@ -1123,7 +1145,7 @@ exports.handler = async (event) => {
             activityId: a.activityId || null, seriesId: a.seriesId || a.activityId || null,
             registrationFee: SERIES.feeOf(a),
             title: a.title, langs: langsPresent(a),
-            testActivity: !!a.testActivity,
+            listing: LST.listingOf(a),
             isoUpdated: a.isoUpdated || null,
             lastEditedByName: a.lastEditedByName || null,
             urls: []

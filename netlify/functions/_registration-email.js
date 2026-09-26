@@ -27,6 +27,7 @@ const terms = require('./_cancellation-terms');
 // label lives there because the same three words appear on the family's own
 // registration page, and two copies of a label is two labels.
 const FACTS = require('./_activity-facts');
+const LST = require('./_activity-listing');
 
 const titleOf = (reg, l) => pick(((reg && reg.frozen) || {}).activityTitle, l) || '';
 const childOf = (reg) => ((reg && reg.frozen) || {}).participantName || '';
@@ -1007,8 +1008,22 @@ async function payUrlFor(reg, account) {
 // the builder opens no store. Best effort in the same way too — a ledger that
 // will not answer costs this message one sentence rather than costing the
 // family the message.
-async function creditFor(account) {
-  try { return await require('./_credit-ledger').balanceFor(account.accountId); }
+//
+// ⚠ IN THE REGISTRATION'S OWN MODE, because the sentence it produces offers the
+// balance towards THIS activity — and a rehearsal's credit cannot settle a real
+// term. Quoting the real balance in a test activity's approval, or the reverse,
+// would point a family at money the page will refuse to spend.
+//
+// ⚠ IT WAS CALLED creditFor(), WHICH IS ALSO THE NAME OF THE CANCELLATION
+// ARITHMETIC IN _credit.js. Two unrelated functions sharing a name in one
+// directory is a thing no reader can see and no source-level check can either:
+// the test that scans every creditFor() call site for its third argument had to
+// carry an exclusion matching this one's exact signature, so adding an argument
+// here broke a rule about a function one file over. Renamed rather than
+// re-excluded — the exclusion would have had to be rewritten every time either
+// function's shape changed.
+async function heldBy(account, mode) {
+  try { return await require('./_credit-ledger').balanceFor(account.accountId, mode); }
   catch (err) {
     console.warn('[registration-email] balance not read: ' + (err && err.message));
     return 0;
@@ -1024,7 +1039,8 @@ async function creditFor(account) {
 const sendApproved = (reg, account, sessionCancelHours, where, by) =>
   email.settle('registration-approved', account.email, async () =>
     email.send(approvedMessage(reg, account, await payUrlFor(reg, account),
-                               await creditFor(account), sessionCancelHours, where),
+                               await heldBy(account, LST.modeOfRecord(reg)),
+                               sessionCancelHours, where),
       as('registration-approved', account, reg, by)));
 
 const sendRejected = (reg, account, override) =>

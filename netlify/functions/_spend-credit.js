@@ -26,6 +26,7 @@
 // list had never heard of them.
 
 const ledger = require('./_credit-ledger');
+const LST = require('./_activity-listing');
 const R = require('./_registration');
 const attendance = require('./_session-attendance');
 const store = require('./_registration-store');
@@ -55,10 +56,22 @@ async function spendCredit({ record, kind, cents, by, note }) {
   if (!(amount > 0)) {
     throw Object.assign(new Error('An amount is a positive number of cents'), { reason: 'amount' });
   }
-  const balance = await ledger.balanceFor(record.accountId);
+  // ⚠ CROSS-MODE SPENDING IS REFUSED BY CONSTRUCTION, NOT BY A CHECK.
+  //
+  // The mode is the RECORD'S — frozen onto it when the place was taken — and the
+  // balance is asked for in that mode alone. So a rehearsal's €50 credit is not
+  // in the balance a real registration is measured against, and there is no
+  // branch anywhere that has to remember to exclude it. An account holding both
+  // simply has two balances, and neither can pay the other's debt.
+  //
+  // The refusal an account meets is therefore the ordinary `insufficient` one,
+  // carrying the balance IN THIS MODE — which is the honest figure: what is held
+  // against this debt really is nothing.
+  const mode = LST.modeOfRecord(record);
+  const balance = await ledger.balanceFor(record.accountId, mode);
   if (amount > balance) {
     throw Object.assign(new Error('That is more than this account holds'),
-      { reason: 'insufficient', balanceCents: balance });
+      { reason: 'insufficient', balanceCents: balance, mode: mode });
   }
   const owed = owingOn(record);
   if (amount > owed) {
@@ -69,7 +82,7 @@ async function spendCredit({ record, kind, cents, by, note }) {
   const key = R.key(record.participantId, record.activityId);
   const entry = await ledger.append({
     accountId: record.accountId, type: 'debit', amountCents: amount,
-    reason: 'credit-applied',
+    reason: 'credit-applied', mode: mode,
     relatedRegistrationKey: key,
     // Which evening, when it is one. The ledger line is what a family is read
     // back six weeks later, and "credit applied" against a term they have five
@@ -86,6 +99,11 @@ async function spendCredit({ record, kind, cents, by, note }) {
   next.payment = Object.assign({}, next.payment, {
     paidCents: paid,
     paidAt: new Date().toISOString(),
+    // WHICH KIND OF MONEY HAS BEEN TAKEN ON THIS RECORD, stamped by every payment
+    // path. It can only ever be the mode the record was sold in, which is why
+    // there is nothing to check here — see paymentModeRefusal(), which the paths
+    // that receive a mode from OUTSIDE (the webhook, the desk) do have to ask.
+    mode: mode,
     // `owed` until it covers what was billed — the same rule every other payment
     // path follows, because a part payment reading as settled is a debt nobody
     // chases.
@@ -95,7 +113,8 @@ async function spendCredit({ record, kind, cents, by, note }) {
   if (kind === 'session') await attendance.saveAttendance(next);
   else await store.saveRegistration(next);
 
-  return { record: next, entry: entry, balanceCents: balance - amount, spentCents: amount };
+  return { record: next, entry: entry, balanceCents: balance - amount,
+           spentCents: amount, mode: mode };
 }
 
 module.exports = { spendCredit, spendable, owingOn };

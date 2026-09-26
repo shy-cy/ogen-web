@@ -150,11 +150,11 @@ function setClosing(C, date) {
   // ⚠ AND THE FIGURE IS THE ONE THAT IS ACTUALLY WRITTEN. A dialog agreeing with
   // a payload proves only that two readers of one bug agree. Cancel, and read
   // the ledger.
-  const before = await ledger.balanceFor(dana.accountId);
+  const before = await ledger.balanceFor(dana.accountId, 'live');
   const done = await H.call(regs.handler, { action: 'cancel', token: dana.token,
     participantId: noa, activityId: course.activityId });
   H.eq(done.status, 200, 'the cancellation goes through');
-  const moved = (await ledger.balanceFor(dana.accountId)) - before;
+  const moved = (await ledger.balanceFor(dana.accountId, 'live')) - before;
   H.eq(moved, reg.cancellation.credit,
     'and the ledger moved by EXACTLY what the dialog promised — ' + moved);
 
@@ -303,11 +303,11 @@ function setClosing(C, date) {
 
   // Executed, not read: the client's own check is cosmetic, and what decides is
   // the handler.
-  const shutBefore = await ledger.balanceFor(dana.accountId);
+  const shutBefore = await ledger.balanceFor(dana.accountId, 'live');
   const shut = await H.call(regs.handler, { action: 'cancel', token: dana.token,
     participantId: noa, activityId: course.activityId });
   H.eq(shut.status, 200, '⚠ and the SERVER lets it through — it answered 409 before');
-  H.eq(await ledger.balanceFor(dana.accountId), shutBefore,
+  H.eq(await ledger.balanceFor(dana.accountId, 'live'), shutBefore,
     'writing nothing to the ledger, which is the half the cutoff does decide');
   H.eq((await store.getRegistration(noa, course.activityId)).status, 'cancelled',
     'and the place is genuinely given back');

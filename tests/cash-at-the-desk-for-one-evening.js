@@ -104,6 +104,32 @@ const src = read('js/registrations-admin.js');
   H.eq(res.body.session.payment.status, 'paid', 'and now it settles');
   H.eq(res.body.session.history.filter((h) => /paid/.test(h.note || '')).length, 2,
     'both payments are in the history, which is the point of adding rather than setting');
+  // ⚠ CASH IS STILL ONE KIND OF MONEY OR THE OTHER, and it is the EVENING'S own —
+  // read off its frozen block, never chosen by whoever is at the desk. A test
+  // activity's register is a rehearsal whether the money arrives by card or in an
+  // envelope, and stamping it live would file pretend takings with the real ones
+  // on the one screen somebody reconciles.
+  H.eq(res.body.session.payment.mode, 'live',
+    'and the payment is stamped with the mode the evening was sold in');
+
+  // The same desk, the same action, on an evening sold as a rehearsal. Nothing
+  // about the request changes — which is the point: the mode is not an input.
+  const rehearsal = Object.assign({}, await att.getAttendance('p-1', AID, DATE), {
+    payment: { owedCents: OWED, paidCents: 0, currency: 'EUR', status: 'owed' }
+  });
+  rehearsal.frozen = Object.assign({}, rehearsal.frozen, { paymentMode: 'test' });
+  await att.saveAttendance(rehearsal);
+  res = await pay(OWED);
+  H.eq(res.body.session.payment.mode, 'test',
+    '⚠ so an identical request against a rehearsal is recorded as test money');
+  // Put it back, so everything below reads the record the rest of this suite means.
+  const restored = Object.assign({}, await att.getAttendance('p-1', AID, DATE), {
+    payment: { owedCents: OWED, paidCents: OWED, currency: 'EUR', status: 'paid', mode: 'live' }
+  });
+  restored.frozen = Object.assign({}, restored.frozen, { paymentMode: 'live' });
+  restored.history = res.body.session.history.slice(0, 2);
+  await att.saveAttendance(restored);
+  res = { body: { session: restored } };
 
   const after = await regStore.getRegistration('p-1', AID);
   H.eq(after.payment.owedCents, regOwedBefore,

@@ -16,6 +16,8 @@
 
 const { sidebarGroups, sidebarRows, factPriceRows, sessionTables, SESSION_TABLE,
         groupChoice } = require('./_activity-facts');
+// What a crawler is told, decided in one place for all three listing states.
+const LISTING = require('./_activity-listing');
 
 // Sidebar group icons. Lucide, drawn white inside a solid circle, which is the
 // site's icon rule. The circle is 34px rather than the 56px used for section
@@ -575,8 +577,11 @@ ${tables.map(oneTable).join('\n')}
     // sitemap, from the listing pages and from the menu — see _activity-index.js
     // and js/nav.js. The page itself is real and registration works on it, which
     // is the whole point: the only thing it lacks is a way to be found.
-    robots: activity.testActivity ? 'noindex, nofollow'
-          : activity.robots === 'noindex' ? 'noindex, follow' : 'index, follow'
+    // ⚠ ONE FUNCTION DECIDES IT, so the meta tag and sitemap.xml cannot disagree
+    // across three listing states and a robots select on top of them. See
+    // robotsFor() in _activity-listing.js, which _activity-index.js also reads to
+    // decide what it may advertise.
+    robots: LISTING.robotsFor(activity)
   })}
 <body>
 <div id="page" dir="${L.dir}">

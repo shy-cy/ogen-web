@@ -285,7 +285,7 @@ const HOUR = 3600 * 1000;
   H.eq(ended.body.sessions.length, 1, 'but the evening they had booked is released');
   H.eq(ended.body.sessions[0].credit, 1200,
     'and the money they paid for it comes back, judged on that evening\'s own deadline');
-  H.eq(await ledger.balanceFor(dana.accountId), 1200, 'which is what the ledger says');
+  H.eq(await ledger.balanceFor(dana.accountId, 'live'), 1200, 'which is what the ledger says');
   const talRows = await att.forParticipant(tal, dropin.activityId);
   H.eq(talRows[0].status, 'cancelled', 'the booking is cancelled rather than deleted — it is something that happened');
 

@@ -74,8 +74,8 @@ process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
   // Real money on the account, so every refusal below is about the rule rather
   // than about an empty wallet.
   await ledger.append({ accountId: dana.accountId, type: 'credit', amountCents: 100000,
-                        reason: 'admin-adjustment', note: 'seeded by the test' });
-  H.eq(await ledger.balanceFor(dana.accountId), 100000, 'the account is holding €1000');
+                        reason: 'admin-adjustment', mode: 'live', note: 'seeded by the test' });
+  H.eq(await ledger.balanceFor(dana.accountId, 'live'), 100000, 'the account is holding €1000');
 
   const use = () => H.call(regs.handler, Object.assign({ action: 'useCredit', token: dana.token }, target));
   const pay = () => H.call(regs.handler, Object.assign({ action: 'pay', token: dana.token }, target));
@@ -124,7 +124,7 @@ process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
   H.eq(creditUnverified.body.reason, 'email-unverified',
     'with the same reason, so the client branches on one thing rather than two');
   H.eq((await owing()).paid, 0, 'and nothing was paid against the place');
-  H.eq(await ledger.balanceFor(dana.accountId), 100000, 'and the balance is untouched');
+  H.eq(await ledger.balanceFor(dana.accountId, 'live'), 100000, 'and the balance is untouched');
 
   // The refusal is in the reader's language, like every other one here.
   const inHebrew = await H.call(regs.handler, Object.assign(
@@ -148,7 +148,7 @@ process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
   H.eq(creditPending.body.reason, 'not-approved',
     'reading the same isPayable() both other doors read');
   H.eq((await owing()).paid, 0, 'and still nothing has moved');
-  H.eq(await ledger.balanceFor(dana.accountId), 100000, 'and the balance is still whole');
+  H.eq(await ledger.balanceFor(dana.accountId, 'live'), 100000, 'and the balance is still whole');
 
   // -------------------------------------------------------------------------
   console.log('[with both answered, the credit is spent exactly as before]');
@@ -164,7 +164,7 @@ process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
   const good = await use();
   H.eq(good.status, 200, 'an approved registration on a confirmed address spends it');
   H.eq((await owing()).paid, owed, 'the whole debt is settled from the balance');
-  H.eq(await ledger.balanceFor(dana.accountId), 100000 - owed,
+  H.eq(await ledger.balanceFor(dana.accountId, 'live'), 100000 - owed,
     'and the ledger is down by exactly that, never more');
 
   // Capped at the debt, which the suite beside this one pins in the pure half —

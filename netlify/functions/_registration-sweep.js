@@ -30,6 +30,7 @@ const waitlist = require('./_waitlist');
 const auto = require('./_activity-autocomplete');
 const B = require('./_bundle');
 const bundleStore = require('./_bundle-store');
+const LST = require('./_activity-listing');
 const ledger = require('./_credit-ledger');
 const { recordAudit } = require('./_audit');
 
@@ -209,6 +210,9 @@ async function reconcileBundles(at) {
           await ledger.append({
             accountId: bundle.accountId, type: 'credit', amountCents: amount,
             reason: 'bundle-shortfall',
+            // The mode the bundle was BOUGHT in, off its own frozen block. A
+            // rehearsal's shortfall comes back as rehearsal credit.
+            mode: LST.normaliseMode((bundle.frozen || {}).paymentMode),
             basis: {
               bundleId: bundle.bundleId, purchasedAt: bundle.purchasedAt,
               entries: (bundle.frozen || {}).entries,

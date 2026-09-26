@@ -23,6 +23,7 @@ const credit = require('./_credit');
 const { ageFlag } = require('./_participant-store');
 const REG = require('./_activity-registration');
 const groups = require('./_activity-groups');
+const listing = require('./_activity-listing');
 
 // Five, and deliberately five. `rejected` and `expired` and `cancelled` are all
 // "does not hold a spot", but they are different things that happened and the
@@ -605,6 +606,14 @@ function freeze(activity, participant, groupId, flag, fee) {
     // outright for a drop-in — and an admin switching an activity's type in
     // March must not change what a January family's cancellation is worth.
     type: (activity && activity.type) || 'course',
+    // ⚠ WHOSE MONEY THIS REGISTRATION'S PAYMENTS ARE, frozen for exactly the
+    // reason the line above is. It is derived from the activity's listing state —
+    // `test` means the rehearsal Stripe configuration — and an admin switching
+    // that state next month must not turn money already taken into pretend
+    // money, or pretend money into real. Every payment path reads it back off
+    // this block rather than off the activity, which is also what lets /pay pick
+    // a Stripe key with no session and no repository read at all.
+    paymentMode: listing.paymentModeOf(activity),
     participantName: [participant.firstName, participant.lastName].filter(Boolean).join(' '),
     dateOfBirth: participant.dateOfBirth || null,
     activityTitle: activity.title || null,

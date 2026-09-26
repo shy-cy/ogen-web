@@ -122,8 +122,8 @@ H.eq(writers.join(','), '',
   await regStore.saveRegistration(reg);
 
   await ledger.append({ accountId: account.accountId, type: 'credit',
-    amountCents: OWED * 3, reason: 'registration-cancelled-by-admin', createdBy: 'test' });
-  const startBalance = await ledger.balanceFor(account.accountId);
+    amountCents: OWED * 3, reason: 'registration-cancelled-by-admin', mode: 'live', createdBy: 'test' });
+  const startBalance = await ledger.balanceFor(account.accountId, 'live');
   H.eq(startBalance, OWED * 3, 'the account holds a balance: ' + startBalance);
 
   const apply = (over) => H.call(api.handler, Object.assign({
@@ -179,9 +179,9 @@ H.eq(writers.join(','), '',
   H.eq(res.status, 400, 'nought is not an amount');
 
   // Drain the balance, then prove the other cap.
-  const left = await ledger.balanceFor(account.accountId);
+  const left = await ledger.balanceFor(account.accountId, 'live');
   await ledger.append({ accountId: account.accountId, type: 'debit', amountCents: left,
-                        reason: 'admin-adjustment', note: 'drained', createdBy: 'test' });
+                        reason: 'admin-adjustment', mode: 'live', note: 'drained', createdBy: 'test' });
   res = await apply({ sessionDate: D2, amountCents: 100 });
   H.eq(res.status, 409, '⚠ and more than the account holds is refused');
   H.eq(res.body.reason, 'insufficient', 'by the other cap: ' + res.body.reason);
@@ -189,7 +189,7 @@ H.eq(writers.join(','), '',
   // The term's own path still works, unchanged, and still answers under its own
   // name — the client reads `session || registration` and must not get both.
   await ledger.append({ accountId: account.accountId, type: 'credit', amountCents: 5000,
-                        reason: 'registration-cancelled-by-admin', createdBy: 'test' });
+                        reason: 'registration-cancelled-by-admin', mode: 'live', createdBy: 'test' });
   res = await apply({ amountCents: 1000 });
   H.eq(res.status, 200, 'a term is settled from the same action with no date');
   H.ok(res.body.registration && !res.body.session,

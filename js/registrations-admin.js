@@ -1726,13 +1726,29 @@
       var box = $('account-body');
       box.innerHTML = '';
 
+      // ⚠ THE BALANCE THIS DEBT CAN ACTUALLY BE PAID FROM. An account can hold
+      // both real credit and a rehearsal's, and the two are never added together
+      // anywhere — test credit cannot settle a real class and the reverse. So the
+      // headline figure is the one in THIS record's mode, and the other is named
+      // underneath when it is not zero rather than left to explain why the entries
+      // below do not add up to the number above them.
+      var mode = r.paymentMode === 'test' ? 'test' : 'live';
+      var held = mode === 'test' ? (d.testBalanceCents || 0) : (d.balanceCents || 0);
+      var other = mode === 'test' ? (d.balanceCents || 0) : (d.testBalanceCents || 0);
       box.appendChild(el('div', {}, [
-        el('span', { class: 'balance', text: money(d.balanceCents) }),
-        el('span', { class: 'why', text: ' credit held · ' + r.name +
-          (date ? ' owes ' : ' owes ') +
+        el('span', { class: 'balance', text: money(held) }),
+        el('span', { class: 'why', text: (mode === 'test' ? ' TEST credit held · ' : ' credit held · ') +
+          r.name + ' owes ' +
           money((r.payment || {}).owedCents) + ', paid ' + money((r.payment || {}).paidCents) +
           (date ? ' for this evening' : '') })
       ]));
+      if (other) {
+        box.appendChild(el('p', { class: 'hint', text:
+          'This account also holds ' + money(other) + ' of ' +
+          (mode === 'test' ? 'real' : 'test-mode') + ' credit, which cannot be spent here: ' +
+          (mode === 'test' ? 'this is a test activity, so only test-mode credit applies to it.'
+                           : 'test-mode credit is only spendable on a test activity.') }));
+      }
 
       box.appendChild(amountForm(date ? 'Record a payment for this evening' : 'Record a payment',
         date
@@ -1762,18 +1778,30 @@
             + 'carries the date, so a family read it back six weeks later knows which evening it '
             + 'went on. It is refused past what this evening owes or what the account holds.'
           : 'Writes a debit on the ledger and the same amount onto the registration, in one action — separately they would disagree about the same euros.',
-        S.canCancel && d.balanceCents > 0, function (cents, note) {
+        S.canCancel && held > 0, function (cents, note) {
           var out = { action: 'applyCredit', participantId: r.participantId,
                       activityId: date ? aid : r.activityId, amountCents: cents, note: note };
           if (date) out.sessionDate = date;
           return out;
         }, r, false, evening));
 
-      box.appendChild(amountForm('Adjust the credit',
-        'A correction is an entry, never an edit: the ledger is append-only, so the opposite line is written and both stay in the record. A note is required.',
+      // ⚠ THE ONE MONEY CONTROL THAT HAS TO BE TOLD WHICH POCKET, because an
+      // adjustment is attached to an ACCOUNT rather than to a record and there is
+      // no frozen block to read it off. It follows the panel's own mode, which is
+      // the activity an admin is standing on — so correcting a rehearsal from a
+      // rehearsal's roster lands in the rehearsal's balance without anybody
+      // choosing. The label says which, because this is the one figure on the
+      // screen nobody can infer.
+      box.appendChild(amountForm(
+        mode === 'test' ? 'Adjust the TEST credit' : 'Adjust the credit',
+        'A correction is an entry, never an edit: the ledger is append-only, so the opposite ' +
+        'line is written and both stay in the record. A note is required. It is written in ' +
+        (mode === 'test' ? 'TEST mode, from this test activity\u2019s roster, so it can only be ' +
+                           'spent on a test activity.'
+                         : 'live mode \u2014 real money.'),
         S.canCancel, function (cents, note) {
           return { action: 'adjustCredit', accountId: r.accountId, amountCents: cents,
-                   note: note, type: cents < 0 ? 'debit' : 'credit' };
+                   note: note, mode: mode, type: cents < 0 ? 'debit' : 'credit' };
         }, r, true));
 
       if (d.entries.length) {
@@ -1791,8 +1819,14 @@
                 ' sessions left · fee ' + money(e.basis.feeCredit) +
                 ' + course ' + money(e.basis.courseCredit) }) : null
             ]),
-            el('td', { class: 'amt ' + e.type,
-                       text: (e.type === 'debit' ? '−' : '+') + money(e.amountCents) })
+            el('td', { class: 'amt ' + e.type }, [
+              // ⚠ MARKED ONLY WHEN IT IS TEST MONEY. Every entry written before
+              // modes existed carries none and is real, so an unmarked line means
+              // real — and marking the common case would put a label on every row
+              // of a table nobody would then read.
+              e.mode === 'test' ? el('span', { class: 'pill test', text: 'test' }) : null,
+              el('span', { text: (e.type === 'debit' ? '−' : '+') + money(e.amountCents) })
+            ])
           ]);
         });
         box.appendChild(el('table', { class: 'ledger' }, [el('tbody', {}, rows)]));

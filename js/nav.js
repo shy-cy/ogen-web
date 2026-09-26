@@ -287,12 +287,22 @@
         // what the listing page filters on too; without it the Russian menu
         // would link to a Russian page that was never generated.
         var mine = list.filter(function (a) {
-          // ⚠ A TEST ACTIVITY IS IN THIS FILE AND NOT IN THIS MENU. The index is
-          // a lookup — it is how a slug becomes an activityId for the family
-          // area — so the row has to be there; the menu is a way of finding
-          // things, which is the one thing a test activity must not offer. The
-          // listing pages apply the same filter server-side.
-          if (!a || a.testActivity) return false;
+          // ⚠ A HIDDEN ACTIVITY IS IN THIS FILE AND NOT IN THIS MENU. The index
+          // is a lookup — it is how a slug becomes an activityId for the family
+          // area — so the row has to be there; the menu is a way of FINDING
+          // things, which is the one thing an unlisted or test activity must not
+          // offer. The listing pages apply the same filter server-side.
+          //
+          // ⚠ AND IT FALLS BACK TO THE OLD FLAG, which is not tidiness. This
+          // reads a DEPLOYED activities-index.json, and the file on the site is
+          // whatever the last publish wrote — so between this script deploying
+          // and the next publish rebuilding the index, every row still says
+          // `testActivity` and none says `listing`. Reading only the new field
+          // there would put every test activity into the public menu for exactly
+          // that window.
+          if (!a) return false;
+          var listing = a.listing || (a.testActivity ? 'test' : 'listed');
+          if (listing !== 'listed') return false;
           return a.langs && a.langs.indexOf(lang) !== -1;
         });
         var open = mine.filter(function (a) { return OPEN.indexOf(a.status) !== -1; });

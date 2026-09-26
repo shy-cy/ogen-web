@@ -1083,7 +1083,7 @@ The confirmation now names **which dates actually moved**, and says so plainly
 when neither could be computed. A missing start date reads *"no start date"*
 rather than an em dash mid-sentence, and one session is *"1 session"*.
 
-### ⚠ A test activity: published for real, reachable only by its link
+### ⚠ Who can find it: one dropdown, three states
 
 There was **no way to rehearse a registration on the live site**. Everything that
 moves money only really runs deployed — Blobs is unreliable locally and Stripe
@@ -1100,41 +1100,232 @@ The two things that already existed were both the wrong shape for it:
   the site** — that flag is an instruction to a crawler, not to a visitor, and
   the listing and the menu still carry it.
 
-`testActivity` is the third answer. It is a **tickbox in Settings, beside
-Status**, and deliberately **not a status**: a rehearsal has to run through the
-same open-activity code every family meets, or it rehearses something else. What
-it removes is every *route to* the page and nothing else.
+The third answer was `testActivity`, a tickbox. ⚠ **AND IT ASKED ONE QUESTION AND
+ANSWERED TWO.** *Is this advertised* and *is this real money* were one fact only
+while there was one Stripe configuration — and an activity nobody should stumble
+on and an activity whose payments are pretend are different things. The first is
+perfectly ordinary: a closed group, a class filled by word of mouth, a page sent
+to one family. Under a tickbox, anything hidden had to be a rehearsal, so hiding a
+real class was not expressible at all.
 
-| Reader | A test activity |
-|---|---|
-| `activities/<slug>.html` ×3 | rendered and committed exactly as usual, with `noindex, nofollow` |
-| `sitemap.xml` | absent |
-| the three listing pages | absent |
-| the hamburger's Activities group | absent — `js/nav.js` filters it |
-| `activities-index.json` | **present**, carrying `testActivity: true` |
-| the admin's activity picker | present, marked with a dashed `test` pill |
+`listing` is **one select in Settings, beside Status**, with three states, and it
+is deliberately **not a status**: all three are published for real and behave
+exactly like an open activity, because that is what a closed group and a rehearsal
+both need. What changes is every *route to* the page and, for `test`, which keys
+the money moves on.
 
-`noindex, nofollow` rather than the `noindex, follow` an ordinary noindex
-activity gets: `/about`'s links are still worth crawling and nothing here is.
-Ticking the box is enough — it wins over the robots select rather than being a
-second thing to remember beside it.
+| Reader | `listed` | `unlisted` | `test` |
+|---|---|---|---|
+| `activities/<slug>.html` ×3 | as usual | as usual | as usual |
+| the `robots` meta | the select decides | `noindex, follow` | `noindex, nofollow` |
+| `sitemap.xml` | present | absent | absent |
+| the three listing pages | present | absent | absent |
+| the hamburger's Activities group | present | absent | absent |
+| `activities-index.json` | **present**, carrying `listing` | **present** | **present** |
+| the admin's activity picker | plain | dashed navy `unlisted` pill | dashed terracotta `test` pill |
+| payments | **live** Stripe | **live** Stripe | **test** Stripe |
+
+⚠ **`unlisted` IS REAL MONEY, and that is the whole reason the third state is not
+just a rename.** It is a real class; only the advertising is off.
+
+`nofollow` for `test` alone: `/about`'s links are worth crawling, and so are a
+real unlisted activity's — nothing on a rehearsal is. The state wins over the
+robots select rather than being a second thing to remember beside it, and ⚠ **one
+function decides the meta tag and the sitemap reads the same one**
+(`robotsFor()`), because a sitemap advertising a page that asks not to be indexed
+contradicts itself and that pairing now has to hold across three states plus the
+select.
 
 ⚠ **AND ONE READER OF THE INDEX MUST NOT FILTER.** `activities-index.json` is not
 a shop window, it is the lookup that turns a slug into an `activityId` — which is
 how `/account/activity?register=<slug>` finds an activity at all, in the family
-area and in both registration handlers. Drop the row and the one thing a test
+area and in both registration handlers. Drop the row and the one thing a hidden
 activity exists for becomes impossible, silently, with the page still serving.
-So the row stays and carries the flag, and the readers that **are** shop windows
-each leave it out. Publishing the flag costs nothing it protects: the file is
+So the row stays and carries the state, and the readers that **are** shop windows
+each leave it out. Publishing the state costs nothing it protects: the file is
 public, the row names an activity whose page is already served to anyone holding
-the URL, and what keeps a test activity out of sight is the absence of a link to
-it rather than the absence of a fact about it.
+the URL, and what keeps it out of sight is the absence of a link to it rather than
+the absence of a fact about it. ⚠ `testActivity` is **gone** from that file rather
+than kept beside `listing` — two machine-readable statements of one fact are two
+that can disagree.
 
-It is **structure**, like `robots` — whether an activity is listed is one answer
-for all three trees, so a Russian-only role cannot take the Hebrew page off it.
-And the client's read-back keeps the stored value when the box is not drawn,
-which is the undrawn-field trap in the one direction that would publish a test
-activity to the world.
+It is **structure**, like `robots` — one answer for all three trees, so a
+Russian-only role cannot take the Hebrew page off the listing. ⚠ That matters more
+than it did: this field decides which Stripe keys the activity's payments move on,
+so a restricted role able to write it would be a restricted role able to turn a
+rehearsal into real money. And the client's read-back keeps the stored value when
+the select is not drawn, which is the undrawn-field trap in the one direction that
+would publish a rehearsal to the world.
+
+**The migration is one line, on read.** `listingOf()` in `_activity-listing.js`
+reads `testActivity: true` as `test` and anything else — `false`, or the key
+absent — as `listed`, so every record in the repository answers correctly the
+moment this deploys rather than after somebody opens and saves each one.
+`migrate()` then drops the old key, the way `ctaUrl` went, and is idempotent
+because after one pass there is no `testActivity` left to consult.
+
+⚠ **`js/nav.js` FALLS BACK TO THE OLD FLAG, AND THAT IS LOAD-BEARING.** It reads
+the **deployed** `activities-index.json`, which is whatever the last publish
+wrote — so between this deploying and the next publish rebuilding the index, every
+row still says `testActivity` and none says `listing`. Reading only the new field
+there would put every test activity into the public menu for the length of that
+window. The menu suite proves it with a row carrying the legacy flag.
+
+### ⚠ Test-mode payments: two complete Stripe configurations
+
+A test activity was published for real and behaved exactly like an open one,
+which is the point — and "exactly like" included the money. One secret key, one
+webhook endpoint, one signing secret, so **every rehearsal was a real charge on a
+real card**, to be refunded by hand afterwards.
+
+There are two configurations now, and **complete** is the load-bearing word:
+
+| | live | test |
+|---|---|---|
+| secret key | `STRIPE_SECRET_KEY` | `STRIPE_TEST_SECRET_KEY` |
+| webhook endpoint | `/api/stripe-webhook` | `/api/stripe-webhook-test` |
+| signing secret | `STRIPE_WEBHOOK_SECRET` | `STRIPE_TEST_WEBHOOK_SECRET` |
+| `Ogen CTR` descriptor suffix | set | **not set** |
+| `organization: "ogen"` tag | set | **set** |
+
+Nothing is shared. A half-shared pair is the shape that produces a test card
+charging real money, because the piece that was shared is the piece nobody
+checked.
+
+⚠ **THE SUFFIX IS THE ONE GENUINE ASYMMETRY.** A statement descriptor is what a
+**cardholder reads on a bank statement**, and a test payment reaches none — so on
+a rehearsal it is a value with no reader. It is also the half of `_stripe.js` that
+depends on a prefix the *other* organisation owns, and a rehearsal is precisely
+where not to exercise that dependency.
+
+⚠ **THE ORGANISATION TAG IS WRITTEN IN BOTH MODES, AND THE BRIEF SAID IT NEED NOT
+BE.** It is not a descriptor-shaped nicety: it is the **only** thing that tells an
+Ogen event from Shirat HaYam's, and the account is shared in test mode exactly as
+in live mode — the other organisation's developers press test cards too. Dropping
+it on rehearsals would mean `isOurs()` had to accept **untagged** events on one
+endpoint, and "accept untagged" is the single relaxation that file exists to
+forbid. It costs one metadata key. `ogen_mode` travels beside it, so the Stripe
+dashboard says which configuration built a session and a webhook can refuse one
+built for the other.
+
+⚠ **THE KEY'S OWN PREFIX IS CHECKED AGAINST THE MODE, before a request is made.**
+A Stripe key says which mode it is, so the one misconfiguration that would be both
+catastrophic and silent is also trivially detectable: a `sk_test_…` pasted into
+`STRIPE_SECRET_KEY` would build "live" sessions that are actually test ones, and
+every real payment on the site would quietly stop arriving. It throws at
+construction instead.
+
+#### The mode is frozen, and read back off the record
+
+`paymentMode` is derived from the listing and **frozen onto every record at the
+moment a place is taken or an evening booked** — `frozen.paymentMode` on a
+registration (beside `frozen.type`, for the same reason), on each attendance blob
+via `freezeSession()`, and on a bundle via the Checkout metadata, since a bundle
+is the one purchase paid for before its record exists.
+
+Two things follow, and both are why it is not read live off the activity:
+
+- an admin switching a listing to Test in March must not turn money already taken
+  in January into a rehearsal, or the reverse;
+- **`/pay` has no session and reads no repository at all**, so the record is the
+  only place it can ask which key to open Checkout with.
+
+`payment.mode` is then stamped by **every** payment path — the webhook, the desk,
+credit being spent — so the record says which kind of money it has taken.
+⚠ **Cash at a desk is the record's mode too, never the admin's choice**: a test
+activity's register is a rehearsal whether the money arrives by card or in an
+envelope, and stamping it live would file pretend takings with the real ones on the
+one screen somebody reconciles.
+
+⚠ **AN ABSENT MODE IS `live`, EVERYWHERE.** Every payment and every ledger entry
+written before this existed was made with the one key that existed, and it was the
+real one. Reading a blank as `test` would relabel the whole history of real money
+as pretend and — worse — make it spendable against a test activity. This is the
+one place in the money code where a blank resolves *away* from generosity, and it
+does so because the generous reading is the dangerous one.
+
+#### Two endpoints, one implementation
+
+Stripe verifies with a per-endpoint signing secret, so **which secret verified the
+body is the only unforgeable statement of a mode** — hence two registered
+endpoints. `stripe-webhook-test.js` is one line calling `handlerFor('test')`:
+everything else (the organisation check, the idempotency list, Stripe's figure
+being the authority, only-a-bad-signature-is-not-a-200) is identical, and a second
+copy is a second place the retry rule can drift.
+
+Three checks, in order, and none of them throws:
+
+1. `isOurs()` — is this Ogen's at all.
+2. `ogen_mode` on the session against the endpoint's, and Stripe's own `livemode`
+   against it too. These cannot normally disagree, so a disagreement means a key
+   or an endpoint is set to the wrong mode.
+3. `paymentModeRefusal(record, mode)` — the mode being paid in against the mode
+   the record was **sold** in, off its frozen block.
+
+⚠ **THE RECORD CHECK COMES BEFORE THE IDEMPOTENCY LIST**, in both branches. A
+wrong-mode payment recorded as counted would make the retry on the *right*
+endpoint find it already settled. And the refusal is a **logged boolean, never a
+throw**: a retry cannot fix a mismatch and Stripe disables an endpoint that keeps
+erroring, so the answer is still 200 and somebody has to read the log.
+
+`paymentModeRefusal` has a second refusal, `mode-frozen`: a record that has
+already taken money in the *other* mode takes no more. It is only reachable from a
+hand-edited frozen block, and it is the one state that must never be added to —
+a `paidCents` part real and part pretend cannot be unpicked.
+
+⚠ **ONE PAYMENT CANNOT STRADDLE THE TWO.** Several evenings are one Checkout
+session built with one key, so a list mixing a rehearsal evening with a real one
+is **refused** (`mode-mixed`) rather than resolved. It can only arise from
+evenings booked either side of a listing change, which the freeze deliberately
+allows to coexist; what it does not allow is paying for both at once.
+
+#### The ledger has a mode, and two balances that never add up
+
+Every entry carries `mode`, and it is **required rather than defaulted**: a
+default would read as `live`, which is right for every entry written before this
+existed and wrong for every one a caller forgot. A test scans every
+`ledger.append(` call site for one, exactly as the clock on `creditFor()` is
+scanned.
+
+`balanceOf(entries, mode)` and `balanceFor(accountId, mode)` **require** the mode
+too, and refuse to answer without it. ⚠ **That is what makes cross-mode spending
+refused BY CONSTRUCTION rather than by a check**: a live record's spender is handed
+the live balance, a rehearsal's credit is simply not in it, and there is no branch
+anywhere that has to remember to exclude it. A family meets the ordinary
+`insufficient` refusal carrying the balance **in that mode**, which is the honest
+figure — what is held against this debt really is nothing.
+
+Where a screen has a record it uses that record's mode. Where it does not:
+
+- **the dashboard** shows the **live** balance, because it is about an account
+  rather than one activity and the figure on a family's own front page is the money
+  they actually have. ⚠ Its **entries are filtered to match**, or the card prints a
+  total and then lists rows that do not add up to it — and becomes the one place on
+  the site where the two kinds of money share a column;
+- **the admin's ledger panel** is sent **both** figures, because an account can
+  hold both and one number would be a sum nobody is owed. Only test lines are
+  marked; an unmarked line means real, since every entry predating this is real;
+- **`adjustCredit`** is the one place a mode is *chosen* rather than derived — an
+  adjustment hangs off an account and no record. It defaults to real money, and the
+  roster sends the mode of the activity the admin is standing on.
+
+#### A listing change is counted, never applied
+
+Switching a live activity to Test changes which configuration its **future**
+payments run through, and every registration already taken keeps the mode frozen
+on it. That is the freeze working, and it is also invisible — from the form an
+admin has just changed how this activity is paid for, and the families already on
+it are the one group the change does not reach.
+
+So `_registration-fallout.js` **counts and names it**, exactly as a rewritten
+refund schedule is counted: the publish notice and the audit line say which
+configuration payments now run through and how many live registrations keep the
+old one. Nothing is rewritten and nobody is emailed — a family's payments go on
+working through the keys they were sold under, which is correct. What an admin
+needs to know is that switching a live activity to Test does **not** turn its
+outstanding debts into rehearsals, and therefore that a rehearsal wants a fresh
+activity rather than a repurposed one. ⚠ `listed → unlisted` is **not** a mode
+change and says nothing, because unlisted is real money.
 
 ### Conditional panels, and the trap they bring
 
@@ -2137,6 +2328,9 @@ netlify/functions/
                          store, no gate. See the naming warning at its top; PURE
   _activity-series.js    what makes two terms one activity, and the one field
                          that has to follow from it; PURE
+  _activity-listing.js   who can find an activity — listed | unlisted | test — and
+                         which of the two Stripe configurations its payments run
+                         through. Requires nothing; PURE
   _credit.js             what a cancellation credits; reads one registration and
                          one timestamp, and nothing else; PURE
   _family-errors.js      every refusal a family can be shown, in three
@@ -4076,9 +4270,17 @@ category. **Zero is refused**: a zero entry is a line in a financial record that
 means nothing and still has to be explained, so a caller with nothing to write
 writes nothing.
 
-`basis` carries what `basisFor()` produced — the mode, both dates, sessions
+`basis` carries what `basisFor()` produced — the refund mode, both dates, sessions
 remaining over sessions total, and the two figures added — so a family credited
-150 out of 350 gets the answer from the record.
+150 out of 350 gets the answer from the record. ⚠ Note `basis.mode` is the
+**refund** mode (`flat` / `prorated`) and the entry's own `mode` is the **payment**
+mode (`live` / `test`); the two words are unrelated and both are load-bearing where
+they sit.
+
+⚠ **AND EVERY ENTRY SAYS WHICH KIND OF MONEY IT IS.** `mode` is `live` or `test`,
+required rather than defaulted, and `balanceOf()` / `balanceFor()` require one too
+and refuse to answer without it — so there is no single figure across the two and a
+rehearsal's credit cannot settle a real class. See **Test-mode payments**.
 
 ### `cancelAndCredit()` — written once, called by both
 
@@ -6696,6 +6898,16 @@ admin-side "grant a bundle" for a family who paid in cash. Both are real gaps
 rather than decisions; today an admin compensates with `adjustCredit`, which
 writes a line in the ledger with a note.
 
+⚠ **AND `buyBundle` HAD NEVER ONCE RUN.** `createBundleCheckout()` read a
+`groupId` that was not in its own parameter list — the caller passed one and the
+destructure did not name it — so every bundle purchase threw a `ReferenceError`,
+was swallowed by the `try` around it, and answered `502 checkout-failed`. The
+whole of Phase 8 was tested and this door was shut. It is the same shape as the
+pure bundle module wired to nothing for a release, one layer in: the suite
+asserted the function *exists* (`/async function createBundleCheckout/`) and
+nothing executed it, so an undeclared identifier in its body was invisible. The
+payment-mode suite executes a bundle Checkout now.
+
 ## The emailed payment link
 
 `/pay?t=<token>` — a link in a payment email that opens Stripe Checkout with no
@@ -6709,6 +6921,14 @@ netlify/functions/
   _pay-link.js    ogen-pay-links; pay-<token>; arms the legal gate
   pay-link.js     /pay — the only endpoint here that acts with no session at all
 ```
+
+⚠ **AND `/pay` IS WHY THE PAYMENT MODE IS FROZEN ONTO THE REGISTRATION.** This
+endpoint reads no repository at all, deliberately — a public handler holding a
+GitHub credential is a different class of thing — so it cannot ask the activity
+which Stripe configuration to open Checkout with. It reads `frozen.paymentMode`
+off the record, which is also the right answer: a listing switched to Test since
+the message went out must not turn a real debt into a rehearsal. See **Test-mode
+payments**.
 
 **A magic link hands whoever opens a forwarded message the whole family
 record** — children's names, dates of birth, medical notes, the members-only
@@ -6785,7 +7005,9 @@ test pins that the block carries no `s-maxage`.
 `_stripe.js` gained `_internal.setClient()`, the same seam `_email.js` has and
 for the same reason: static analysis can assert a descriptor suffix is set, and
 only *executing* the thing catches an endpoint building a session for the wrong
-registration.
+registration. ⚠ It takes a **mode** now, because a test that installed one fake
+client for both configurations would be unable to see a path picking the wrong
+one — which is the thing most worth testing there.
 
 ## QR check-in (drop-ins)
 
@@ -7566,6 +7788,17 @@ functions until the next deploy**.
 | `GITHUB_REPO` / `GITHUB_BRANCH` | `shy-cy/ogen-web` / `main` |
 | `NETLIFY_BLOBS_SITE_ID` / `NETLIFY_BLOBS_TOKEN` | Blobs |
 | `ADMIN_PASSWORD` | bootstrap only — stops being accepted the moment one account exists |
+| `STRIPE_SECRET_KEY` | the LIVE key. Must begin `sk_live_` / `rk_live_` or `_stripe.js` refuses it |
+| `STRIPE_WEBHOOK_SECRET` | `whsec_…` for the endpoint registered at `/api/stripe-webhook` in **live** mode |
+| `STRIPE_TEST_SECRET_KEY` | the TEST key. Must begin `sk_test_` / `rk_test_` |
+| `STRIPE_TEST_WEBHOOK_SECRET` | `whsec_…` for a **second** endpoint, registered at `/api/stripe-webhook-test` in Stripe's **test** mode |
+
+⚠ **The two Stripe pairs are set independently and neither falls back to the
+other.** An activity whose listing is `test` cannot take a payment until the test
+pair is set, and it fails loudly rather than quietly charging a real card — which
+is the whole point. The test-mode webhook is a **separate endpoint registered in
+Stripe's test mode**; its signing secret cannot exist before the endpoint does, the
+same ordering `RESEND_WEBHOOK_SECRET` has.
 
 ### Tests
 
@@ -7664,5 +7897,18 @@ share image, Formspree wiring, domain) is done. Open items:
   phases of the registration system are built.
   The gate that held Phase 6 opened when English became the binding version and
   was confirmed reviewed; the Russian is now a declared courtesy translation.
+  **Payments run on two complete Stripe configurations**, chosen by the activity's
+  listing state, with the mode frozen onto every payment record and every ledger
+  entry — so a rehearsal can be run on the live site without a real card being
+  charged, and test credit can never settle a real class. See **Test-mode
+  payments** and **Who can find it**.
+- ⚠ **The TEST Stripe pair is not set yet.** `STRIPE_TEST_SECRET_KEY` and
+  `STRIPE_TEST_WEBHOOK_SECRET` have to be set with `netlify env:set`, and the
+  test-mode webhook endpoint has to be created in **Stripe's test mode** pointing
+  at `/api/stripe-webhook-test` — its signing secret cannot exist before the
+  endpoint does. Until both are set, an activity whose listing is `test` fails
+  loudly on its first payment attempt rather than quietly charging a real card,
+  which is the intended failure. Remember an env change does not reach deployed
+  functions until the next deploy.
 - **Rotate the setup credentials.** The GitHub PAT and Netlify token were pasted
   into a chat transcript during setup.
