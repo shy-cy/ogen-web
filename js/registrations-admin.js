@@ -1815,12 +1815,81 @@
   // and the panel cannot disagree about a status, because there is one payload
   // and one reader of it. A second fetch per row would have been a second shape
   // to keep in step, and this admin has paid for that twice.
+  // ⚠ THE CONFIRMATION, SENT AGAIN — the only message in the log's table marked
+  // resendable, and for releases nothing offered it.
+  //
+  // ⚠ THE REGISTRATION'S STATUS, NEVER THE ROW'S. On the queue those are the same
+  // value; on the evening register `r.status` is the BOOKING — booked, attended,
+  // no-show — and reading it as the registration's would offer to resend "your
+  // place is confirmed" to a family whose place has gone. The server sends
+  // `regStatus` on a register row for exactly that, and re-decides either way.
+  //
+  // It is a WORD rather than a glyph, like Give a place: the glyphs earn their
+  // place on controls repeated down every row of a table, and this is one control
+  // inside a panel, doing something nobody expects to be possible.
+  function regStatusOf(r) { return r.regStatus || r.status; }
+
+  function resendRow(r) {
+    var ok = regStatusOf(r) === 'approved';
+    var m = S.mail && !S.mail.error ? mailFor(r) : null;
+    var bad = m && m.messages ? m.messages.filter(function (x) { return x.final; })[0] : null;
+    var go = el('button', {
+      type: 'button',
+      disabled: !S.canApprove || !ok || null,
+      title: !S.canApprove ? 'Your role may open the queue but not write to families'
+        : !ok ? 'Only a confirmed place has a confirmation. This registration is '
+                + regStatusOf(r) + '.'
+        : null,
+      text: 'Send the confirmation again'
+    });
+    go.addEventListener('click', function () {
+      go.disabled = true;
+      send({ action: 'resendApproval', participantId: r.participantId,
+             activityId: S.queue.activity.activityId, slug: S.slug }).then(function (res) {
+        go.disabled = false;
+        if (!res.ok) return message('err', (res.data && res.data.error) || 'That did not work');
+        if (res.data.emailed === false) {
+          return message('err', 'It did NOT go to ' + res.data.to + '. Tell them another way.');
+        }
+        message('ok', 'Confirmation sent again to ' + res.data.to);
+        // The log itself, so the new line appears rather than the panel claiming
+        // something the list under it does not show.
+        loadMail();
+      });
+    });
+    return el('div', {}, [
+      el('div', { class: 'label-row' }, [
+        go,
+        window.AdminHelp.badge('It is built again from the record as it stands rather than '
+          + 'being a copy of what was sent, so the address, the cancellation terms and the '
+          + 'payment link are today\u2019s. It is the only message here that may be sent twice: '
+          + 're-delivering a refusal or a cancellation a fortnight later does harm.')
+      ]),
+      // ⚠ STATE, SO IT STAYS ON SCREEN. A bounce is a fact about the ADDRESS —
+      // `suppressed` means the provider will not try again — so sending to the
+      // same address is very likely to fail the same way, and what the family
+      // needs is to give a new one. An admin pressing this without knowing that
+      // would report the message as sent.
+      bad ? el('p', { class: 'hint', style: 'margin-top:0;', text:
+        'The last message to this address came back \u2018' + bad.status + '\u2019. Sending again '
+        + 'will very likely do the same \u2014 the address itself may be wrong, and the family '
+        + 'would need to give a new one.' }) : null
+    ]);
+  }
+
   function openMail(r) {
     var addr = String(r.accountEmail || '').trim().toLowerCase();
     $('mail-panel').hidden = false;
     $('mail-title').textContent = 'Email \u00b7 ' + (r.accountEmail || r.accountId);
     var box = $('mail-body');
     box.innerHTML = '';
+
+    // ⚠ ABOVE EVERY BRANCH, INCLUDING THE EMPTY ONE — which is where it is most
+    // needed. The "nothing has been recorded as sent" message already ended by
+    // telling an admin to send it again from the row, and there was nothing to
+    // press: a sentence describing a control that does not exist, which is this
+    // admin's own oldest mistake.
+    box.appendChild(resendRow(r));
 
     var m = S.mail && !S.mail.error ? mailFor(r) : null;
     if (!m) {
@@ -1841,7 +1910,7 @@
       box.appendChild(el('p', { class: 'hint',
         text: 'Nothing has been recorded as sent to this address. Either nothing was sent, or it '
             + 'went out at a moment the log could not be written \u2014 sending never waits for the '
-            + 'record. If a message was expected, send it again from the row rather than assuming '
+            + 'record. If the confirmation was expected, send it again above rather than assuming '
             + 'it arrived.' }));
     } else {
       box.appendChild(el('table', { class: 'ledger' }, [el('tbody', {}, m.messages.map(function (x) {

@@ -952,11 +952,17 @@ const langOf = (account) => lang(((account || {}).profile || {}).preferredLangua
 // and can be renamed, and the id is the thing that still means the same activity
 // afterwards. Frozen rather than live, for the same reason
 // `activitySlugAtSubmission` is — it is what this message was about at the time.
-const as = (template, account, reg) => ({
+// ⚠ `by` IS ONE FACT, NOT TWO. The log carries `sentBy` and `manual`, and they
+// are the same answer: a person asked for this rather than a decision producing
+// it. Derived from one argument rather than passed as a pair, so they cannot
+// disagree — and absent means the system sent it, which is every other call.
+const as = (template, account, reg, by) => ({
   template: template,
   lang: langOf(account),
   relatedActivityId: (reg && reg.activityId) || null,
-  relatedSlug: (reg && reg.frozen && reg.frozen.activitySlugAtSubmission) || null
+  relatedSlug: (reg && reg.frozen && reg.frozen.activitySlugAtSubmission) || null,
+  sentBy: by || null,
+  manual: !!by
 });
 
 // `sessionCancelHours` rides in from the caller for the reason termsBlock()
@@ -973,8 +979,21 @@ const sendReceived = (reg, account, sessionCancelHours, where) =>
 // and a failure to open it costs the family one password rather than the email.
 // `payUrl` stays null on that path and the button falls back to the
 // registration page, which is where it pointed before any of this existed.
+// ⚠ AND IT MINTS NOTHING WHEN NOTHING IS OWED, which is the rule the RECEIPT
+// already followed and the approval never learned. `/pay` computes the amount
+// from the record and refuses at `nothing-due`, so a link minted against a
+// settled registration is a Pay now button that leads to a refusal — a dead
+// button, which this project treats as worse than no button.
+//
+// It bit the moment the confirmation became resendable: the likeliest reason to
+// resend one is a family who says it never arrived, and by then they have often
+// paid. It is decided from the AMOUNT rather than by each caller, for the reason
+// the receipt's own comment gives: a caller that has to remember is a caller
+// that forgets, and `approve` on a drop-in registration — which owes nothing at
+// all — was already reaching this.
 async function payUrlFor(reg, account) {
   try {
+    if (!(require('./_checkout').dueCents(reg) > 0)) return null;
     const l = langOf(account);
     const link = await require('./_pay-link').createPayLink(reg, l);
     return SITE + '/pay?t=' + encodeURIComponent(link.token) + '&l=' + l;
@@ -996,11 +1015,17 @@ async function creditFor(account) {
   }
 }
 
-const sendApproved = (reg, account, sessionCancelHours, where) =>
+// ⚠ THE ONE RESENDABLE MESSAGE IN THE TABLE, and `by` is what a resend adds:
+// everything else about it is REBUILT from the record as it stands rather than
+// re-delivered, because the log stores what was sent and not the words. So a
+// family whose room has moved gets the new room, the terms are the block frozen
+// on the record today, and the pay link is fresh — a resend of a month-old
+// message is not a month-old message.
+const sendApproved = (reg, account, sessionCancelHours, where, by) =>
   email.settle('registration-approved', account.email, async () =>
     email.send(approvedMessage(reg, account, await payUrlFor(reg, account),
                                await creditFor(account), sessionCancelHours, where),
-      as('registration-approved', account, reg)));
+      as('registration-approved', account, reg, by)));
 
 const sendRejected = (reg, account, override) =>
   email.settle('registration-rejected', account.email, () =>

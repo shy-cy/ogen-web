@@ -1,7 +1,8 @@
 // /api/admin-registrations — the approval queue.
 //
 // Actions: queue | approve | reject | cancel | moveGroup | givePlace | register |
-//          markAttendance | cancelSession | mail | checkinCodes | bundles |
+//          resendApproval | markAttendance | cancelSession | mail | checkinCodes |
+//          bundles |
 //          recordPayment | applyCredit | adjustCredit | recordSessionPayment |
 //          ledger | sweep
 //
@@ -379,8 +380,17 @@ exports.handler = async (event) => {
         let emailed = null;
         const account = await accounts.getAccount(next.accountId);
         if (account) {
+          // ⚠ THE PER-EVENING WINDOW GOES TO BOTH. It was handed to sendReceived
+          // on the next line and `null` to sendApproved on this one, which on a
+          // DROP-IN is a false statement about a deadline: null reads as "you can
+          // cancel an evening until it starts", and an activity with a 24-hour
+          // window then promises credit it will refuse. It is not frozen onto the
+          // registration — it belongs to each evening — so it has to be read from
+          // the activity and passed, which is what the parameter is for.
           emailed = next.status === 'approved'
-            ? await mail.sendApproved(next, account, null, facts.whereFor(activity, next.groupId))
+            ? await mail.sendApproved(next, account,
+                                      (activity.registration || {}).sessionCancelHours,
+                                      facts.whereFor(activity, next.groupId))
             : await mail.sendReceived(next, account,
                                       (activity.registration || {}).sessionCancelHours,
                                       facts.whereFor(activity, next.groupId));
@@ -466,7 +476,8 @@ exports.handler = async (event) => {
             const reg2 = out.payload.registration;
             const act2 = status === 'approved' ? await published(reg2.slug || body.slug) : null;
             emailed = status === 'approved'
-              ? await mail.sendApproved(reg2, account, null,
+              ? await mail.sendApproved(reg2, account,
+                                        act2 ? (act2.registration || {}).sessionCancelHours : null,
                                         act2 ? facts.whereFor(act2, reg2.groupId) : null)
               : await mail.sendRejected(reg2, account, override);
           }
@@ -704,6 +715,15 @@ exports.handler = async (event) => {
         // a place that cannot see the calendar; the rule stays server-side, the
         // same way the family's own picker gets its list.
         const all = await attendance.forActivity(activity.activityId);
+        // ⚠ THE REGISTRATION BEHIND EACH BOOKING, because `status` on a register
+        // row is the BOOKING's — booked, attended, no-show — and the confirmation
+        // an admin may resend is about the registration. The two are different
+        // questions about one family, and a screen reading one as the other would
+        // offer to resend "you have a place" to somebody whose place has gone.
+        // It costs no read: these are already being counted for `registered`.
+        const regs = await store.forActivity(activity.activityId);
+        const regStatus = {};
+        for (const rg of regs) regStatus[rg.participantId] = rg.status;
         const rows = [];
         // ⚠ ONE CLOCK FOR THE WHOLE TABLE. creditForSession() measures against a
         // deadline in hours, so reading Date.now() per row would let two rows of
@@ -735,7 +755,8 @@ exports.handler = async (event) => {
             // is about to answer the family's question about it. `too-late`,
             // `started` and `nothing paid at all` are three different
             // conversations and the figure alone cannot tell them apart.
-            cancelReason: giveBack ? giveBack.reason : null
+            cancelReason: giveBack ? giveBack.reason : null,
+            regStatus: regStatus[att.participantId] || null
           });
         }
         return json(200, {
@@ -757,8 +778,7 @@ exports.handler = async (event) => {
           capacity: date ? R.capacityForDate(activity, all, date) : null,
           // How many hold a REGISTRATION, which is a different question from how
           // many are in the room on any evening and is deliberately uncapped.
-          registered: (await store.forActivity(activity.activityId))
-            .filter((r) => R.holdsASpot(r)).length,
+          registered: regs.filter((r) => R.holdsASpot(r)).length,
           // ⚠ THE QUEUE IS ITS OWN LIST, exactly as it is on the course roster,
           // and for the same reason: nothing in a register row applies to
           // somebody waiting. They hold no seat, owe nothing, have no attendance
@@ -953,6 +973,72 @@ exports.handler = async (event) => {
           body.participantId + '__' + body.activityId + '__' + body.sessionDate, 'ok',
           { detail: body.status });
         return json(200, { ok: true, session: next });
+      }
+
+      // ⚠ SENDING THE CONFIRMATION AGAIN — the one thing `_email-log.js`'s own
+      // table said was allowed and nothing had ever offered.
+      //
+      // `isResendable()` has existed since that module was written, decides this
+      // for every template, and HAD NO CALLER. Only `registration-approved` is
+      // `resend: true`, and the reasoning is written beside each entry: a family
+      // legitimately loses "you have a place", where re-delivering a refusal or a
+      // cancellation a fortnight later does harm. So the capability was described,
+      // justified and unreachable — and the mail panel's own empty state told an
+      // admin to "send it again from the row", pointing at a control that did not
+      // exist. That is the invite button labelled with a description, one screen
+      // over.
+      //
+      // ⚠ IT IS REBUILT, NEVER RE-DELIVERED. The log records that a message went
+      // and what became of it, not the words — so this is `sendApproved()` run
+      // again against the record as it stands today. That is the right answer
+      // rather than a limitation: a family whose room has moved gets the new room,
+      // the terms are the block frozen on the record now, and the pay link is
+      // fresh instead of a month-old token.
+      //
+      // ⚠ THE GATE IS THE STATUS NOW, NOT THE LOG. The message says the place is
+      // confirmed, so resending it to somebody cancelled, rejected, expired or
+      // still `pending` would be a sentence that is no longer true — and the one
+      // about a `pending` row would be worse than untrue, since no person has
+      // decided anything yet. `approved` alone, which is the same single-status
+      // list `isPayable()` reads and for a related reason.
+      //
+      // `approve` gates it: it decides nothing and moves no money, but it writes
+      // to a family, which is the axis the sweep button is already behind for
+      // saying it "only updates what the queue says and tells the family".
+      case 'resendApproval': {
+        if (!canApprove(session)) {
+          return json(403, { error: 'Your role may open the queue but not write to families' });
+        }
+        // ⚠ ASKED OF THE TABLE RATHER THAN ASSUMED. The judgement about which
+        // messages may be sent twice lives in `_email-log.js`, beside the reason
+        // for each one — and a handler that hardcoded "the approval is
+        // resendable" would be a second copy of that decision, free to disagree
+        // with the first the day somebody changes it there.
+        if (!emailLog.isResendable('registration-approved')) {
+          return json(409, { error: 'The confirmation is not marked resendable.' });
+        }
+        const reg = await store.getRegistration(body.participantId, body.activityId);
+        if (!reg) return json(404, { error: 'No such registration.' });
+        if (reg.status !== 'approved') {
+          return json(409, { error: 'This registration is ' + reg.status + ', so there is no ' +
+                                    'confirmation to send again. Only a confirmed place has one.' });
+        }
+        const account = await accounts.getAccount(reg.accountId);
+        if (!account) return json(404, { error: 'That registration has no account behind it.' });
+
+        // The activity, for the two things the message cannot get from the record:
+        // where to go, read live because a room that moves has to reach them, and
+        // the per-evening window on a drop-in, which belongs to each evening
+        // rather than to the registration.
+        const activity = await published(body.slug);
+        const emailed = await mail.sendApproved(reg, account,
+          activity ? (activity.registration || {}).sessionCancelHours : null,
+          activity ? facts.whereFor(activity, reg.groupId) : null,
+          session.email);
+        await recordAudit(session, 'registrations.resendApproval',
+          body.participantId + '__' + body.activityId, emailed ? 'ok' : 'failed',
+          { detail: reg.frozen.participantName + ' \u00b7 ' + account.email });
+        return json(200, { ok: true, emailed: emailed, to: account.email });
       }
 
       // ⚠ ONE EVENING, CANCELLED ON A FAMILY'S BEHALF — the other half of a

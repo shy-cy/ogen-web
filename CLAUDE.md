@@ -3581,7 +3581,9 @@ answer, so "your request expired" — which reads as the family having let
 something lapse — is the wrong sentence. **Only the confirmation is resendable**
 out of the eleven messages in `_registration-email.js`: a family
 legitimately loses "you have a place", whereas re-delivering a refusal a
-fortnight later is the clearest case in that table of a resend doing harm.
+fortnight later is the clearest case in that table of a resend doing harm. ⚠ For
+releases that judgement had no door and `isResendable()` had no caller — see
+**And the one message the table said could be sent twice, nothing offered**.
 
 **⚠ AND NOTHING ELSE IN THAT TABLE SAYS "REQUEST" ANY MORE.** The submission
 message opened with "your request has arrived" and promised an answer within
@@ -7385,6 +7387,82 @@ about `skipErrors` as a call to it — wrong in both directions, and the same le
 **The webhook returns 2xx unless the signature itself fails.** An event matching
 nothing is an email sent before the store existed, or a dashboard test;
 answering 500 makes Resend retry for days and then disable the endpoint.
+
+### ⚠ And the one message the table said could be sent twice, nothing offered
+
+`TEMPLATES` has carried a `resend` flag since `_email-log.js` was written, with
+the reasoning beside each entry — a family legitimately loses *"you have a
+place"*, where re-delivering a refusal or a cancellation a fortnight later does
+harm. Exactly one message is `resend: true`. `isResendable()` reads the flag.
+⚠ **AND IT HAD NO CALLER.** The judgement was described, justified and
+unreachable, which is the same shape as the delivery statuses the webhook
+laddered up for releases with no screen reading them — one section above, in the
+same file.
+
+⚠ **AND THE MAIL PANEL MADE IT WORSE THAN ABSENT.** Its own empty state ended by
+telling an admin to *"send it again from the row"*, which is a sentence
+describing a control that does not exist. The invite button labelled with a
+description, arriving on the screen built to close that class of gap.
+
+So the confirmation can be sent again, from the panel — which is where an admin
+is standing when they have just found out it bounced or was never recorded.
+
+- ⚠ **THE TABLE DECIDES, NOT THE HANDLER.** It asks
+  `isResendable('registration-approved')` rather than knowing the answer, because
+  a handler that hardcoded it would be a second copy of that judgement, free to
+  disagree with the first the day somebody edits the table. A test asserts the
+  function now has exactly one caller — it had none.
+- ⚠ **IT IS REBUILT, NEVER RE-DELIVERED.** The log records that a message went
+  and what became of it, not the words, so this is `sendApproved()` run again
+  against the record as it stands. That is the right answer rather than a
+  limitation: the address is read live, so a family whose **room has moved** gets
+  the new room; the terms are the block frozen on the record today; and the pay
+  link is fresh instead of a month-old token. A test moves the room between two
+  sends and reads the second.
+- ⚠ **THE GATE IS THE STATUS NOW, NOT THE LOG.** The message says the place is
+  confirmed, so `cancelled`, `rejected`, `expired`, `waitlisted` and `pending`
+  are all refused — and `pending` is worse than merely untrue, since no person
+  has decided anything yet. `approved` alone, the same single-status list
+  `isPayable()` reads.
+- ⚠ **AND ON THE EVENING REGISTER, `status` IS THE BOOKING'S.** A seat can be
+  live on a registration that has ended, so a screen reading one as the other
+  would offer to resend *"your place is confirmed"* to a family whose place has
+  gone. The row carries `regStatus` beside it, from the registrations the strip
+  was already counting, so it costs no read.
+- ⚠ **IT IS RECORDED AS A PERSON'S DOING.** `sentBy` and `manual` are one fact —
+  somebody asked for this rather than a decision producing it — so they are
+  derived from one `by` argument on `as()` rather than passed as a pair that can
+  disagree. The panel already prints *"sent by …"* for a manual line.
+
+It is gated on `approve`: it decides nothing and moves no money, but it writes to
+a family, which is the axis the sweep button is already behind for saying it
+"only updates what the queue says and tells the family". A **bounce is a fact
+about the address**, so when the last message to it came back final the panel
+says sending again will very likely do the same and that the family may need to
+give a new address — state, on screen, rather than behind the (i).
+
+#### ⚠ Two faults it surfaced, both about messages nobody had reread
+
+**1. A settled registration was handed a dead Pay now button.** `payUrlFor()`
+minted a link whenever it could, and `/pay` computes the amount from the record
+and refuses at `nothing-due` — so any approval message for a registration owing
+nothing carried a button leading to a refusal. The **receipt** already knew this
+rule (*"a settled receipt carrying 'pay the balance' asks for money that is not
+owed"*) and the approval never learned it. Resending is what made it bite: the
+likeliest reason to resend a confirmation is a family who says it never arrived,
+and by then they have often paid. It is decided from the **amount**, inside
+`payUrlFor()`, rather than by each caller — `approve` on a drop-in registration,
+which owes nothing at all, was already reaching it.
+
+**2. The admin's approval told a drop-in family the wrong deadline.**
+`sendApproved` takes `sessionCancelHours` because the per-evening window is
+**not** frozen onto the registration — it belongs to each evening — and both
+admin call sites passed `null`, where the family's own path passed the real
+number. `null` reads as *"an evening can be cancelled any time until it
+starts"*, so an activity with a 24-hour window promised credit it would refuse.
+`givePlace` handed the value to `sendReceived` on one line and `null` to
+`sendApproved` on the line above it, which is the tell that it was an oversight
+rather than a decision.
 
 **The ICS builder takes instants and emits UTC.** Ogen's session times are local
 wall clock in `Asia/Nicosia`, and resolving wall clock to an instant is the
