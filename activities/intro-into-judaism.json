@@ -15,20 +15,12 @@
     "cancellationPolicy": {
       "tiers": [
         {
-          "until": "2026-10-14",
+          "until": "start",
           "percent": 100
         },
         {
-          "until": "2026-11-01",
-          "percent": 90
-        },
-        {
-          "until": "2026-12-01",
-          "percent": 80
-        },
-        {
-          "until": "2027-01-01",
-          "percent": 70
+          "until": "2027-02-10",
+          "percent": 50
         }
       ],
       "note": {
@@ -37,7 +29,10 @@
         "ru": ""
       }
     },
-    "defaultBasis": null
+    "defaultBasis": {
+      "startDate": "2026-10-21",
+      "sessionCount": 24
+    }
   },
   "seriesId": "act-464bec45a8f83618",
   "title": {
@@ -111,7 +106,7 @@
         "schedule": {
           "frequency": "custom",
           "overrideText": {
-            "he": "  mmm",
+            "he": "",
             "en": "",
             "ru": ""
           },
@@ -403,10 +398,10 @@
     }
   ],
   "sponsors": [],
-  "isoUpdated": "2026-09-26T13:33:51.045Z",
+  "isoUpdated": "2026-09-26T15:20:48.892Z",
   "isoCreated": "2026-09-26T10:50:38.584Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
   "activityId": "act-464bec45a8f83618",
-  "lastPublishedAt": "2026-09-26T13:33:51.045Z"
+  "lastPublishedAt": "2026-09-26T15:20:48.892Z"
 }
