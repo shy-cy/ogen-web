@@ -19,8 +19,12 @@
           "percent": 100
         },
         {
-          "until": "2027-02-24",
-          "percent": 50
+          "until": "2026-11-01",
+          "percent": 90
+        },
+        {
+          "until": "2026-12-01",
+          "percent": 60
         }
       ],
       "note": {
@@ -71,7 +75,7 @@
     "price": {
       "registrationFee": 50,
       "fullPrice": 1200,
-      "termUnit": "semester",
+      "termUnit": "year",
       "termLabel": {
         "he": "",
         "en": "",
@@ -398,10 +402,10 @@
     }
   ],
   "sponsors": [],
-  "isoUpdated": "2026-09-26T15:23:14.435Z",
+  "isoUpdated": "2026-09-26T15:26:13.395Z",
   "isoCreated": "2026-09-26T10:50:38.584Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
   "activityId": "act-464bec45a8f83618",
-  "lastPublishedAt": "2026-09-26T15:23:14.435Z"
+  "lastPublishedAt": "2026-09-26T15:26:13.395Z"
 }
