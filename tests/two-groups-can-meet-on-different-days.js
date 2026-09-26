@@ -335,7 +335,18 @@ H.ok(/function primeGroups/.test(adminJs),
 // name or its places — so a save that walked the DOM would clear all of it.
 H.ok(/rec\.groups = S\.groups \|\| \[\];/.test(adminJs),
   'the groups are saved from the model, not read back off a form they are not on');
-const reads = adminJs.slice(adminJs.indexOf('function readFacts'));
+// ⚠ readFacts()'S OWN BODY, not "everything after it in the file". This sliced
+// to the end of the source, which was true only for as long as nothing later
+// mentioned a calendar — and it fired on the save-time auto-fill, which carries
+// generated dates into the model and is nothing to do with the read-back. Same
+// shape as the LANG_SUBKEYS check that asked `!/schedule|sessionDates/` and so
+// refused the words along with the days: a proxy that happens to hold.
+const readsFrom = adminJs.indexOf('function readFacts');
+H.ok(readsFrom !== -1, 'readFacts() is there to be checked');
+const readsEnd = adminJs.indexOf('\n  function ', readsFrom + 10);
+const reads = adminJs.slice(readsFrom, readsEnd === -1 ? undefined : readsEnd);
+H.ok(reads.length > 200 && reads.length < adminJs.length / 4,
+  'and the slice is that function rather than the rest of the file: ' + reads.length + ' chars');
 H.ok(!/sessionDates|S\.schedule/.test(reads),
   'and the main form\'s read-back does not mention a calendar at all, because it draws none');
 H.ok(/facts\.duration = Object\.assign\(\{\}, facts\.duration, \{ sessionDates: e\.dates/.test(adminJs),

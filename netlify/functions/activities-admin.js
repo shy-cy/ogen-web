@@ -307,10 +307,53 @@ async function seriesCandidates() {
 // which is every activity on this site today — asks nothing and pays nothing.
 async function mergeFor(record, incoming, session) {
   const merged = mergeByPermission(record, incoming, session);
+  const calendars = fillCustomCalendars(merged);
   const series = SERIES.isLinkedTerm(merged)
     ? SERIES.applyFee(merged, await seriesCandidates())
     : { inherits: false };
-  return { merged, series };
+  return { merged, series, calendars };
+}
+
+// ⚠ A CUSTOM SCHEDULE'S CALENDAR IS FILLED IN AT SAVE TIME, and it is here
+// rather than at three call sites for the reason mergeFor() exists at all:
+// preview, saveDraft and publish all merge, and the one that forgot would be the
+// one where an admin's dates never became a calendar.
+//
+// ⚠ AND BECAUSE PREVIEW HAS TO SEE IT TOO. `preview-matches-publish` asserts the
+// previewed HTML is byte-identical to the committed file, so a fill that ran on
+// publish and not on preview would break that the first time it fired — the
+// preview would render no session table and the published page would render one.
+//
+// ⚠ IT IS DERIVED FROM WHAT IS ALREADY STORED, never from anything the request
+// carried, which is what makes it safe for a restricted role. A Russian-only
+// reviewer's save produces byte-identical dates to a full editor's, because the
+// only inputs are the schedule rows and the calendar on the record — there is
+// nothing here a request can steer. A test drives both sessions and compares.
+//
+// The rule itself, and the refusal to guess, live in _activity-sessions.js.
+function fillCustomCalendars(activity) {
+  const generated = [];
+  const undated = [];
+  (Array.isArray(activity && activity.groups) ? activity.groups : []).forEach((g) => {
+    const facts = (g && g.facts) || {};
+    const out = SESSIONS.autoFill(facts);
+    if (!out) return;
+    const who = { groupId: g.groupId || null, name: g.name || null };
+    if (out.undated) { undated.push(who); return; }
+    facts.duration = Object.assign({}, facts.duration || {}, { sessionDates: out.sessionDates });
+    g.facts = facts;
+    const live = SESSIONS.scheduled(out.sessionDates).map((r) => r.date);
+    generated.push(Object.assign(who, {
+      count: live.length,
+      first: live[0] || null,
+      last: live[live.length - 1] || null,
+      // Reported, never corrected — see strayDates(). A date outside the term
+      // may be a real extra meeting, and the term's own two dates may be the
+      // thing that is wrong.
+      stray: SESSIONS.strayDates(out.sessionDates, facts.duration)
+    }));
+  });
+  return { generated, undated };
 }
 
 // Thrown in the shape validate() throws, so the one channel the client already
@@ -1150,7 +1193,7 @@ exports.handler = async (event) => {
         const slug = String(incoming.slug || '');
         if (!SLUG_RE.test(slug)) return json(400, { error: 'Bad slug' });
         const { record } = await assertFresh(slug, body.baseUpdatedAt, { overwrite: body.overwrite });
-        const { merged: draftRecord, series } = await mergeFor(record, incoming, session);
+        const { merged: draftRecord, series, calendars } = await mergeFor(record, incoming, session);
         const merged = stamp(draftRecord);
         merged.status = 'draft';
         await putDraft(merged);
@@ -1177,8 +1220,14 @@ exports.handler = async (event) => {
         // same string publish refuses with, so the two cannot drift into two
         // accounts of one rule.
         if (series.problem) warnings.push(series.problem);
+        // ⚠ NEVER A SILENT BACKGROUND ACTION. A calendar appearing on a record
+        // because somebody pressed Save is a change they did not ask for, and an
+        // admin who is not told cannot tell it from the calendar having been
+        // there all along — nor check the dates it was built from. So it is
+        // named, with its count and its span, and the client redraws the
+        // calendar so the thing itself is on screen and not only described.
         return json(200, { ok: true, slug, baseUpdatedAt: merged.isoUpdated,
-                           activity: merged, warnings: warnings });
+                           activity: merged, warnings: warnings, calendars: calendars });
       }
 
       case 'publish': {
@@ -1190,7 +1239,7 @@ exports.handler = async (event) => {
         if (!SLUG_RE.test(slug)) return json(400, { error: 'Bad slug' });
 
         const { record, overwritten } = await assertFresh(slug, body.baseUpdatedAt, { overwrite: body.overwrite });
-        const { merged: toPublish, series } = await mergeFor(record, incoming, session);
+        const { merged: toPublish, series, calendars } = await mergeFor(record, incoming, session);
         if (series.problem) refuse(series.problem);
         const merged = stamp(toPublish);
         if (merged.status === 'draft') {
@@ -1228,8 +1277,16 @@ exports.handler = async (event) => {
         }
 
         await recordAudit(session, 'publish', slug, overwritten ? 'overwrite' : 'ok',
-          { commit: out.commit.sha, detail: falloutAudit(fallout) });
-        return json(200, { ok: true, ...out, fallout: fallout, baseUpdatedAt: merged.isoUpdated });
+          { commit: out.commit.sha,
+            // In the audit as well as on the screen. A calendar that appeared on
+            // a publish is a change to what the page says, and the trail is where
+            // somebody looks a month later asking when the session table arrived.
+            detail: falloutAudit(fallout) +
+              (calendars.generated.length
+                ? ' \u00b7 session calendar generated for ' +
+                  calendars.generated.length + ' group(s)' : '') });
+        return json(200, { ok: true, ...out, fallout: fallout,
+                           calendars: calendars, baseUpdatedAt: merged.isoUpdated });
       }
 
       case 'unpublish': {

@@ -181,6 +181,85 @@ function enumerate(spec) {
   return capped != null ? sorted.slice(0, capped) : sorted;
 }
 
+// ⚠ THE CALENDAR A CUSTOM SCHEDULE ALREADY IMPLIES, filled in at save time.
+//
+// Generation was a button and only a button, so an activity could be saved and
+// published with its dates in `schedule.sessions[]` and `duration.sessionDates`
+// never generated from them. All three custom activities on the live site were
+// in exactly that state: the pages rendered no session table, `sessionCount()`
+// derived nothing, the "(N sessions × M lessons)" qualifier was absent, and a
+// prorated refund would have divided by an empty list. Nothing errored, because
+// each half was behaving as written — the button works, and nothing ever said it
+// was compulsory.
+//
+// ⚠ IT READS, IT NEVER GUESSES. `enumerate()` on a custom schedule takes the
+// dates that are written down and nothing else — no start date, no end date, no
+// weekday walked forward — so this cannot invent a meeting. A custom row with a
+// weekday and no date yields nothing, and that is the honest answer rather than
+// a calendar built from a pattern nobody typed: `beit-midrash` holds
+// `{day: 0, time: '18:00'}` and no dates at all, and gets no calendar from this.
+// It says so instead, because an admin who saves and sees no table needs to know
+// which of the two states they are in.
+//
+// ⚠ AND IT NEVER OVERWRITES. Any existing calendar — including one whose every
+// date an admin has excluded — means this has nothing to do. So the button keeps
+// its whole job: regenerating after a schedule change, clearing, and editing by
+// hand all still go through it, and this only ever fills a blank.
+//
+// It is built from the SAME spec the button builds, `limit` included, so pressing
+// Generate straight after a save cannot produce a different calendar from the one
+// the save produced. Two mechanisms answering one question have to agree, and the
+// only way to be sure is to ask once.
+function autoFill(facts) {
+  const sched = (facts && facts.schedule) || {};
+  const duration = (facts && facts.duration) || {};
+  if (String(sched.frequency || '') !== 'custom') return null;
+  const rows = Array.isArray(sched.sessions) ? sched.sessions : [];
+  if (!rows.length) return null;
+  const have = Array.isArray(duration.sessionDates) ? duration.sessionDates : [];
+  if (have.length) return null;
+
+  const dates = enumerate({
+    frequency: 'custom',
+    sessions: rows,
+    weekOfMonth: sched.weekOfMonth,
+    startDate: duration.startDate,
+    endDate: duration.endDate,
+    limit: duration.sessionCount
+  });
+  // Rows, but not one of them carrying a date. There is nothing here to build a
+  // calendar out of, and saying so is the only useful answer.
+  if (!dates.length) return { undated: true };
+  // `previous` is empty by definition — this only runs on a blank calendar — but
+  // it goes through the same merge so there is one way a calendar is shaped.
+  return { sessionDates: mergeExclusions(dates, have) };
+}
+
+// ⚠ DATES THAT FALL OUTSIDE THE ACTIVITY'S OWN TERM.
+//
+// `enumerate()` deliberately does not bound a custom schedule by the start and
+// end dates, because filtering would drop a date somebody typed on purpose —
+// that rule stands and is not being weakened here. What was missing is anybody
+// SAYING SO. A typed date is a typed date, and a typo in one is invisible until
+// a calendar exists to print it: `intro-into-judaism` holds `2021-05-05` in the
+// middle of a run of 2027 dates, and an end date of `0027-02-21`, and neither
+// could be seen because that activity had no calendar at all.
+//
+// So it is reported and never corrected. Both halves matter: a stray date may be
+// a real extra meeting before the term formally opens, and the two figures it is
+// compared against may themselves be the thing that is wrong.
+function strayDates(sessionDates, duration) {
+  const d = duration || {};
+  const start = parseISO(d.startDate);
+  const end = parseISO(d.endDate);
+  if (start == null && end == null) return [];
+  return scheduled(sessionDates).map((r) => r.date).filter((iso) => {
+    const t = parseISO(iso);
+    if (t == null) return false;
+    return (start != null && t < start) || (end != null && t > end);
+  });
+}
+
 // Regenerating the calendar after a schedule change must not quietly un-exclude
 // a holiday the admin already removed. Exclusions are matched by date, so a date
 // that survives the change keeps its status and one that no longer occurs simply
@@ -216,6 +295,7 @@ function sessionCount(sessionDates) { return scheduled(sessionDates).length; }
 function isGenerated(freq) { return GENERATED.indexOf(String(freq || '')) !== -1; }
 
 module.exports = {
+  autoFill, strayDates,
   FREQUENCIES, GENERATED,
   enumerate, mergeExclusions, scheduled, sessionCount, isGenerated,
   parseISO, toISO, isoWeekday, nthWeekdayOfMonth

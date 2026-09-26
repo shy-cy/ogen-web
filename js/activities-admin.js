@@ -3169,6 +3169,88 @@
     });
   }
 
+  // ⚠ A CALENDAR THAT APPEARED BECAUSE SOMEBODY PRESSED SAVE HAS TO BE SAID OUT
+  // LOUD, AND HAS TO BE ON SCREEN.
+  //
+  // The gap being closed is that a custom schedule could be saved and published
+  // with its dates in the schedule rows and `sessionDates` never generated from
+  // them — no session table on the page, no derived count, and an empty
+  // denominator under a prorated refund. Filling it at save time fixes that and
+  // introduces a new risk in its place: a record changing in a way nobody asked
+  // for. An admin who is not told cannot tell a calendar that was just built from
+  // one that was always there, and cannot check the dates it was built from.
+  //
+  // So two things happen, and the second is the one that matters: the save says
+  // what it generated, with the count and the span, and the model is patched so
+  // the calendar itself is visible rather than only described.
+  function calendarLines(c) {
+    var out = [];
+    var one = (S.groups || []).length === 1;
+    var whoOf = function (g) {
+      var label = groupLabel({ name: g.name });
+      return label === 'Unnamed group' ? (one ? 'this activity' : 'a group') : '\u201c' + label + '\u201d';
+    };
+    (c.generated || []).forEach(function (g) {
+      var line = 'Session calendar generated for ' + esc(whoOf(g)) + ' from the dates already on '
+        + 'its schedule: ' + g.count + (g.count === 1 ? ' date' : ' dates')
+        + (g.first ? ', ' + esc(g.first) + ' to ' + esc(g.last) : '') + '.';
+      // Reported here rather than corrected anywhere. A date outside the term may
+      // be a real extra meeting, and the term's own two dates may be the thing
+      // that is wrong — but a typo in a date nobody could see until now is the
+      // likeliest reading, so it is put in front of the person who typed it.
+      if (g.stray && g.stray.length) {
+        line += ' \u26a0 ' + g.stray.length + (g.stray.length === 1 ? ' of them falls' : ' of them fall')
+          + ' outside this activity\u2019s own start and end dates \u2014 '
+          + esc(g.stray.slice(0, 4).join(', ')) + (g.stray.length > 4 ? ', \u2026' : '')
+          + '. Worth checking before a refund is calculated against them.';
+      }
+      out.push(line);
+    });
+    (c.undated || []).forEach(function (g) {
+      out.push('\u26a0 ' + esc(whoOf(g)) + ' has a custom schedule whose rows carry no dates, so no '
+        + 'session calendar could be generated \u2014 nothing here guesses one from a weekday. Open '
+        + 'the group and give each row its date, or pick a frequency that can be enumerated.');
+    });
+    return out.length ? '<ul><li>' + out.join('</li><li>') + '</li></ul>' : '';
+  }
+
+  // The record is already back from the server; this carries the generated dates
+  // into the client's own model, which a draft save does not otherwise reload.
+  // ⚠ Without it the next save would send the groups the client still holds —
+  // calendar-less — and the table would stay blank in front of somebody who has
+  // just been told it exists.
+  function absorbCalendars(data) {
+    var c = data.calendars;
+    if (!c) return '';
+    var saved = ((data.activity || {}).groups) || [];
+    (c.generated || []).forEach(function (g) {
+      var mine = (S.groups || []).filter(function (x) { return x.groupId === g.groupId; })[0];
+      var src = saved.filter(function (x) { return x.groupId === g.groupId; })[0];
+      if (!mine || !src) return;
+      mine.facts = mine.facts || {};
+      mine.facts.duration = JSON.parse(JSON.stringify((src.facts || {}).duration || {}));
+      // The open sub-page keeps its own working copy of the calendar, so patching
+      // the model alone would leave the table empty in front of the confirmation
+      // saying it was built.
+      if (S.ownerEdit && S.ownerEdit.groupId === g.groupId) {
+        S.ownerEdit.facts.duration = JSON.parse(JSON.stringify(mine.facts.duration));
+        S.ownerEdit.dates = ((mine.facts.duration.sessionDates) || []).map(function (r) {
+          return { date: r.date, status: r.status === 'excluded' ? 'excluded' : 'scheduled',
+                   reason: r.reason || '' };
+        });
+        var page = $('group-page');
+        if (page && !page.hidden) drawOwnerPage(page);
+      }
+    });
+    // The group list summarises each group's timetable, so it says what was true
+    // before the save until it is redrawn.
+    if ((c.generated || []).length) {
+      var box = $('group-list');
+      if (box) drawGroups(box);
+    }
+    return calendarLines(c);
+  }
+
   function doSaveDraft(overwrite) {
     message('');
     if (!requireSlug()) return;
@@ -3197,12 +3279,13 @@
         // later. The server runs the same validate() and hands back what it
         // found, so a warning here and the refusal there cannot become two
         // different accounts of one rule.
+        var cal = absorbCalendars(res.data);
         var warn = (res.data.warnings || []);
         if (warn.length) {
           message('warn', 'Draft saved — but it cannot be published yet:<ul>' +
-            warn.map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>');
+            warn.map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>' + cal);
         } else {
-          message('ok', 'Draft saved. It is not on the site — there is no page for it until you publish.');
+          message('ok', 'Draft saved. It is not on the site — there is no page for it until you publish.' + cal);
         }
         refreshList(S.slug);
       });
@@ -3312,6 +3395,11 @@
         // them. On screen rather than behind an (i), for the same reason the
         // fallout line is: it is true of this publish and of no other.
         if (res.data.seriesStale) extra += ' — ⚠ ' + esc(res.data.seriesStale);
+        // ⚠ AND WHAT IT GENERATED. A publish reloads through fillForm(), so the
+        // calendar is on screen without any patching — but the sentence still has
+        // to be there, because a page that has just gained a session table nobody
+        // asked for is exactly the change an admin must not discover later.
+        extra += calendarLines(res.data.calendars || {});
         load(S.slug).then(function () {
           message(falloutBad(res.data.fallout) ? 'err' : 'ok', done + extra);
         });

@@ -1158,7 +1158,10 @@ and the merge reads, because two copies fall out of step.
 `facts.duration.sessionDates` is `[{date, status, reason?}]` and is the source of
 truth: `sessionCount` is derived from it, not read beside it. `_activity-sessions.js`
 enumerates it from the frequency; the admin then edits it by hand. **Generate
-once, then edit.**
+once, then edit** — and a **custom** schedule whose dates are already written down
+no longer waits to be asked: a save fills a blank calendar from them, which is the
+one case where "generate once" could be skipped without anything saying so. See
+**Generating the calendar was a button** below.
 
 ⚠ **A `custom` schedule names its dates.** Its rows were a weekday and a time —
 "Wednesday, 16:00" — which is the right shape for something that repeats and says
@@ -1212,15 +1215,79 @@ translator's reach asked `!/schedule|sessionDates/` of `LANG_SUBKEYS` — a prox
 that refused the words along with the days; it asks the **sub-keys** now, so
 `schedule: ['overrideText']` passes and `sessions` still cannot.
 
-⚠ **AND THE CALENDAR IS EMPTY ON ALL THREE CUSTOM ACTIVITIES.** `beit-midrash`,
-`beit-midrash-ayeka` and `intro-into-judaism` hold their dates **only** in
+⚠ **AND THE CALENDAR WAS EMPTY ON ALL THREE CUSTOM ACTIVITIES.** `beit-midrash`,
+`beit-midrash-ayeka` and `intro-into-judaism` held their dates **only** in
 `schedule.sessions[]`; `facts.duration.sessionDates` was never generated. So
-those pages render **no session table**, `sessionCount` is nothing, the
-`(N sessions × M lessons)` qualifier is absent — and a prorated refund would have
-an empty denominator. `enumerate()` reads a custom schedule rather than walking
-it, so pressing **Generate** fixes all of it. That is a data gap rather than a
-code one, and it is the reason collapsing the line does not lose anything the
-page was showing: there was never a table under it.
+those pages rendered **no session table**, `sessionCount` was nothing, the
+`(N sessions × M lessons)` qualifier was absent — and a prorated refund would have
+divided by an empty list. It was recorded here as a data gap rather than a code
+one, on the grounds that pressing **Generate** fixes it. That was the wrong
+reading and is the subject of the section below.
+
+### ⚠ Generating the calendar was a button, and nothing said pressing it was compulsory
+
+Reported as the bug it is: *"activities using a custom schedule can be saved with
+dates entered in `schedule.sessions[]`, but never having their actual session
+calendar generated from those dates."*
+
+Every piece behaved as written, which is why it survived three published
+activities. `enumerate()` reads a custom schedule correctly, the button commits
+nothing and works, and **Generate once, then edit** is the right workflow. What
+was missing is that nothing made the first half of it happen — so *saved* and
+*has a calendar* were two different states, and every reader downstream
+(`sessionCount()`, the session table, the qualifier, the prorated denominator)
+quietly answered for the second while an admin had only done the first.
+
+**`autoFill()` in `_activity-sessions.js` fills a blank calendar at save time**,
+and five rules keep it from becoming a second, competing mechanism:
+
+- ⚠ **IT READS, IT NEVER GUESSES.** Only the dates already written down, through
+  the same `enumerate()` the button uses — which for a custom schedule takes the
+  dates and nothing else: no start date, no end date, no weekday walked forward.
+  A custom row carrying a **weekday and no date** therefore yields nothing, which
+  is `beit-midrash` (`{day: 0, time: '18:00'}`), and it gets no calendar rather
+  than one built from a pattern nobody typed.
+- ⚠ **IT NEVER OVERWRITES.** Any existing calendar means there is nothing to do —
+  **including one whose every date is excluded**, which is a deliberate state that
+  refilling would silently un-exclude. So the button keeps its whole job:
+  regenerating after a schedule change, clearing, and editing by hand all still go
+  through it, and this only ever fills a blank.
+- ⚠ **IT AGREES WITH THE BUTTON, TO THE DATE.** Same spec, `limit` included — so
+  the typed session count caps both. Two mechanisms answering one question have to
+  give one answer, or pressing Generate straight after a save changes the calendar
+  for no reason. A test builds both from one input and compares them byte for
+  byte.
+- ⚠ **IT IS NOT SILENT.** A record changing in a way nobody asked for is the risk
+  this introduces in place of the one it removes, and an admin who is not told
+  cannot tell a calendar that was just built from one that was always there, nor
+  check the dates it came from. So the save **names** it — the count and the span
+  — the client carries the dates into its own model so the table is on screen
+  rather than only described, and a publish puts it in the audit line.
+- ⚠ **IT IS DERIVED FROM WHAT IS STORED**, never from anything the request
+  carried, which is what makes it safe on a **restricted** role's save: a
+  Russian-only reviewer cannot steer it, because nothing it reads comes from the
+  request. A test drives both roles over one record and asserts the dates are
+  byte-identical.
+
+It lives in **`mergeFor()`**, the one helper `preview`, `saveDraft` and `publish`
+all go through — for the reason that helper exists, and ⚠ **because preview has
+to see it too**: a fill that ran on publish and not on preview would break
+`preview-matches-publish` the first time it fired, with the preview rendering no
+session table and the committed page rendering one.
+
+⚠ **AND IT SURFACED TWO TYPOS THAT NOTHING COULD HAVE SHOWN.** A date is only
+checkable once there is a calendar printing it. `intro-into-judaism` holds
+**`2021-05-05`** in the middle of a run of 2027 dates, and an end date of
+**`0027-02-21`** — which `parseISO()` rejects (`Date.UTC(27, …)` lands in 1927 and
+fails the round-trip), so every consumer has been reading that activity's end
+date as **absent**, `reachesEnd()` included.
+
+`strayDates()` reports the first of those and deliberately does not fix it:
+`enumerate()` not bounding a custom schedule by the term's dates is a rule that
+stands — filtering would drop a date somebody typed on purpose — and what was
+missing was anybody **saying so**. A stray date may be a real extra meeting, and
+the two dates it is compared against may themselves be the thing that is wrong.
+So the save names how many fall outside and which, and corrects nothing.
 
 ⚠ **The weekday is DERIVED from the date, never stored beside it.** A row saying
 "Tuesday" and "14 October 2026" — a Wednesday — is two claims that can disagree,
