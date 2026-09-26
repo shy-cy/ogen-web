@@ -1,6 +1,8 @@
 // /api/admin-registrations — the approval queue.
 //
-// Actions: queue | approve | reject | cancel | moveGroup | sweep
+// Actions: queue | approve | reject | cancel | moveGroup | givePlace | register |
+//          markAttendance | mail | checkinCodes | bundles | recordPayment |
+//          applyCredit | adjustCredit | recordSessionPayment | ledger | sweep
 //
 // IT AUTHENTICATES THROUGH THE ADMIN STORE, which is the only reason it is a
 // separate function from account-registrations.js. One handler serving both
@@ -41,6 +43,7 @@ const B = require('./_bundle');
 const bundleStore = require('./_bundle-store');
 const { recordAudit } = require('./_audit');
 const mail = require('./_registration-email');
+const emailLog = require('./_email-log');
 const waitlist = require('./_waitlist');
 const { sanitiseRich } = require('./_sanitise-rich');
 const codes = require('./_checkin-token');
@@ -48,6 +51,12 @@ const { strip, SITE } = require('./_email-shell');
 const sweep = require('./_registration-sweep');
 
 const TOOL = 'registrations';
+
+// How many addresses one `mail` request reads for. Every one costs a prefix
+// listing plus up to a dozen reads, and this function has ten seconds. Sixty is
+// far above any roster this centre runs and still leaves the request well inside
+// its budget — and going over is named rather than trimmed away.
+const MAX_MAIL_ADDRESSES = 60;
 
 const json = (statusCode, payload) => ({
   statusCode,
@@ -741,6 +750,94 @@ exports.handler = async (event) => {
           // Join order, which is the only order a queue has. Oldest first.
           waiting: rows.filter((r) => r.status === 'waiting')
             .sort((a, b) => String(a.waitingSince || '').localeCompare(String(b.waitingSince || '')))
+        });
+      }
+
+      // ⚠ WHAT BECAME OF WHAT WE WROTE TO THIS FAMILY.
+      //
+      // Asked for as the only way to tell "never sent" from "bounced" from
+      // "delivered and ignored" when a family says they never received
+      // something — and those three need opposite responses, which is the
+      // sentence _email-log.js opens with. Every send has been recorded since
+      // that module was written and the delivery webhook has been updating the
+      // statuses ever since, and NOTHING HAS EVER READ ANY OF IT. A record
+      // nobody can see answers no question at all.
+      //
+      // ⚠ IT IS ITS OWN REQUEST, not part of `queue` or `register`. Those two
+      // draw the screen; this does not — a roster is readable and workable while
+      // the mail line is still filling in — and it is the largest single piece of
+      // work either screen could do: a prefix listing plus a read per message for
+      // every address on the roster. Folded into the load, the table itself would
+      // wait for it, on a function with ten seconds. That is the opposite trade
+      // from `dashboard` and `registerPanel`, and for the opposite reason: those
+      // consolidate calls the screen cannot draw without.
+      //
+      // ⚠ THE ADDRESSES COME FROM THE ACTIVITY, NEVER FROM THE REQUEST. A list of
+      // addresses in the body would make this a reader for any address's mail on
+      // the site, typed by hand. Here the server need not trust anything: the
+      // screen's scope is one roster, so the roster is what it derives. It reads
+      // the REGISTRATIONS for both kinds of activity, because an evening booking
+      // always has a registration behind it — openRegistration() is what creates
+      // one — so that list is the superset either screen needs.
+      //
+      // `access` gates it, the same axis that already prints every one of these
+      // addresses on the row above.
+      case 'mail': {
+        const activity = await published(body.slug);
+        if (!activity) return json(404, { error: 'No such activity.' });
+        const regs = await store.forActivity(activity.activityId);
+        const ids = [];
+        for (const reg of regs) if (reg.accountId && ids.indexOf(reg.accountId) === -1) ids.push(reg.accountId);
+        // ⚠ BOUNDED, AND THE BOUND IS REPORTED. An unbounded read here is an
+        // admin watching a line never arrive; a silent truncation is worse,
+        // because the rows left out would read as families we never wrote to —
+        // which is the one wrong answer this screen exists to prevent. So the cap
+        // is named in the response and the screen says which addresses it did not
+        // reach.
+        const capped = ids.length > MAX_MAIL_ADDRESSES;
+        const use = capped ? ids.slice(0, MAX_MAIL_ADDRESSES) : ids;
+        const found = await accounts.getAccounts(use);
+        const emails = use.map((id) => (found[id] || {}).email).filter(Boolean);
+        const byEmail = await emailLog.listForRecipients(emails);
+        // One row per message, flattened to what a screen shows. The status and
+        // the template label come from the module that owns both, so the roster
+        // cannot invent a word for a state or print a raw template name — which
+        // is what it did for 'registration-terms-changed' until that template was
+        // given a line in the table.
+        const out = {};
+        Object.keys(byEmail).forEach((addr) => {
+          const bag = byEmail[addr];
+          out[addr] = {
+            read: bag.read,
+            total: bag.total,
+            messages: bag.entries.map((e) => ({
+              template: e.template,
+              label: emailLog.templateLabel(e.template),
+              subject: e.subject || null,
+              lang: e.lang || null,
+              status: e.status,
+              final: emailLog.FINAL.indexOf(e.status) !== -1,
+              sentAt: e.sentAt,
+              statusUpdatedAt: e.statusUpdatedAt,
+              sentBy: e.sentBy,
+              manual: !!e.manual,
+              error: e.error || null,
+              // Whether this message was about the activity whose roster is
+              // open. By ID: the slug beside it is the spelling at the time and
+              // is a label only, exactly as the frozen slug on a registration is.
+              thisActivity: !!(e.relatedActivityId && e.relatedActivityId === activity.activityId),
+              relatedSlug: e.relatedSlug || null
+            }))
+          };
+        });
+        return json(200, {
+          ok: true,
+          activity: { slug: activity.slug, activityId: activity.activityId },
+          mail: out,
+          perRecipient: emailLog.MAIL_PER_RECIPIENT,
+          addressesRead: use.length,
+          addressesTotal: ids.length,
+          capped: capped
         });
       }
 

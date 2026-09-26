@@ -868,6 +868,26 @@ function paidMessage(reg, account, paidCents, outstandingCents, payUrl) {
 
 const langOf = (account) => lang(((account || {}).profile || {}).preferredLanguage);
 
+// ⚠ WHAT THE LOG RECORDS ABOUT A SEND, IN ONE PLACE.
+//
+// `relatedActivityId` is what makes one activity's mail findable from that
+// activity's own roster. It had a field in _email-log.js from the day that module
+// was written, described there as exactly this, and every sender in this file
+// left it out — so the field was null on every record ever stored and the screen
+// it existed for could not be built from it. Ten call sites is ten places to
+// forget it again, so they all go through here.
+//
+// The SLUG rides along as a label and nothing matches on it: a slug is a filename
+// and can be renamed, and the id is the thing that still means the same activity
+// afterwards. Frozen rather than live, for the same reason
+// `activitySlugAtSubmission` is — it is what this message was about at the time.
+const as = (template, account, reg) => ({
+  template: template,
+  lang: langOf(account),
+  relatedActivityId: (reg && reg.activityId) || null,
+  relatedSlug: (reg && reg.frozen && reg.frozen.activitySlugAtSubmission) || null
+});
+
 // `sessionCancelHours` rides in from the caller for the reason termsBlock()
 // gives: a drop-in's per-evening window lives on the activity, and a message
 // builder that opened one would stop being runnable with no infrastructure. A
@@ -875,7 +895,7 @@ const langOf = (account) => lang(((account || {}).profile || {}).preferredLangua
 const sendReceived = (reg, account, sessionCancelHours, where) =>
   email.settle('registration-received', account.email, () =>
     email.send(receivedMessage(reg, account, sessionCancelHours, where),
-      { template: 'registration-received', lang: langOf(account) }));
+      as('registration-received', account, reg)));
 
 // MINTED HERE, INSIDE settle(). The link is a row in a Blobs store and the
 // message is not — so the store is opened by the sender, never by the builder,
@@ -909,17 +929,17 @@ const sendApproved = (reg, account, sessionCancelHours, where) =>
   email.settle('registration-approved', account.email, async () =>
     email.send(approvedMessage(reg, account, await payUrlFor(reg, account),
                                await creditFor(account), sessionCancelHours, where),
-      { template: 'registration-approved', lang: langOf(account) }));
+      as('registration-approved', account, reg)));
 
 const sendRejected = (reg, account, override) =>
   email.settle('registration-rejected', account.email, () =>
     email.send(rejectedMessage(reg, account, override),
-      { template: 'registration-rejected', lang: langOf(account) }));
+      as('registration-rejected', account, reg)));
 
 const sendExpired = (reg, account) =>
   email.settle('registration-expired', account.email, () =>
     email.send(expiredMessage(reg, account),
-      { template: 'registration-expired', lang: langOf(account) }));
+      as('registration-expired', account, reg)));
 
 // TWO CALLERS, ONE MESSAGE. A guardian cancelling their own place gets it
 // immediately with no review, because nobody is at a screen to review it; an
@@ -928,17 +948,17 @@ const sendExpired = (reg, account) =>
 const sendCancelled = (reg, account, creditCents, override) =>
   email.settle('registration-cancelled', account.email, () =>
     email.send(cancelledMessage(reg, account, creditCents, override),
-      { template: 'registration-cancelled', lang: langOf(account) }));
+      as('registration-cancelled', account, reg)));
 
 const sendWaiting = (reg, account, when) =>
   email.settle('registration-waiting', account.email, () =>
     email.send(waitingMessage(reg, account, when),
-      { template: 'registration-waiting', lang: langOf(account) }));
+      as('registration-waiting', account, reg)));
 
 const sendPlaceOpen = (reg, account, when) =>
   email.settle('registration-place-open', account.email, () =>
     email.send(placeOpenMessage(reg, account, when),
-      { template: 'registration-place-open', lang: langOf(account) }));
+      as('registration-place-open', account, reg)));
 
 // NO DRAFT, unlike the rejection and the cancellation. Those two are reviewed
 // because approval carries no reason code and money is about to move, so an
@@ -948,18 +968,18 @@ const sendPlaceOpen = (reg, account, when) =>
 const sendMoved = (reg, account, fromName, toName) =>
   email.settle('registration-moved', account.email, () =>
     email.send(movedMessage(reg, account, fromName, toName),
-      { template: 'registration-moved', lang: langOf(account) }));
+      as('registration-moved', account, reg)));
 
 const sendTermsChanged = (reg, account, sessionCancelHours) =>
   email.settle('registration-terms-changed', account.email, () =>
     email.send(termsChangedMessage(reg, account, sessionCancelHours),
-      { template: 'registration-terms-changed', lang: langOf(account) }));
+      as('registration-terms-changed', account, reg)));
 
 const sendPaid = (reg, account, paidCents, outstandingCents) =>
   email.settle('registration-paid', account.email, async () =>
     email.send(paidMessage(reg, account, paidCents, outstandingCents,
                            outstandingCents > 0 ? await payUrlFor(reg, account) : null),
-      { template: 'registration-paid', lang: langOf(account) }));
+      as('registration-paid', account, reg)));
 
 module.exports = {
   payUrlFor,

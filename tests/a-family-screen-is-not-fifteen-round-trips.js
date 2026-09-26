@@ -89,8 +89,18 @@ process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
   H.eq(lenient[1], null, 'as empty');
   // One caller, and it says why in the source. A second one is how the
   // dangerous default arrives by the back door.
+  //
+  // ⚠ ON COMMENT-STRIPPED SOURCE, which is the same lesson `.activity-card-image
+  // img` taught in the stylesheet: a check that greps raw text cannot tell a CALL
+  // from a sentence about one. It read both ways wrongly — a file that only
+  // explains why it does NOT skip errors counted as a caller, which is how a
+  // comment saying "no skipErrors here, and here is why" failed this assertion;
+  // and a real call could be hidden from nothing, because prose is what survives
+  // when code moves. `_account-store.js` is the file that found it.
+  const bare = (f) => read('netlify/functions/' + f)
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
   const users = fs.readdirSync(path.join(R, 'netlify/functions'))
-    .filter((f) => /skipErrors/.test(read('netlify/functions/' + f)))
+    .filter((f) => /skipErrors/.test(bare(f)))
     .filter((f) => f !== '_blobs.js');
   H.eq(users.join(','), '_email-log.js',
     '⚠ and exactly ONE caller opts into it — the email log, which would rather ' +

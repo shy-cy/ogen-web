@@ -44,7 +44,7 @@ const src = fs.readFileSync(path.join(R, 'js/registrations-admin.js'), 'utf8');
 const api = fs.readFileSync(path.join(R, 'netlify/functions/admin-registrations.js'), 'utf8');
 
 const IDS = ['messages', 'picker', 'queue-panel', 'queue-title', 'capacity', 'dates', 'queue',
-             'bundles-panel', 'bundles', 'codes-panel', 'codes', 'account-panel', 'account-title',
+             'bundles-panel', 'bundles', 'codes-panel', 'codes', 'account-panel', 'account-title', 'mail-panel', 'mail-title', 'mail-body',
              'account-body', 'app', 'tool', 'no-access', 'who', 'logout',
              'btn-codes', 'btn-bundles', 'btn-sweep'];
 
@@ -96,7 +96,13 @@ function boot(answerOver) {
     activities: () => ({ ok: true, data: { activities: [
       { slug: 'test10', title: { en: 'Test 10' }, status: 'open' }] } }),
     queue: () => ({ ok: true, data: QUEUE }),
-    register: () => ({ ok: true, data: REG_ANSWER })
+    register: () => ({ ok: true, data: REG_ANSWER }),
+    // The roster asks for the email history once the table is painted. Answered
+    // with nothing here, which draws the "never emailed" line on every row —
+    // that suite is a-roster-knows-what-became-of-its-email.js, and this one only
+    // has to not fall over when the second call lands.
+    mail: () => ({ ok: true, data: { ok: true, mail: {}, perRecipient: 12,
+                                     addressesRead: 0, addressesTotal: 0, capped: false } })
   }, answerOver || {});
   dom.window.AdminSession = {
     requireSession: () => true, logout: () => {},
@@ -158,17 +164,29 @@ function choose(sel, value) {
     'headed with its own count: ' + screenText(dom).slice(0, 0));
 
   console.log('\n[⚠ and nobody is marked present for a seat they do not hold]');
-  // The waiting table has two columns and no controls at all. Read as the
-  // absence of a button rather than as a disabled one: there is no admin action
-  // for handing out a seat on one evening, so a control here would be a door to
-  // nowhere — which is the mistake this admin has made three times.
+  // Nothing on the waiting table GIVES a seat, and it is read as the absence of a
+  // control rather than as a disabled one: there is no admin action for handing
+  // out a seat on one evening, so a button for it would be a door to nowhere —
+  // the mistake this admin has made three times.
+  //
+  // ⚠ ASKED BY LABEL, NOT BY COUNTING. It used to assert the row held no button
+  // at all, which proves nothing about WHICH button: the envelope — email
+  // history, a read that decides nothing — belongs here more than anywhere,
+  // because "a place has opened" went to everybody waiting at once and whether it
+  // arrived is the whole question. A count would have refused it while still
+  // passing on a row that offered Present.
   const tableOf = (first) => D.byTag(dom.byId('queue'), 'table')
     .filter((x) => (D.byTag(x, 'th')[0] || {}).textContent === first)[0];
   const waitTable = tableOf('Waiting');
-  H.eq(D.byTag(waitTable, 'button').length, 0,
-    'no button on a waiting row — Present would put them in a room nothing counts them in');
-  H.eq(D.byTag(waitTable, 'th').map((h) => h.textContent).join(','), 'Waiting,Since',
-    'and the columns are the two that mean anything: who, and since when');
+  const waitLabels = D.byTag(waitTable, 'button')
+    .map((b) => b.getAttribute('aria-label') || b.textContent);
+  H.eq(waitLabels.filter((l) => /Present|No-show|Give a place/.test(l)).length, 0,
+    'nothing on a waiting row marks or gives a seat — Present would put them in a room ' +
+    'nothing counts them in');
+  H.eq(waitLabels.join(','), 'Email history',
+    '⚠ and the one control it does carry only READS: whether the place-open message arrived');
+  H.eq(D.byTag(waitTable, 'th').map((h) => h.textContent).join(','), 'Waiting,Since,',
+    'and the columns are who, since when, and that one control');
 
   // The register's own rows still have theirs.
   const regTable = tableOf('Participant');

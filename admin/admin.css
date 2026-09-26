@@ -483,7 +483,15 @@ h2 > button.help,h3 > button.help{vertical-align:2px;}
 .queue tr:hover td{background:#fbfaf6;}
 .queue .num{font-variant-numeric:tabular-nums;white-space:nowrap;}
 .queue .who b{display:block;}
-.queue .who span{color:var(--muted);font-size:12px;}
+/* ⚠ `.who .addr`, NOT `.who span`, AND THAT IS A CASCADE FIX RATHER THAN TIDYING.
+   The rule is here to grey the ADDRESS under the name, and as a bare descendant
+   selector it was (0,2,1) — beating every badge that lands in the same cell.
+   `participant deleted` was already losing its amber to it, unnoticed because
+   amber-on-cream and grey-on-cream both read as "quiet"; the delivery line made
+   it visible, because a red pill with grey letters on it is not quiet at all.
+   Naming the thing the rule is for is the same answer `.acc-field > label` and
+   `.field-row .label-row` reached, one stylesheet over. */
+.queue .who .addr{display:block;color:var(--muted);font-size:12px;}
 /* Moving a child between named groups. It is a select rather than a button,
    because the whole action is choosing one of two or three things — a button
    here would open a dialog whose only content is this control. It carries no
@@ -598,6 +606,14 @@ h2 > button.help,h3 > button.help{vertical-align:2px;}
 .pill.lapsed{background:var(--camel);color:#fff;}
 .pill.paid{background:var(--olive);color:#fff;}
 .pill.owed{background:#efeee9;color:#6a6658;}
+/* ⚠ RED, ON A SCREEN THAT KEEPS RED FOR TWO THINGS. A bounced, failed,
+   complained-about or suppressed message is the one delivery status an admin has
+   to act on — _email-log.js keeps those four off the ladder for exactly that
+   reason, so that a later "delivered" can never hide one — and it joins over
+   capacity and cancelling as the third. Everything else on that line is quiet,
+   because "delivered" and "opened" are good news and a figure that explains
+   itself needs no colour. */
+.pill.undelivered{background:var(--danger);color:#fff;}
 .pill.credited{background:var(--navy);color:#fff;}
 .pill.written-off{background:#c8c2b4;color:#5a5646;}
 

@@ -7010,6 +7010,120 @@ The log is keyed `log-<encoded recipient>__<ISO>__<random>` with an
 `rid-<resend id>` pointer beside it, so the webhook is one read rather than a
 scan of the store.
 
+### ⚠ And for every release of it, nothing had ever READ that status
+
+`_email-log.js` opens with the reason it exists, quoting the sister project: when
+somebody was approved and never paid there was no way to tell whether they had
+ignored the email or never received it, **"AND THOSE NEED OPPOSITE RESPONSES"**.
+Every send has been recorded since. `resend-webhook.js` has been laddering the
+statuses up ever since. **No screen anywhere displayed one of them** — the
+webhook was maintaining a field with no reader, which is the same shape as the
+pure bundle module wired to nothing and the invite button labelled with a
+description. Reported back as the highest priority of its group, in the report's
+own words: *"the only way to distinguish 'never sent,' 'bounced,' or 'delivered
+but ignored' when a family says they never received something."*
+
+⚠ **AND THE FIELD THE DISPLAY WAS DESIGNED AROUND WAS NULL ON EVERY RECORD EVER
+WRITTEN.** `relatedSlug` carried a comment saying it *"will let an admin see one
+activity's mail on that activity's own row rather than reading a whole history to
+find it"*, and **not one sender ever passed it**. That could only surface by
+building the screen it was for. Two things came out of closing it:
+
+- ⚠ **It is the ID that is matched on.** `relatedActivityId` is new beside it,
+  and the slug stays as a **label** — the spelling at the time, audit only,
+  exactly the rule `frozen.activitySlugAtSubmission` already states. Filtering a
+  roster on a slug would lose a family's whole history the first time an activity
+  was renamed, silently.
+- **One helper, not ten call sites.** `as(template, account, reg)` in
+  `_registration-email.js` builds what the log records, because ten senders is
+  ten places to forget the field again — which is how it came to be forgotten in
+  all ten.
+
+`'registration-terms-changed'` had **no line in `TEMPLATES`**, so `templateLabel()`
+fell through and an admin would have met a raw key. The suite reads every
+`template:` a sender can emit off the comment-stripped source and asserts each
+has a label, so the next message added is covered without anybody remembering.
+
+**The row says the state; the panel says the history.** And the row's line sits
+**under the address, in the participant cell**, not in a seventh column — it is a
+fact about that address, and a column of its own would make it a claim about the
+row. It costs the table no width, on a screen whose whole job is scanning.
+
+⚠ **THE SUBJECT IS THE ADDRESS, NOT THE REGISTRATION**, and the second reason is
+the load-bearing one. The message a family rings about is as often the
+verification link or a reset as the confirmation, and neither is about an
+activity at all — but more than that, **a bounce is a fact about an address**.
+`suppressed` literally means the provider refuses to send there because it
+bounced before, so one bounce is why the next nine will not arrive either.
+Filtered to "this activity" it would be hidden in exactly the case it matters.
+Which messages were about the open activity is marked **in the panel**, where
+there is room to say it.
+
+Four states, four different sentences, and the pair in the middle is the one that
+must not collapse:
+
+| | |
+|---|---|
+| `mail unknown` | the log would not answer. ⚠ **NOT** "nothing was sent" — that reading sends an admin to apologise for mail that went out perfectly |
+| `never emailed` | amber, advisory. A registered family with no record of our writing to them is the silent half of this whole feature |
+| the bounce | **red**, and it wins over anything newer. The third red on this screen, beside over capacity and cancelling |
+| the ladder | quiet. `delivered` and `opened` are the two halves of "delivered but ignored", so the word is the answer |
+
+⚠ **AND "NOTHING RECORDED" IS SAID AS A FACT ABOUT THE RECORD.** `_email.js` sends
+first and logs second, on purpose, so a send that succeeded while Blobs was
+unreachable leaves exactly this gap. The panel names both readings rather than
+telling an admin the family was never written to.
+
+⚠ **IT IS ITS OWN REQUEST, after the table has painted.** That is the opposite
+trade from the family area's `dashboard` and `registerPanel`, and for the opposite
+reason: those fold in calls a screen cannot draw without, and this is the largest
+single read either roster could do — a prefix listing plus a read per message for
+every address on it — on a function with ten seconds. The table is what an admin
+came for. It repaints the **rows** and not the screen, because rebuilding the
+filter bar takes the focus out of the search box, and it **checks the slug it
+asked for**, or an admin who pressed another activity mid-flight gets one
+roster's mail drawn against another's rows.
+
+⚠ **THE ADDRESSES COME FROM THE ACTIVITY, NEVER FROM THE REQUEST BODY.** A list of
+addresses in the body would make this a reader for any address's mail on the
+site, typed by hand. The screen's scope is one roster, so the roster is what the
+server derives — and it reads the **registrations** for both kinds of activity,
+since an evening booking always has one behind it.
+
+**Bounded, and the bound is named rather than trimmed away.** Twelve messages per
+address (the total is reported, so the panel says "the newest 12 of 19") and sixty
+addresses per call. A silent truncation would be worse than an unbounded read:
+the rows left out would say *never emailed*, which is the one wrong answer the
+whole feature exists to prevent.
+
+`listForRecipients()` does **one prefix listing per recipient, several at a
+time** — deliberately not one listing of the whole store, which holds every email
+the site has ever sent. Same reason the key puts the recipient first.
+
+⚠ **The envelope is on all four tables** — the course queue, the course waiting
+list, the evening register and the evening's own waiting list. A waiting row is
+not the exception it looks like: *"a place has opened"* went to everybody waiting
+at once, and whether it **arrived** is the whole question. The evening waiting
+list's *"no controls at all"* becomes "nothing that gives a seat", which is what
+that rule always meant.
+
+⚠ **And it surfaced a cascade collision that was already live.**
+`.queue .who span` is (0,2,1) and beat every badge landing in the same cell —
+`participant deleted` had been losing its amber to it unnoticed, because
+amber-on-cream and grey-on-cream both read as quiet. A red pill with grey letters
+on it does not. It is `.queue .who .addr` now, and the test asks **by shape**: no
+rule may reach a bare `label`-like `span` from `.who`. Same answer
+`.acc-field > label` and `.field-row .label-row` reached, one stylesheet over.
+
+⚠ **`getAccounts()` takes no `skipErrors`, and the test that counts its callers
+is what caught the attempt.** A missing account already comes back as a miss;
+what `skipErrors` would swallow is a store having a bad minute — and this answer
+feeds a list of **addresses**, so one unreadable account silently drops an address
+and the screen says *never emailed* about a family we wrote to perfectly. That
+check now runs on **comment-stripped source**, because it was reading a sentence
+about `skipErrors` as a call to it — wrong in both directions, and the same lesson
+`.activity-card-image img` taught in the stylesheet.
+
 **The webhook returns 2xx unless the signature itself fails.** An event matching
 nothing is an email sent before the store existed, or a dashboard test;
 answering 500 makes Resend retry for days and then disable the endpoint.

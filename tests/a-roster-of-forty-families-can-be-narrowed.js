@@ -65,7 +65,7 @@ const src = read('js/registrations-admin.js');
 // exactly as it would in a browser — which is what the admin's own id check
 // exists to catch, so this list is deliberately the page's and not a catch-all.
 const IDS = ['messages', 'picker', 'queue-panel', 'queue-title', 'capacity', 'dates', 'queue',
-             'bundles-panel', 'bundles', 'codes-panel', 'codes', 'account-panel', 'account-title',
+             'bundles-panel', 'bundles', 'codes-panel', 'codes', 'account-panel', 'account-title', 'mail-panel', 'mail-title', 'mail-body',
              'account-body', 'app', 'tool', 'no-access', 'who', 'logout',
              'btn-codes', 'btn-bundles', 'btn-sweep'];
 
@@ -138,6 +138,12 @@ function boot(opts) {
   opts = opts || {};
   const dom = D.makeDom({ ids: IDS, lang: 'en' });
   const answers = {
+    // The roster asks for the email history once the table is painted. Answered
+    // with nothing here, which draws the "never emailed" line on every row —
+    // that suite is a-roster-knows-what-became-of-its-email.js, and this one only
+    // has to not fall over when the second call lands.
+    mail: () => ({ ok: true, data: { ok: true, mail: {}, perRecipient: 12,
+                                     addressesRead: 0, addressesTotal: 0, capped: false } }),
     auth: () => ({ ok: true, data: { name: 'Michal', roleName: 'Super Admin',
                                      canApprove: true, canCancel: true } }),
     activities: () => ({ ok: true, data: { activities: [
@@ -326,7 +332,7 @@ function choose(sel, value) {
   await settle();
   const acts = D.byClass(back.byId('queue'), 'acts')[0];
   const icons = D.byTag(acts, 'button');
-  H.eq(icons.length, 4, 'four controls on a row, on one line rather than two');
+  H.eq(icons.length, 5, 'five controls on a row, on one line rather than two');
   icons.forEach((b) => {
     H.ok(/\bicon\b/.test(b.className), 'drawn as a glyph: ' + b.getAttribute('aria-label'));
     H.eq(b.textContent, '', 'with no text node, which is what made the row two lines tall');
@@ -339,7 +345,7 @@ function choose(sel, value) {
       'and a title, which is all a touch device with no hover has');
   });
   H.eq(icons.map((b) => b.getAttribute('aria-label')).join(', '),
-    'Approve, Reject, Cancel, Payments and credit', 'named in the order they were');
+    'Approve, Reject, Cancel, Payments and credit, Email history', 'named in the order they were');
   // The glyph is drawn, not typed. ⚠ createElementNS: an <svg> made with
   // createElement is an HTMLUnknownElement and draws nothing at all.
   const svg = D.byTag(icons[0], 'svg')[0];

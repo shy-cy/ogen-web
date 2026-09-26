@@ -91,6 +91,27 @@ async function getAccount(accountId) {
   return (await store.get(acctKey(accountId), { type: 'json' })) || null;
 }
 
+// Several accounts at once, for a screen that has a list of ids in hand. A loop
+// of awaits here is the fifteen-round-trip bug _blobs.js exists to stop.
+//
+// ⚠ NO `skipErrors`, and the test that says there is exactly one caller of it is
+// right to have caught this. A missing account already comes back as a miss;
+// what skipErrors would swallow is a store having a bad minute, and this answer
+// feeds a list of addresses. Swallowed, one unreadable account silently drops an
+// address from that list — and the screen reading it says "never emailed" about a
+// family we wrote to perfectly, which is the one wrong answer the whole feature
+// exists to prevent. Thrown, every row says "mail unknown", which is true.
+async function getAccounts(accountIds) {
+  const ids = (accountIds || []).map((id) => String(id || '')).filter(Boolean);
+  const out = {};
+  if (!ids.length) return out;
+  const store = await optionalStore(ACCOUNTS);
+  if (!store) return out;
+  const recs = await readMany(store, ids.map(acctKey));
+  ids.forEach((id, i) => { if (recs[i]) out[id] = recs[i]; });
+  return out;
+}
+
 // Sign-in reads the pointer, then the account. Two reads rather than a scan,
 // which is the entire reason the pointer store exists.
 async function accountIdForEmail(email) {
@@ -346,7 +367,7 @@ module.exports = {
   allAccounts,
   ACCOUNTS, EMAILS, ROUNDS, MIN_PASSWORD, MAX_FAILED, LOCK_MS,
   mintAccountId, normaliseEmail, validEmail, publicAccount, preferredLanguage,
-  getAccount, getAccountByEmail, accountIdForEmail,
+  getAccount, getAccounts, getAccountByEmail, accountIdForEmail,
   createAccount, updateProfile, changeEmail, setPassword, markEmailVerified,
   verifyPassword, isLocked, saveAccount,
   _keys: { acctKey, emailKey }

@@ -77,7 +77,12 @@ const TEMPLATES = {
   // Not resendable: a second copy of "the group has changed" reads as a second
   // move, and the family would go looking for a third group.
   'registration-moved': { label: 'Group changed', resend: false },
-  'registration-paid': { label: 'Payment received', resend: false }
+  'registration-paid': { label: 'Payment received', resend: false },
+  // ⚠ THIS ONE WAS MISSING, so templateLabel() fell through to the raw
+  // 'registration-terms-changed' and an admin reading the log met a key rather
+  // than a sentence. Not resendable: it says two dates that govern refunds have
+  // moved, and a second copy a fortnight later reads as them having moved again.
+  'registration-terms-changed': { label: 'Cancellation dates changed', resend: false }
 };
 
 function templateLabel(t) { return (TEMPLATES[t] && TEMPLATES[t].label) || String(t || 'Email'); }
@@ -161,9 +166,23 @@ function normalizeRecord(input) {
     id: str(input.id, 200) || keyFor(input.recipient, at),
     recipient: normalizeEmail(input.recipient),
     template: str(input.template, 60),
-    // Null for anything not about one activity. It is what will let an admin
-    // see one activity's mail on that activity's own row rather than reading a
-    // whole history to find it.
+    // ⚠ WHICH ACTIVITY THIS WAS ABOUT, AND THE ID IS THE HALF THAT RESOLVES.
+    //
+    // `relatedSlug` came first, described here as what "will let an admin see
+    // one activity's mail on that activity's own row rather than reading a whole
+    // history to find it" — and NOTHING EVER SET IT. Every record ever written
+    // carries null, so the screen it was designed for could not have been built
+    // from it, which is why it took building that screen to notice. Same shape
+    // as the pure bundle module wired to nothing and the invite button labelled
+    // with a description.
+    //
+    // It is the id that is matched against, never the slug, and that is the same
+    // rule the registration record already states about its own frozen copy: a
+    // slug is the filename and can be renamed, and following one after a rename
+    // finds the wrong activity or none. So the slug stays as a LABEL — what this
+    // message was about, spelled the way it was spelled at the time, audit only
+    // — and the id is what a roster filters on.
+    relatedActivityId: input.relatedActivityId ? str(input.relatedActivityId, 60) : null,
     relatedSlug: input.relatedSlug ? str(input.relatedSlug, 80) : null,
     resendId: input.resendId ? str(input.resendId, 120) : null,
     status: STATUSES.indexOf(input.status) !== -1 ? input.status : 'sent',
@@ -218,11 +237,79 @@ async function listForRecipient(email) {
     // the one caller in this codebase that wants that, and it says why.
     const out = (await blobs.readMany(store, keys, { skipErrors: true }))
       .filter((r) => r && r.template);
-    return out.sort((a, b) => {
-      if (a.sentAt !== b.sentAt) return a.sentAt < b.sentAt ? 1 : -1;
-      return String(a.id) < String(b.id) ? 1 : -1;
-    });
+    return out.sort(newestFirst);
   } catch (e) { return []; }
+}
+
+function newestFirst(a, b) {
+  if (a.sentAt !== b.sentAt) return a.sentAt < b.sentAt ? 1 : -1;
+  return String(a.id) < String(b.id) ? 1 : -1;
+}
+
+// How many of one recipient's messages a roster reads. The cell needs the newest
+// and the panel wants recent history; twelve covers a registration's whole run
+// (received, confirmed, paid) plus the account messages a family asks about most
+// — the verification link and a reset. It is a bound rather than a judgement:
+// this is read for every address on a roster at once, and an unbounded read is
+// an admin watching a screen not answer.
+const MAIL_PER_RECIPIENT = 12;
+
+// Several recipients' mail in one pass, for a roster.
+//
+// ⚠ ONE PREFIX LISTING PER RECIPIENT, SEVERAL AT A TIME — deliberately not one
+// listing of the whole store. A prefix is filtered by Blobs rather than by us
+// and comes back in tens of keys; this store holds every email the site has ever
+// sent, so after a few terms a full listing is pages of keys almost all of which
+// belong to somebody who is not on this roster. That is the same reason
+// `log-<recipient>__` puts the recipient first, and the same reason a guardian
+// link is keyed participant-first.
+//
+// ⚠ AND "WE COULD NOT READ IT" IS NOT "NOTHING WAS SENT". Each recipient carries
+// its own `read`, so a store having a bad minute shows as unknown rather than as
+// a family we never wrote to — which is the one reading that would send an admin
+// to apologise for a message that went out perfectly.
+async function listForRecipients(emails, opts) {
+  const per = Math.max(1, (opts && opts.perRecipient) || MAIL_PER_RECIPIENT);
+  const want = [];
+  const seen = new Set();
+  for (const e of (emails || [])) {
+    const n = normalizeEmail(e);
+    if (n && !seen.has(n)) { seen.add(n); want.push(n); }
+  }
+  const out = {};
+  for (const n of want) out[n] = { entries: [], total: 0, read: false };
+
+  const store = await logStore();
+  if (!store || !want.length) return out;
+
+  const wanted = [];
+  let next = 0;
+  const lister = async () => {
+    for (;;) {
+      const i = next++;
+      if (i >= want.length) return;
+      const n = want[i];
+      try {
+        const listing = await store.list({ prefix: recipientPrefix(n) });
+        // The key sorts chronologically within a recipient, so newest-first is a
+        // sort of the KEYS — which is what lets the slice happen before anything
+        // is read rather than after.
+        const keys = (listing.blobs || []).map((b) => b.key).sort().reverse();
+        out[n].total = keys.length;
+        out[n].read = true;
+        for (const key of keys.slice(0, per)) wanted.push({ recipient: n, key: key });
+      } catch (e) { /* `read` stays false, which is the honest answer */ }
+    }
+  };
+  await Promise.all(new Array(Math.min(blobs.READ_CONCURRENCY, want.length)).fill(0).map(lister));
+
+  const recs = await blobs.readMany(store, wanted.map((w) => w.key), { skipErrors: true });
+  wanted.forEach((w, i) => {
+    const rec = recs[i];
+    if (rec && rec.template) out[w.recipient].entries.push(rec);
+  });
+  for (const n of want) out[n].entries.sort(newestFirst);
+  return out;
 }
 
 // Apply a webhook event. Returns what happened, so the endpoint can log a line
@@ -272,6 +359,7 @@ module.exports = {
   STORE, TEMPLATES, STATUSES, PROGRESS, FINAL, EVENT_STATUS,
   templateLabel, isResendable, supersedes, normalizeRecord,
   keyFor, pointerKey, recipientPrefix,
-  record, listForRecipient, markStatus, knownResendIds,
+  record, listForRecipient, listForRecipients, markStatus, knownResendIds,
+  MAIL_PER_RECIPIENT,
   _internal: { resetStore }
 };

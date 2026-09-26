@@ -18,7 +18,13 @@
 (function () {
   var API = '/api/admin-registrations';
   var S = { activities: [], slug: null, queue: null, register: null, date: null,
-            canApprove: false, canCancel: false, filter: null, eveFilter: null };
+            canApprove: false, canCancel: false, filter: null, eveFilter: null,
+            // What became of the mail to every address on this roster, and the
+            // function that repaints the rows once it lands. `mail` is null while
+            // the answer is still coming, which is not the same as empty — see
+            // mailLine(), where "we have not read it" and "nothing was ever sent"
+            // are deliberately different sentences.
+            mail: null, repaint: null };
   // Written out rather than shown as a code: "ru" beside a draft is something an
   // admin has to decode, and this line is the whole warning.
   var LANG_NAME = { he: 'Hebrew', en: 'English', ru: 'Russian' };
@@ -183,6 +189,96 @@
     }));
   }
 
+  // ⚠ WHAT BECAME OF WHAT WE WROTE TO THEM — and it belongs UNDER THE ADDRESS.
+  //
+  // Asked for as the only way to tell "never sent" from "bounced" from
+  // "delivered and ignored" when a family says they never received something.
+  // Every send has been recorded since _email-log.js was written and the webhook
+  // has been ladder-ing the statuses up ever since, and no screen has ever shown
+  // a single one of them.
+  //
+  // It is a line in the participant cell rather than a seventh column, because
+  // that cell already prints the address and this is a fact ABOUT that address —
+  // put in its own column it would be a fact about the row, which is a different
+  // and wronger claim. It also costs the table no width, on a screen whose whole
+  // job is scanning.
+  //
+  // ⚠ THE ADDRESS IS THE SUBJECT, NOT THIS REGISTRATION. Two reasons, and the
+  // second is the load-bearing one:
+  //
+  //  - the message a family rings about is as often the verification link or a
+  //    reset as it is the confirmation, and neither is about an activity at all;
+  //  - A BOUNCE IS A FACT ABOUT AN ADDRESS. `suppressed` literally means the mail
+  //    provider refuses to send there at all because it bounced before — so a
+  //    bounce on one message is the reason the next nine will not arrive either,
+  //    and hiding it behind "not about this activity" would hide it in exactly
+  //    the case it matters. Which messages were about the open activity is marked
+  //    in the panel, where there is room to say it.
+  //
+  // Four states, and they are four different sentences:
+  //
+  //   unreadable     the log would not answer. NOT "nothing was sent" — that
+  //                  reading sends an admin to apologise for mail that went out
+  //                  perfectly.
+  //   never emailed  amber, advisory. A registered family we have no record of
+  //                  writing to is the silent half of this whole feature.
+  //   undelivered    red. The one status that has to be acted on, and the only
+  //                  red on this screen besides over capacity and cancelling.
+  //   the ladder     quiet. `delivered` and `opened` are the two halves of
+  //                  "delivered but ignored", so the word itself is the answer
+  //                  and nothing else needs saying.
+  function mailFor(r) {
+    var addr = String(r.accountEmail || '').trim().toLowerCase();
+    if (!addr || !S.mail || !S.mail.mail) return null;
+    return S.mail.mail[addr] || { read: true, total: 0, messages: [] };
+  }
+
+  function mailLine(r) {
+    // Still coming, or this roster has no answer at all. Nothing is drawn rather
+    // than a placeholder on every row: the envelope button beside the row opens
+    // the same panel either way, so the capability is reachable while the line is
+    // not yet there.
+    if (!S.mail) return null;
+    if (S.mail.error) {
+      return el('span', { class: 'flag unknown', title: S.mail.error, text: 'mail unknown' });
+    }
+    var m = mailFor(r);
+    if (!m) return null;
+    if (!m.read) {
+      return el('span', { class: 'flag unknown',
+        title: 'The email log would not answer for this address. It is not a record of nothing being sent.',
+        text: 'mail unknown' });
+    }
+    if (!m.total) {
+      return el('span', { class: 'flag',
+        title: 'Nothing has ever been recorded as sent to this address.',
+        text: 'never emailed' });
+    }
+    var bad = m.messages.filter(function (x) { return x.final; })[0];
+    if (bad) {
+      return el('span', { class: 'pill undelivered', title: bad.label + ' \u00b7 ' + bad.status,
+                          text: bad.status });
+    }
+    var last = m.messages[0];
+    return el('span', { class: 'why', text: last
+      ? last.status + ' \u00b7 ' + shortDate(String(last.sentAt).slice(0, 10)) +
+        ' \u00b7 ' + m.total + (m.total === 1 ? ' email' : ' emails')
+      : m.total + ' emails' });
+  }
+
+  // The participant cell, shared by the queue and the evening register — one
+  // shape for one thing, so the mail line cannot appear on one table and not the
+  // other. That is the half of this that was asked for twice.
+  function whoCell(r, extra) {
+    var line = mailLine(r);
+    return el('td', { class: 'who' }, [
+      el('b', { text: r.name }),
+      el('span', { class: 'addr', text: r.accountEmail || r.accountId }),
+      extra || null,
+      line ? el('div', {}, [line]) : null
+    ]);
+  }
+
   function when(r) {
     var out = [el('span', { class: 'num', text: (r.submittedAt || '').slice(0, 10) })];
     // The DERIVED answer, not the stored one. A pending request whose deadline
@@ -306,7 +402,10 @@
     // different acts and two crosses would say they are the same one.
     cancel: 'M4.9 4.9l14.2 14.2',
     // circle-dollar
-    money: 'M12 6v12M15 9.5a2.5 2.5 0 0 0-2.5-2h-1a2 2 0 1 0 0 4h1a2 2 0 1 1 0 4h-1A2.5 2.5 0 0 1 9 14.5'
+    money: 'M12 6v12M15 9.5a2.5 2.5 0 0 0-2.5-2h-1a2 2 0 1 0 0 4h1a2 2 0 1 1 0 4h-1A2.5 2.5 0 0 1 9 14.5',
+    // mail — an envelope, drawn as the rectangle plus its flap in one path so it
+    // needs no second element the way the two circled glyphs do.
+    mail: 'M3 6h18v12H3zM3 7l9 6 9-6'
   };
   function glyph(name) {
     var NS = 'http://www.w3.org/2000/svg';
@@ -372,8 +471,24 @@
         'to their account and cannot be undone', 'no', !S.canCancel || !live,
         function () { review('cancel', r); }),
       iconButton('money', 'Payments and credit', null, null, false,
-        function () { openAccount(r); })
+        function () { openAccount(r); }),
+      mailButton(r)
     ]);
+  }
+
+  // ⚠ THE ENVELOPE IS ON ALL FOUR TABLES, which is the half that was asked for
+  // twice — the course queue, the course waiting list, the evening register and
+  // the evening's own waiting list. A waiting row is not the exception it looks
+  // like: it is the row somebody rings about, because "a place has opened" went
+  // to everybody waiting at once and whether it ARRIVED is the whole question.
+  //
+  // It is a lookup rather than a decision, so it sits beside the money button —
+  // the other lookup in this column — and not beside approve and reject. `access`
+  // already prints the address on the row, so nothing here is gated further.
+  function mailButton(r) {
+    return iconButton('mail', 'Email history',
+      'every message sent to this address, and what became of each one \u2014 delivered, '
+      + 'opened, or bounced', null, false, function () { openMail(r); });
   }
 
   // ---------- narrowing the table ----------
@@ -565,6 +680,9 @@
 
     var box = $('queue');
     box.innerHTML = '';
+    // Cleared before anything is drawn, so a repaint that arrives after the table
+    // has been replaced cannot write into a node that is no longer on the page.
+    S.repaint = null;
 
     // ⚠ ONE TABLE, TWO SUBJECTS. With an evening picked the table is that
     // evening's register; with "All" it is the registrations. A second table
@@ -582,10 +700,12 @@
     // the bar on a keystroke and the search box loses the focus it is being
     // typed into.
     var rowsBox = el('div', {});
-    var bar = filterBar(regs, waiting, function () { paintRows(bar, rowsBox, regs, waiting); });
+    var repaint = function () { paintRows(bar, rowsBox, regs, waiting); };
+    var bar = filterBar(regs, waiting, repaint);
     if (bar) box.appendChild(bar);
     box.appendChild(rowsBox);
-    paintRows(bar, rowsBox, regs, waiting);
+    S.repaint = repaint;
+    repaint();
   }
 
   function paintRows(bar, box, regs, waiting) {
@@ -622,11 +742,7 @@
       .map(function (h) { return el('th', { text: h }); }));
     var rows = show.map(function (r) {
       return el('tr', {}, [
-        el('td', { class: 'who' }, [
-          el('b', { text: r.name }),
-          el('span', { text: r.accountEmail || r.accountId }),
-          r.stillExists ? null : el('span', { class: 'flag', text: 'participant deleted' })
-        ]),
+        whoCell(r, r.stillExists ? null : el('span', { class: 'flag', text: 'participant deleted' })),
         el('td', {}, [ageCell(r)]),
         el('td', {}, [groupCell(r)]),
         el('td', {}, [
@@ -690,11 +806,7 @@
     var rows = list.map(function (r) {
       var room = roomFor(r);
       return el('tr', {}, [
-        el('td', { class: 'who' }, [
-          el('b', { text: r.name }),
-          el('span', { text: r.accountEmail || r.accountId }),
-          r.stillExists ? null : el('span', { class: 'flag', text: 'participant deleted' })
-        ]),
+        whoCell(r, r.stillExists ? null : el('span', { class: 'flag', text: 'participant deleted' })),
         el('td', {}, [ageCell(r)]),
         el('td', {}, [el('span', { text: r.groupName ? titleOf(r.groupName, r.groupId) : '—' })]),
         el('td', {}, [el('span', { text: shortDate((r.waitingSince || '').slice(0, 10)) })]),
@@ -712,7 +824,8 @@
                  : 'Opens the registration, re-freezes the terms at today\'s price and '
                    + 'emails the family. The hold is hours, not weeks.',
             onclick: function () { givePlace(r); }, text: 'Give a place'
-          })
+          }),
+          mailButton(r)
         ])])
       ]);
     });
@@ -931,10 +1044,12 @@
     }
 
     var rowBox = el('div', {});
-    var bar = eveningBar(rows, waiting, function () { paintEvening(bar, rowBox, rows, waiting); });
+    var repaint = function () { paintEvening(bar, rowBox, rows, waiting); };
+    var bar = eveningBar(rows, waiting, repaint);
     if (bar) box.appendChild(bar);
     box.appendChild(rowBox);
-    paintEvening(bar, rowBox, rows, waiting);
+    S.repaint = repaint;
+    repaint();
   }
 
   function paintEvening(bar, box, rows, waiting) {
@@ -958,10 +1073,7 @@
         el('thead', {}, [head]),
         el('tbody', {}, show.map(function (r) {
           return el('tr', {}, [
-            el('td', { class: 'who' }, [
-              el('b', { text: r.name }),
-              el('span', { text: r.accountEmail || r.accountId })
-            ]),
+            whoCell(r),
             el('td', {}, [el('span', { class: 'pill ' + r.status, text: SEAT[r.status] || r.status })]),
             el('td', {}, [moneyCell(r)]),
             el('td', {}, [markCell(r)])
@@ -979,13 +1091,18 @@
     eveningWaiting(box, showWaiting, waiting.length);
   }
 
-  // The queue for ONE evening. Its own table, in join order, with no controls on
-  // it at all — and that is the honest state rather than an omission. A place on
-  // an evening opens when somebody cancels it, and every family waiting is
-  // emailed at once; there is no admin action for handing one out, so there is
-  // no button here pretending otherwise. (The course's "Give a place" goes
-  // through openRegistration(), which is about a TERM and has no per-evening
-  // equivalent built.)
+  // The queue for ONE evening, in join order, with no action on it that GIVES a
+  // seat — and that is the honest state rather than an omission. A place on an
+  // evening opens when somebody cancels it, and every family waiting is emailed
+  // at once; there is no admin action for handing one out, so there is no button
+  // here pretending otherwise. (The course's "Give a place" goes through
+  // openRegistration(), which is about a TERM and has no per-evening equivalent
+  // built.)
+  //
+  // ⚠ The envelope is not an exception to that. It decides nothing and moves
+  // nothing; it says whether the "a place has opened" message this table's whole
+  // mechanism rests on actually reached the person. Withholding it here would
+  // withhold it from the rows where it answers the most.
   function eveningWaiting(box, list, total) {
     if (!total) return;
     box.appendChild(el('div', { class: 'label-row', style: 'margin-top:26px;' }, [
@@ -1002,16 +1119,14 @@
       return;
     }
     box.appendChild(el('table', { class: 'queue' }, [
-      el('thead', {}, [el('tr', {}, ['Waiting', 'Since'].map(function (h) {
+      el('thead', {}, [el('tr', {}, ['Waiting', 'Since', ''].map(function (h) {
         return el('th', { text: h });
       }))]),
       el('tbody', {}, list.map(function (r) {
         return el('tr', {}, [
-          el('td', { class: 'who' }, [
-            el('b', { text: r.name }),
-            el('span', { text: r.accountEmail || r.accountId })
-          ]),
-          el('td', {}, [el('span', { text: shortDate((r.waitingSince || '').slice(0, 10)) })])
+          whoCell(r),
+          el('td', {}, [el('span', { text: shortDate((r.waitingSince || '').slice(0, 10)) })]),
+          el('td', {}, [el('div', { class: 'acts' }, [mailButton(r)])])
         ]);
       }))
     ]));
@@ -1037,19 +1152,26 @@
   // table now, and the rule is a list of what DOES hold a seat, so the next
   // status added is refused until somebody says otherwise.
   var MARKABLE = ['booked', 'attended', 'no-show'];
+  // ⚠ THE ENVELOPE SURVIVES BOTH EARLY RETURNS. Marking the register is a
+  // decision and needs `approve` and a seat that is actually held; reading what
+  // was sent to an address is neither. Both of these branches used to end the
+  // cell outright, which would have put the whole mail feature on every row
+  // except the cancelled ones — and a cancelled booking is exactly the row an
+  // admin opens when a family says they were never told.
   function markCell(r) {
-    if (MARKABLE.indexOf(r.status) === -1) return el('span', { class: 'why', text: '\u2014' });
-    if (!S.canApprove) {
-      return el('span', { class: 'why', title: 'Your role may open the register but not mark it',
-                          text: '\u2014' });
+    var kids = [];
+    if (MARKABLE.indexOf(r.status) === -1) {
+      kids = [];
+    } else if (!S.canApprove) {
+      kids = [el('span', { class: 'why', title: 'Your role may open the register but not mark it',
+                           text: '\u2014' })];
+    } else {
+      kids = [mark(r, 'attended', 'Present'), mark(r, 'no-show', 'No-show')];
     }
     // The same `.acts` idiom the queue rows use, rather than a second set of
     // row buttons with their own styling — one table, one shape for the controls
     // in it.
-    return el('div', { class: 'acts' }, [
-      mark(r, 'attended', 'Present'),
-      mark(r, 'no-show', 'No-show')
-    ]);
+    return el('div', { class: 'acts' }, kids.concat([mailButton(r)]));
   }
 
   // ⚠ PRESENT IS NOT OFFERED BEFORE THE CLASS HAS STARTED.
@@ -1478,6 +1600,126 @@
     });
   }
 
+  // ⚠ EVERY MESSAGE TO THIS ADDRESS, AND WHAT BECAME OF EACH ONE.
+  //
+  // The line on the row answers "is anything wrong"; this answers "what did we
+  // actually send them", which is the question a family on the telephone is
+  // asking. Ten messages do not fit in a cell, and a cell that tried would be
+  // the money column printing a ledger.
+  //
+  // ⚠ IT COSTS NO REQUEST. The roster already read every address's mail in one
+  // pass, so the panel renders from what is in hand — which also means the row
+  // and the panel cannot disagree about a status, because there is one payload
+  // and one reader of it. A second fetch per row would have been a second shape
+  // to keep in step, and this admin has paid for that twice.
+  function openMail(r) {
+    var addr = String(r.accountEmail || '').trim().toLowerCase();
+    $('mail-panel').hidden = false;
+    $('mail-title').textContent = 'Email \u00b7 ' + (r.accountEmail || r.accountId);
+    var box = $('mail-body');
+    box.innerHTML = '';
+
+    var m = S.mail && !S.mail.error ? mailFor(r) : null;
+    if (!m) {
+      box.appendChild(el('p', { class: 'hint', text: S.mail
+        ? 'The email log could not be read. That is not a record of nothing having been sent \u2014 '
+          + 'the messages may well have gone. Try again in a moment.'
+        : 'Still reading the log for this activity\u2019s addresses.' }));
+    } else if (!m.read) {
+      box.appendChild(el('p', { class: 'hint',
+        text: 'The log would not answer for this address. That is not a record of nothing having '
+            + 'been sent.' }));
+    } else if (!m.total) {
+      // ⚠ SAID AS A FACT ABOUT THE RECORD, never as a fact about the family. The
+      // log is best effort by construction — _email.js sends first and records
+      // second, so a send that succeeded while the log was unreachable leaves
+      // exactly this gap. Reading it as "they were never written to" is the one
+      // wrong turn available here, so the sentence names both possibilities.
+      box.appendChild(el('p', { class: 'hint',
+        text: 'Nothing has been recorded as sent to this address. Either nothing was sent, or it '
+            + 'went out at a moment the log could not be written \u2014 sending never waits for the '
+            + 'record. If a message was expected, send it again from the row rather than assuming '
+            + 'it arrived.' }));
+    } else {
+      box.appendChild(el('table', { class: 'ledger' }, [el('tbody', {}, m.messages.map(function (x) {
+        return el('tr', {}, [
+          el('td', { class: 'num', text: shortDate(String(x.sentAt).slice(0, 10)) }),
+          el('td', {}, [
+            el('div', { text: x.label }),
+            x.subject ? el('div', { class: 'why', text: x.subject }) : null,
+            el('div', { class: 'why', text: [
+              // Which of three languages went out. An admin asked why a family
+              // did not understand a message needs this before anything else.
+              LANG_NAME[x.lang] || x.lang || '',
+              // ⚠ WHETHER IT WAS ABOUT THE ACTIVITY WHOSE ROSTER IS OPEN, matched
+              // by activityId. The slug beside it in the record is the spelling
+              // at the time and is a label only — the same rule the frozen slug
+              // on a registration already states.
+              x.thisActivity ? 'this activity'
+                : x.relatedSlug ? 'about ' + x.relatedSlug
+                : 'account message',
+              x.manual ? 'sent by ' + x.sentBy : null
+            ].filter(Boolean).join(' \u00b7 ') }),
+            x.error ? el('div', { class: 'why', text: x.error }) : null
+          ]),
+          el('td', { class: 'amt' }, [
+            // The ladder is quiet and the bad news is loud, exactly as the row
+            // line is. The words are the server's — one table decides what a
+            // status is called, so a screen cannot invent a fifth one.
+            el('span', { class: x.final ? 'pill undelivered' : 'why', text: x.status }),
+            // When the status last moved, and only when it is not the send
+            // itself: "delivered" with no second date says nothing, and
+            // "delivered, 3 days later" is a real answer to why nobody replied.
+            String(x.statusUpdatedAt || '').slice(0, 10) !== String(x.sentAt || '').slice(0, 10)
+              ? el('div', { class: 'why',
+                  text: shortDate(String(x.statusUpdatedAt).slice(0, 10)) })
+              : null
+          ])
+        ]);
+      }))]));
+      // ⚠ NAMED RATHER THAN TRIMMED AWAY. A roster reads a bounded number per
+      // address, and an admin who cannot see that the list is cut would read the
+      // oldest message shown as the first one ever sent.
+      if (m.total > m.messages.length) {
+        box.appendChild(el('p', { class: 'hint',
+          text: 'The newest ' + m.messages.length + ' of ' + m.total + ' messages to this address.' }));
+      }
+    }
+    $('mail-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  // ⚠ A SECOND REQUEST, AFTER THE TABLE IS ALREADY ON SCREEN, and deliberately
+  // so. It is the largest single read either roster does — a prefix listing plus
+  // a read per message for every address on it — and the table does not need it
+  // to be useful. That is the opposite trade from the family area's `dashboard`
+  // and `registerPanel`, and for the opposite reason: those fold in calls a
+  // screen cannot draw without.
+  //
+  // ⚠ IT REPAINTS THE ROWS AND NOT THE SCREEN. renderQueue() rebuilds the filter
+  // bar, and a rebuild while somebody is typing in the search box takes the focus
+  // out of it — the rule that bar was written under. So the paint function is
+  // kept on S and called directly.
+  //
+  // ⚠ AND IT CHECKS THE SLUG IT ASKED FOR. An admin who presses another activity
+  // while this is in flight would otherwise have one roster's mail drawn against
+  // another's rows, every line internally consistent and every one about somebody
+  // else.
+  function loadMail() {
+    var slug = S.slug;
+    S.mail = null;
+    return send({ action: 'mail', slug: slug }).then(function (res) {
+      if (slug !== S.slug) return;
+      S.mail = res.ok ? res.data
+        : { error: (res.data && res.data.error) || 'The email log did not answer.' };
+      if (S.repaint) S.repaint();
+      if (S.mail.capped) {
+        message('err', 'This roster has ' + S.mail.addressesTotal + ' addresses and the email '
+          + 'history was read for the first ' + S.mail.addressesRead + '. The rest say nothing '
+          + 'rather than nothing-was-sent.');
+      }
+    });
+  }
+
   // Euros in the box, cents on the wire. Typing 12.50 and sending 12.5 somewhere
   // that expects cents is the kind of mistake that is found by a family.
   function amountForm(title, hint, enabled, build, r, allowNegative) {
@@ -1537,8 +1779,11 @@
     // activity nobody has registered for. The one thing this screen must never
     // say wrongly is the thing a stale filter would make it say.
     if (slug !== S.slug) {
-      S.date = null; S.register = null;
+      S.date = null; S.register = null; S.mail = null;
       S.filter = newFilter(); S.eveFilter = newEveFilter();
+      // A panel about one family's mail, left open across the picker, would be a
+      // heading naming an address that is not on the table under it.
+      $('mail-panel').hidden = true;
     }
     if (!S.filter) S.filter = newFilter();
     if (!S.eveFilter) S.eveFilter = newEveFilter();
@@ -1559,6 +1804,11 @@
       // `undefined` the first time, so it lands on the next evening; S.date
       // afterwards, so a refresh keeps whichever chip is open — including
       // "All", which is a real choice and not an absent one.
+      // After the paint, and not awaited by it: the table is what an admin came
+      // for, and the mail line arriving a moment later costs them nothing. One
+      // call covers both tables on a drop-in, because an evening's bookings are a
+      // subset of the activity's registrations.
+      loadMail();
       if (res.data.activity.type === 'dropin') return loadRegister(S.register ? S.date : undefined);
     });
   }

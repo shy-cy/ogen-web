@@ -79,12 +79,33 @@ REAL.forEach((slug) => {
 // ⚠ THE ONE NUMBER MOST WORTH PINNING. Two pooled groups of ten is twenty
 // places, and the group that replaces them holds twenty — not ten, which is
 // what reading `maxPerGroup` alone would have given, and not two.
-const h4k = migrate(record('hebrew4kids'));
+//
+// ⚠ AND IT IS PINNED ON THE POOLED SHAPE, BUILT HERE, for the reason the
+// uncapped rule below already learned the hard way — and this one had gone
+// further than folk-dance's. It read `migrate(record('hebrew4kids'))`, and the
+// live record has since been published through the form: it carries its one
+// group, that group has been NAMED, and `facts.groupSize` no longer holds
+// `groups` or `maxPerGroup` at all. migrate() leaves an existing list alone, on
+// purpose, so every assertion here had quietly stopped testing the migration and
+// started reading back the stored group — the twenty passing because the group
+// really holds twenty, not because anything multiplied it.
+//
+// So it failed on "no name", which is the one of the four that an ordinary admin
+// edit can change, and that failure was the only reason anybody looked. A pin on
+// a migration needs a record that still needs migrating.
+const POOLED = { slug: 'hebrew4kids', activityId: 'act-0000000000000h4k', type: 'course',
+                 facts: { groupSize: { groups: 2, maxPerGroup: 10 } } };
+const h4k = migrate(POOLED);
 H.eq(h4k.groups.length, 1, 'hebrew4kids was pooled, so it becomes ONE group');
 H.eq(h4k.groups[0].capacity, 20, '⚠ holding 20 — the product, not one group of ten');
 H.eq(G.totalCapacity(h4k), 20, 'and the activity still holds twenty altogether');
 H.eq(FACTS.pick(h4k.groups[0].name, 'en'), '',
   'with no name, because one group offers no choice and nothing is published');
+// And the live record is still read for what it is: one group, holding the same
+// twenty, whatever it has since been called.
+const liveH4k = migrate(record('hebrew4kids'));
+H.eq(liveH4k.groups.length, 1, 'the published hebrew4kids still has exactly one group');
+H.eq(G.totalCapacity(liveH4k), 20, 'and still holds twenty');
 
 // ⚠ THE UNCAPPED RULE IS PINNED ON A RECORD BUILT HERE, not on whichever real
 // activity happens to have no size today. It was folk-dance, until an admin gave
