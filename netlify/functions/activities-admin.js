@@ -766,6 +766,24 @@ function validate(activity) {
   // which was strictly stronger and refused a shape Ogen actually runs.
   GROUPS.validateGroups(activity).forEach((m) => errors.push(m));
 
+  // ⚠ THE MAP PIN, ON EVERY GROUP. It is refused rather than silently dropped:
+  // a link that does not pass is treated as absent by mapUrlOf() at every point
+  // of use, so a half-pasted string would simply never appear and an admin would
+  // be left wondering why the email says nothing. Said at the moment it is
+  // typed, which is the only moment somebody still has the right link in their
+  // clipboard. Warning on a draft save and a refusal at publish, one message.
+  const groupList = GROUPS.groupList(activity);
+  groupList.forEach((g) => {
+    const problem = FACTS.mapUrlProblem((((g.facts || {}).address) || {}).mapUrl);
+    if (!problem) return;
+    // Named only when there is more than one, because with a single group the
+    // name is not published and saying "in group ''" describes a structure the
+    // admin has never been shown.
+    const name = groupList.length > 1
+      ? ((g.name && (g.name.en || g.name.he || g.name.ru)) || g.groupId) : '';
+    errors.push(name ? name + ': ' + problem : problem);
+  });
+
   if (errors.length) {
     const err = new Error(errors[0]);
     err.validation = errors;

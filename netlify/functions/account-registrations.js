@@ -1013,7 +1013,7 @@ exports.handler = async (event) => {
         // booked, nothing is charged, and the message that explains the wait is
         // the one that already exists for exactly this case.
         if (reg.status !== 'approved') {
-          if (opened.created) await mail.sendReceived(reg, me, (activity.registration || {}).sessionCancelHours);
+          if (opened.created) await mail.sendReceived(reg, me, (activity.registration || {}).sessionCancelHours, facts.whereFor(activity, reg.groupId));
           return json(200, {
             ok: true, awaitingApproval: true, status: reg.status,
             registration: regRow(reg, participant, lang, null,
@@ -1214,7 +1214,7 @@ exports.handler = async (event) => {
         if (opened.status) return no(opened.status, opened.key, opened.extra);
         const reg = opened.reg;
         if (reg.status !== 'approved') {
-          if (opened.created) await mail.sendReceived(reg, me, (activity.registration || {}).sessionCancelHours);
+          if (opened.created) await mail.sendReceived(reg, me, (activity.registration || {}).sessionCancelHours, facts.whereFor(activity, reg.groupId));
           return json(200, { ok: true, awaitingApproval: true, status: reg.status });
         }
 
@@ -1598,10 +1598,40 @@ exports.handler = async (event) => {
             // and its only caller: the members-only address is filtered out here
             // as it is everywhere, and the authenticated view that would serve
             // it is still not built.
-            facts: facts.sidebarGroups(activity, lang).map((g) => ({
+            // ⚠ THE AUTHENTICATED VIEW, AND THE FIRST ONE THERE HAS EVER BEEN.
+            //
+            // The exact address is members-only from birth so that an activity
+            // can say where it is without publishing where children will be,
+            // and until now NOTHING revealed it — not the page, not this screen,
+            // not one of the ten messages. A family registered and was never
+            // told the room. This file's own comment said the view "is still not
+            // built"; it is this line.
+            //
+            // ⚠ IT IS GATED ON HOLDING A PLACE, from holdsASpot() — the same
+            // derived rule capacity counts by. So a lapsed hold, a rejection, a
+            // cancellation and a spot in a queue all fall back to the public
+            // rows on exactly the schedule they stop being a place. Somebody
+            // WAITING has not been given anything yet and is not told where.
+            //
+            // isPubliclyVisible() keeps its meaning and its one caller; what
+            // this decides is whether the filter is asked at all, and it may
+            // only be skipped by a caller that has established who is asking —
+            // which mustGuard() and this gate together have.
+            facts: (R.holdsASpot(reg, Date.now())
+              ? facts.memberSidebarGroups(activity, lang, reg.groupId || undefined)
+              : facts.sidebarGroups(activity, lang, reg.groupId || undefined)
+            ).map((g) => ({
               key: g.key,
               heading: plainLabel(L['g' + g.key.charAt(0).toUpperCase() + g.key.slice(1)]),
-              facts: g.facts.map((f) => ({ key: f.key, label: plainLabel(L[f.key]), value: f.value }))
+              facts: g.facts.map((f) => Object.assign(
+                { key: f.key, label: plainLabel(L[f.key]), value: f.value },
+                // The pin rides with the row it belongs to, so a client cannot
+                // draw it anywhere else — and it is absent whenever the row is,
+                // which is the whole reason it lives on the address fact.
+                f.key === 'address'
+                  ? { mapUrl: facts.mapUrlOf(groups.factFor(activity, 'address', reg.groupId || undefined)),
+                      mapLabel: facts.mapLabel(lang) }
+                  : null))
             })),
             // Rows, never a total. The registration fee is charged once a year
             // and the course fee once a semester, so their sum is a figure
@@ -1686,8 +1716,8 @@ exports.handler = async (event) => {
         // Best effort, and after the write. An email that fails must not undo a
         // registration that succeeded.
         if (R.isWaiting(reg)) await mail.sendWaiting(reg, me, null);
-        else if (reg.status === 'approved') await mail.sendApproved(reg, me, (activity.registration || {}).sessionCancelHours);
-        else await mail.sendReceived(reg, me, (activity.registration || {}).sessionCancelHours);
+        else if (reg.status === 'approved') await mail.sendApproved(reg, me, (activity.registration || {}).sessionCancelHours, facts.whereFor(activity, reg.groupId));
+        else await mail.sendReceived(reg, me, (activity.registration || {}).sessionCancelHours, facts.whereFor(activity, reg.groupId));
         return json(200, { ok: true, registration: reg, waiting: R.isWaiting(reg) });
       }
 

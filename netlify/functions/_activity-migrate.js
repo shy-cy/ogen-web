@@ -14,7 +14,7 @@
 // Everything here is pure. migrate() is idempotent: running it on an
 // already-migrated record returns the same record.
 
-const { FACT_ORDER, TEXT_FACTS, DEFAULT_VISIBILITY, num,
+const { FACT_ORDER, TEXT_FACTS, DEFAULT_VISIBILITY, num, mapUrlText,
         INSTRUCTION_LANGUAGES, LEVELS,
         LANGUAGE_NAMES, LEVEL_NAMES } = require('./_activity-facts');
 const sessionsModule = require('./_activity-sessions');
@@ -186,7 +186,20 @@ const SHAPES = {
     };
   },
   location: (f) => ({ text: langObject(f.text) }),
-  address: (f) => ({ text: langObject(f.text) }),
+  // ⚠ THE PIN LIVES ON THE ADDRESS, and only on the address. A map link IS the
+  // address in another form — a dropped pin says where a child will be just as
+  // plainly as a street name does — so it has to be governed by the same
+  // visibility flag rather than by a second rule somebody has to remember. On
+  // the `address` fact it is filtered by the same isPubliclyVisible() call, and
+  // there is nothing to keep in step.
+  //
+  // Not on `location`: that is the general area, it is public, and a pin for
+  // "Limassol" answers nothing anybody asked.
+  //
+  // It is STRUCTURE — one value for all three languages, like cardImage and
+  // robots — so `mapUrl` is deliberately absent from LANG_SUBKEYS and a role
+  // permitted to edit only Russian cannot move where the class is.
+  address: (f) => ({ text: langObject(f.text), mapUrl: mapUrlText(f.mapUrl) }),
   price: (f) => ({
     registrationFee: num(f.registrationFee),
     fullPrice: num(f.fullPrice),

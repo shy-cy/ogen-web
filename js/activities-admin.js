@@ -1552,6 +1552,27 @@
       // them the same inputs: duplicate DOM ids, and a read-back that took the
       // first match for both, so saving would copy the location over the address.
       body = fieldRow({ label: 'Text' }, langObj(fact.text), p + '-' + d.key);
+      // ⚠ THE PIN IS ON THE ADDRESS AND NOWHERE ELSE, keyed by the FACT and not
+      // by the kind — the two facts of this kind already gave each other
+      // duplicate ids once, and the read-back copied the location over the
+      // address. A pin for "Limassol" answers nothing anybody asked, and putting
+      // one on the public fact would publish the thing the private one exists to
+      // keep back.
+      if (d.key === 'address') {
+        var mapId = p + '-address-mapUrl';
+        var map = el('input', { type: 'url', id: mapId, value: fact.mapUrl || '',
+                                placeholder: 'https://maps.app.goo.gl/\u2026' });
+        map.addEventListener('input', function () { S.dirty = true; });
+        body = el('div', {}, [body, el('div', { style: 'margin-top:12px;' }, [
+          withHelp(el('label', { for: mapId, text: 'Map link' }),
+            'Optional. Open the place in Google Maps, press Share, then Copy link \u2014 that is the '
+            + 'https://maps.app.goo.gl/\u2026 address. It is ONE link for all three languages, and it '
+            + 'is as private as the address it sits on: it is left out of the published page by the '
+            + 'same setting, and reaches a family in the email confirming their registration and on '
+            + 'their own registration page. Leave it blank and the address is shown with no link.'),
+          map
+        ])]);
+      }
     } else if (d.kind === 'ages') {
       body = el('div', { class: 'fact-grid' }, [
         numField(p + '-ages-min', 'Youngest', fact.min),
@@ -2067,7 +2088,14 @@
     previous = previous || {};
     var out;
     if (d.kind === 'text') out = readLangField(p + '-' + d.key);
-    else if (d.kind === 'location') out = { text: readLangField(p + '-' + d.key) };
+    else if (d.kind === 'location') {
+      out = { text: readLangField(p + '-' + d.key) };
+      // Only the address draws one, so only the address reads one back. Sending
+      // a mapUrl for `location` would be writing a key its stored shape drops,
+      // which is a silent no-op rather than an error — the shape this codebase
+      // keeps meeting from the other direction.
+      if (d.key === 'address') out.mapUrl = ($(p + '-address-mapUrl') || {}).value || '';
+    }
     else if (d.kind === 'languages') {
       out = {
         codes: (S.schema.instructionLanguages || []).map(function (o) { return o.key; })

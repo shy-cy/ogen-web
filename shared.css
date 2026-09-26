@@ -1470,6 +1470,11 @@ td .acc-actions{ gap:14px; }
 .acc-fact p{ margin:0 0 12px; }
 .acc-fact p:last-child{ margin-bottom:0; }
 .acc-fact b{ display:block; font-size:14px; font-weight:700; }
+/* The map link, under the address rather than trailing it. The value wraps to
+   two lines on a phone, and a link glued to the end of a wrapped street name
+   reads as part of the street name. Nothing is pushed to an edge, so there is
+   no directional override and it sits correctly in all three languages. */
+.acc-fact .acc-map{ display:block; margin-block-start:4px; font-size:13.5px; }
 /* A fact value can be more than one line — the group size splits the count from
    the size, the duration puts the date range above the sessions. The newline is
    in the plain text, never markup, so nothing here is ever interpreted as HTML. */

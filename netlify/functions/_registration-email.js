@@ -23,6 +23,10 @@ const email = require('./_email');
 const { lang, pathFor, esc, strip, shell, shellRaw, SITE } = require('./_email-shell');
 const { pick, dayAndMonth } = require('./_activity-facts');
 const terms = require('./_cancellation-terms');
+// Pure, and already loaded by every handler that sends one of these. The map
+// label lives there because the same three words appear on the family's own
+// registration page, and two copies of a label is two labels.
+const FACTS = require('./_activity-facts');
 
 const titleOf = (reg, l) => pick(((reg && reg.frozen) || {}).activityTitle, l) || '';
 const childOf = (reg) => ((reg && reg.frozen) || {}).participantName || '';
@@ -580,12 +584,55 @@ function termsBlock(reg, l, sessionCancelHours) {
     lines.map(esc).join('<br>') + '</span>';
 }
 
-function receivedMessage(reg, account, sessionCancelHours) {
+// ⚠ WHERE TO GO — THE FIRST TIME THIS SITE EVER TELLS ANYBODY.
+//
+// The exact address is members-only from birth, so that an activity can say
+// where it is without publishing where children will be, and until now nothing
+// revealed it: not the page, not the family's own screen, not one of the ten
+// messages here. A family registered and was never told the room.
+//
+// This is a deliberate disclosure and it is the ordinary one — a confirmation
+// that does not say where to bring a child is not a confirmation. It goes only
+// to the address on the account that registered, and only on the two messages
+// that mean "you are in": the confirmation and the approval. Not the receipt,
+// not the expiry apology, and above all not the rejection, where it would be
+// telling somebody with no place where the place is.
+//
+// ⚠ THE LINK IS CHECKED AGAIN HERE. mapUrlOf() re-tests the host rather than
+// trusting what is stored: this string is about to become an href in somebody's
+// mail client, and the value can only have been checked when it was written —
+// an older record, a hand-edited file or a restored backup are all ways for it
+// to stop being true with nothing saved. A link that does not pass renders as
+// no link, never as a broken one.
+//
+// ⚠ AND IT PICKS FROM THE BAG. `where` arrives as { he, en, ru } and is
+// resolved with THIS message's language, which is the account's. A caller that
+// picked for us would hand the family whichever language the admin's screen or
+// the request happened to be in — the bug the group-move message already had.
+const WHERE_LABEL = { he: 'כתובת', en: 'Where', ru: 'Адрес' };
+function whereLine(where, l) {
+  const addr = String(((where || {}).address || {})[l] || '').trim()
+    || String(((where || {}).address || {}).en || '').trim()
+    || String(((where || {}).address || {}).he || '').trim();
+  if (!addr) return null;
+  const url = FACTS.mapUrlOf(where);
+  const line = '<strong>' + esc(WHERE_LABEL[l]) + ':</strong> ' + esc(addr);
+  // Appended to the address rather than given a line of its own, because it is
+  // the same fact: where this is, and how to get there. A labelled link, never
+  // a bare goo.gl string — which in the middle of a confirmation reads as
+  // something to be suspicious of.
+  return url ? line + ' · <a href="' + esc(url) + '">' + esc(FACTS.mapLabel(l)) + '</a>' : line;
+}
+
+function receivedMessage(reg, account, sessionCancelHours, where) {
   const l = lang(((account || {}).profile || {}).preferredLanguage);
   const T = RECEIVED[l];
   const child = childOf(reg), act = titleOf(reg, l);
-  const html = shell(l, T.heading,
-    [esc(T.body(child, act)), esc(T.next)],
+  const lines = [esc(T.body(child, act))];
+  const place = whereLine(where, l);
+  if (place) lines.push(place);
+  lines.push(esc(T.next));
+  const html = shell(l, T.heading, lines,
     { href: registrationHref(reg, l), label: T.button },
     termsBlock(reg, l, sessionCancelHours));
   return { to: account.email, subject: T.subject(child, act), html: html, text: strip(html) };
@@ -620,11 +667,17 @@ function receivedMessage(reg, account, sessionCancelHours) {
 // `creditCents` is a parameter for the same reason `payUrl` is: this builder
 // opens no store, so the whole table stays runnable in three languages with no
 // infrastructure.
-function approvedMessage(reg, account, payUrl, creditCents, sessionCancelHours) {
+function approvedMessage(reg, account, payUrl, creditCents, sessionCancelHours, where) {
   const l = lang(((account || {}).profile || {}).preferredLanguage);
   const T = APPROVED[l];
   const child = childOf(reg), act = titleOf(reg, l);
-  const lines = [esc(T.body(child, act)), esc(payUrl ? T.pay : T.next)];
+  const lines = [esc(T.body(child, act))];
+  // Before the money, because a family reading "you have a place" wants the
+  // room before the balance — and the terms block at the foot already owns the
+  // last word.
+  const place = whereLine(where, l);
+  if (place) lines.push(place);
+  lines.push(esc(payUrl ? T.pay : T.next));
   if (payUrl && creditCents > 0) {
     lines.push(T.credit(money(creditCents), esc(registrationHref(reg, l))));
   }
@@ -801,9 +854,9 @@ const langOf = (account) => lang(((account || {}).profile || {}).preferredLangua
 // gives: a drop-in's per-evening window lives on the activity, and a message
 // builder that opened one would stop being runnable with no infrastructure. A
 // course sends nothing and needs to: its terms are frozen on the record.
-const sendReceived = (reg, account, sessionCancelHours) =>
+const sendReceived = (reg, account, sessionCancelHours, where) =>
   email.settle('registration-received', account.email, () =>
-    email.send(receivedMessage(reg, account, sessionCancelHours),
+    email.send(receivedMessage(reg, account, sessionCancelHours, where),
       { template: 'registration-received', lang: langOf(account) }));
 
 // MINTED HERE, INSIDE settle(). The link is a row in a Blobs store and the
@@ -834,10 +887,10 @@ async function creditFor(account) {
   }
 }
 
-const sendApproved = (reg, account, sessionCancelHours) =>
+const sendApproved = (reg, account, sessionCancelHours, where) =>
   email.settle('registration-approved', account.email, async () =>
     email.send(approvedMessage(reg, account, await payUrlFor(reg, account),
-                               await creditFor(account), sessionCancelHours),
+                               await creditFor(account), sessionCancelHours, where),
       { template: 'registration-approved', lang: langOf(account) }));
 
 const sendRejected = (reg, account, override) =>

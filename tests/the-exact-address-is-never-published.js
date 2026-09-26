@@ -111,8 +111,24 @@ H.ok(adminJs.indexOf("'fact-location'") === -1,
 // the KEY half of the id is what this is about, and it is still the fact's.
 H.ok(/body = fieldRow\(\{ label: 'Text' \}, langObj\(fact\.text\), p \+ '-' \+ d\.key\)/.test(adminJs),
      'the field is keyed by the fact key when it is drawn');
-H.ok(/d\.kind === 'location'\) out = \{ text: readLangField\(p \+ '-' \+ d\.key\) \}/.test(adminJs),
+// Read off the branch rather than pinned as one line: the address grew a map
+// link beside its text, so a regex matching the whole statement fails on a
+// change that keeps the rule. What matters is that the read-back addresses the
+// field by the FACT's key, which is what stopped the two copying over each other.
+const readFrom = adminJs.lastIndexOf("else if (d.kind === 'location')");
+const readBack = adminJs.slice(readFrom,
+                               adminJs.indexOf("else if (d.kind === 'languages')", readFrom));
+H.ok(readBack.length > 40, 'the location read-back is where this test expects it');
+H.ok(/readLangField\(p \+ '-' \+ d\.key\)/.test(readBack),
      'and by the same key when it is read back');
+// ⚠ AND THE PIN IS READ BACK ONLY FOR THE ADDRESS. `location` shares this kind
+// and is PUBLIC: a map link there would publish the one thing the split exists
+// to keep back, and it is the same duplicate-id trap one field over.
+H.ok(/d\.key === 'address'\) out\.mapUrl/.test(readBack),
+     'the map link is read back for the address alone');
+H.ok(/d\.key === 'address'/.test(adminJs.slice(adminJs.indexOf("body = fieldRow({ label: 'Text' }"),
+                                                adminJs.indexOf("} else if (d.kind === 'ages')"))),
+     'and drawn for the address alone');
 // And the two halves use the SAME prefix variable, which is what stops a group's
 // editor writing into the main form's ids or the other way round.
 H.ok(/function factEditor\(d, fact, p\)/.test(adminJs) && /function readFactEditor\(d, p, previous\)/.test(adminJs),

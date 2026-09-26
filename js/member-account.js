@@ -2657,9 +2657,11 @@
   }
 
   // THE SAME FACTS THE PUBLIC PAGE SHOWS, built by the same module on the
-  // server. Nothing members-only reaches here: isPubliclyVisible() filtered the
-  // rows exactly as it does for the static page, so the exact address is still
-  // not published — the authenticated view that would serve it is not built.
+  // server — and, for a family holding a place, the members-only ones as well.
+  // That is the authenticated view this comment used to say was not built: the
+  // server decides from holdsASpot() and sends the rows it decided on, so there
+  // is nothing here that could show a private fact to somebody the server did
+  // not mean to show it to.
   function factsBlock(act) {
     return el('div', { class: 'acc-facts' }, (act.facts || []).map(function (g) {
       return el('div', { class: 'acc-fact' }, [
@@ -2688,9 +2690,17 @@
         // step: the qualifier becomes its own quiet line and the label stops
         // repeating the heading above it.
         if (f.key === 'price' && (act.priceRows || []).length) return priceFact(act.priceRows);
+        // ⚠ THE MAP LINK IS PART OF THE ADDRESS ROW, not a row of its own,
+        // because it is the same fact: where this is, and how to get there. The
+        // server sends it only on the row it belongs to and only when it sent
+        // that row at all, so there is no second visibility rule here to keep in
+        // step with the one that matters.
         return el('p', {}, [
           el('b', { text: f.label }),
-          el('span', { text: f.value })
+          el('span', { text: f.value }),
+          f.mapUrl ? el('a', { class: 'acc-link acc-map', href: f.mapUrl,
+                               target: '_blank', rel: 'noopener',
+                               text: f.mapLabel || 'Map' }) : null
         ]);
       })));
     }));

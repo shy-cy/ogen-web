@@ -370,9 +370,10 @@ exports.handler = async (event) => {
         const account = await accounts.getAccount(next.accountId);
         if (account) {
           emailed = next.status === 'approved'
-            ? await mail.sendApproved(next, account)
+            ? await mail.sendApproved(next, account, null, facts.whereFor(activity, next.groupId))
             : await mail.sendReceived(next, account,
-                                      (activity.registration || {}).sessionCancelHours);
+                                      (activity.registration || {}).sessionCancelHours,
+                                      facts.whereFor(activity, next.groupId));
         }
         await recordAudit(session, 'registrations.givePlace',
           next.participantId + '__' + next.activityId, 'ok',
@@ -447,9 +448,17 @@ exports.handler = async (event) => {
             // that rule is not being touched — but an admin who has just written
             // a message by hand must be told if it did not leave, or they will
             // believe a family has been told something nobody has told them.
+            // ⚠ THE ADDRESS IS READ LIVE, and only for the message that says
+            // yes. A rejection must never carry it: telling somebody with no
+            // place where the place is, in the one message that takes something
+            // away, is the worst possible pairing. It is loaded here rather than
+            // by decide(), which is deliberately about the status table alone.
+            const reg2 = out.payload.registration;
+            const act2 = status === 'approved' ? await published(reg2.slug || body.slug) : null;
             emailed = status === 'approved'
-              ? await mail.sendApproved(out.payload.registration, account)
-              : await mail.sendRejected(out.payload.registration, account, override);
+              ? await mail.sendApproved(reg2, account, null,
+                                        act2 ? facts.whereFor(act2, reg2.groupId) : null)
+              : await mail.sendRejected(reg2, account, override);
           }
           out.payload.emailed = emailed;
           // ⚠ A REJECTION FREES A PLACE, which is easy to forget because it is

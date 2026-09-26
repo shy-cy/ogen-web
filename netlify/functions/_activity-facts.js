@@ -234,6 +234,93 @@ function isPubliclyVisible(visibility) {
 // second place the rule is spelled out. It is spelled out here, once.
 const isPublicFact = (activity, key) => isPubliclyVisible(visibilityOf(activity, key));
 
+// --- the map pin -----------------------------------------------------------
+//
+// A direct Google Maps link, stored beside the exact address and governed by the
+// same visibility flag — see the note on SHAPES.address in _activity-migrate.js
+// for why it lives there and nowhere else.
+//
+// ⚠ THE VALUE IS CHECKED AGAIN AT EVERY POINT OF USE, never trusted from the
+// record. It is about to become an href in somebody's mail client, and the
+// sister project's own map handling says the same thing for the same reason.
+// The storage check can only have been true when it was written; an old record,
+// a hand-edited JSON file and a restored backup are all ways for it to stop
+// being true without anybody saving anything.
+//
+// ⚠ AND THE HOST IS CHECKED, WHICH IS STRICTER THAN THE SISTER PROJECT IS. That
+// is this repository's own scar: `ctaUrl` was a free-text URL box, every value
+// it ever held was a mistake, and it is gone. An allowlist cannot tell a right
+// URL from a wrong one — the second bad ctaUrl was a well-formed https link on
+// this very domain — so this is not claimed as a guarantee that the pin is
+// correct. What it buys is narrower and real: `javascript:` cannot be stored, a
+// half-pasted string is refused at the moment it is typed rather than mailed to
+// a family, and the message can name what to paste instead.
+//
+// `maps.app.goo.gl` is first because it is what the Share button actually
+// produces on a phone, which is where an admin standing in the room will get it.
+const MAP_HOSTS = /^https:\/\/(?:maps\.app\.goo\.gl\/|goo\.gl\/maps\/|maps\.google\.[a-z.]{2,6}\/|(?:www\.)?google\.[a-z.]{2,6}\/maps)/i;
+
+// The stored spelling: trimmed, or '' — never null, so a cleared box and an
+// absent one read the same downstream.
+const mapUrlText = (v) => String(v == null ? '' : v).trim();
+
+// What a screen may link to. Anything that does not pass is treated as absent
+// rather than rendered, because a broken pin in a confirmation email is worse
+// than no pin: it reads as the centre not knowing where its own class is.
+function mapUrlOf(fact) {
+  const u = mapUrlText(fact && fact.mapUrl);
+  return MAP_HOSTS.test(u) ? u : '';
+}
+
+// Why a typed value is refused, or null. Shown at the moment it is typed.
+function mapUrlProblem(value) {
+  const u = mapUrlText(value);
+  if (!u) return null;
+  if (MAP_HOSTS.test(u)) return null;
+  return 'The map link has to be a Google Maps address beginning https:// — open the place in '
+    + 'Google Maps, press Share, and Copy link. Leave it blank and the address alone is used.';
+}
+
+// ⚠ A LABELLED LINK, NEVER A BARE URL. A goo.gl string in the middle of a
+// confirmation email reads as something to be suspicious of, which is the
+// opposite of what a family needs from the line telling them where to bring a
+// child. It is appended to the address rather than given a line of its own,
+// because it is the same fact: where this is, and how to get there.
+const MAP_LABEL = {
+  he: '\u05d4\u05d5\u05e8\u05d0\u05d5\u05ea \u05d4\u05d2\u05e2\u05d4',
+  en: 'Get directions',
+  ru: '\u041a\u0430\u043a \u0434\u043e\u0431\u0440\u0430\u0442\u044c\u0441\u044f'
+};
+const mapLabel = (lang) => MAP_LABEL[lang] || MAP_LABEL.en;
+
+// Where a family actually goes, for one group. Language-free ON PURPOSE.
+//
+// ⚠ THE BAGS TRAVEL, NOT THE PICKED TEXT. An email is written in the language of
+// the ACCOUNT and a screen in the language of the PAGE, and a handler resolving
+// this for a message would hand it whichever one it happens to be running in —
+// which is the bug the group-move message already had, where an admin's screen
+// language reached a family's inbox.
+//
+// It reads the GROUP's address, because two groups under the equal-hours rule
+// can be in different places, and a family being sent to the other group's room
+// is the same class of mistake as being told about a place in a group they
+// cannot attend.
+//
+// ⚠ AND IT IS NOT FROZEN ONTO THE REGISTRATION, which every other fact in a
+// confirmation is. The price and the terms are frozen because they are what a
+// family AGREED to and an admin's later edit must not rewrite them. An address
+// is not an agreement — it is where to turn up on Tuesday — so a room that moves
+// has to reach the family, and a frozen copy would go on sending them to the
+// old one. Read live, every time.
+function whereFor(activity, groupId) {
+  const fact = groups.factFor(activity, 'address', groupId) || {};
+  const bag = (fact && fact.text) || {};
+  const any = ['he', 'en', 'ru'].some((l) => String(bag[l] || '').trim());
+  if (!any) return null;
+  return { address: { he: bag.he || '', en: bag.en || '', ru: bag.ru || '' },
+           mapUrl: mapUrlOf(fact) };
+}
+
 // --- formatters ------------------------------------------------------------
 // Each returns display text for one language, or '' if there is nothing to say.
 
@@ -1050,8 +1137,35 @@ const FACT_GROUPS = [
 // Groups with their facts resolved, ready to render. A group whose facts are all
 // empty or all members-only is dropped whole, so an activity that has not filled
 // in its schedule gets no empty "When & where" heading with an icon beside it.
+// ⚠ THE AUTHENTICATED VIEW, and it is a SECOND DOOR ONTO ONE BUILDER rather
+// than a second builder.
+//
+// This file has said since the flag was written that "when a members area
+// exists, the private rows are served by that authenticated view — they still
+// never enter this file". This is that view. isPubliclyVisible() keeps its exact
+// meaning and its one caller; what changes is whether the filter is asked at
+// all, and only a caller that has already established WHO is asking may skip it.
+//
+// Two separate exported names rather than an options flag, so the published
+// template cannot reach the private rows by forgetting an argument — the same
+// reason `published()` and `publishedForDisplay()` are two names for one read. A
+// test asserts _activity-template.js never mentions this one.
+function memberSidebarRows(activity, lang, groupId) {
+  return FACT_ORDER
+    .map((key) => ({ key, visibility: visibilityOf(activity, key),
+                     value: factText(activity, key, lang, groupId) }))
+    .filter((row) => row.value);
+}
+
+function memberSidebarGroups(activity, lang, groupId) {
+  return groupsOf(memberSidebarRows(activity, lang, groupId));
+}
+
 function sidebarGroups(activity, lang, groupId) {
-  const rows = sidebarRows(activity, lang, groupId);
+  return groupsOf(sidebarRows(activity, lang, groupId));
+}
+
+function groupsOf(rows) {
   const byKey = {};
   rows.forEach((r) => { byKey[r.key] = r; });
   return FACT_GROUPS
@@ -1076,5 +1190,7 @@ module.exports = {
   priceRows, factPriceRows,
   academicHours, pricePerHour,
   visibilityOf, isPubliclyVisible, factText, sidebarRows,
+  memberSidebarRows, memberSidebarGroups,
+  mapUrlOf, mapUrlProblem, mapUrlText, mapLabel, MAP_LABEL, whereFor,
   FACT_GROUPS, sidebarGroups
 };

@@ -653,6 +653,80 @@ Two rules hold the change-over together:
   read its source. When a members area exists, the private rows are served by
   that authenticated view; they still never enter this file.
 
+### ⚠ A map pin, and the first time the address is ever revealed
+
+Asked for as a Google Maps link "added to the email that will [go] to those
+that register", and "as a link under or next to the precise address once it's
+revealed". ⚠ **Nothing revealed it.** `address` had been members-only since it
+was split out, the flag was enforced by omission, and the comment beside it had
+always ended *"when a members area exists, the private rows are served by that
+authenticated view"* — which was never built. So the published page filtered it,
+**the family's own page filtered it too** (same builder, same filter), and not
+one of the ten messages said where to go. A family registered, paid, and was
+never told the room, with every piece behaving exactly as written.
+
+⚠ **THE PIN LIVES ON THE `address` FACT, and that is the whole privacy design.**
+A dropped pin says where a child will be as plainly as a street name does, so it
+is governed by the same visibility flag rather than by a second rule somebody
+has to remember — one `isPubliclyVisible()` call filters both, because they are
+one fact. On `location` it would publish the thing the split exists to keep
+back, so the stored shape **drops it there outright**. It is **structure** — one
+value for all three languages, absent from `LANG_SUBKEYS` — so a Russian-only
+role cannot move where the class is.
+
+The sister project reached the same split independently and decided it the same
+way: *"Private, like the address it belongs to, so it rides beside the record
+rather than on it and never reaches events-index.json."* Its stored links are
+`maps.app.goo.gl/…`, which is what the Share button produces on a phone and is
+therefore what an admin will actually paste — so that form is first in the
+allowlist.
+
+**`memberSidebarGroups()` is the authenticated view**, and it is a **second door
+onto one builder** rather than a second builder. `isPubliclyVisible()` keeps its
+meaning and its one caller; what changed is whether the filter is asked at all,
+and only a caller that has established *who* is asking may skip it. Two exported
+names rather than an options flag, so the published template cannot reach the
+private rows by forgetting an argument — a test asserts `_activity-template.js`
+never mentions the members view.
+
+⚠ **THE GATE IS `holdsASpot()`**, the same derived rule capacity counts by. So a
+cancellation, a refusal, a lapsed hold and a **place in a queue** all fall back
+to the public rows on exactly the schedule they stop being a place — not four
+special cases but one rule, which a fifth status inherits. Somebody **waiting**
+has not been given anything yet and is not told where.
+
+Four details carry the rest:
+
+- ⚠ **`whereFor()` takes no language at all.** It returns the `{he,en,ru}` bag
+  and the pin, and the message picks. An email is written in the language of the
+  **account** and a screen in the language of the **page**; a resolver that
+  picked would hand a family whichever one the handler happened to be running
+  in, which is the bug the group-move message already had.
+- ⚠ **It is NOT frozen onto the registration**, which every other fact in a
+  confirmation is. The price and the terms are frozen because they are what a
+  family *agreed to*; an address is not an agreement, it is where to turn up on
+  Tuesday, so a room that moves has to reach them and a frozen copy would go on
+  sending them to the old one. Read live, per **group**, because two groups
+  under the equal-hours rule can be in different places.
+- ⚠ **The link is re-checked at the point it becomes an href**, never trusted
+  from the record — the stored value can only have been true when it was
+  written, and an older record, a hand-edited file and a restored backup are
+  three ways for it to stop being so with nothing saved. A value that does not
+  pass renders as **no link**, never a broken one.
+- **Only the two messages that mean "you are in"** carry it: the confirmation
+  and the approval. Not the receipt, not the expiry apology, and above all not
+  the rejection — telling somebody with no place where the place is, in the
+  message that takes it away, is the worst pairing available.
+
+⚠ **The host is checked, which is stricter than the sister project is, and the
+reason is `ctaUrl`.** That was a free-text URL box, every value it ever held was
+a mistake, and it is gone. An allowlist **cannot** tell a right URL from a wrong
+one — the second bad `ctaUrl` was a well-formed `https` link on this very
+domain — so this is not claimed as a guarantee the pin is correct. What it buys
+is narrower and real: `javascript:` cannot be stored, and a half-pasted string
+is refused at the moment it is typed rather than mailed to a family, with a
+message naming what to paste instead.
+
   It used to return `true` for everything, which was the honest choice while
   Location was the only members-only fact: hiding it would have hidden it from
   the families who needed it. **Splitting location in two removed that

@@ -163,14 +163,30 @@ H.eq((rowFn.match(/participantName:/g) || []).length, 1,
 H.eq((regs.match(/regRow\(/g) || []).length > 2, true,
   'and both views go through it rather than composing their own');
 
-console.log('\n[the facts on the page are the PUBLIC facts, and nothing more]');
-// isPubliclyVisible() keeps its exact current meaning and its only caller. The
-// members-only address is the whole reason that function exists, and a family
-// area is exactly where somebody would be tempted to reach past it.
-H.ok(/facts\.sidebarGroups\(activity, lang\)/.test(action),
-  'built from sidebarGroups, which filters through isPubliclyVisible()');
-H.ok(!/memberVisibleRows|visibility: *'members'|factText\(/.test(action),
-  'and nothing here reaches around it');
+console.log('\n[the facts on the page are the public ones, unless a place is held]');
+// \u26a0 THIS PAIR USED TO ASSERT "and nothing here reaches around it", which was
+// right for as long as there was no authenticated view at all. There is one
+// now — the exact address reaches a family who holds a place, on their own
+// signed-in page and in the message confirming their registration — so what
+// this pins changed from "never" to "only behind the gate". The privacy
+// property is unchanged and the guard has to be at least as tight, so it pins
+// the GATE rather than the absence.
+//
+// The executed half, including a cancelled and a waiting registration being
+// refused the address, is in a-family-holding-a-place-is-told-where-to-go.js.
+H.ok(/facts\.sidebarGroups\(activity, lang/.test(action),
+  'the public builder is still what a reader with no place gets');
+H.ok(/R\.holdsASpot\(reg, Date\.now\(\)\)\s*\?\s*facts\.memberSidebarGroups/.test(action),
+  '\u26a0 and the private one is reached ONLY under holdsASpot() — the same derived '
+  + 'rule capacity counts by, so a lapse, a refusal or a queue falls back on its own');
+// Nothing hand-rolls its way past the two builders.
+H.ok(!/visibility: *'members'/.test(action), 'nothing here filters by hand');
+// \u26a0 AND THE PUBLISHED TEMPLATE CANNOT REACH THE PRIVATE VIEW AT ALL. Two
+// exported names rather than an options flag exist precisely so a static page
+// cannot get there by forgetting an argument.
+const tplSrc = require('fs').readFileSync(H.fnPath('_activity-template'), 'utf8');
+H.ok(!/memberSidebar/.test(tplSrc),
+  'the page that is served to anyone never mentions the members view');
 
 console.log('\n[labels reach the screen as words, not as entities]');
 // LABELS is authored for an HTML template, so "When &amp; where" is correct
@@ -259,12 +275,18 @@ action: 'signup', email: 'michal@example.com', password: 'password-123',
   H.eq(page.body.activity.slug, 'folk-dancing', 'and the activity is the one it actually is now');
   H.eq(page.body.registration.participantName, 'Michal Shinitzky', 'named from the live record');
 
-  console.log('\n[the page carries the public facts, priced, and not the address]');
+  console.log('\n[the page carries the public facts, priced, and now the address]');
   const flat = JSON.stringify(page.body.activity.facts);
   H.ok(page.body.activity.facts.length >= 2, 'there are fact groups (' + page.body.activity.facts.length + ')');
   H.ok(flat.indexOf('Limassol') !== -1, 'the public location is there');
-  H.ok(flat.indexOf('12 Example Street') === -1,
-    'and the members-only address is NOT — omitted from the payload, never hidden in the client');
+  // \u26a0 THIS ASSERTED THE OPPOSITE until the authenticated view existed, and the
+  // flip is the feature rather than a regression: this participant HOLDS A
+  // PLACE, and a family who registers and is never told the room is the gap
+  // that has been open since the flag was written. Whether a reader who does
+  // NOT hold one still gets nothing is the half that matters, and it is
+  // executed in a-family-holding-a-place-is-told-where-to-go.js.
+  H.ok(flat.indexOf('12 Example Street') !== -1,
+    'and a family holding a place is told the exact address, which nothing ever did before');
   H.ok(flat.indexOf('&amp;') === -1, 'no HTML entity survives into a label a person reads');
   H.ok(page.body.activity.priceRows.length >= 2, 'the price is rows');
   const labels = page.body.activity.priceRows.map((r) => r.label).join(' | ');
