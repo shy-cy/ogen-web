@@ -28,7 +28,7 @@
     "slug": "beit-midrash-ayeka",
     "activityId": "act-933879f776409a9f",
     "seriesId": "act-933879f776409a9f",
-    "type": "course",
+    "type": "dropin",
     "status": "open",
     "langs": [
       "he",
@@ -47,7 +47,7 @@
     },
     "cardImage": "/images/activities/beit-midrash-ayeka-card-8c260c28.jpg",
     "testActivity": false,
-    "isoUpdated": "2026-09-26T09:03:55.412Z"
+    "isoUpdated": "2026-09-26T10:51:02.007Z"
   },
   {
     "slug": "bnei-mitzvah-2027",
