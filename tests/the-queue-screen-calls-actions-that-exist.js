@@ -87,9 +87,13 @@ const UNREACHED = {
   // That is what this list is for. It is not an excuse column; it is a standing
   // question, and every line on it is a capability sitting in the repository,
   // passing its tests, that nobody using the product can reach.
-  recordSessionPayment: 'NO SCREEN YET — cash at the desk for one evening cannot be recorded. ' +
-    'The evening register now exists, so this is a control on it rather than a screen; ' +
-    'it is behind the CANCEL axis, not approve, because it moves money'
+  //
+  // ⚠ AND `recordSessionPayment` HAS COME OFF IT TOO, which empties the list.
+  // It was the last line, and it had sat here since Phase 7 — cash at the desk
+  // for one evening, written, tested, and with nothing anywhere to press. The
+  // control is on the evening register's money panel, pointed at the booking
+  // rather than at the term. An empty list is the state to keep this in; the
+  // next endpoint written without a door reappears here on its own.
 };
 // ⚠ NAMED, not only sent as `action: '…'`. Three of them travel differently:
 // approve goes through act('approve', …) as a bare argument, and the two

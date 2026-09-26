@@ -138,10 +138,20 @@
     var bits = [el('span', { class: 'num', text: money(p.paidCents) + ' / ' + money(p.owedCents) })];
     // Whether the yearly fee was billed on THIS term. An admin looking at a 300
     // beside a 350 should not have to open the other term to find out why.
-    bits.push(el('div', {}, [el('span', {
-      class: 'flag ok',
-      text: r.feeCharged ? 'inc. yearly fee' : 'fee already paid ' + (r.feeYear || '')
-    })]));
+    //
+    // ⚠ ONLY WHERE THERE IS A TERM TO ANSWER FOR. This cell is shared with the
+    // evening register, whose rows are bookings rather than registrations and
+    // carry no fee answer at all — so `r.feeCharged` was undefined there and
+    // every €7 evening printed "fee already paid " under it, with a trailing
+    // space where the year should be. A false sentence about money, on the one
+    // screen an admin reconciles cash on. The yearly fee is charged on the
+    // REGISTRATION; an evening has never had anything to do with it.
+    if (r.feeCharged !== undefined) {
+      bits.push(el('div', {}, [el('span', {
+        class: 'flag ok',
+        text: r.feeCharged ? 'inc. yearly fee' : 'fee already paid ' + (r.feeYear || '')
+      })]));
+    }
     // ⚠ DERIVED, NOT `payment.status`. That field is stamped 'owed' when the
     // record is written and stays there on a row that owes nothing at all —
     // which is how the live roster came to print "€0.00 / €0.00 OWED", and how
@@ -1171,7 +1181,26 @@
     // The same `.acts` idiom the queue rows use, rather than a second set of
     // row buttons with their own styling — one table, one shape for the controls
     // in it.
-    return el('div', { class: 'acts' }, kids.concat([mailButton(r)]));
+    return el('div', { class: 'acts' }, kids.concat([eveningMoney(r), mailButton(r)]));
+  }
+
+  // ⚠ CASH AT THE DESK FOR ONE EVENING, which had a server action since Phase 7
+  // and no control anywhere — the last line left in UNREACHED.
+  //
+  // ⚠ OFFERED ON A NO-SHOW AND ON A CANCELLED BOOKING, and withheld only from a
+  // WAITING row. The tempting rule is "wherever a seat is held", which is what
+  // Present and No-show ask, and it is wrong here in both directions: a no-show
+  // frees the place and STILL OWES for it, which is the row most likely to be
+  // settled in cash afterwards; and an evening that was paid for and then given
+  // back has to be recordable before it can be credited. Somebody waiting holds
+  // no booking and owes nothing by definition — the sentence this table already
+  // says in three other places — so there is no debt for a payment to land on.
+  function eveningMoney(r) {
+    if (r.status === 'waiting') return null;
+    return iconButton('money', 'Payments and credit',
+      'cash at the desk for this evening, against this booking rather than the term',
+      null, !S.canCancel,
+      function () { openAccount(r, { sessionDate: r.sessionDate }); });
   }
 
   // ⚠ PRESENT IS NOT OFFERED BEFORE THE CLASS HAS STARTED.
@@ -1537,34 +1566,87 @@
   // permission axis and because the ledger is the context all three need: what a
   // family is owed is the first thing to know before recording a payment against
   // it or spending it.
-  function openAccount(r) {
+  // ⚠ ONE MONEY PANEL, AND WHAT IT IS POINTED AT IS EITHER A TERM OR AN EVENING.
+  //
+  // `recordSessionPayment` — cash at the desk for one evening — has existed
+  // server-side since Phase 7 with nothing calling it, and was the last line left
+  // in UNREACHED. The obvious place to put the control was on the register row,
+  // and that is the shape this screen already rejected once: "every money control
+  // lives in one panel, not on the row", because money is its own permission axis
+  // and the ledger is the context all of them need. An amount box, a note box and
+  // a button, repeated down twenty rows of a register, is also the two-line row
+  // the glyphs were introduced to fix.
+  //
+  // So the evening opens the SAME panel. What differs is the debt it is aimed at
+  // — the evening's own `owedCents` rather than the term's — and therefore which
+  // action the amount is sent to. One implementation of euros-in-cents-out, one
+  // ledger table, one balance line.
+  //
+  // `evening` is `{ sessionDate }` or nothing. Absent means the registration,
+  // which is what every existing caller passes.
+  function openAccount(r, evening) {
+    var date = evening && evening.sessionDate;
+    var aid = r.activityId || (S.queue && S.queue.activity && S.queue.activity.activityId);
     send({ action: 'ledger', accountId: r.accountId }).then(function (res) {
       if (!res.ok) return message('err', (res.data && res.data.error) || 'Could not read the ledger');
       var d = res.data;
       $('account-panel').hidden = false;
-      $('account-title').textContent = 'Money · ' + (d.email || d.accountId);
+      $('account-title').textContent = 'Money · ' + (d.email || d.accountId) +
+        (date ? ' · ' + shortDate(date) : '');
       var box = $('account-body');
       box.innerHTML = '';
 
       box.appendChild(el('div', {}, [
         el('span', { class: 'balance', text: money(d.balanceCents) }),
-        el('span', { class: 'why', text: ' credit held · ' + r.name + ' owes ' +
-          money((r.payment || {}).owedCents) + ', paid ' + money((r.payment || {}).paidCents) })
+        el('span', { class: 'why', text: ' credit held · ' + r.name +
+          (date ? ' owes ' : ' owes ') +
+          money((r.payment || {}).owedCents) + ', paid ' + money((r.payment || {}).paidCents) +
+          (date ? ' for this evening' : '') })
       ]));
 
-      box.appendChild(amountForm('Record a payment',
-        'Money received from outside — a transfer, or cash at the desk. It adds, so two part payments are two entries.',
+      box.appendChild(amountForm(date ? 'Record a payment for this evening' : 'Record a payment',
+        date
+          ? 'Cash at the desk for one evening. It adds, so two part payments are two entries, and '
+            + 'the booking settles to paid once the total covers what it owes.'
+          : 'Money received from outside — a transfer, or cash at the desk. It adds, so two part payments are two entries.',
         S.canCancel, function (cents, note) {
-          return { action: 'recordPayment', participantId: r.participantId,
-                   activityId: r.activityId, amountCents: cents, note: note };
-        }, r));
+          return date
+            ? { action: 'recordSessionPayment', participantId: r.participantId,
+                activityId: aid, sessionDate: date, amountCents: cents, note: note }
+            : { action: 'recordPayment', participantId: r.participantId,
+                activityId: r.activityId, amountCents: cents, note: note };
+        }, r, false, evening));
 
-      box.appendChild(amountForm('Spend credit on this registration',
-        'Writes a debit on the ledger and the same amount onto the registration, in one action — separately they would disagree about the same euros.',
-        S.canCancel && d.balanceCents > 0, function (cents, note) {
-          return { action: 'applyCredit', participantId: r.participantId,
-                   activityId: r.activityId, amountCents: cents, note: note };
-        }, r));
+      // ⚠ THE CREDIT FORM IS THE TERM'S, AND AN EVENING SAYS SO RATHER THAN
+      // DRAWING A CONTROL THAT WOULD SETTLE THE WRONG DEBT. `applyCredit` looks
+      // up a REGISTRATION and spends against it; pointed at an evening it would
+      // pay down the term's bill while the €7 stayed owed, with both figures
+      // internally consistent. _spend-credit.js already knows how to spend on an
+      // evening — the family's own page does it — so this is a door that was
+      // never built rather than a rule, and the panel names the route that
+      // exists instead of offering one that is subtly wrong.
+      if (date) {
+        box.appendChild(el('div', { style: 'margin-top:16px;padding-top:14px;border-top:1px solid #f0ece1;' }, [
+          el('div', { class: 'label-row' }, [
+            el('div', { class: 'field-label', text: 'Spending credit on one evening' }),
+            window.AdminHelp.badge('There is no admin action for it yet. The family can spend their '
+              + 'own credit on an evening from their registration page, which is the route to point '
+              + 'them at. To do it here, debit the credit below with a note saying which evening, '
+              + 'and record the payment above \u2014 two entries, both in the ledger, which is what an '
+              + 'append-only record is for.')
+          ]),
+          el('p', { class: 'hint', style: 'margin:6px 0 0;',
+            text: 'Not built. Debit the credit below and record the payment above \u2014 both lines stay '
+                + 'in the ledger.' })
+        ]));
+      } else {
+        box.appendChild(amountForm('Spend credit on this registration',
+          'Writes a debit on the ledger and the same amount onto the registration, in one action — separately they would disagree about the same euros.',
+          S.canCancel && d.balanceCents > 0, function (cents, note) {
+            return { action: 'applyCredit', participantId: r.participantId,
+                     activityId: r.activityId, amountCents: cents, note: note };
+          }, r));
+      }
 
       box.appendChild(amountForm('Adjust the credit',
         'A correction is an entry, never an edit: the ledger is append-only, so the opposite line is written and both stay in the record. A note is required.',
@@ -1722,7 +1804,7 @@
 
   // Euros in the box, cents on the wire. Typing 12.50 and sending 12.5 somewhere
   // that expects cents is the kind of mistake that is found by a family.
-  function amountForm(title, hint, enabled, build, r, allowNegative) {
+  function amountForm(title, hint, enabled, build, r, allowNegative, evening) {
     var amount = el('input', { type: 'text', placeholder: '0.00', style: 'max-width:110px;', disabled: !enabled || null });
     var note = el('input', { type: 'text', placeholder: 'Note', disabled: !enabled || null });
     var btn = el('button', { type: 'button', class: 'btn btn-draft', disabled: !enabled || null, text: title });
@@ -1737,8 +1819,15 @@
         if (!res.ok) return message('err', (res.data && res.data.error) || 'That did not work');
         message('ok', title + ' · ' + money(Math.abs(cents)));
         amount.value = ''; note.value = '';
-        loadQueue(S.slug);
-        openAccount(r);
+        // ⚠ THE ROW IN HAND IS NOW STALE, and the panel is about to be reopened
+        // from it. The server hands back the record it just wrote, so the figures
+        // in the line above the form follow the payment that was just recorded
+        // rather than showing what was owed a second ago — which is the one
+        // number somebody at a desk is reading back to a family.
+        var written = res.data && (res.data.session || res.data.registration);
+        if (written && written.payment) r.payment = written.payment;
+        if (evening) loadRegister(S.date); else loadQueue(S.slug);
+        openAccount(r, evening);
       });
     });
     // ⚠ AN EXPLANATION IS A CONTROL — see js/admin-help.js. The heading names

@@ -4130,10 +4130,57 @@ other way.
 the room, and whether they are billed for it lives on their own record. A test
 marks one and checks both halves move independently.
 
-`recordSessionPayment` is what is left in `UNREACHED`: cash at the desk for one
-evening. It is now a **control on a screen that exists** rather than a screen
-that does not, and it belongs behind the `cancel` axis rather than `approve`,
-because it moves money.
+### ⚠ Cash at the desk for one evening, and the list it emptied
+
+`recordSessionPayment` was the **last line left in `UNREACHED`** — written in
+Phase 7, tested, behind the `cancel` axis because it moves money, and with
+nothing anywhere to press. An action with no door has usually also never been
+**run**, and this one had not been: the suite that executes it is new.
+
+**The control is on the register row; the FORM is in the money panel.** That
+split is the rule this screen already learned — *"every money control lives in
+one panel, not on the row"*, because money is its own permission axis and the
+ledger is the context all of them need — and an amount box, a note box and a
+button repeated down twenty rows is also the two-line row the glyphs were
+introduced to fix. So the envelope's neighbour opens the **same** panel
+`openAccount()` has always drawn; what differs is the debt it is pointed at, and
+therefore which action the amount is sent to. One euros-to-cents conversion, one
+ledger table, one balance line. The heading carries the date, so an evening's
+panel cannot be mistaken for the term's.
+
+⚠ **OFFERED ON A NO-SHOW AND ON A CANCELLED BOOKING, withheld only from a
+WAITING row.** The tempting rule is *"wherever a seat is held"* — which is what
+Present and No-show ask — and it is wrong in both directions: a no-show frees
+the place and **still owes for it**, which is the row most likely to be settled
+in cash afterwards, and an evening that was paid for and then given back has to
+be recordable before it can be credited. Somebody waiting holds no booking and
+owes nothing by definition, so there is no debt for a payment to land on.
+
+⚠ **THE TERM'S CREDIT FORM IS NOT DRAWN THERE, AND THE PANEL SAYS SO.**
+`applyCredit` looks up a **registration** and spends against it; pointed at an
+evening it would pay down the term's bill while the €7 stayed owed, with both
+figures internally consistent. `_spend-credit.js` already knows how to spend on
+an evening — `kind: 'session'`, which the family's own page uses — so this is a
+**door that was never built** rather than a rule. The panel names the two routes
+that do exist (the family's own page, or a debit plus a recorded payment, both
+lines staying in the ledger) instead of offering a control that is subtly wrong.
+
+⚠ **The row in hand is stale the moment the payment lands.** Both money actions
+hand back the record they just wrote, so the panel reopens on those figures
+rather than on what was owed a second ago — which is the one number somebody at a
+desk is reading back to a family. That was already wrong for a term's payment and
+is fixed in the one place.
+
+⚠ **AND THE SHARED MONEY CELL CLAIMED A YEARLY FEE ON EVERY EVENING.**
+`moneyCell()` serves both tables, and a **booking carries no fee answer at all** —
+so `r.feeCharged` was `undefined`, the falsy branch ran, and every €7 evening
+printed *"fee already paid "* under it, trailing space where the year should be.
+A false sentence about money on the one screen an admin reconciles cash on. The
+yearly fee is charged on the **registration** and has never had anything to do
+with an evening.
+
+`UNREACHED` is now **empty**, and that is the state to keep it in: the next
+endpoint written without a door reappears there on its own.
 
 ### ⚠ An evening register is not a queue
 
