@@ -474,6 +474,10 @@ function imagePathsOf(activity) {
 // list was written to end.
 const LANG_SUBKEYS = {
   location: ['text'], address: ['text'], groupSize: ['overrideText'],
+  // Words describing when a class meets — a translator's job. Which DAYS it
+  // meets on is the sessions list beside it and stays out of reach, exactly as
+  // a group's size is out of reach beside its override.
+  schedule: ['overrideText'],
   instructionLanguage: ['text'], prerequisites: ['text']
 };
 

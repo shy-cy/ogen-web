@@ -378,11 +378,78 @@ function dayAndMonth(iso, lang) {
        : `${dayNum} ${months[mi]}`;
 }
 
+// How many dated rows a schedule may NAME before it stops being a schedule and
+// becomes the calendar. Four is what "an activity meeting a handful of times
+// could not name them" meant when dated rows were added — that case is exactly
+// what this preserves. Past it the line is not long, it is a wall: the live
+// listing printed twenty-four dates into a 320px card, in a band whose whole job
+// is to be scanned.
+const MAX_NAMED_DATES = 4;
+
+// What a long dated schedule says instead, and it is deliberately the most
+// conservative true thing.
+//
+// ⚠ A WEEKDAY IS CLAIMED ONLY WHEN EVERY SESSION SHARES ONE. Twenty-three
+// Wednesdays and one Thursday is not "Wednesdays and Thursdays" — a reader takes
+// that as twice a week, which is the confidently-wrong card the listing already
+// drops a multi-group schedule to avoid. The same for the time: stated only when
+// every session agrees on it.
+//
+// What is left when the weekdays differ is the count, which is true of any list
+// of dates and answers "how big is this". Everything better than that is a
+// judgement about a pattern — "twice a month", "term-time only" — and a
+// judgement is what overrideText is for.
+function collapseDates(sessions, lang) {
+  const names = DAYS[lang] || DAYS.en;
+  const days = [];
+  const times = [];
+  sessions.forEach((s) => {
+    const d = num(s && s.day);
+    if (d != null && d >= 0 && d <= 6 && days.indexOf(d) === -1) days.push(d);
+    const t = String((s && s.time) || '').trim();
+    if (t && times.indexOf(t) === -1) times.push(t);
+  });
+  const time = times.length === 1 ? times[0] : '';
+  if (days.length === 1) {
+    const name = names.many[days[0]];
+    return time ? `${name}, ${time}` : name;
+  }
+  const n = sessions.length;
+  const count = lang === 'he' ? `${n} מפגשים`
+              : lang === 'ru' ? `${n} ${ruPlural(n, 'занятие', 'занятия', 'занятий')}`
+              : `${n} sessions`;
+  return time ? `${count}, ${time}` : count;
+}
+
 function formatSchedule(f, lang) {
+  // ⚠ A SCHEDULE CAN BE OVERRIDDEN WITH WORDS, AND THE WORDS ARE TRILINGUAL.
+  //
+  // Word for word the argument `groupSize.overrideText` is built on: not every
+  // grouping is "N groups of up to M", and no amount of number-formatting makes
+  // one so. Not every timetable is "Wednesday, 19:30" either — a course meeting
+  // on twenty-four particular evenings is "Wednesdays, twice a month", and
+  // nothing derivable from a list of dates can say that without guessing.
+  //
+  // A filled-in language replaces the computed line OUTRIGHT, and falls back
+  // across languages the usual way: the same sentence in the wrong language
+  // beats three pages making different claims about when a class meets. It is
+  // WORDS, so it is in LANG_SUBKEYS and a Russian-only role may translate it
+  // — and cannot change which day anybody turns up.
+  const override = pick(f.overrideText, lang);
+  if (override) return override;
+
   const sessions = Array.isArray(f.sessions) ? f.sessions : [];
   const freq = String(f.frequency || '').trim();
   const names = DAYS[lang] || DAYS.en;
   const plural = !!((PLURAL_DAY[lang] || PLURAL_DAY.en)[freq]);
+
+  // Past the cap, the dates are described rather than listed. Only a DATED
+  // schedule can get here — a weekly one has one row whatever its term is long,
+  // and this is counted on the rows rather than on the frequency so a future
+  // frequency that names dates inherits it.
+  if (sessions.filter((s) => s && s.date).length > MAX_NAMED_DATES) {
+    return collapseDates(sessions, lang);
+  }
 
   const parts = sessions
     .map((s) => {

@@ -1118,6 +1118,56 @@ schedule rather than walking it — the admin has already written the answer dow
 and it is deliberately **not** bounded by the term's start and end dates, because
 filtering would drop a date somebody typed on purpose. `limit` still caps.
 
+⚠ **AND PAST FOUR DATES IT DESCRIBES ITSELF INSTEAD OF LISTING.** Reported from
+the live listing: *"Custom date — we cannot show all these dates. In Custom
+cases, we should provide a tri-lingual description like — Wednesdays, Twice a
+month."* Every piece was behaving as written. Naming the date is why a dated row
+exists at all — an activity meeting on four particular days could not say so —
+and `formatSchedule()` joins the rows with ` · `, which is right for four and a
+wall at twenty-four. `intro-into-judaism` printed its whole year into a 320px
+card, in the tinted band whose entire job is to be **scanned**.
+
+Two halves, and the second is why the first is not enough:
+
+- **Past `MAX_NAMED_DATES` (4) the line is described rather than listed.**
+  ⚠ And a weekday is claimed **only when every session shares one**:
+  twenty-three Wednesdays and one Thursday is not *"Wednesdays and Thursdays"*,
+  which a reader takes as twice a week — the confidently-wrong card the listing
+  already drops a multi-group schedule to avoid. Same for the hour. What is left
+  is the count, which is true of any list of dates. Counted on the **rows**
+  rather than on the frequency, so a future frequency that names dates inherits
+  it.
+- ⚠ **`schedule.overrideText`, a `{he,en,ru}` bag, replaces the line outright**
+  — word for word the argument `groupSize.overrideText` is built on. *"Twice a
+  month"* is a judgement about a pattern, and nothing derivable from a list of
+  dates can say it without guessing. It falls back across languages the usual
+  way, it is in `LANG_SUBKEYS` so a Russian-only role may translate it and still
+  cannot change which day anybody turns up, and it is **not custom-only**: a
+  weekly line can be replaced too.
+
+It lives on the **group**, because two groups under the equal-hours rule can meet
+on different days and one sentence for the activity would be right for at most
+one of them. The full list of dates is unaffected and stays in the calendar.
+
+⚠ **Three ways it could have been lost silently, all three already scars on this
+file.** A key missing from `SHAPES.schedule` is deleted on the next save (`date`
+and `sessionDates` both learned that). The client **rebuilds** `facts.schedule`
+from scratch on every commit, so a field not read back there is an input an admin
+types into and a save drops. And the test that kept the timetable out of a
+translator's reach asked `!/schedule|sessionDates/` of `LANG_SUBKEYS` — a proxy
+that refused the words along with the days; it asks the **sub-keys** now, so
+`schedule: ['overrideText']` passes and `sessions` still cannot.
+
+⚠ **AND THE CALENDAR IS EMPTY ON ALL THREE CUSTOM ACTIVITIES.** `beit-midrash`,
+`beit-midrash-ayeka` and `intro-into-judaism` hold their dates **only** in
+`schedule.sessions[]`; `facts.duration.sessionDates` was never generated. So
+those pages render **no session table**, `sessionCount` is nothing, the
+`(N sessions × M lessons)` qualifier is absent — and a prorated refund would have
+an empty denominator. `enumerate()` reads a custom schedule rather than walking
+it, so pressing **Generate** fixes all of it. That is a data gap rather than a
+code one, and it is the reason collapsing the line does not lose anything the
+page was showing: there was never a table under it.
+
 ⚠ **The weekday is DERIVED from the date, never stored beside it.** A row saying
 "Tuesday" and "14 October 2026" — a Wednesday — is two claims that can disagree,
 with nothing to say which a reader should believe. `SHAPES.schedule` computes it

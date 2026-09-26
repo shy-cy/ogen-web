@@ -94,6 +94,12 @@ const SHAPES = {
   schedule: (f) => {
     const out = {
       frequency: sessionsModule.FREQUENCIES.indexOf(f.frequency) !== -1 ? f.frequency : 'weekly',
+      // ⚠ THE WORDS THAT REPLACE THE COMPUTED LINE, and they are named here for
+      // the same reason `date` and `sessionDates` had to be: a key this shape
+      // does not list is deleted on the next save. Trilingual, like
+      // groupSize.overrideText, because a timetable a formula cannot state is
+      // still a sentence three pages have to agree on.
+      overrideText: langObject(f.overrideText),
       // ⚠ `date` HAS TO BE LISTED HERE OR IT IS DELETED ON EVERY READ. This
       // shape runs on every load and every save, so a key it does not name is
       // gone by the next write — the same silent loss sessionDates suffered

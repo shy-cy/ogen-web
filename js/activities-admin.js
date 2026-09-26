@@ -1284,7 +1284,9 @@
       return S.schema.langs.some(function (l) { return String((v || {})[l] || '').trim(); });
     };
     if (kind === 'ages') return f.min != null || f.max != null;
-    if (kind === 'schedule') return (f.sessions || []).length > 0;
+    // Words alone are a schedule: an activity whose timetable is a sentence has
+    // nothing in the rows and everything in the override.
+    if (kind === 'schedule') return (f.sessions || []).length > 0 || anyLang(f.overrideText);
     if (kind === 'duration') {
       return !!f.startDate || !!f.endDate || pos(f.sessionCount) || pos(f.sessionMinutes);
     }
@@ -2381,7 +2383,12 @@
     if (!e) return;
     var rows = e.sessions.filter(function (x) { return x.day != null || x.time || x.date; });
     var facts = e.facts;
-    facts.schedule = { frequency: e.freq, sessions: rows };
+    // ⚠ READ BACK HERE, or it is an input an admin types into and a save that
+    // drops. facts.schedule is REBUILT from scratch on every commit rather than
+    // merged, so a key left out of this line is gone — the same trap
+    // SHAPES.schedule has on the server side, one layer up.
+    facts.schedule = { frequency: e.freq, sessions: rows,
+                       overrideText: readLangField(GROUP_PREFIX + '-schedule-overrideText') };
     if (e.freq === 'monthly') facts.schedule.weekOfMonth = e.weekOfMonth;
     facts.duration = Object.assign({}, facts.duration, { sessionDates: e.dates || [] });
 
@@ -2524,6 +2531,26 @@
         S.dirty = true; drawOwnerPage(page);
       }
     }));
+
+    // ⚠ THE LABEL NAMES THE LINE IT REPLACES, which is the lesson the
+    // group-size override paid for: a box labelled "Free-text override" under a
+    // heading saying something else collects whatever the person wanted to say
+    // next, and beit-midrash published "Group size: Dates will be announced
+    // soon" as a result. This one sits directly under the rows it overrides.
+    //
+    // It is here rather than on the main form because a schedule belongs to a
+    // GROUP — two groups under the equal-hours rule can meet on different days,
+    // so one sentence for the activity would be right for at most one of them.
+    var whenOverride = fieldRow({
+      label: 'Instead of the schedule line',
+      hint: 'Leave blank and the page describes the rows above. Filled in, it replaces that one '
+          + 'line for that language — for a timetable no formula can state, like "Wednesdays, '
+          + 'twice a month". A schedule naming more than four dates is already shortened on its '
+          + 'own (the weekday if every date shares one, otherwise how many meetings there are), '
+          + 'because twenty-four dates in a listing card is not a schedule; this is how you say '
+          + 'something better than that. The full list stays in the calendar below.'
+    }, langObj((e.facts.schedule || {}).overrideText), GROUP_PREFIX + '-schedule-overrideText');
+    schedBox.appendChild(whenOverride);
     page.appendChild(schedBox);
 
     // --- the dates -----------------------------------------------------------

@@ -269,8 +269,26 @@ console.log('\n[it is structure, so a translator cannot move it]');
 const adminFn = read('netlify/functions/activities-admin.js');
 const subkeys = /const LANG_SUBKEYS = \{[\s\S]*?\};/.exec(adminFn);
 H.ok(subkeys, 'LANG_SUBKEYS is readable');
-H.ok(!/schedule|sessionDates/.test(subkeys[0]),
-  'neither the schedule nor the calendar is a translatable sub-key');
+// ⚠ ASKED OF THE SUB-KEYS, NOT OF THE WORD. This used to be
+// `!/schedule|sessionDates/.test(...)`, which is a proxy for the rule and not
+// the rule: what must stay out of a translator's reach is WHEN A CLASS MEETS —
+// the days, the times, the dates and the frequency. A sentence DESCRIBING when
+// it meets is words, and words are exactly what a translator is for. The coarse
+// version refused `schedule: ['overrideText']`, which is the same split
+// `groupSize` has had since it was reduced to an override: the sentence is
+// translatable, the count beside it is not.
+const entry = (key) => {
+  const m = new RegExp(key + ":\\s*\\[([^\\]]*)\\]").exec(subkeys[0]);
+  return m ? m[1].replace(/['\s]/g, '').split(',').filter(Boolean).sort() : [];
+};
+H.eq(entry('schedule').join(','), 'overrideText',
+  '⚠ the schedule fact offers a translator its WORDS and nothing else');
+H.eq(entry('duration').join(','), '',
+  'and the calendar offers none at all — a date is not a sentence');
+['sessions', 'frequency', 'weekOfMonth', 'sessionDates', 'sessionMinutes'].forEach((k) => {
+  H.ok(subkeys[0].indexOf("'" + k + "'") === -1,
+    'no timetable field is translatable: ' + k);
+});
 // And the merge's own shape is what enforces it: for a restricted role the
 // whole structured fact comes from the STORED record, so nothing a
 // Russian-only session sends can reach a group's timetable at all.
