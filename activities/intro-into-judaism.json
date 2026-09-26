@@ -1,0 +1,304 @@
+{
+  "slug": "intro-into-judaism",
+  "status": "open",
+  "motif": "book",
+  "corner": "tl",
+  "cardImage": "/images/activities/intro-into-judaism-card-a63c87a4.jpg",
+  "shareImage": "/images/activities/intro-into-judaism-share-f8f8759e.jpg",
+  "robots": "index",
+  "testActivity": false,
+  "type": "course",
+  "registration": {
+    "autoApprove": false,
+    "pendingExpiryDays": null,
+    "registrationFeeCutoffDate": "2026-10-15",
+    "cancellationPolicy": {
+      "tiers": [
+        {
+          "until": "2026-10-14",
+          "percent": 100
+        },
+        {
+          "until": "2026-11-01",
+          "percent": 90
+        },
+        {
+          "until": "2026-12-01",
+          "percent": 80
+        },
+        {
+          "until": "2027-01-01",
+          "percent": 70
+        }
+      ],
+      "note": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      }
+    },
+    "defaultBasis": null
+  },
+  "seriesId": "act-464bec45a8f83618",
+  "title": {
+    "he": "לימודי יהדות",
+    "en": "Introduction to Judaism ",
+    "ru": "Знакомство с иудаизмом"
+  },
+  "summary": {
+    "he": "היכרות עם היהדות, המסורת, התרבות ואורח החיים היהודי, מהמקורות ועד ימינו.",
+    "en": "Discover Judaism through its traditions, culture, beliefs and way of life, from its ancient roots to the present day.",
+    "ru": "Знакомство с иудаизмом, его историей, верованиями, культурой и традициями, которые продолжают жить и развиваться сегодня."
+  },
+  "about": {
+    "he": "מבוא ליהדות<h3>להכיר את המסורת היהודית, להבין את ההווה ולגלות את הדרך האישית שלנו</h3><p>מהי יהדות? מיהו העם היהודי, ומה מחבר בין אנשים, קהילות ודורות? כיצד רעיונות, ערכים ומסורות שעוצבו לאורך אלפי שנים באים לידי ביטוי בחיים שלנו כיום?</p><p>קורס <strong>מבוא ליהדות</strong> מזמין אתכם למסע היכרות מעמיק עם היהדות, על מגוון היבטיה: אמונה ורוח, טקסטים ומקורות, מסורת ותרבות, חגים וטקסים, היסטוריה וחיי קהילה. נלמד על הרעיונות והערכים שעיצבו את החיים היהודיים, ונבחן כיצד הם ממשיכים להתפתח ולהשפיע גם בעולם המודרני.</p><p>במהלך הקורס נעסוק בחמישה תחומים מרכזיים:</p><ul><li><strong>העם היהודי, אמונות וטקסטים:</strong> זהות יהודית, תפיסות שונות של אלוהים, התורה והמקורות היהודיים, תפילה ובית הכנסת.</li><li><strong>לחיות חיים יהודיים:</strong> ערכים ואתיקה, הבית היהודי, זוגיות ומשפחה, טקסי חיים, חינוך ומעגל החיים.</li><li><strong>לחיות בזמן יהודי:</strong> לוח השנה העברי, שבת, חגי תשרי, שלושת הרגלים וחגים ומועדים נוספים.</li><li><strong>הסיפור היהודי:</strong> התפתחות העם היהודי לאורך ההיסטוריה, השואה, הציונות וישראל, והגיוון שבחיים היהודיים ובקהילות היהודיות.</li><li><strong>זהות והשתייכות:</strong> הקשר בין זהות אישית לזהות יהודית, מקומה של המשפחה בחיים היהודיים והדרכים להיות חלק מקהילה יהודית.</li></ul><p>הלימוד משלב היכרות עם מקורות ורעיונות יהודיים לצד שיחה, שאלות והתבוננות אישית. נבחן גישות שונות, נעמיק בסוגיות משמעותיות ונחשוב כיצד אפשר לחבר בין המסורת לבין הזהות, הבחירות ואורח החיים שלנו.</p><p>הקורס מתאים לכל מי שרוצה להכיר את היהדות מקרוב או להעמיק את הידע והקשר האישי שלה או שלו למסורת היהודית. אין צורך בידע קודם. כל שאלה, נקודת מבט וסיפור אישי מוזמנים להיות חלק מהלמידה המשותפת.</p><p><strong>בואו להכיר את היהדות לעומק, לגלות את העושר שבמסורת ולמצוא את החיבור האישי שלכם אליה.</strong></p>",
+    "en": "Introduction to Judaism<h3>Explore Jewish Tradition, Discover Its Richness and Find Your Own Connection</h3><p>What is Judaism? Who are the Jewish people, and what connects Jews across generations, cultures and communities? How do ideas, values and traditions that have evolved over thousands of years continue to shape our lives today?</p><p>The Introduction to Judaism course offers an engaging journey through the many dimensions of Jewish life, from faith and spirituality to sacred texts, culture, history and community. We will explore the traditions and values that have shaped Jewish identity, discover how they are expressed in everyday life, and consider how they continue to evolve in the modern world.</p><p>The course explores five key themes:</p><ul><li>The Jewish People, Beliefs and Sacred Texts: Jewish identity, different understandings of God, the Torah and other Jewish sources, prayer and the synagogue.</li><li>Living a Jewish Life: Jewish values and ethics, the Jewish home, relationships and family, life-cycle rituals, education and the different stages of life.</li><li>Living in Jewish Time: The Hebrew calendar, Shabbat, the High Holidays, the major Jewish festivals and other holidays and observances.</li><li>The Jewish Story: The history of the Jewish people, the Holocaust, Zionism and Israel, and the diversity of Jewish life and communities around the world.</li><li>Identity and Belonging: The connection between personal and Jewish identity, the role of family in Jewish life, and the many ways people find a sense of belonging in a Jewish community.</li></ul><p>Learning combines the exploration of Jewish texts and ideas with open discussion, questions and personal reflection. We will encounter different perspectives, explore questions that have shaped Jewish thought and consider how Jewish tradition relates to our own identities, values and choices.</p><p>Whether you are discovering Judaism for the first time or looking to deepen your understanding, this course offers an opportunity to learn, reflect and ask questions in a welcoming environment. No previous knowledge is needed. All questions and perspectives are welcome, and everyone's contribution is part of the shared learning experience.</p><p>Join us to explore the richness of Judaism, discover the traditions that have shaped Jewish life and find your own connection to this living heritage.</p>",
+    "ru": "Знакомство с иудаизмом<h3>Еврейская традиция, её история и место в современной жизни</h3><p>Что такое иудаизм? Кто такие евреи и что объединяет их на протяжении поколений, несмотря на различия в культуре и образе жизни? Как традиции, ценности и идеи, формировавшиеся тысячелетиями, продолжают влиять на нашу жизнь сегодня?</p><p>Курс «Знакомство с иудаизмом» приглашает вас открыть для себя разные стороны еврейской жизни: веру и духовность, священные тексты, культуру, историю, праздники и жизнь еврейских общин. Мы поговорим о традициях и ценностях, которые лежат в основе еврейской идентичности, узнаем, как они проявляются в повседневной жизни, и обсудим, как еврейская традиция меняется и развивается в современном мире.</p><p>В рамках курса мы рассмотрим пять основных тем:</p><ul><li>Еврейский народ, верования и священные тексты: еврейская идентичность, различные представления о Боге, Тора и другие еврейские источники, молитва и синагога.</li><li>Еврейский образ жизни: еврейские ценности и этика, традиции еврейского дома, отношения и семья, обряды жизненного цикла, образование и разные этапы жизни.</li><li>Еврейский календарь и праздники: еврейский календарь, Шаббат, Высокие праздники, основные еврейские праздники и памятные даты.</li><li>История еврейского народа: ключевые этапы еврейской истории, Холокост, сионизм и Израиль, разнообразие еврейской жизни и общин в разных странах.</li><li>Идентичность и чувство принадлежности: связь личной и еврейской идентичности, роль семьи в еврейской жизни и разные способы быть частью еврейской общины.</li></ul><p>Занятия будут сочетать изучение еврейских текстов и идей с обсуждениями, вопросами и личными размышлениями. Мы познакомимся с разными точками зрения, обратимся к вопросам, которые занимали еврейских мыслителей на протяжении веков, и поговорим о том, как еврейская традиция связана с нашими ценностями, убеждениями и жизненным выбором.</p><p>Курс подойдёт тем, кто хочет впервые познакомиться с иудаизмом, а также тем, кто стремится глубже понять еврейскую традицию и своё отношение к ней. Предварительные знания не нужны. Здесь можно задавать любые вопросы, делиться своим мнением и личным опытом. Открытый диалог и разнообразие точек зрения делают обучение интересным и содержательным.</p><p>Приходите, чтобы открыть для себя богатство иудаизма, узнать больше о традициях еврейского народа и найти собственную связь с его наследием.</p>"
+  },
+  "metaTitle": {
+    "he": "מבוא ליהדות | קורס להיכרות עם היהדות בלימסול | מרכז עוגן",
+    "en": "Introduction to Judaism | Jewish Learning in Limassol | OGEN Centre",
+    "ru": "Знакомство с иудаизмом | Еврейские традиции и культура в Лимассоле | OGEN"
+  },
+  "metaDescription": {
+    "he": "קורס מבוא ליהדות במרכז עוגן בלימסול. היכרות עם המסורת, המקורות, החגים, ההיסטוריה ואורח החיים היהודי, בשילוב לימוד, שיחה והתבוננות אישית.",
+    "en": "Discover Judaism at OGEN Centre in Limassol. Explore Jewish traditions, sacred texts, holidays, history and everyday life through engaging learning and discussion.",
+    "ru": "Курс «Знакомство с иудаизмом» в центре OGEN в Лимассоле. Узнайте больше о еврейских традициях, священных текстах, праздниках, истории и образе жизни через изучение и открытый диалог."
+  },
+  "facts": {
+    "groupSize": {
+      "overrideText": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      }
+    },
+    "price": {
+      "registrationFee": 50,
+      "fullPrice": 1200,
+      "perHourOverride": null,
+      "perSessionPrice": null,
+      "showPerLesson": false,
+      "lateDropIn": {
+        "enabled": false,
+        "hoursBefore": null,
+        "price": null
+      },
+      "bundles": []
+    }
+  },
+  "groups": [
+    {
+      "groupId": "g-mui84lyvcd66",
+      "name": {
+        "he": "לימודי יהדות",
+        "en": "Introduction to Judaism ",
+        "ru": "Знакомство с иудаизмом"
+      },
+      "capacity": 25,
+      "teacherIds": [],
+      "facts": {
+        "ages": {
+          "min": 20,
+          "max": 120
+        },
+        "schedule": {
+          "frequency": "custom",
+          "sessions": [
+            {
+              "day": 3,
+              "time": "19:30",
+              "date": "2026-10-21"
+            },
+            {
+              "day": 3,
+              "time": "19:30",
+              "date": "2026-11-04"
+            },
+            {
+              "day": 3,
+              "time": "19:30",
+              "date": "2026-11-18"
+            },
+            {
+              "day": 3,
+              "time": "19:30",
+              "date": "2026-12-09"
+            },
+            {
+              "day": 3,
+              "time": "19:30",
+              "date": "2027-01-13"
+            },
+            {
+              "day": 3,
+              "time": "19:30",
+              "date": "2027-01-27"
+            },
+            {
+              "day": 3,
+              "time": "19:30",
+              "date": "2027-02-10"
+            },
+            {
+              "day": 3,
+              "time": "19:30",
+              "date": "2027-02-24"
+            },
+            {
+              "day": 3,
+              "time": "19:30",
+              "date": "2027-03-10"
+            },
+            {
+              "day": 3,
+              "time": "19:30",
+              "date": "2027-03-24"
+            },
+            {
+              "day": 3,
+              "time": "19:30",
+              "date": "2027-04-07"
+            },
+            {
+              "day": 3,
+              "time": "19:30",
+              "date": "2027-04-21"
+            },
+            {
+              "day": 3,
+              "time": "19:30",
+              "date": "2021-05-05"
+            },
+            {
+              "day": 3,
+              "time": "19:30",
+              "date": "2027-05-19"
+            },
+            {
+              "day": 3,
+              "time": "19:30",
+              "date": "2027-06-09"
+            },
+            {
+              "day": 3,
+              "time": "19:30",
+              "date": "2027-06-23"
+            },
+            {
+              "day": 3,
+              "time": "19:30",
+              "date": "2027-07-07"
+            },
+            {
+              "day": 3,
+              "time": "19:30",
+              "date": "2027-07-21"
+            },
+            {
+              "day": 3,
+              "time": "19:30",
+              "date": "2027-08-04"
+            },
+            {
+              "day": 3,
+              "time": "19:30",
+              "date": "2027-08-18"
+            },
+            {
+              "day": 4,
+              "time": "19:30",
+              "date": "2027-09-02"
+            },
+            {
+              "day": 3,
+              "time": "19:30",
+              "date": "2027-09-22"
+            },
+            {
+              "day": 3,
+              "time": "19:30",
+              "date": "2027-10-06"
+            },
+            {
+              "day": 3,
+              "time": "19:30",
+              "date": "2027-10-20"
+            }
+          ]
+        },
+        "duration": {
+          "startDate": "2026-10-21",
+          "endDate": "0027-02-21",
+          "sessionCount": 24,
+          "sessionMinutes": 90,
+          "sessionDates": []
+        },
+        "instructionLanguage": {
+          "codes": [
+            "en",
+            "ru"
+          ],
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "prerequisites": {
+          "level": "beginner",
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "location": {
+          "text": {
+            "he": "לימסול",
+            "en": "Limassol",
+            "ru": "Лимассол"
+          }
+        },
+        "address": {
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          },
+          "mapUrl": ""
+        }
+      }
+    }
+  ],
+  "factVisibility": {
+    "ages": "public",
+    "schedule": "public",
+    "duration": "public",
+    "groupSize": "public",
+    "instructionLanguage": "public",
+    "prerequisites": "public",
+    "location": "public",
+    "address": "members",
+    "price": "public"
+  },
+  "faq": [],
+  "teachers": [
+    {
+      "id": "tea-mui8n28x-1",
+      "name": {
+        "he": "ענת זמלינסקי-שטרן",
+        "en": "Anat Zemlinsky-Stern",
+        "ru": "Анат Землински-Штерн"
+      },
+      "photo": "/images/activities/intro-into-judaism-teachers-tea-mui8n28x-1-a3098507.jpg"
+    }
+  ],
+  "sponsors": [],
+  "isoUpdated": "2026-09-26T10:50:38.584Z",
+  "isoCreated": "2026-09-26T10:50:38.584Z",
+  "lastEditedBy": "michal@ogen.cy",
+  "lastEditedByName": "Michal",
+  "activityId": "act-464bec45a8f83618",
+  "lastPublishedAt": "2026-09-26T10:50:38.584Z"
+}

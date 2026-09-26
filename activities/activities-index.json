@@ -125,6 +125,31 @@
     "isoUpdated": "2026-09-26T07:02:43.390Z"
   },
   {
+    "slug": "intro-into-judaism",
+    "activityId": "act-464bec45a8f83618",
+    "seriesId": "act-464bec45a8f83618",
+    "type": "course",
+    "status": "open",
+    "langs": [
+      "he",
+      "en",
+      "ru"
+    ],
+    "title": {
+      "he": "לימודי יהדות",
+      "en": "Introduction to Judaism ",
+      "ru": "Знакомство с иудаизмом"
+    },
+    "summary": {
+      "he": "היכרות עם היהדות, המסורת, התרבות ואורח החיים היהודי, מהמקורות ועד ימינו.",
+      "en": "Discover Judaism through its traditions, culture, beliefs and way of life, from its ancient roots to the present day.",
+      "ru": "Знакомство с иудаизмом, его историей, верованиями, культурой и традициями, которые продолжают жить и развиваться сегодня."
+    },
+    "cardImage": "/images/activities/intro-into-judaism-card-a63c87a4.jpg",
+    "testActivity": false,
+    "isoUpdated": "2026-09-26T10:50:38.584Z"
+  },
+  {
     "slug": "qa-course",
     "activityId": "act-150a47f2e326ab9a",
     "seriesId": "act-150a47f2e326ab9a",
