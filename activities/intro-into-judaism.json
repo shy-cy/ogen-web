@@ -365,7 +365,7 @@
         },
         "address": {
           "text": {
-            "he": "",
+            "he": "נעדכן בהמשך",
             "en": "",
             "ru": ""
           },
@@ -398,10 +398,10 @@
     }
   ],
   "sponsors": [],
-  "isoUpdated": "2026-09-26T15:21:36.910Z",
+  "isoUpdated": "2026-09-26T15:23:14.435Z",
   "isoCreated": "2026-09-26T10:50:38.584Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
   "activityId": "act-464bec45a8f83618",
-  "lastPublishedAt": "2026-09-26T15:21:36.910Z"
+  "lastPublishedAt": "2026-09-26T15:23:14.435Z"
 }
