@@ -25,6 +25,31 @@
     "isoUpdated": "2026-09-23T16:37:06.012Z"
   },
   {
+    "slug": "beit-midrash-ayeka",
+    "activityId": "act-933879f776409a9f",
+    "seriesId": "act-933879f776409a9f",
+    "type": "course",
+    "status": "open",
+    "langs": [
+      "he",
+      "en",
+      "ru"
+    ],
+    "title": {
+      "he": "בית מדרש קהילתי - אייכה?",
+      "en": "Community Beit Midrash - Ayekha?",
+      "ru": "Общинный Бейт-Мидраш - Айеха?"
+    },
+    "summary": {
+      "he": "אייכה? מפגש חודשי ברוסית ללימוד פרשת השבוע ולחיבור בין מסורת עתיקה לחיים של היום.",
+      "en": "A monthly Russian-language gathering exploring the weekly Torah portion and its relevance today.",
+      "ru": "Ежемесячные встречи на русском языке, посвящённые изучению недельной главы Торы и поиску её связи с современной жизнью."
+    },
+    "cardImage": "/images/activities/beit-midrash-ayeka-card-8c260c28.jpg",
+    "testActivity": false,
+    "isoUpdated": "2026-09-26T09:03:08.149Z"
+  },
+  {
     "slug": "bnei-mitzvah-2027",
     "activityId": "act-b6728af43e70352b",
     "seriesId": "act-b6728af43e70352b",

@@ -1,0 +1,210 @@
+{
+  "slug": "beit-midrash-ayeka",
+  "status": "open",
+  "motif": "ring",
+  "corner": "tl",
+  "cardImage": "/images/activities/beit-midrash-ayeka-card-8c260c28.jpg",
+  "shareImage": "/images/activities/beit-midrash-ayeka-share-b6222676.jpg",
+  "robots": "index",
+  "testActivity": false,
+  "type": "course",
+  "registration": {
+    "autoApprove": false,
+    "pendingExpiryDays": null,
+    "registrationFeeCutoffDate": "2026-09-17",
+    "cancellationPolicy": {
+      "mode": "flat",
+      "cancellationCutoffDate": "2026-12-22"
+    },
+    "defaultBasis": {
+      "startDate": "2026-10-01",
+      "sessionCount": 9
+    }
+  },
+  "seriesId": "act-933879f776409a9f",
+  "title": {
+    "he": "בית מדרש קהילתי - אייכה?",
+    "en": "Community Beit Midrash - Ayekha?",
+    "ru": "Общинный Бейт-Мидраш - Айеха?"
+  },
+  "summary": {
+    "he": "אייכה? מפגש חודשי ברוסית ללימוד פרשת השבוע ולחיבור בין מסורת עתיקה לחיים של היום.",
+    "en": "A monthly Russian-language gathering exploring the weekly Torah portion and its relevance today.",
+    "ru": "Ежемесячные встречи на русском языке, посвящённые изучению недельной главы Торы и поиску её связи с современной жизнью."
+  },
+  "about": {
+    "he": "אייכה?<h3>פרשת השבוע, החיים שלנו ומה שביניהם</h3><p>איך סיפורים ורעיונות שנכתבו לפני אלפי שנים יכולים לדבר אלינו גם היום? אילו שאלות הם מעוררים, ומה הם יכולים ללמד אותנו על החיים, על עצמנו ועל העולם שסביבנו?</p><p>אייכה? הוא מפגש חודשי ברוסית, שבו נלמד יחד את פרשת השבוע ונבחן אותה דרך העיניים של החיים המודרניים.</p><p>בכל מפגש נצלול אל הסיפורים, הרעיונות והערכים שבפרשה, נעלה שאלות, נשתף מחשבות ונחפש את הקשרים בין המסורת היהודית העתיקה לבין המציאות שבה אנחנו חיים היום. ננסה לגלות כיצד הטקסטים והמסורות שלנו יכולים להציע נקודות מבט חדשות, לעורר מחשבה ולהעניק משמעות לחיי היומיום.</p><p>זהו מרחב פתוח ללימוד, לשיחה ולהתבוננות, שבו אפשר להכיר את המסורת היהודית לעומק, להקשיב לפרשנויות שונות ולגבש תובנות אישיות מתוך מפגש עם הטקסט ועם הקבוצה.</p><p>המפגשים מתקיימים אחת לחודש וברוסית, ומתאימים לכל מי שסקרן להכיר את פרשת השבוע ולגלות כיצד מסורת עתיקה יכולה להאיר את חיינו בהווה. אין צורך בידע מוקדם.</p><p>מסורת עתיקה. שאלות של היום. תובנות לחיים.</p>",
+    "en": "Ayekha?<h3>Ancient Wisdom, Modern Life</h3><p>How can stories written thousands of years ago speak to us today? What can they teach us about ourselves, our relationships and the world we live in?</p><p>Ayekha? is a monthly gathering in Russian where we explore the weekly Torah portion and discover how its stories, ideas and timeless questions connect with our lives today.</p><p>Together, we will delve into the text, share perspectives and explore the values and questions at its heart. We will look at familiar stories in new ways, reflect on their meaning in the context of modern life, and consider how Jewish tradition can offer fresh insights into the challenges and experiences we face today.</p><p>More than a study session, Ayekha? is a space for open conversation, curiosity and shared reflection. A place to engage with Jewish tradition, hear different interpretations and develop our own understanding through learning together.</p><p>The gatherings take place once a month and are conducted in Russian. They are open to anyone who is curious about the weekly Torah portion and interested in discovering new connections between Jewish tradition and contemporary life. No previous knowledge is needed, just an open mind and a willingness to explore.</p><p>Ancient stories. Today's questions. New perspectives.</p>",
+    "ru": "Айеха?<h3>Мудрость веков и вопросы сегодняшнего дня</h3><p>Как тексты, созданные тысячи лет назад, могут быть актуальны для нас сегодня? Какие вопросы они поднимают и что помогают понять о себе, своих отношениях и мире вокруг нас?</p><p><strong>«Айеха?»</strong> — это ежемесячные встречи на русском языке, посвящённые недельной главе Торы. Вместе мы будем читать и обсуждать библейские истории, размышлять над их смыслами и искать связь между древней традицией и нашей сегодняшней жизнью.</p><p>Каждая встреча — возможность взглянуть на знакомые сюжеты по-новому, обсудить заложенные в них идеи и ценности, поделиться своими мыслями и услышать другие точки зрения. Мы будем искать ответы на вопросы, которые волнуют нас сегодня, и открывать новые смыслы в текстах, проверенных временем.</p><p><strong>«Айеха?»</strong> — это не только изучение текста, но и пространство для живого разговора, свободного обмена мнениями и совместных размышлений. Здесь можно глубже познакомиться с еврейской традицией, услышать разные интерпретации и найти собственные ответы на вопросы, которые возникают в процессе изучения.</p><p>Встречи проходят <strong>раз в месяц на русском языке</strong> и открыты для всех, кому интересно узнавать больше о недельной главе Торы и находить в еврейской традиции отклик на вопросы современной жизни. <strong>Предварительные знания не нужны. Достаточно любознательности и желания размышлять вместе.</strong></p><p><strong>Древние тексты. Вопросы, которые волнуют нас сегодня. Новые смыслы.</strong></p>"
+  },
+  "metaTitle": {
+    "he": "אייכה? לימוד פרשת השבוע ברוסית בלימסול | מרכז עוגן",
+    "en": "Ayekha? | Russian-Language Torah Study in Limassol",
+    "ru": "Айеха? | Изучение недельной главы Торы на русском в Лимассоле"
+  },
+  "metaDescription": {
+    "he": "מפגש חודשי ברוסית במרכז עוגן בלימסול. לומדים את פרשת השבוע, מחברים בין המסורת היהודית לחיים המודרניים ומגלים תובנות חדשות ומשמעותיות.",
+    "en": "Join \"Ayekha?\" at OGEN Centre in Limassol for monthly Torah study in Russian. Explore the weekly Torah portion and discover its relevance to modern life.",
+    "ru": "Ежемесячные встречи «Айеха?» в центре OGEN в Лимассоле. Изучаем недельную главу Торы на русском языке, обсуждаем её идеи и ищем связь с современной жизнью."
+  },
+  "facts": {
+    "groupSize": {
+      "overrideText": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      }
+    },
+    "price": {
+      "registrationFee": null,
+      "fullPrice": null,
+      "perHourOverride": null,
+      "perSessionPrice": null,
+      "showPerLesson": false,
+      "lateDropIn": {
+        "enabled": false,
+        "hoursBefore": null,
+        "price": null
+      },
+      "bundles": []
+    }
+  },
+  "groups": [
+    {
+      "groupId": "g-mui3xx6wackv",
+      "name": {
+        "he": "בית מדרש 1",
+        "en": "Beit Midrash 1",
+        "ru": ""
+      },
+      "capacity": null,
+      "teacherIds": [],
+      "facts": {
+        "ages": {
+          "min": 20,
+          "max": 120
+        },
+        "schedule": {
+          "frequency": "custom",
+          "sessions": [
+            {
+              "day": 2,
+              "time": "19:30",
+              "date": "2026-10-20"
+            },
+            {
+              "day": 2,
+              "time": "19:30",
+              "date": "2026-11-10"
+            },
+            {
+              "day": 2,
+              "time": "19:30",
+              "date": "2026-12-08"
+            },
+            {
+              "day": 2,
+              "time": "19:30",
+              "date": "2027-01-05"
+            },
+            {
+              "day": 2,
+              "time": "19:30",
+              "date": "2027-02-09"
+            },
+            {
+              "day": 2,
+              "time": "19:30",
+              "date": "2027-03-09"
+            },
+            {
+              "day": 2,
+              "time": "19:30",
+              "date": "2027-04-06"
+            },
+            {
+              "day": 2,
+              "time": "19:30",
+              "date": "2027-05-11"
+            },
+            {
+              "day": 2,
+              "time": "",
+              "date": "2027-06-15"
+            }
+          ]
+        },
+        "duration": {
+          "startDate": "2026-10-01",
+          "endDate": "2027-06-30",
+          "sessionCount": 9,
+          "sessionMinutes": 90,
+          "sessionDates": []
+        },
+        "instructionLanguage": {
+          "codes": [
+            "ru"
+          ],
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "prerequisites": {
+          "level": "beginner",
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "location": {
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "address": {
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          },
+          "mapUrl": ""
+        }
+      }
+    }
+  ],
+  "factVisibility": {
+    "ages": "public",
+    "schedule": "public",
+    "duration": "public",
+    "groupSize": "public",
+    "instructionLanguage": "public",
+    "prerequisites": "public",
+    "location": "public",
+    "address": "members",
+    "price": "public"
+  },
+  "faq": [],
+  "teachers": [
+    {
+      "id": "tea-mui49h0b-1",
+      "name": {
+        "he": "ענת זמלינסקי-שטרן",
+        "en": "Anat Zemlinsky-Stern",
+        "ru": "Анат Землински-Штерн"
+      },
+      "photo": "/images/activities/beit-midrash-ayeka-teachers-tea-mui49h0b-1-a3098507.jpg"
+    }
+  ],
+  "sponsors": [],
+  "isoUpdated": "2026-09-26T09:03:08.149Z",
+  "isoCreated": "2026-09-26T09:03:08.149Z",
+  "lastEditedBy": "michal@ogen.cy",
+  "lastEditedByName": "Michal",
+  "activityId": "act-933879f776409a9f",
+  "lastPublishedAt": "2026-09-26T09:03:08.149Z"
+}
