@@ -1344,6 +1344,24 @@ td .acc-actions{ gap:14px; }
 }
 .acc-terms b{ color:var(--navy); font-weight:700; }
 
+/* THE REFUND SCHEDULE, when there is more than the classic one to state.
+   -------------------------------------------------------------------------
+   A grid of two columns rather than stacked spans, because these two halves ARE
+   a pair a reader scans across — "which row is my date" and then the figure
+   beside it — which is the one thing the stacked rule above is not for.
+
+   `max-content` on the first track and nothing pushed to an edge, so there is no
+   directional override here either: the columns flow from the reading start in
+   all three languages, and the figure sits beside its date rather than at the
+   far side of the card. `dt` and `dd` are reset because a definition list ships
+   with a margin on the value that would break the alignment. */
+.acc-terms-steps{
+  display:grid; grid-template-columns:max-content auto;
+  column-gap:14px; row-gap:2px; margin:4px 0 2px;
+}
+.acc-terms-steps dt{ color:var(--navy); }
+.acc-terms-steps dd{ margin:0; }
+
 /* THE CREDIT BLOCK ON A COST CARD.
    -------------------------------------------------------------------------
    It was one grey sentence and a text link between the figures and the pay

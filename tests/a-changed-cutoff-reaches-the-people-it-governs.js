@@ -103,6 +103,23 @@ function twoGroups(overrides) {
 
 const cut = (a) => a.registration.cancellationPolicy.cancellationCutoffDate;
 const frozenOf = (reg) => reg.frozen.cancellation;
+// ⚠ THE CLOSING DATE IS THE LAST STEP OF THE REFUND SCHEDULE NOW, not a field of
+// its own — a closing date beside a table of steps is two fields that can
+// contradict each other. closingOf() is the one translation, and it answers for a
+// block frozen before the schedule existed as well as one frozen after, which is
+// why this suite reads through it rather than reaching for a key.
+const credit = require(H.fnPath('_credit'));
+const closesOn = (reg) => credit.closingOf(frozenOf(reg));
+// The percentages, which a publish deliberately does NOT move.
+const shapeOf = (reg) => credit.tiersFrom(frozenOf(reg)).map((t) => t.percent).join(',');
+// The closing date an ADMIN set, written where it now lives: the last step of the
+// schedule. These assertions are about the three states of that one value — a
+// date, "none", and never-configured — and all three still mean what they meant;
+// only the key they are written under has moved.
+const setClose = (a, v) => {
+  const list = a.registration.cancellationPolicy.tiers;
+  list[list.length - 1].until = v;
+};
 // What the TRANSPORT was handed: _email.js wraps `to` in an array on the way to
 // Resend, so a suite comparing it to a string silently matches nothing.
 const rcpt = (m) => [].concat(m.to)[0];
@@ -146,7 +163,7 @@ const rcpt = (m) => [].concat(m.to)[0];
     '⚠ and a FIRST publish has moved nothing — there was nothing agreed to move from');
 
   const later = twoGroups();
-  later.registration.cancellationPolicy.cancellationCutoffDate = '2026-11-10';
+  setClose(later, '2026-11-10');
   H.ok(fallout.cutoffFieldsMoved(before, later), 'a changed cancellation cutoff has');
   const feeMoved = twoGroups();
   feeMoved.registration.registrationFeeCutoffDate = '2026-09-01';
@@ -155,10 +172,10 @@ const rcpt = (m) => [].concat(m.to)[0];
   // The three states of a cutoff field are genuinely three, and switching one OFF
   // is as much a change as moving it.
   const off = twoGroups();
-  off.registration.cancellationPolicy.cancellationCutoffDate = 'none';
+  setClose(off, 'none');
   H.ok(fallout.cutoffFieldsMoved(before, off), '"none" is a change, not a blank');
   const cleared = twoGroups();
-  cleared.registration.cancellationPolicy.cancellationCutoffDate = null;
+  setClose(cleared, null);
   H.ok(fallout.cutoffFieldsMoved(before, cleared),
     'and clearing it back to computed is a change too');
   H.ok(fallout.cutoffFieldsMoved(off, cleared),
@@ -176,7 +193,7 @@ const rcpt = (m) => [].concat(m.to)[0];
   // ordinary business of running a term, and neither is a change of policy.
   const unset = twoGroups();
   unset.registration.registrationFeeCutoffDate = null;
-  unset.registration.cancellationPolicy.cancellationCutoffDate = null;
+  setClose(unset, null);
   const firstGroup = unset.groups[0].groupId;
 
   const holiday = JSON.parse(JSON.stringify(unset));
@@ -260,36 +277,40 @@ const rcpt = (m) => [].concat(m.to)[0];
 
   const noaFirst = frozenOf(await store.getRegistration(noa, AID));
   const gilFirst = frozenOf(await store.getRegistration(gil, AID));
-  H.eq(noaFirst.cancellationCutoffDate, '2026-10-28', 'Noa froze the stored cutoff');
-  H.eq(gilFirst.cancellationCutoffDate, '2026-10-28', 'and so did Gil');
+  H.eq(credit.closingOf(noaFirst), '2026-10-28', 'Noa froze the stored closing date');
+  H.eq(credit.closingOf(gilFirst), '2026-10-28', 'and so did Gil');
 
   sent.length = 0;
   const moved = twoGroups();
-  moved.registration.cancellationPolicy.cancellationCutoffDate = '2026-11-20';
+  moved.registration.cancellationPolicy.tiers[1].until = '2026-11-20';
   // ⚠ AND THE SAME PUBLISH MOVES THE MODE AND THE CALENDAR, deliberately. Without
   // that, re-freezing the WHOLE block produces a byte-identical mode and session
   // list and the two assertions below are vacuous — which is how the first draft
   // of this suite passed with the narrowing reverted. An admin genuinely does
   // switch flat to prorated and exclude a holiday in the same sitting.
-  moved.registration.cancellationPolicy.mode = 'prorated';
+  // ⚠ AND THE PERCENTAGES MOVE IN THE SAME PUBLISH. This used to switch the MODE
+  // from flat to prorated, which is the same rule stated in the old vocabulary:
+  // what creditFor() applies to the course half is frozen terms, and a publish may
+  // not rewrite it. Here the second step goes from 50% to prorated, so a
+  // propagation that carried the schedule across would be visible below.
+  moved.registration.cancellationPolicy.tiers[1].percent = 'remaining';
   moved.groups[0].facts.duration.sessionDates[3].status = 'excluded';
   const out1 = await live.afterPublish(moved, activity);
   H.ok(out1, 'the publish had something to do');
   H.eq(out1.terms.changed, 2, 'both live registrations moved to the new date');
   H.eq(out1.terms.emailed, 2, 'and both families were emailed');
   H.eq(out1.terms.failed.length, 0, 'with nothing failing');
-  H.eq(frozenOf(await store.getRegistration(noa, AID)).cancellationCutoffDate, '2026-11-20',
-    'the frozen block on the record now carries the new cutoff');
+  H.eq(closesOn(await store.getRegistration(noa, AID)), '2026-11-20',
+    'the frozen block on the record now carries the new closing date');
   H.eq(frozenOf(await store.getRegistration(noa, AID)).registrationFeeCutoffDate, '2026-09-30',
     '⚠ and the fee cutoff, which nobody touched, is untouched');
 
   // ⚠ ONLY THE TWO DATES. The mode and the frozen session list are what
   // creditFor() divides by, and rewriting them here would re-price a term.
   const noaNow = frozenOf(await store.getRegistration(noa, AID));
-  H.eq(noaFirst.mode, 'flat', 'Noa agreed to flat');
-  H.eq(noaNow.mode, 'flat',
-    '⚠ and still holds flat, though the activity now says prorated — the mode is ' +
-    'what creditFor() branches on, and rewriting it would re-price her term');
+  H.eq(shapeOf(await store.getRegistration(noa, AID)), '100,50',
+    '⚠ and still holds 100 then 50, though the activity now says prorated — the ' +
+    'percentages are what creditFor() applies, and rewriting them would re-price her term');
   H.eq(noaFirst.sessionStartsAt.length, 4, 'she was sold four sessions');
   H.eq(noaNow.sessionStartsAt.length, 4,
     '⚠ and still holds four, though one has since been excluded — that list is the ' +
@@ -317,11 +338,11 @@ const rcpt = (m) => [].concat(m.to)[0];
   console.log('\n[executed: and EARLIER, which is the direction that takes something away]');
   sent.length = 0;
   const earlier = twoGroups();
-  earlier.registration.cancellationPolicy.cancellationCutoffDate = '2026-10-06';
+  setClose(earlier, '2026-10-06');
   const out2 = await live.afterPublish(earlier, moved);
   H.eq(out2.terms.changed, 2, '⚠ an earlier cutoff moves the same records');
   H.eq(out2.terms.emailed, 2, 'and the same families are told');
-  H.eq(frozenOf(await store.getRegistration(noa, AID)).cancellationCutoffDate, '2026-10-06',
+  H.eq(closesOn(await store.getRegistration(noa, AID)), '2026-10-06',
     'the record now holds a deadline earlier than the one it was taken under');
 
   // ⚠ THE OLD DATES SURVIVE IN THE HISTORY. "The record says 6 October" is not an
@@ -346,17 +367,17 @@ const rcpt = (m) => [].concat(m.to)[0];
   // which is the whole reason the freeze is per group.
   sent.length = 0;
   const computed = twoGroups();
-  computed.registration.cancellationPolicy.cancellationCutoffDate = null;
+  setClose(computed, null);
   computed.registration.registrationFeeCutoffDate = null;
   const out3 = await live.afterPublish(computed, earlier);
   H.eq(out3.terms.changed, 2, 'both moved to their computed defaults');
   const noaC = frozenOf(await store.getRegistration(noa, AID));
   const gilC = frozenOf(await store.getRegistration(gil, AID));
-  H.eq(noaC.cancellationCutoffDate, REG.resolveCutoffs(computed, G1).cancellationCutoffDate,
+  H.eq(credit.closingOf(noaC), REG.resolveCutoffs(computed, G1).cancellationCutoffDate,
     'Noa got group one\'s answer');
-  H.eq(gilC.cancellationCutoffDate, REG.resolveCutoffs(computed, G2).cancellationCutoffDate,
+  H.eq(credit.closingOf(gilC), REG.resolveCutoffs(computed, G2).cancellationCutoffDate,
     'and Gil got group two\'s');
-  H.ok(noaC.cancellationCutoffDate !== gilC.cancellationCutoffDate,
+  H.ok(credit.closingOf(noaC) !== credit.closingOf(gilC),
     '⚠ which are DIFFERENT DATES — one activity-level answer would have governed ' +
     'the other group\'s families, plausibly and silently');
   H.ok(noaC.registrationFeeCutoffDate !== gilC.registrationFeeCutoffDate,
@@ -371,7 +392,7 @@ const rcpt = (m) => [].concat(m.to)[0];
   // Idempotent: the same change applied twice finds the second pass has nothing
   // left, because it compares frozen against resolved rather than trusting a flag.
   const twice = twoGroups();
-  twice.registration.cancellationPolicy.cancellationCutoffDate = '2026-12-01';
+  setClose(twice, '2026-12-01');
   twice.registration.registrationFeeCutoffDate = '2026-09-30';
   await live.afterPublish(twice, computed);
   sent.length = 0;
@@ -396,7 +417,7 @@ const rcpt = (m) => [].concat(m.to)[0];
   const heldWaiting = frozenOf(await store.getRegistration(waiting, AID)).cancellationCutoffDate;
   const heldCancelled = frozenOf(await store.getRegistration(gil, AID)).cancellationCutoffDate;
   const shifted = twoGroups();
-  shifted.registration.cancellationPolicy.cancellationCutoffDate = '2026-12-20';
+  setClose(shifted, '2026-12-20');
   const out4 = await live.afterPublish(shifted, twice);
   H.eq(out4.terms.changed, 1, 'only the live registration moved');
   H.eq(sent.length, 1, 'and only that family heard');
@@ -606,8 +627,11 @@ const rcpt = (m) => [].concat(m.to)[0];
   const OLDCUT = '2026-11-05';
   const first = JSON.parse(JSON.stringify(loaded.body.activity));
   first.registration = first.registration || {};
-  first.registration.cancellationPolicy =
-    Object.assign({}, first.registration.cancellationPolicy, { cancellationCutoffDate: OLDCUT });
+  // ⚠ WRITTEN AS A STEP, not as the old single field. Assigning
+  // `cancellationCutoffDate` onto a policy that already carries a schedule writes a
+  // key nothing reads — tiersOf() only translates the old pair when there is no
+  // schedule at all — so the publish would have gone through and governed nobody.
+  setClose(first, OLDCUT);
   const seededPub = await H.call(adminApi.handler, Object.assign({ action: 'publish',
     activity: first, baseUpdatedAt: loaded.body.baseUpdatedAt }, as));
   H.eq(seededPub.status, 200, 'and publishes once to mint its id and fix a cutoff');
@@ -642,7 +666,7 @@ const rcpt = (m) => [].concat(m.to)[0];
   // files, so the page a reader sees still carries the old date.
   const NEWCUT = '2027-02-14';
   const edited = JSON.parse(JSON.stringify(rec));
-  edited.registration.cancellationPolicy.cancellationCutoffDate = NEWCUT;
+  setClose(edited, NEWCUT);
   sent2.length = 0;
   const saved = await H.call(adminApi.handler, Object.assign({ action: 'saveDraft',
     activity: edited, baseUpdatedAt: seededPub.body.baseUpdatedAt }, as));

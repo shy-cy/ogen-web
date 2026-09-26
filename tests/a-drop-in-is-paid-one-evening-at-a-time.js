@@ -119,9 +119,21 @@ const HOUR = 3600 * 1000;
     'a blank group size is uncapped, never zero');
 
   console.log('\n[4. validate() refuses what is meaningless on a drop-in]');
-  H.ok(REG.validateRegistration(Object.assign({}, dropin, {
-    registration: Object.assign({}, dropin.registration, { cancellationPolicy: { mode: 'prorated' } })
-  })).some((e) => /prorate/i.test(e)), 'a drop-in has no course to prorate, and says so rather than ignoring it');
+  // ⚠ AND A REFUND SCHEDULE IS NO LONGER ONE OF THEM. This used to assert that a
+  // prorated drop-in is refused; the danger it named is real ("a setting saved and
+  // never read is one somebody will believe is in force") and the refusal produced
+  // a trap, because the form does not draw the schedule on a drop-in and the merge
+  // keeps it across a type switch on purpose — so a prorated course switched to a
+  // drop-in could not be published, with no control anywhere able to fix it.
+  //
+  // What replaces it is structural rather than a refusal: creditFor() returns at
+  // the top on `frozen.type === 'dropin'`, so the schedule cannot be reached at
+  // all. It is asserted here rather than left as prose.
+  H.eq(REG.validateRegistration(Object.assign({}, dropin, {
+    registration: Object.assign({}, dropin.registration, {
+      cancellationPolicy: { tiers: [{ until: 'start', percent: 100 },
+                                    { until: null, percent: 'remaining' }] } })
+  })).length, 0, 'a drop-in carries a schedule unread rather than refusing to save it');
   H.eq(REG.validateRegistration(dropin).length, 0, 'and is otherwise valid as configured');
   // ⚠ KEYS, NOT SENTENCES. validate() used to answer in English prose, which
   // put one language's copy inside a pure rule module that both a family and an
@@ -137,7 +149,13 @@ const HOUR = 3600 * 1000;
   console.log('\n[5. FIELD_SCHEMA draws each type its own fields, and keeps the rest]');
   const drawn = (t) => REG.FIELDS.filter((f) => !f.types || f.types.indexOf(t) !== -1).map((f) => f.key);
   H.ok(drawn('dropin').indexOf('sessionCancelHours') !== -1, 'the drop-in draws its per-session window');
-  H.ok(drawn('dropin').indexOf('cancellationPolicy.mode') === -1, 'and not the term modes');
+  H.ok(drawn('dropin').indexOf('cancellationPolicy.tiers') === -1, 'and not the term refund schedule');
+  // ⚠ THE NOTE IS DRAWN BY BOTH, and deliberately: the sentence explaining why a
+  // deadline is what it is applies to a per-evening window as much as to a term's
+  // closing date, and a type-scoped LIST is one more undrawn-field trap for nothing.
+  H.ok(drawn('dropin').indexOf('cancellationPolicy.note') !== -1 &&
+       drawn('course').indexOf('cancellationPolicy.note') !== -1,
+    'while the optional explanation is drawn by both');
   H.ok(drawn('course').indexOf('registrationFeeCutoffDate') !== -1, 'the course draws its cutoffs');
 
   // THE CONDITIONAL-PANEL TRAP, confirmed still shut. A group the form did not
@@ -147,12 +165,13 @@ const HOUR = 3600 * 1000;
   // read-back bug.
   const configured = { autoApprove: true, pendingExpiryDays: 7,
                        registrationFeeCutoffDate: '2026-09-30',
-                       cancellationPolicy: { mode: 'prorated', cancellationCutoffDate: '2026-11-04' },
+                       cancellationPolicy: { tiers: [{ until: 'start', percent: 100 },
+                                                     { until: '2026-11-04', percent: 'remaining' }] },
                        sessionCancelHours: 24 };
   const switched = REG.mergeRegistration(configured, { autoApprove: false, sessionCancelHours: 12 }, 'dropin');
   H.eq(switched.registrationFeeCutoffDate, '2026-09-30', 'the fee cutoff survives a switch to drop-in');
-  H.eq(switched.cancellationPolicy.cancellationCutoffDate, '2026-11-04', 'and so does the hard cutoff');
-  H.eq(switched.cancellationPolicy.mode, 'prorated', 'and the mode');
+  H.eq(switched.cancellationPolicy.tiers[1].until, '2026-11-04', 'and so does the closing date');
+  H.eq(switched.cancellationPolicy.tiers[1].percent, 'remaining', 'and the prorated step');
   H.eq(switched.sessionCancelHours, 12, 'while the field it DID draw was applied');
   const back = REG.mergeRegistration(switched, { autoApprove: false }, 'course');
   H.eq(back.sessionCancelHours, 12, 'switching back keeps the drop-in field the course form does not draw');

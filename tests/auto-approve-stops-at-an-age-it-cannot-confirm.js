@@ -165,7 +165,10 @@ action: 'signup', email: 'dana@example.com', password: 'password-123', termsAcce
   H.eq(frozen.price.fullPrice, 300, 'the term price');
   H.eq(frozen.price.currency, 'EUR', 'in cents-friendly currency, stated');
   H.eq(frozen.groupName.en, 'Beginners', 'the group NAME, not only its id');
-  H.eq(frozen.cancellation.mode, 'flat', 'the cancellation terms this family agreed to');
+  // The refund schedule, which is what the mode became: a step crediting everything
+  // until it starts, then one crediting half until the closing date.
+  H.eq(frozen.cancellation.tiers.length, 2, 'the cancellation terms this family agreed to');
+  H.eq(frozen.cancellation.tiers[1].percent, 50, 'and what the second step of them credits');
   H.eq(frozen.cancellation.sessionStartsAt.length, 10,
     'and the sessions that are actually happening, resolved once');
   H.eq(frozen.activitySlugAtSubmission, 'auto-named',

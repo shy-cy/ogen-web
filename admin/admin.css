@@ -255,6 +255,30 @@ h2 > button.help,h3 > button.help{vertical-align:2px;}
 .fact-head .field-label{flex:1;font-size:12.5px;font-weight:800;color:var(--navy);
   text-transform:none;letter-spacing:0;margin:0;}
 .fact-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;}
+
+/* THE REFUND SCHEDULE EDITOR.
+   -------------------------------------------------------------------------
+   It sits inside .fact-grid, which is an auto-fit grid of ~160px columns, so a
+   row of controls placed in one cell would be squeezed into a sixth of the
+   panel. `grid-column:1/-1` takes the whole width for the two fields that are
+   not a single box: the schedule, and the trilingual note beside it. */
+.span-all{ grid-column:1 / -1; }
+.tier-rows{ display:flex; flex-direction:column; gap:8px; margin:6px 0 10px; }
+.tier-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.tier-row input[type=number]{ width:72px; flex:none; }
+.tier-row input[type=date]{ width:auto; flex:none; }
+.tier-row select{ width:auto; flex:none; }
+.tier-lead{ font-weight:600; color:var(--navy); }
+.tier-unit{ font-weight:600; }
+.tier-pro{ font-weight:600; }
+/* The row controls sit at the trailing end of the row. margin-inline-start keeps
+   that true if this admin is ever rendered right-to-left; it is English-only
+   today, so this costs nothing and assumes nothing. */
+.tier-acts{ display:flex; gap:6px; margin-inline-start:auto; }
+.tier-acts button{ width:auto; padding:4px 9px; }
+/* The schedule as the boxes above currently read it. A .hint, because it is what
+   is true right now rather than an explanation — the manual is behind the (i). */
+.tier-summary{ margin:0; }
 /* One checkbox, not a labelled dropdown with a hint under it. Public is the
    default and the overwhelmingly common case, so it is the unchecked state and
    costs no words at all; only the exception is spelled out. */

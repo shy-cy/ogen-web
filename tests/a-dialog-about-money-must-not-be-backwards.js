@@ -49,8 +49,13 @@ process.env.RESEND_FROM = 'Merkaz Ogen <noreply@ogen.cy>';
 
 // creditNote(), lifted out and executed. Reading it is what missed this.
 function noteMaker(strings) {
-  const from = ui.indexOf('  function creditNote(cancellation) {');
-  const to = ui.indexOf('\n  function ', from + 1);
+  // ⚠ stepWorth() COMES WITH IT. creditNote() calls it to say what the NEXT step
+  // of the refund schedule is worth, so lifting creditNote() alone leaves a
+  // ReferenceError rather than a failing assertion — which is a worse failure,
+  // because it looks like a broken test instead of a broken dialog.
+  const from = ui.indexOf('  function stepWorth(p) {');
+  const to = ui.indexOf('\n  function ',
+                        ui.indexOf('  function creditNote(cancellation) {') + 1);
   const ctx = vm.createContext({
     T: strings,
     money: (c) => '€' + (Number(c) / 100).toFixed(2)
@@ -62,8 +67,23 @@ const T = { confirmCredit: 'CREDITED', confirmNoCredit: 'NOTHING BACK',
             whyNothing: { 'nothing-paid': 'NOTHING PAID', 'too-late': 'TOO LATE',
                           'started': 'STARTED', 'per-session': 'PER SESSION',
                           'past-cutoff': 'PAST CUTOFF', 'closed': 'CLOSED' },
-            whyLess: { 'flat': 'HALF', 'prorated': 'REMAINING', 'fee-closed': 'FEE CLOSED' } };
+            // `tier` is a FUNCTION of the band, because the figure is the admin's
+            // rather than a fixed half — so the stub interpolates it and the
+            // assertions below can see which percentage the dialog was handed.
+            whyLess: { 'tier': (b) => 'STEP ' + b.percent, 'prorated': 'REMAINING',
+                       'fee-closed': 'FEE CLOSED' },
+            confirmNextStep: (untilText, worth) => 'NEXT ' + untilText + ' ' + worth,
+            stepNothing: 'NOTHING', stepProrated: 'REMAINING',
+            stepPercent: (n) => n + '%' };
 const creditNote = noteMaker(T);
+// The closing date, written where it lives: the last step of the frozen refund
+// schedule. Assigning the old `cancellationCutoffDate` key onto a block that
+// carries a schedule writes a field nothing reads — tiersFrom() only translates
+// the old pair when there is no schedule at all.
+function setClosing(C, date) {
+  if (Array.isArray(C.tiers) && C.tiers.length) C.tiers[C.tiers.length - 1].until = date;
+  else C.cancellationCutoffDate = date;
+}
 
 (async () => {
   const blobs = H.makeBlobs();
@@ -219,7 +239,14 @@ const creditNote = noteMaker(T);
   now = await row();
   H.ok(now.cancellation.credit > 0, 'with money on the record there is credit');
   H.eq(now.cancellation.whyNothing, null, 'and no reason is sent');
-  H.eq(creditNote(now.cancellation).length, 1, 'so the dialog is one line again');
+  H.eq((now.cancellation.whyLess || []).length, 0, 'and nothing is missing to explain');
+  // ⚠ ONE LINE ABOUT THE FIGURE, and a second about what waiting costs — which is
+  // new, and is the one sentence said even when nothing is missing. The rule this
+  // case was written for is untouched: no sentence EXPLAINS the figure, because a
+  // figure equal to what was paid answers its own question.
+  H.ok(creditNote(now.cancellation).every((l) => l.indexOf('HALF') === -1 &&
+                                                l.indexOf('STEP ') === -1),
+    'so nothing explains the figure');
 
   // 3. THE FEE'S OWN DATE. Paid, inside the cancellation window, and still
   //    nothing back: everything paid so far was the registration fee, and the
@@ -230,7 +257,7 @@ const creditNote = noteMaker(T);
   fresh.frozen.price.registrationFee = 50;
   fresh.frozen.price.feeCharged = true;
   fresh.frozen.cancellation.registrationFeeCutoffDate = '2020-01-01';
-  fresh.frozen.cancellation.cancellationCutoffDate = null;
+  setClosing(fresh.frozen.cancellation, null);
   fresh.frozen.cancellation.sessionStartsAt = [];
   await store.saveRegistration(fresh);
   now = await row();
@@ -261,7 +288,7 @@ const creditNote = noteMaker(T);
   // nothing, under a comment claiming to match what the course cutoff did.
   fresh.frozen.type = 'course';
   fresh.payment = Object.assign({}, fresh.payment, { paidCents: 33000, creditedCents: 0 });
-  fresh.frozen.cancellation.cancellationCutoffDate = '2020-01-01';
+  setClosing(fresh.frozen.cancellation, '2020-01-01');
   fresh.frozen.cancellation.registrationFeeCutoffDate = null;
   fresh.status = 'approved';
   await store.saveRegistration(fresh);
@@ -326,7 +353,7 @@ const creditNote = noteMaker(T);
   // with different internals; what they must not be is different KEY NAMES on
   // the one screen that renders both.
   const api = fs.readFileSync(H.fnPath('account-registrations'), 'utf8');
-  H.ok(/function cancellationView\(c, paidCents\)/.test(api), 'there is one adapter');
+  H.ok(/function cancellationView\(c, paidCents, lang\)/.test(api), 'there is one adapter');
   // ⚠ COUNTED ON CODE, NOT ON PROSE. This counted the raw file, so the paragraph
   // ABOVE the function explaining what it is for pushed the count to four and
   // failed a test about call sites — the same trap the stylesheet check was
@@ -379,9 +406,17 @@ const creditNote = noteMaker(T);
     r.frozen.type = 'course';
     r.frozen.price.registrationFee = 50;
     r.frozen.price.feeCharged = true;
-    r.frozen.cancellation.cancellationCutoffDate = null;
-    r.frozen.cancellation.mode = 'flat';
-    Object.assign(r.frozen.cancellation, over || {});
+    // The classic schedule, written as one: everything back until it starts, then
+    // half until a closing date nobody has set. This used to be a mode and a date.
+    r.frozen.cancellation.tiers = [{ until: 'start', percent: 100 },
+                                   { until: null, percent: 50 }];
+    const o = Object.assign({}, over || {});
+    // `mode` and `cancellationCutoffDate` were the two knobs this helper turned.
+    // They are steps now, so the helper translates rather than every caller.
+    if (o.mode === 'prorated') r.frozen.cancellation.tiers[1].percent = 'remaining';
+    if ('cancellationCutoffDate' in o) r.frozen.cancellation.tiers[1].until = o.cancellationCutoffDate;
+    delete o.mode; delete o.cancellationCutoffDate;
+    Object.assign(r.frozen.cancellation, o);
     await store.saveRegistration(r);
     return row();
   };
@@ -392,17 +427,17 @@ const creditNote = noteMaker(T);
   let v = await paidInFull({ sessionStartsAt: [Date.parse('2020-01-05T16:00:00Z')],
                              registrationFeeCutoffDate: '2020-01-01' });
   H.eq(v.cancellation.credit, 15000, 'half the course and none of the fee');
-  H.eq((v.cancellation.whyLess || []).join(','), 'flat,fee-closed',
+  H.eq((v.cancellation.whyLess || []).join(','), 'tier,fee-closed',
     '\u26a0 BOTH reasons, because both halves shrank \u2014 one alone still would not add up');
-  H.eq(creditNote(v.cancellation).join(' | '), 'CREDITED \u20ac150.00 | HALF | FEE CLOSED',
-    'and the dialog says all of it');
+  H.eq(creditNote(v.cancellation).join(' | '), 'CREDITED \u20ac150.00 | STEP 50 | FEE CLOSED',
+    'and the dialog says all of it, naming the step that applied');
 
   // 2. The course halved, the fee still creditable: one reason, not two. A
   //    sentence about a fee that IS coming back would be inventing a deduction.
   v = await paidInFull({ sessionStartsAt: [Date.parse('2020-01-05T16:00:00Z')],
                          registrationFeeCutoffDate: null });
   H.eq(v.cancellation.credit, 20000, 'half the course plus the whole fee');
-  H.eq((v.cancellation.whyLess || []).join(','), 'flat', 'only the half that actually shrank');
+  H.eq((v.cancellation.whyLess || []).join(','), 'tier', 'only the half that actually shrank');
 
   // 3. Prorated says what prorated does, rather than borrowing flat's sentence.
   v = await paidInFull({ mode: 'prorated', registrationFeeCutoffDate: null,
@@ -410,7 +445,7 @@ const creditNote = noteMaker(T);
                                            Date.parse('2099-01-05T16:00:00Z')] });
   H.ok((v.cancellation.whyLess || []).indexOf('prorated') !== -1,
     'a prorated term names its own rule: ' + (v.cancellation.whyLess || []).join(','));
-  H.ok((v.cancellation.whyLess || []).indexOf('flat') === -1, 'and not the other one');
+  H.ok((v.cancellation.whyLess || []).indexOf('tier') === -1, 'and not the other one');
 
   // 4. The fee alone, on a course that has not begun: the course comes back in
   //    full and only the fee is missing.
@@ -427,7 +462,60 @@ const creditNote = noteMaker(T);
                          registrationFeeCutoffDate: null });
   H.eq(v.cancellation.credit, 35000, 'everything paid comes back');
   H.eq((v.cancellation.whyLess || []).length, 0, 'and there is nothing to account for');
+  H.ok(creditNote(v.cancellation).every((l) => l.indexOf('STEP ') === -1 &&
+                                               l.indexOf('FEE CLOSED') === -1),
+    'so no sentence explains a deduction that did not happen');
+
+  // ⚠ 5b. AND WHAT WAITING WOULD COST, which is the one thing said even when
+  //     nothing is missing. "Cancelling credits €350" answers what happens today;
+  //     it says nothing about whether deciding next week is free, and that is the
+  //     question somebody is holding when they open this dialog. Until the refund
+  //     schedule existed there was nothing to name — one closing date and one
+  //     halving, neither of them a step with a step after it.
+  v = await paidInFull({ sessionStartsAt: [Date.parse('2099-01-05T16:00:00Z')],
+                         registrationFeeCutoffDate: null, cancellationCutoffDate: '2099-06-01' });
+  H.eq(v.cancellation.credit, 35000, 'before the first session the whole of it comes back');
+  H.eq(v.cancellation.band.percent, 100, 'on the first step');
+  H.eq(v.cancellation.band.nextPercent, 50, 'with a 50% step after it');
+  H.ok(v.cancellation.band.untilText,
+    'and the date is formatted by the module that owns cancellation words in three ' +
+    'languages, rather than assembled in the browser');
+  H.ok(creditNote(v.cancellation).join(' | ').indexOf('NEXT ') !== -1,
+    '⚠ so the dialog says what the next step is worth, though nothing is missing from this one');
+  H.eq(creditNote(v.cancellation).length, 2, 'two lines: the figure, and what waiting costs');
+
+  // And it is NOT said when the step that APPLIES never ends, because there is
+  // then no "after that" to warn about. ⚠ Note that needs a schedule of ONE step:
+  // with [100% until it starts, 50% for ever] the step in force is still the
+  // first, it still ends when the class begins, and warning about it is right.
+  const forever = JSON.parse(JSON.stringify(fresh));
+  forever.status = 'approved';
+  forever.payment = Object.assign({}, forever.payment, { paidCents: 35000 });
+  forever.frozen.type = 'course';
+  forever.frozen.price.registrationFee = 50;
+  forever.frozen.price.feeCharged = true;
+  forever.frozen.cancellation.tiers = [{ until: 'none', percent: 100 }];
+  forever.frozen.cancellation.registrationFeeCutoffDate = null;
+  forever.frozen.cancellation.sessionStartsAt = [Date.parse('2020-01-05T16:00:00Z')];
+  await store.saveRegistration(forever);
+  v = await row();
+  H.eq(v.cancellation.credit, 35000, 'a schedule that never closes always credits everything');
+  H.eq(v.cancellation.band.untilText, null, 'and its step has no boundary to name');
   H.eq(creditNote(v.cancellation).length, 1, 'so the dialog is one line');
+
+  // ⚠ AND NOT WHEN NOTHING HAS BEEN PAID. A warning about what waiting costs,
+  // on a registration nobody has paid for, is a warning about losing nothing —
+  // noise in the one dialog on the site that has to be read.
+  const unpaid = JSON.parse(JSON.stringify(fresh));
+  unpaid.payment = Object.assign({}, unpaid.payment, { paidCents: 0 });
+  unpaid.frozen.cancellation.tiers = [{ until: 'start', percent: 100 },
+                                      { until: '2099-06-01', percent: 50 }];
+  unpaid.frozen.cancellation.sessionStartsAt = [Date.parse('2099-01-05T16:00:00Z')];
+  await store.saveRegistration(unpaid);
+  const nothingPaid = await row();
+  H.eq(nothingPaid.cancellation.band, null, 'no step is named when nothing was paid');
+  H.eq(creditNote(nothingPaid.cancellation).join(' | '), 'NOTHING BACK | NOTHING PAID',
+    'and the dialog is the two lines it always was');
 
   // 6. A zero is still whyNothing's, never whyLess's. Two mechanisms describing
   //    one zero is two sentences contradicting each other.
@@ -441,7 +529,7 @@ const creditNote = noteMaker(T);
   // different costume — the dialog going quiet about money.
   const lessKeys = (api.match(/out\.push\('([a-z-]+)'\)/g) || [])
     .map((m) => m.replace(/.*'([a-z-]+)'.*/, '$1'));
-  H.eq(lessKeys.sort().join(','), 'fee-closed,flat,prorated', 'the server emits three keys');
+  H.eq(lessKeys.sort().join(','), 'fee-closed,prorated,tier', 'the server emits three keys');
   ['he', 'en', 'ru'].forEach((lang) => {
     const table = ui.slice(ui.indexOf(lang + ': {'));
     const block = table.slice(table.indexOf('whyLess: {'), table.indexOf('whyLess: {') + 900);

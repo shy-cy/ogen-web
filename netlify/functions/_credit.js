@@ -211,6 +211,124 @@ function sessionInstants(C) {
 }
 
 const hasStarted = (starts, now) => starts.length > 0 && ms(now) != null && ms(now) >= starts[0];
+
+// --- the refund schedule -----------------------------------------------------
+//
+// ⚠ THE ONE PLACE A FROZEN POLICY BECOMES A SCHEDULE, and it is what makes the
+// old records and the new ones share a single arithmetic.
+//
+// The policy used to be a MODE plus one closing date, and the branch below used
+// to read them directly. That pair was already a two-step schedule and could not
+// say so: 100% until the first session, then 50% or remaining÷total until the
+// closing date, then nothing. So a record written before the schedule existed is
+// not a special case to be handled, it is a schedule to be spelled out — and
+// spelling it out is exact rather than approximate, because share(cents, 50, 100)
+// and share(cents, 1, 2) agree on every cent value.
+//
+// This translation is PERMANENT. Frozen blocks written before the schedule are
+// read for as long as those registrations exist, and `tiers` is never written
+// back onto one: the terms a family agreed to are not ours to rewrite. The
+// activity stops carrying the old pair from its next save; this function never
+// stops understanding it.
+const AT_START = 'start';
+const PRORATED = 'remaining';
+
+function tiersFrom(C) {
+  const c = C || {};
+  if (Array.isArray(c.tiers)) {
+    // ⚠ AN EMPTY SCHEDULE CREDITS EVERYTHING, AND THE LOOP BELOW WOULD SAY THE
+    // OPPOSITE. Walking the steps and returning nought when none matches is the
+    // obvious shape and it reads a blank as "every deadline has passed" — the one
+    // place in this file where an unconfigured value would resolve AGAINST the
+    // family, in the one file where that costs them money. Every other null here
+    // goes the other way, and so does this.
+    if (!c.tiers.length) return [{ until: OFF, percent: 100 }];
+    return c.tiers;
+  }
+  // ⚠ THE TRANSLATION ITSELF LIVES IN _activity-registration.js, AND IS CALLED
+  // RATHER THAN REPEATED. It was written out here as well for one bite-check, and
+  // that check found it: reverting the rule in one copy left the other one correct,
+  // so half the suite went on passing. Two statements of how a mode becomes a
+  // schedule is two statements that can drift, and the one that drifts is whichever
+  // of an ACTIVITY's policy and a FROZEN block nobody happened to be testing.
+  //
+  // This module already requires REG for resolveCutoffs(), so there is nothing to
+  // buy by keeping a copy.
+  return REG.legacyTiers(c);
+}
+
+// Has this step's boundary been reached? 'start' is the first frozen session,
+// which is why the schedule needs no calendar lookup to evaluate — that instant
+// is already in the block. A date is the end of its day in Asia/Nicosia, and
+// null and 'none' are never reached, exactly as past() has always read them.
+function boundaryPassed(until, starts, now) {
+  if (until === AT_START) return hasStarted(starts, now);
+  return past(until, now);
+}
+
+// The boundary past which nothing is creditable: the last step's. This is what
+// the single `cancellationCutoffDate` was, and it is derived rather than stored
+// beside the schedule so the two cannot contradict each other.
+function closingOf(C) {
+  const tiers = tiersFrom(C);
+  return tiers.length ? tiers[tiers.length - 1].until : null;
+}
+
+// Which step applies, and what it credits. `index: -1` means every boundary has
+// passed, which is the closed window — and note the FEE is nought there too,
+// which is the rule the single hard cutoff has always had ("the hard cutoff
+// answers for everything and comes first").
+// ⚠ THE LAST BOUNDARY THAT HAS PASSED DECIDES WHICH STEP YOU ARE IN, and the
+// obvious rule — "the first step whose boundary has not passed" — is wrong in a
+// case Ogen deliberately wants to support.
+//
+// A closing date BEFORE the course starts is a real policy: costs committed on
+// the family's behalf, materials and tickets bought in advance. Under the obvious
+// rule, a schedule of [100% until it starts, 50% until 1 September] on a course
+// beginning on the 15th credits everything on the 5th — the first step's boundary
+// has not been reached, so the loop stops there and never notices that the
+// closing date went by a week ago. That is a full refund out of a policy written
+// to withhold one, and the old single hard cutoff got it right for exactly the
+// reason stated where it used to live: "the hard cutoff answers for everything,
+// and comes first".
+//
+// The same thing happens to an ordinary activity nobody has scheduled yet, where
+// 'start' resolves to "never reached" and every boundary above it is invisible.
+// So the rule is not about ordering at all: whichever boundaries have passed, the
+// step that applies is the one after the last of them. Validation keeps the
+// boundaries increasing, which makes this the same answer in the ordinary case —
+// it is the cases validation cannot reach that it gets right.
+function bandFor(course, C, starts, now) {
+  const tiers = tiersFrom(C);
+  let passed = -1;
+  for (let i = 0; i < tiers.length; i++) {
+    if (boundaryPassed((tiers[i] || {}).until, starts, now)) passed = i;
+  }
+  const idx = passed + 1;
+  if (idx >= tiers.length) return { index: -1, percent: 0, until: null, nextPercent: 0, credit: 0 };
+  const t = tiers[idx] || {};
+  const next = tiers[idx + 1];
+  return {
+    index: idx,
+    percent: t.percent,
+    until: t.until == null ? null : t.until,
+    // What the step after this one credits, so a family deciding whether to act
+    // today can be told what waiting costs. Nought when this is the last.
+    nextPercent: next ? next.percent : 0,
+    credit: t.percent === PRORATED
+      ? share(course, remaining(starts, now), starts.length)
+      // ⚠ A STEP WITH NO RATE CREDITS EVERYTHING, which is the generous direction
+      // every blank in this file takes and is deliberately not `|| 0`.
+      //
+      // It is a half-typed row: normaliseTiers() keeps it rather than dropping it
+      // silently, and validateTiers() refuses the publish — so it can only exist
+      // on a draft, and a draft has no page and no registrations, which means no
+      // frozen block can hold one by any ordinary route. Reading it as nought
+      // anyway would put the one unconfigured value in this file on the side that
+      // keeps a family's money.
+      : share(course, Number.isFinite(Number(t.percent)) ? Number(t.percent) : 100, 100)
+  };
+}
 // Counted by START time, so cancelling at nine in the morning on a session day
 // still counts that session as remaining. The family has not had it yet.
 const remaining = (starts, now) => starts.filter((t) => t > ms(now)).length;
@@ -296,7 +414,12 @@ function creditFor(reg, now, opts) {
   // because it is what the client reads to draw the button — a constant `true`
   // is the rule written down, where an absent field would be a rule nobody
   // states. An admin cancelling here was never refused and is unchanged.
-  if (past(C.cancellationCutoffDate, now)) {
+  // ⚠ IT IS THE LAST STEP OF THE SCHEDULE NOW, not a field of its own. `index:
+  // -1` means every boundary has been reached, which is exactly what "past the
+  // hard cutoff" was — and for a record written before the schedule existed the
+  // translation makes it the same instant to the second.
+  const band = bandFor(course, C, starts, now);
+  if (band.index === -1) {
     return {
       guardianMayCancel: true,
       feeCredit: 0, courseCredit: 0, total: 0,
@@ -305,7 +428,7 @@ function creditFor(reg, now, opts) {
       // explanations for one zero is one explanation too many.
       feeHeldElsewhere: false,
       reason: 'cancellation-closed',
-      closedOn: C.cancellationCutoffDate
+      closedOn: closingOf(C)
     };
   }
 
@@ -327,16 +450,13 @@ function creditFor(reg, now, opts) {
   // another cause and already has words for it.
   const feeHeldElsewhere = held && !feeClosed && fee > 0;
 
-  // 3. The course: has it started, and then which mode.
+  // 3. The course: which step of the schedule applies, decided above.
   //
-  // The denominator is the LENGTH OF THE FROZEN LIST, not a separate count
-  // field. This project has had a typed session count disagreeing with its own
-  // calendar since before any of this was built, and the one place that
-  // disagreement would have decided money is here.
-  let courseCredit;
-  if (!hasStarted(starts, now)) courseCredit = course;
-  else if (C.mode === 'prorated') courseCredit = share(course, remaining(starts, now), starts.length);
-  else courseCredit = share(course, 1, 2);
+  // The denominator of a prorated step is the LENGTH OF THE FROZEN LIST, not a
+  // separate count field. This project has had a typed session count disagreeing
+  // with its own calendar since before any of this was built, and the one place
+  // that disagreement would have decided money is here.
+  const courseCredit = band.credit;
 
   return {
     guardianMayCancel: true,
@@ -357,9 +477,22 @@ function creditFor(reg, now, opts) {
     paidFeeCents: fee,
     paidCourseCents: course,
     feeHeldElsewhere: feeHeldElsewhere,
-    reason: !hasStarted(starts, now) ? 'not-started'
-          : C.mode === 'prorated' ? 'prorated'
-          : 'flat'
+    // ⚠ WHICH STEP, AND WHAT THE NEXT ONE IS WORTH. A family looking at a figure
+    // smaller than what they paid asks two questions — why this much, and does
+    // waiting cost me anything — and until now the answer to the second was on
+    // no screen at all. Both come out of the same evaluation as the figure, so
+    // the dialog cannot describe a step the arithmetic did not apply.
+    band: {
+      index: band.index, percent: band.percent,
+      until: band.until, nextPercent: band.nextPercent
+    },
+    // 'full' where this used to say 'not-started': the first step no longer has
+    // to end at the first session, so "it has not begun" stopped being the thing
+    // that is true. A step crediting everything has nothing missing to explain,
+    // which is all any reader of this field wanted to know.
+    reason: band.percent === PRORATED ? 'prorated'
+          : Number(band.percent) >= 100 ? 'full'
+          : 'tier'
   };
 }
 
@@ -385,13 +518,20 @@ function basisFor(reg, now, opts) {
   const split = splitPaid(((reg && reg.payment) || {}).paidCents, price.registrationFee, price.feeCharged);
   return {
     at: new Date(ms(now)).toISOString(),
-    mode: C.mode || 'flat',
+    // Kept for every entry already written, which names a mode. A schedule says
+    // so instead, and the step that was applied is recorded beside it — "50% step,
+    // 3 of 11 sessions left" is the answer to a family asking about their figure
+    // months later, which is the whole job of this object.
+    mode: C.mode || (Array.isArray(C.tiers) ? 'schedule' : 'flat'),
+    tiers: tiersFrom(C),
+    tierIndex: result.band ? result.band.index : null,
+    tierPercent: result.band ? result.band.percent : null,
     // Whether the fee was billed on THIS registration, so a family asking why
     // their spring credit is smaller than their autumn one has the answer in the
     // record rather than in somebody's memory of the waiver rule.
     feeCharged: price.feeCharged !== false,
     registrationFeeCutoffDate: C.registrationFeeCutoffDate == null ? null : C.registrationFeeCutoffDate,
-    cancellationCutoffDate: C.cancellationCutoffDate == null ? null : C.cancellationCutoffDate,
+    cancellationCutoffDate: closingOf(C) == null ? null : closingOf(C),
     sessionsTotal: starts.length,
     sessionsRemaining: remaining(starts, now),
     started: hasStarted(starts, now),
@@ -454,9 +594,22 @@ function freezeCancellation(activity, groupId, resolveSessionInstant) {
   const cutoffs = REG.resolveCutoffs(activity, groupId);
 
   return {
-    mode: policy.mode === 'prorated' ? 'prorated' : 'flat',
+    // ⚠ THE SCHEDULE, RESOLVED FOR THIS GROUP, and no `mode` and no closing date
+    // beside it. The closing date IS the last step's boundary, so writing both
+    // would be two fields that can disagree about one policy — and a record
+    // carrying a mode as well would give creditFor() two answers to choose
+    // between. Blocks written before this keep theirs and are translated on read.
+    tiers: REG.resolveTiers(activity, groupId),
+    // ⚠ FROZEN WITH THE DATES IT EXPLAINS, not read live from the activity.
+    //
+    // It justifies a particular deadline — "the materials were bought in
+    // advance" — so an admin rewording it for next term would otherwise hand
+    // this family a justification for a policy they do not hold. That is the
+    // failure the whole freeze exists on the other side of, arriving in the one
+    // field written to explain it. When a publish moves the dates onto a live
+    // registration, the note travels with them; nothing else changes it.
+    note: (policy.note && !REG.noteIsEmpty(policy.note)) ? policy.note : null,
     registrationFeeCutoffDate: cutoffs.registrationFeeCutoffDate,
-    cancellationCutoffDate: cutoffs.cancellationCutoffDate,
     sessionStartsAt: rows
       .map((r) => resolve(r.date, r.time || defaultTime))
       .filter((t) => t != null)
@@ -623,7 +776,8 @@ function resolveLocal(iso, time, tz) {
 }
 
 module.exports = {
-  TZ, OFF,
+  TZ, OFF, AT_START, PRORATED,
+  tiersFrom, boundaryPassed, closingOf, bandFor,
   creditFor, basisFor, freezeCancellation,
   creditForSession, freezeSession,
   splitPaid, share, past, endOfDay, resolveLocal, parseDateParts, priceForSession,

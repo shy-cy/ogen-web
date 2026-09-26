@@ -183,13 +183,16 @@ H.ok(owed(beg) !== owed(adv),
 // held one of the two groups to the other's date — and it would have looked
 // perfectly reasonable on both receipts.
 const open2 = activity({ registration: { cancellationPolicy: { mode: 'prorated' } } });
-H.eq(C.freezeCancellation(open2, 'g-beg').cancellationCutoffDate, '2026-10-19',
+// The closing date is the last step of the frozen refund schedule, so it is read
+// through closingOf() — the one translation, which answers for a block frozen
+// before the schedule existed as well as one frozen after.
+H.eq(C.closingOf(C.freezeCancellation(open2, 'g-beg')), '2026-10-19',
   'Beginners are held to their own second session');
-H.eq(C.freezeCancellation(open2, 'g-adv').cancellationCutoffDate, '2026-10-21',
+H.eq(C.closingOf(C.freezeCancellation(open2, 'g-adv')), '2026-10-21',
   'and Advanced to theirs, two days later');
 // A date an admin actually typed wins for everybody, which is what makes this a
 // DEFAULT rather than a formula that re-evaluates behind their back.
-H.eq(C.freezeCancellation(act, 'g-beg').cancellationCutoffDate, '2026-12-31',
+H.eq(C.closingOf(C.freezeCancellation(act, 'g-beg')), '2026-12-31',
   'a typed cutoff governs every group, because somebody decided it');
 
 console.log('\n[the page shows both, rather than one of them]');

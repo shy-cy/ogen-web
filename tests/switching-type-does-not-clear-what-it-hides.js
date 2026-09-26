@@ -28,6 +28,11 @@ const fs = require('fs');
 const path = require('path');
 const H = require('./_helpers');
 const F = require('./_fixtures');
+// The closing date, which is the last step of the refund schedule.
+const closes = (reg) => {
+  const list = (reg.cancellationPolicy || {}).tiers || [];
+  return list.length ? list[list.length - 1].until : null;
+};
 const REG = require('../netlify/functions/_activity-registration');
 
 const R = path.join(__dirname, '..');
@@ -43,7 +48,7 @@ H.ok(/registration: REG\.FIELDS/.test(fs.readFileSync(path.join(R, 'netlify/func
 const courseFields = REG.FIELDS.filter((f) => REG.draws(f, 'course')).map((f) => f.key);
 const dropinFields = REG.FIELDS.filter((f) => REG.draws(f, 'dropin')).map((f) => f.key);
 H.ok(courseFields.indexOf('registrationFeeCutoffDate') !== -1, 'a course draws the fee cutoff');
-H.ok(courseFields.indexOf('cancellationPolicy.mode') !== -1, 'and the cancellation policy');
+H.ok(courseFields.indexOf('cancellationPolicy.tiers') !== -1, 'and the refund schedule');
 H.ok(dropinFields.indexOf('registrationFeeCutoffDate') === -1,
   'a drop-in draws neither, because it has no term to withdraw from');
 H.ok(dropinFields.indexOf('sessionCancelHours') !== -1, 'it draws its own per-session window');
@@ -55,11 +60,18 @@ H.ok(courseFields.indexOf('sessionCancelHours') === -1, 'which a course does not
 });
 
 console.log('\n[a configured course, saved as a drop-in, keeps everything]');
+// ⚠ THE SCHEDULE, WHICH USED TO BE A MODE AND A DATE. The rule under test has not
+// changed — an undrawn field survives a save that never mentioned it — but the
+// field it is asked about is a LIST now rather than two scalars, and that is the
+// interesting half: getPath/setPath were only ever exercised on scalars, and an
+// array silently kept by reference or dropped as "not a value" would look exactly
+// like the sessionCancelHours bug in mirror image.
 const configured = {
   autoApprove: true,
   pendingExpiryDays: 7,
   registrationFeeCutoffDate: '2026-09-30',
-  cancellationPolicy: { mode: 'prorated', cancellationCutoffDate: '2026-10-28' }
+  cancellationPolicy: { tiers: [{ until: 'start', percent: 100 },
+                                { until: '2026-10-28', percent: 'remaining' }] }
 };
 // What the drop-in form would actually send: the two shared fields and its own,
 // and nothing at all for the three it did not draw.
@@ -68,9 +80,10 @@ const asDropin = REG.mergeRegistration(configured,
 
 H.eq(asDropin.registrationFeeCutoffDate, '2026-09-30',
   'the fee cutoff survives a save that never mentioned it');
-H.eq(asDropin.cancellationPolicy.cancellationCutoffDate, '2026-10-28', 'so does the other date');
-H.eq(asDropin.cancellationPolicy.mode, 'prorated',
-  'and the mode, which would otherwise silently fall back to the default');
+H.eq(closes(asDropin), '2026-10-28', 'so does the closing date, which is its last step');
+H.eq(asDropin.cancellationPolicy.tiers[1].percent, 'remaining',
+  'and the prorated step, which would otherwise silently fall back to the default 50');
+H.eq(asDropin.cancellationPolicy.tiers.length, 2, 'with the schedule the same length it was');
 H.eq(asDropin.sessionCancelHours, 24, 'the drop-in field it DID draw was applied');
 H.eq(asDropin.autoApprove, false, 'and so was the shared one it changed');
 
@@ -84,8 +97,8 @@ const backToCourse = REG.mergeRegistration(asDropin, {
   cancellationPolicy: asDropin.cancellationPolicy
 }, 'course');
 H.eq(backToCourse.registrationFeeCutoffDate, '2026-09-30', 'the fee cutoff came back');
-H.eq(backToCourse.cancellationPolicy.mode, 'prorated', 'and the mode');
-H.eq(backToCourse.cancellationPolicy.cancellationCutoffDate, '2026-10-28', 'and the date');
+H.eq(backToCourse.cancellationPolicy.tiers[1].percent, 'remaining', 'and the prorated step');
+H.eq(closes(backToCourse), '2026-10-28', 'and the closing date');
 
 console.log('\n[the same rule for the two prices, which are the same trap]');
 // A course quotes the term and a drop-in quotes the session, so exactly one of
@@ -209,13 +222,13 @@ H.eq(roundTrip.price.bundles.length, 1,
 // The cutoffs live one level down, at cancellationPolicy.<key>, so a form that
 // does not draw them sends the PARENT without that key in it.
 const storedReg = { autoApprove: false, registrationFeeCutoffDate: '2026-09-30',
-                    cancellationPolicy: { mode: 'flat', cancellationCutoffDate: '2026-10-28' } };
-const drawnReg = { autoApprove: false, sessionCancelHours: 24,
-                   cancellationPolicy: { mode: 'flat' } };
+                    cancellationPolicy: { tiers: [{ until: 'start', percent: 100 },
+                                                  { until: '2026-10-28', percent: 50 }] } };
+const drawnReg = { autoApprove: false, sessionCancelHours: 24, cancellationPolicy: {} };
 const afterReg = keep.reg(storedReg, drawnReg);
 H.eq(afterReg.registrationFeeCutoffDate, '2026-09-30', 'the fee cutoff survives');
-H.eq(afterReg.cancellationPolicy.cancellationCutoffDate, '2026-10-28',
-  'and the one nested inside cancellationPolicy, which a shallow merge would have lost');
+H.eq(closes(afterReg), '2026-10-28',
+  'and the schedule nested inside cancellationPolicy, which a shallow merge would have lost');
 H.eq(afterReg.sessionCancelHours, 24, 'while what the drop-in form drew is taken');
 
 // The handler must USE them, or the helpers are two functions nothing calls.
@@ -251,7 +264,7 @@ H.ok(!/S\.record\.facts = read\.facts/.test(stripped),
   const figures = (rec) => ({
     fullPrice: ((rec.facts || {}).price || {}).fullPrice,
     fee: (rec.registration || {}).registrationFeeCutoffDate,
-    cancel: ((rec.registration || {}).cancellationPolicy || {}).cancellationCutoffDate
+    cancel: closes(rec.registration || {})
   });
 
   console.log('\n[the whole trip: configure, save as drop-in, save back as course]');
@@ -264,7 +277,8 @@ H.ok(!/S\.record\.facts = read\.facts/.test(stripped),
                teacherIds: [], facts: {} }],
     facts: { price: { registrationFee: 50, fullPrice: 300, showPerLesson: false } },
     registration: { autoApprove: true, registrationFeeCutoffDate: '2026-09-30',
-                    cancellationPolicy: { mode: 'flat', cancellationCutoffDate: '2026-10-28' } }
+                    cancellationPolicy: { tiers: [{ until: 'start', percent: 100 },
+                                                  { until: '2026-10-28', percent: 50 }] } }
   })).body.activity;
   H.eq(JSON.stringify(figures(rec)),
     JSON.stringify({ fullPrice: 300, fee: '2026-09-30', cancel: '2026-10-28' }),
@@ -277,7 +291,7 @@ H.ok(!/S\.record\.facts = read\.facts/.test(stripped),
   rec = (await save(Object.assign({}, rec, {
     type: 'dropin',
     facts: { price: { registrationFee: 50, perSessionPrice: 12, showPerLesson: false, bundles: [] } },
-    registration: { autoApprove: true, sessionCancelHours: 24, cancellationPolicy: { mode: 'flat' } }
+    registration: { autoApprove: true, sessionCancelHours: 24, cancellationPolicy: {} }
   }), rec.isoUpdated)).body.activity;
   H.eq(JSON.stringify(figures(rec)),
     JSON.stringify({ fullPrice: 300, fee: '2026-09-30', cancel: '2026-10-28' }),
@@ -288,7 +302,7 @@ H.ok(!/S\.record\.facts = read\.facts/.test(stripped),
     type: 'course',
     facts: { price: { registrationFee: 50, fullPrice: figures(rec).fullPrice, showPerLesson: false } },
     registration: { autoApprove: true, registrationFeeCutoffDate: figures(rec).fee,
-                    cancellationPolicy: { mode: 'flat', cancellationCutoffDate: figures(rec).cancel } }
+                    cancellationPolicy: rec.registration.cancellationPolicy }
   }), rec.isoUpdated)).body.activity;
   H.eq(JSON.stringify(figures(rec)),
     JSON.stringify({ fullPrice: 300, fee: '2026-09-30', cancel: '2026-10-28' }),

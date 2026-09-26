@@ -151,7 +151,11 @@ function termsForGroup(activity, groupId, lang) {
   if ((activity.type || 'course') === 'dropin') {
     return terms.termsFor({
       type: 'dropin',
-      sessionCancelHours: ((activity.registration || {}).sessionCancelHours)
+      sessionCancelHours: ((activity.registration || {}).sessionCancelHours),
+      // Only for the note. A drop-in's window is not frozen onto the
+      // registration, but the sentence explaining it is the same optional line a
+      // course carries, and it lives on the activity's policy.
+      cancellation: { note: ((activity.registration || {}).cancellationPolicy || {}).note }
     }, lang);
   }
   return terms.termsFor({
@@ -428,7 +432,12 @@ function whyLessCredit(c, credit, paidCents) {
   // has nothing missing to account for.
   if (!(credit > 0) || !(paidCents > credit)) return [];
   const out = [];
-  if (c.reason === 'flat') out.push('flat');
+  // ⚠ 'tier' WHERE THIS SAID 'flat', and the sentence it maps to has to carry the
+  // figure. There is no fixed half any more: the step that applies credits
+  // whatever an admin wrote in it, so a sentence with "half" baked into it would
+  // be right on the activities that happen to say 50 and quietly wrong on the
+  // rest. The percentage travels in `band` below and the client interpolates it.
+  if (c.reason === 'tier') out.push('tier');
   if (c.reason === 'prorated') out.push('prorated');
   // The fee half. Decided from the SPLIT rather than inferred from the gap: with
   // both halves shrinking at once there is no way to read one figure out of the
@@ -457,7 +466,7 @@ function heldBy(people, regs, now) {
   return out;
 }
 
-function cancellationView(c, paidCents) {
+function cancellationView(c, paidCents, lang) {
   if (!c) return null;
   const credit = c.credit !== undefined ? c.credit : c.total;
   return {
@@ -484,6 +493,35 @@ function cancellationView(c, paidCents) {
     // and the missing €50 is the one they will write in about. `false` on an
     // evening's answer, which has no fee in it at all.
     feeHeldElsewhere: !!c.feeHeldElsewhere,
+    // ⚠ WHICH STEP APPLIES, AND WHAT WAITING COSTS. The dialog has always been
+    // able to say what this cancellation is worth and never what it would be
+    // worth next week — which is the actual question somebody is holding when
+    // they open it. Both come out of the one evaluation the figure came from.
+    //
+    // The schedule itself is deliberately NOT here: the terms footnote is where a
+    // family reads a table, and the last thing somebody reads before an action
+    // that cannot be undone is not the place for one. Their own band and the next
+    // boundary are the answer; the rest is reference.
+    //
+    // The date is formatted HERE, by the module that owns cancellation words in
+    // three languages, because a client assembling "until 4 November 2026" would
+    // be a second date formatter in a third grammar.
+    // ⚠ AND ONLY WHEN THERE IS MONEY AT STAKE. "This step applies until it starts,
+    // after that half comes back" under a registration nobody has paid for is a
+    // warning about losing nothing — noise in the one dialog that has to be read.
+    // Decided here rather than in the client, for the reason every other reason on
+    // this object is: the server works out which sentences apply and the screen
+    // renders them.
+    band: c.band && paidCents > 0 ? {
+      percent: c.band.percent,
+      nextPercent: c.band.nextPercent,
+      until: c.band.until == null ? null : c.band.until,
+      // A PHRASE, not a date: the commonest step of all ends when the course
+      // starts, and a dialog that could only interpolate a date went silent in
+      // exactly the case a family most wants it — everything back now, half of it
+      // once the class begins. Empty for a boundary that never arrives.
+      untilText: terms.boundaryText(c.band.until, lang) || null
+    } : null,
     // Only one of these is ever set, and each is named by what it is: the
     // instant one evening stops being creditable, and the date a whole term did.
     deadline: c.deadline == null ? null : c.deadline,
@@ -679,7 +717,7 @@ function regRow(reg, participant, lang, activity, siblings) {
     // What cancelling would do, computed from the terms frozen onto this
     // registration — so the answer shown is the answer that will be applied, and
     // both come from the same function.
-    cancellation: cancellationView(owed, reg.payment.paidCents),
+    cancellation: cancellationView(owed, reg.payment.paidCents, lang),
     // ⚠ THE TERMS AS FROZEN, NOT AS THE ACTIVITY NOW READS THEM. The whole
     // reason freezeCancellation() runs at submission is that an admin switching
     // a course from flat to prorated in March must not change what a January

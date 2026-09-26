@@ -188,10 +188,19 @@
       },
       // ⚠ לא מה שלא הוחזר — למה מה שהוחזר קטן ממה ששולם.
       whyLess: {
-        'flat': 'הפעילות כבר התחילה, ולכן מזוכה מחצית מעלות הפעילות.',
+        // ⚠ הסכום נקבע לפי המדרגה שבתוקף, ולכן האחוז מגיע מהשרת ואינו כתוב כאן.
+        'tier': function (b) { return 'בשלב הזה מזוכים ' + b.percent + '% מעלות הפעילות.'; },
         'prorated': 'הפעילות כבר התחילה, ולכן מזוכים רק המפגשים שעוד לא התקיימו.',
         'fee-closed': 'דמי ההרשמה אינם מזוכים: המועד האחרון לזיכוי שלהם כבר עבר.'
       },
+      // ⚠ מה יקרה אם לא מבטלים עכשיו. זו השאלה שמחזיקים ביד כשפותחים את החלון
+      // הזה, ועד עכשיו היא לא נענתה באף מקום.
+      confirmNextStep: function (untilText, worth) {
+        return 'המדרגה הזו בתוקף ' + untilText + '. לאחר מכן ' + worth + '.';
+      },
+      stepNothing: 'לא יזוכה דבר',
+      stepProrated: 'יזוכו רק המפגשים שעוד לא התקיימו',
+      stepPercent: function (n) { return 'יזוכו ' + n + '% מעלות הפעילות'; },
       registerFullLead: 'הפעילות מלאה כרגע.',
       groupFullLead: 'הקבוצה הזו מלאה כרגע.',
       registerWaitGo: 'הצטרפות לרשימת המתנה',
@@ -380,10 +389,22 @@
                   + 'registered, so it stays paid.'
       },
       whyLess: {
-        'flat': 'The activity has already begun, so half of the activity cost is credited.',
+        // ⚠ A FUNCTION, BECAUSE THERE IS NO FIXED HALF ANY MORE. The step that
+        // applies credits whatever the admin wrote in it, so the figure comes from
+        // the same evaluation the money came from rather than from this sentence.
+        'tier': function (b) { return 'At this point in the schedule ' + b.percent + '% of the activity cost is credited.'; },
         'prorated': 'The activity has already begun, so only the sessions still to come are credited.',
         'fee-closed': 'The registration fee is not credited: the date for crediting it has passed.'
       },
+      // ⚠ WHAT WAITING COSTS. The dialog could always say what cancelling is worth
+      // today and never what it would be worth next week, which is the question
+      // somebody is actually holding when they open it.
+      confirmNextStep: function (untilText, worth) {
+        return 'This step applies ' + untilText + '. After that, ' + worth + '.';
+      },
+      stepNothing: 'nothing is credited',
+      stepProrated: 'only the sessions still to come are credited',
+      stepPercent: function (n) { return n + '% of the activity cost is credited'; },
       registerFullLead: 'This activity is full at the moment.',
       groupFullLead: 'This group is full at the moment.',
       registerWaitGo: 'Join the waiting list',
@@ -561,10 +582,16 @@
                   + 'оформленным, поэтому взнос сохраняется.'
       },
       whyLess: {
-        'flat': 'Занятие уже началось, поэтому возвращается половина стоимости занятия.',
+        'tier': function (b) { return 'На этом этапе возвращается ' + b.percent + '% стоимости занятия.'; },
         'prorated': 'Занятие уже началось, поэтому засчитываются только предстоящие занятия.',
         'fee-closed': 'Регистрационный взнос не возвращается: срок его возврата истёк.'
       },
+      confirmNextStep: function (untilText, worth) {
+        return 'Этот этап действует ' + untilText + '. После этого ' + worth + '.';
+      },
+      stepNothing: 'ничего не возвращается',
+      stepProrated: 'возвращается только стоимость занятий, которые ещё не прошли',
+      stepPercent: function (n) { return 'возвращается ' + n + '% стоимости'; },
       registerFullLead: 'Сейчас на занятии нет мест.',
       groupFullLead: 'В этой группе сейчас нет мест.',
       registerWaitGo: 'В список ожидания',
@@ -904,6 +931,16 @@
   //
   // Nothing is added when there IS credit: the figure explains itself, and a
   // sentence under it would be answering a question nobody asked.
+  // What one step of the schedule is worth, in words. The three values that have
+  // words get them; anything between is a percentage, which is the same split
+  // _cancellation-terms.js makes when it renders the table.
+  function stepWorth(p) {
+    if (p === 'remaining') return T.stepProrated;
+    var n = Number(p);
+    if (!(n > 0)) return T.stepNothing;
+    return T.stepPercent(n);
+  }
+
   function creditNote(cancellation) {
     if (!cancellation) return null;
     var lines;
@@ -920,11 +957,24 @@
       // came out of; this renders them. Empty when the whole of what was paid
       // comes back, which is the case that genuinely needs no sentence.
       (cancellation.whyLess || []).forEach(function (k) {
-        if (T.whyLess[k]) lines.push(T.whyLess[k]);
+        var said = T.whyLess[k];
+        // A string or a function of the band, the same two shapes _family-errors.js
+        // uses: a sentence carrying a figure cannot be a constant.
+        if (typeof said === 'function') said = said(cancellation.band || {});
+        if (said) lines.push(said);
       });
     } else {
       var why = T.whyNothing[cancellation.whyNothing];
       lines = why ? [T.confirmNoCredit, why] : [T.confirmNoCredit];
+    }
+    // ⚠ AND WHAT WAITING WOULD COST, which is said even when the whole of it comes
+    // back — the one case where nothing is missing and there is still something to
+    // know. Shown only when the step actually ends on a date and the next one is
+    // worth something different: a boundary that changes nothing is noise, and a
+    // schedule that never closes has no "after that".
+    var band = cancellation.band;
+    if (band && band.untilText && band.nextPercent !== band.percent) {
+      lines.push(T.confirmNextStep(band.untilText, stepWorth(band.nextPercent)));
     }
     // ⚠ SAID EVEN WHEN THERE IS CREDIT, which every other line here is not.
     //
@@ -1613,7 +1663,19 @@
     if (!lines || !lines.length) return null;
     var box = el('div', { class: 'acc-terms' });
     if (title) box.appendChild(el('b', { text: title }));
-    lines.forEach(function (line) { box.appendChild(el('span', { text: line })); });
+    lines.forEach(function (line) {
+      if (typeof line === 'string') { box.appendChild(el('span', { text: line })); return; }
+      // ⚠ A SCHEDULE OF MORE THAN TWO STEPS IS DRAWN AS ONE. Four sentences of
+      // "cancel by X and Y% comes back" is a list a reader skips, and the one
+      // thing they came for — which band is mine — is the hardest thing to find
+      // in it. The server decided which shape this is; this renders it.
+      var dl = el('dl', { class: 'acc-terms-steps' });
+      (line.schedule || []).forEach(function (r) {
+        dl.appendChild(el('dt', { text: r.when }));
+        dl.appendChild(el('dd', { text: r.credit }));
+      });
+      box.appendChild(dl);
+    });
     return box;
   }
 

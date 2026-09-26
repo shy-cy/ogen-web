@@ -29,6 +29,16 @@
 //    that the shared surface does not branch.
 
 const H = require('./_helpers');
+// The closing date, and a prorated last step: the two things a mode and a date
+// used to say. Written once here rather than in each assertion below.
+const closes = (reg) => {
+  const list = (reg.cancellationPolicy || {}).tiers || [];
+  return list.length ? list[list.length - 1].until : null;
+};
+const prorate = (activity) => {
+  const list = activity.registration.cancellationPolicy.tiers;
+  list[list.length - 1].percent = 'remaining';
+};
 const F = require('./_fixtures');
 const REG = require('../netlify/functions/_activity-registration');
 const facts = require('../netlify/functions/_activity-facts');
@@ -174,12 +184,16 @@ console.log('\n[the two cutoff dates: filled when blank, never overwritten]');
 const filled = REG.defaultIfBlank(F.course());
 H.eq(filled.registrationFeeCutoffDate, '2026-09-30',
   '14 calendar days before a 14 Oct start');
-H.eq(filled.cancellationPolicy.cancellationCutoffDate, '2026-10-28',
+// ⚠ THE CLOSING DATE IS THE LAST STEP OF THE REFUND SCHEDULE NOW. It was a field
+// of its own beside a mode, which was already a two-step schedule that could not
+// say so — and a closing date beside a table of steps would be two fields able to
+// contradict each other. closes() reads it where it lives.
+H.eq(closes(filled), '2026-10-28',
   'and the date of session 3, which is ceil(30% of 10) — counted in sessions, not days');
 // The calendar reading would give 4 November, a week later and the fourth
 // session. Sessions win because the credit formula is session-based, so a
 // day-based cutoff would have the two halves of one policy disagreeing.
-H.ok(filled.cancellationPolicy.cancellationCutoffDate < '2026-11-04',
+H.ok(closes(filled) < '2026-11-04',
   'the session basis is stricter than the calendar one, and they must not be mixed');
 
 const already = REG.defaultIfBlank(F.course({
@@ -187,7 +201,7 @@ const already = REG.defaultIfBlank(F.course({
                   cancellationPolicy: { mode: 'flat', cancellationCutoffDate: '2026-01-02' } }
 }));
 H.eq(already.registrationFeeCutoffDate, '2026-01-01', 'a date that is there is not overwritten');
-H.eq(already.cancellationPolicy.cancellationCutoffDate, '2026-01-02', 'neither is the other one');
+H.eq(closes(already), '2026-01-02', 'neither is the other one');
 
 // The three-state field. This is the reason it is one field and not a date
 // beside a "disabled" boolean: two fields can contradict each other, and here
@@ -198,7 +212,7 @@ const off = REG.defaultIfBlank(F.course({
 }));
 H.eq(off.registrationFeeCutoffDate, 'none',
   'switched OFF is a value, so the default does not refill it on the next save');
-H.eq(off.cancellationPolicy.cancellationCutoffDate, 'none', 'both of them');
+H.eq(closes(off), 'none', 'both of them');
 H.eq(REG.normaliseRegistration({ registrationFeeCutoffDate: '' }).registrationFeeCutoffDate, null,
   'blank is null, which means never configured');
 H.eq(REG.normaliseRegistration({ registrationFeeCutoffDate: '2026-02-30' }).registrationFeeCutoffDate, null,
@@ -212,8 +226,8 @@ H.eq(nothing.defaultBasis, null, 'and stamps no basis, because nothing was compu
 // A drop-in has no term to withdraw from, so there is no cancellation cutoff to
 // compute. Filling one would give it a date that governs nothing.
 const dropDefaults = REG.defaultIfBlank(F.dropin());
-H.eq(dropDefaults.cancellationPolicy.cancellationCutoffDate, null,
-  'a drop-in gets no cancellation cutoff');
+H.eq(closes(dropDefaults), null,
+  'a drop-in gets no closing date — there is no term to withdraw from');
 H.eq(dropDefaults.registrationFeeCutoffDate, '2026-09-22',
   'but it does get a fee cutoff, because the joining fee still applies');
 
@@ -248,23 +262,38 @@ H.eq(REG.normaliseRegistration({ pendingExpiryDays: 0 }).pendingExpiryDays, null
   'zero days is refused: a request dead on arrival is far more likely a half-typed field');
 H.eq(REG.normaliseRegistration({ pendingExpiryDays: -5 }).pendingExpiryDays, null, 'so is a negative');
 
-console.log('\n[prorated is refused unless it can be computed]');
+console.log('\n[a prorated step is refused unless it can be computed]');
 // Without a calendar the formula divides by a number that is not there, at the
 // moment a family is cancelling. That is the worst possible time to find out.
 const proratedNoCal = F.course({ facts: { duration: { startDate: '2026-10-14' } } });
-proratedNoCal.registration.cancellationPolicy.mode = 'prorated';
+prorate(proratedNoCal);
 const errs = REG.validateRegistration(proratedNoCal);
-H.eq(errs.length, 1, 'prorated with no session calendar is one error');
+H.eq(errs.length, 1, 'a prorated step with no session calendar is one error');
 H.ok(/session calendar/.test(errs[0]), 'and it names what is missing');
 
 const proratedOk = F.course();
-proratedOk.registration.cancellationPolicy.mode = 'prorated';
+prorate(proratedOk);
 H.eq(REG.validateRegistration(proratedOk).length, 0, 'with a calendar it is fine');
-H.eq(REG.validateRegistration(F.course()).length, 0, 'flat needs nothing, which is why it is the default');
+H.eq(REG.validateRegistration(F.course()).length, 0,
+  'and the default schedule needs nothing, which is why it is the default');
 
+// ⚠ AND A DROP-IN'S SCHEDULE IS NOT CHECKED AT ALL, which is a deliberate change
+// of answer. This used to assert that a prorated drop-in is refused — right about
+// the danger ("a setting saved and never read is one somebody will believe is in
+// force") and it produced a trap: the form does not draw the policy on a drop-in,
+// mergeRegistration() keeps it across a type switch on purpose, so a prorated
+// course switched to a drop-in could not be published and no control anywhere
+// could fix it. Keeping a value across a switch and refusing to save it are
+// incompatible. What makes it safe is structural: creditFor() returns at the top
+// on `frozen.type === 'dropin'`, so the schedule cannot be reached rather than
+// being merely unused.
 const proratedDropin = F.dropin();
-proratedDropin.registration.cancellationPolicy.mode = 'prorated';
-H.ok(REG.validateRegistration(proratedDropin).some((m) => /no course to prorate/.test(m)),
-  'a drop-in cannot be prorated, and saying so beats storing a mode nothing reads');
+prorate(proratedDropin);
+H.eq(REG.validateRegistration(proratedDropin).length, 0,
+  'a drop-in carries the schedule unread rather than refusing to save it');
+H.eq(require(H.fnPath('_credit')).creditFor(
+  { payment: { paidCents: 5000 }, frozen: { type: 'dropin', price: {}, cancellation:
+    proratedDropin.registration.cancellationPolicy } }, Date.now()).total, 0,
+  '⚠ and what makes that safe is that creditFor() refuses a drop-in at the top');
 
 H.done();

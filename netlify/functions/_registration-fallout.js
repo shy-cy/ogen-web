@@ -74,6 +74,7 @@ const waitlist = require('./_waitlist');
 const groups = require('./_activity-groups');
 const REG = require('./_activity-registration');
 const R = require('./_registration');
+const credit = require('./_credit');
 
 const same = (a, b) => String(a === undefined ? null : a) === String(b === undefined ? null : b);
 
@@ -83,7 +84,55 @@ const same = (a, b) => String(a === undefined ? null : a) === String(b === undef
 function storedCutoffs(activity) {
   const reg = (activity && activity.registration) || {};
   const policy = reg.cancellationPolicy || {};
-  return { fee: reg.registrationFeeCutoffDate, cancel: policy.cancellationCutoffDate };
+  // ⚠ THE CLOSING DATE IS THE LAST STEP'S BOUNDARY NOW, and it is read off the
+  // STORED schedule rather than the resolved one — exactly as this always read
+  // the stored field. resolveTiers() computes a default from the group's calendar
+  // when nobody set one, so comparing resolved dates would read an excluded
+  // holiday or a postponed start as a policy change and mail every family several
+  // times a term. tiersOf() translates a legacy record without resolving it.
+  return { fee: reg.registrationFeeCutoffDate,
+           cancel: REG.closingBoundary(REG.tiersOf(policy)) };
+}
+
+// ⚠ THE SHAPE OF THE SCHEDULE, WITHOUT THE CLOSING DATE OR THE FEE.
+//
+// Those two propagate; the percentages and the steps above the last one do not —
+// they are what a family agreed to, in the same way the price and the mode always
+// were, and rewriting them after acceptance is the unfair-terms problem this file
+// already discusses. So a changed shape is REPORTED rather than applied, and this
+// is the key the two sides are compared by.
+function shapeKey(tiers) {
+  const list = Array.isArray(tiers) ? tiers : [];
+  return list.map((t, i) => (i === list.length - 1
+    ? String(t.percent)
+    : String(t.percent) + '@' + String(t.until == null ? '' : t.until))).join(' | ');
+}
+
+// Cheap pre-check, off the stored records: is there any point reading the
+// registrations to find out who is on an older schedule?
+function scheduleShapeMoved(previous, activity) {
+  if (!previous) return false;
+  const of = (a) => shapeKey(REG.tiersOf(((a && a.registration) || {}).cancellationPolicy));
+  return of(previous) !== of(activity);
+}
+
+// How many live registrations hold a schedule this publish did NOT bring them
+// onto — compared per group, because the last boundary resolves per group, and
+// compared after the closing date has been carried across so a moved date is not
+// counted as a different shape.
+function olderSchedules(activity, regs) {
+  const want = {};
+  const shapeFor = (gid) => {
+    const k = String(gid || '');
+    if (want[k] === undefined) want[k] = shapeKey(REG.resolveTiers(activity, gid || null));
+    return want[k];
+  };
+  return (regs || []).filter((r) => r && R.LIVE_STATUSES.indexOf(r.status) !== -1)
+    .filter((r) => {
+      const frozen = (r.frozen || {}).cancellation;
+      if (!frozen) return false;
+      return shapeKey(credit.tiersFrom(frozen)) !== shapeFor(r.groupId);
+    }).length;
 }
 
 // Did an admin touch either field? A first publish has nothing to have moved
@@ -119,18 +168,35 @@ function reterm(activity, reg) {
   // rebuilt the moment a place is actually taken.
   if (!frozen) return null;
   const want = REG.resolveCutoffs(activity, reg.groupId || null);
+  // The closing date a family currently holds, whichever shape their block is in:
+  // the last step's boundary, or the single field a record written before the
+  // schedule carries. closingOf() is the one translation.
+  const heldClose = credit.closingOf(frozen);
   if (same(frozen.registrationFeeCutoffDate, want.registrationFeeCutoffDate) &&
-      same(frozen.cancellationCutoffDate, want.cancellationCutoffDate)) return null;
+      same(heldClose, want.cancellationCutoffDate)) return null;
   return {
     was: {
       registrationFeeCutoffDate: frozen.registrationFeeCutoffDate,
-      cancellationCutoffDate: frozen.cancellationCutoffDate
+      cancellationCutoffDate: heldClose
     },
     now: {
       registrationFeeCutoffDate: want.registrationFeeCutoffDate,
       cancellationCutoffDate: want.cancellationCutoffDate
     }
   };
+}
+
+// ⚠ WRITTEN INTO THE SHAPE THE RECORD IS ALREADY IN, never converted to the other
+// one. A block frozen before the schedule existed keeps its single field and
+// moves that; one frozen with steps moves its LAST step's boundary. Converting a
+// legacy block to steps here would be this publish rewriting the structure of
+// terms a family agreed to, which is the one thing it is not allowed to do.
+function writeClosing(frozen, date) {
+  if (Array.isArray(frozen.tiers) && frozen.tiers.length) {
+    frozen.tiers[frozen.tiers.length - 1].until = date;
+  } else {
+    frozen.cancellationCutoffDate = date;
+  }
 }
 
 // ⚠ THE OLD DATES GO IN THE HISTORY, NOT JUST THE NEW ONES. A family who was
@@ -164,7 +230,15 @@ async function applyCutoffChange(activity, previous, regs, opts) {
       if (!change) continue;
       const next = JSON.parse(JSON.stringify(reg));
       next.frozen.cancellation.registrationFeeCutoffDate = change.now.registrationFeeCutoffDate;
-      next.frozen.cancellation.cancellationCutoffDate = change.now.cancellationCutoffDate;
+      writeClosing(next.frozen.cancellation, change.now.cancellationCutoffDate);
+      // ⚠ THE EXPLANATION TRAVELS WITH THE DATES IT EXPLAINS. It is one statement
+      // about one policy, and a note frozen against a date that has just moved is
+      // a justification for a deadline this family no longer holds. Note the
+      // deliberate limit: a note edited ON ITS OWN does not propagate, because the
+      // trigger is the two dates and mailing every family to say a sentence was
+      // reworded is noise. It reaches them the next time a date moves.
+      const bag = ((activity.registration || {}).cancellationPolicy || {}).note;
+      next.frozen.cancellation.note = (bag && !REG.noteIsEmpty(bag)) ? bag : null;
       next.isoUpdated = iso;
       next.history = noteChange(reg, change, iso);
       // The record first. An email about terms that were never written is worse
@@ -207,11 +281,23 @@ async function afterPublish(activity, previous, opts) {
   if (!activity || !activity.activityId) return null;
   const needsTerms = cutoffFieldsMoved(previous, activity);
   const needsRoom = roomOpenedPossible(previous, activity);
-  if (!needsTerms && !needsRoom) return null;
+  // ⚠ A CHANGED SCHEDULE IS NOT A CHANGED CUTOFF, and it still has to be counted.
+  // Editing a percentage moves nothing onto anybody — that is the decision — so
+  // `needsTerms` stays false and this would have read no registrations and said
+  // nothing at all. An admin who has just rewritten a refund schedule needs to be
+  // told how many families are still on the old one, or the choice not to
+  // propagate is a choice nobody can see.
+  const needsShape = scheduleShapeMoved(previous, activity);
+  if (!needsTerms && !needsRoom && !needsShape) return null;
   const regs = await store.forActivity(activity.activityId);
+  const terms = await applyCutoffChange(activity, previous, regs, opts);
+  // Counted AFTER the dates have been carried across, off the records as they now
+  // stand, so a moved closing date is not reported as a different schedule.
+  const fresh = terms.changed ? await store.forActivity(activity.activityId) : regs;
   return {
-    terms: await applyCutoffChange(activity, previous, regs, opts),
-    room: await announceNewRoom(activity, previous, regs, opts)
+    terms: terms,
+    room: await announceNewRoom(activity, previous, regs, opts),
+    schedule: needsShape ? { older: olderSchedules(activity, fresh) } : null
   };
 }
 
@@ -230,5 +316,6 @@ function roomOpenedPossible(previous, activity) {
 module.exports = {
   afterPublish,
   applyCutoffChange, announceNewRoom,
-  storedCutoffs, cutoffFieldsMoved, roomOpened, roomOpenedPossible, reterm
+  storedCutoffs, cutoffFieldsMoved, roomOpened, roomOpenedPossible, reterm,
+  shapeKey, scheduleShapeMoved, olderSchedules, writeClosing
 };

@@ -168,7 +168,7 @@ const FIELD_SCHEMA = {
   // not send it", never "the admin emptied it".
   registration: REG.FIELDS,
   types: REG.TYPES,
-  cancellationModes: REG.CANCELLATION_MODES,
+  maxRefundTiers: REG.MAX_TIERS,
   cutoffOff: REG.OFF,
   defaultExpiryDays: REG.DEFAULT_EXPIRY_DAYS,
   // The two closed lists the form draws from, labelled in English because the
@@ -595,7 +595,18 @@ function mergeByPermission(current, incoming, session) {
     out.robots = (base && base.robots) || 'index';
     out.testActivity = !!(base && base.testActivity);
     out.type = REG.normaliseType(base && base.type);
-    out.registration = REG.normaliseRegistration(base && base.registration, out.type);
+    // ⚠ NOT normaliseRegistration() ANY MORE, AND THE DIFFERENCE IS ONE FIELD.
+    //
+    // Everything in this block is structure — numbers, dates and flags, one answer
+    // for all three languages — so a restricted role kept the stored block whole
+    // and sent nothing. The refund schedule's optional explanation is the first
+    // WORDS ever to live here, and a translator who cannot reach it is the exact
+    // gap LANG_SUBKEYS closed for facts and mergeGroups() for a group's name.
+    //
+    // So the merge is handed the languages this session may edit, and it keeps
+    // every figure exactly as stored while letting those languages through.
+    out.registration = REG.mergeRegistration(
+      base && base.registration, incoming.registration, out.type, allowed);
   }
 
   // NEVER from the incoming request, at any permission level. The id is the
@@ -926,6 +937,11 @@ function falloutAudit(fallout) {
   const bits = [];
   const t = fallout.terms || {}, r = fallout.room || {};
   if (t.changed) bits.push(t.changed + ' re-termed, ' + t.emailed + ' emailed');
+  // Not a failure and not a change — the number of families the new schedule
+  // deliberately did NOT reach. It belongs in the audit line for the same reason
+  // the re-termed count does: it is what this publish did and did not do to
+  // people's terms.
+  if (fallout.schedule) bits.push((fallout.schedule.older || 0) + ' on an older refund schedule');
   if (r.groups && r.groups.length) bits.push(r.told + ' told of ' + r.groups.length + ' reopened group(s)');
   (t.failed || []).concat(r.failed || []).forEach((f) => bits.push('FAILED ' + f));
   return bits.length ? bits.join(' · ') : null;

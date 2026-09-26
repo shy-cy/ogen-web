@@ -377,6 +377,36 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
   H.eq(D.byClass(dom.mount, 'acc-notice').length, 0,
     'and NOT as a notice — a tinted panel with a rule means something is wrong');
 
+  // ⚠ AND A SCHEDULE OF MORE THAN THE CLASSIC TWO STEPS IS DRAWN AS A TABLE.
+  //
+  // The refund policy is a list of steps now, and past two of them four sentences
+  // of "cancel by X and Y% comes back" is a list a reader skips — with the one
+  // thing they came for, which band is mine, hardest to find in it. The server
+  // decides the shape and sends one entry that is an object rather than a
+  // sentence; nothing here had ever rendered one, and a client that ignored it
+  // would drop the whole policy off the page in silence.
+  const stepped = await screen({ view: 'activity', lang: 'en', search: '?p=p-1&a=act-1',
+    api: { registration: (b) => {
+      const out = JSON.parse(JSON.stringify(ANSWERS.registration(b)));
+      out.registration.cancellationTerms = [
+        'You can cancel this registration at any time. What comes back depends on when:',
+        { schedule: [{ when: 'until it starts', credit: 'the whole activity fee' },
+                     { when: 'until 15 October 2026', credit: '75%' },
+                     { when: 'until 4 November 2026', credit: '50%' },
+                     { when: 'after that', credit: 'nothing' }] },
+        'Credit stays on your account.'];
+      return out;
+    } } });
+  H.eq(D.byClass(stepped.mount, 'acc-terms-steps').length, 1, 'the steps are one block');
+  H.ok(has(stepped, 'until 15 October 2026') && has(stepped, '75%'),
+    'each step names its date and what it credits');
+  H.ok(has(stepped, 'after that') && has(stepped, 'nothing'),
+    'and the closing row says nothing comes back after it');
+  H.ok(has(stepped, 'Credit stays on your account.'),
+    '⚠ while the sentences either side of the table still render — a client that ' +
+    'only understood strings would have dropped the table and kept these, and one ' +
+    'that only understood the table would have dropped these');
+
   console.log('\n[/account/activity — pay per session, where "attended" lives]');
   dom = await screen({ view: 'activity', lang: 'en', search: '?p=p-1&a=act-2' });
   H.ok(has(dom, 'Attended'), 'an evening that happened says so');

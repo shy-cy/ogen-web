@@ -581,7 +581,25 @@ function termsBlock(reg, l, sessionCancelHours) {
   if (!lines.length) return '';
   return '<span style="font-size:13px;color:#6B705C;">' +
     '<b>' + esc(terms.titleFor(l)) + '</b><br>' +
-    lines.map(esc).join('<br>') + '</span>';
+    lines.map(termsLine).join('<br>') + '</span>';
+}
+
+// One line of the terms, or the refund schedule as a two-column block.
+//
+// ⚠ AN EMAIL HAS NO STYLESHEET, so the layout is a table with inline styles —
+// and the padding is SYMMETRIC on purpose. The shell sets dir on its wrapper, so
+// this block lays out right-to-left in Hebrew by inheritance; a one-sided padding
+// would then sit on the wrong side of the figure, and logical properties are not
+// something mail clients can be relied on for. Equal padding is the one spacing
+// that is correct in both directions.
+function termsLine(line) {
+  if (typeof line === 'string') return esc(line);
+  return '<table role="presentation" cellpadding="0" cellspacing="0" ' +
+    'style="border-collapse:collapse;margin:4px 0;font-size:13px;color:#6B705C;">' +
+    (line.schedule || []).map((r) =>
+      '<tr><td style="padding:2px 0;white-space:nowrap;">' + esc(r.when) + '</td>' +
+      '<td style="padding:2px 12px;">' + esc(r.credit) + '</td></tr>').join('') +
+    '</table>';
 }
 
 // ⚠ WHERE TO GO — THE FIRST TIME THIS SITE EVER TELLS ANYBODY.

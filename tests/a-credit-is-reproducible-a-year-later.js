@@ -134,7 +134,14 @@ console.log('\n[no sessions at all means the course has not started]');
 // testing the wrong branch — which is exactly what it did on the first run.
 const noCal = C.creditFor(reg({ cancellation: { sessionStartsAt: [] } }), at('2026-12-01T12:00:00Z'));
 H.eq(noCal.courseCredit, 30000, 'full course credit');
-H.eq(noCal.reason, 'not-started', 'because an empty list cannot have begun');
+// ⚠ 'full' WHERE THIS SAID 'not-started', and the rename is the feature. The
+// first step of a refund schedule no longer has to end at the first session — it
+// can end on a date after the course has begun, which is a policy Ogen actually
+// wanted — so "it has not begun" stopped being the thing that is true about a step
+// crediting everything. What every reader of this field wanted to know is that
+// nothing is missing, and that is what it says.
+H.eq(noCal.reason, 'full', 'because an empty list cannot have begun, so the first step still applies');
+H.eq(noCal.band.percent, 100, 'and the step that applies credits all of it');
 H.eq(noCal.feeCredit, 0, 'while the fee still answers to its own date, which has passed');
 
 console.log('\n[the cutoff is the END of the day, in Cyprus]');
@@ -304,9 +311,17 @@ const activity = {
 };
 const frozen = C.freezeCancellation(activity);
 H.eq(frozen.sessionStartsAt.length, 2, 'the excluded date is not frozen');
-H.eq(frozen.mode, 'prorated', 'the mode is copied');
+// ⚠ THE SCHEDULE IS COPIED, AND `mode` IS NOT WRITTEN AT ALL. A prorated activity
+// freezes as a schedule whose last step credits the sessions still to come, which
+// is what the mode always meant; carrying both would give creditFor() two answers
+// to choose between, and the closing date beside the schedule would be a second
+// field that can contradict the last step.
+H.eq(frozen.mode, undefined, 'no mode is frozen — the schedule says it');
+H.eq(frozen.tiers.length, 2, 'the schedule is copied');
+H.eq(frozen.tiers[0].percent, 100, 'everything back until it starts');
+H.eq(frozen.tiers[1].percent, 'remaining', 'and then the sessions still to come');
 H.eq(frozen.registrationFeeCutoffDate, '2026-09-30', 'and both dates');
-H.eq(frozen.cancellationCutoffDate, '2026-10-28', 'so the registration carries its own terms');
+H.eq(C.closingOf(frozen), '2026-10-28', 'so the registration carries its own terms');
 H.eq(new Date(frozen.sessionStartsAt[0]).toISOString(), '2026-10-14T13:00:00.000Z',
   '16:00 in Nicosia on 14 October is 13:00 UTC — the wall clock is resolved once, at freezing');
 // The denominator is the length of that list, so an excluded session cannot be

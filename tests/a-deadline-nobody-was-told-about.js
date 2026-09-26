@@ -260,7 +260,10 @@ const justBefore = (iso) => Date.parse(iso + 'T06:00:00Z');
   // from the live activity would quietly re-quote a new policy at an old family,
   // which is that rule broken by the one screen written to explain it.
   const moved = JSON.parse(JSON.stringify(course));
-  moved.registration.cancellationPolicy.cancellationCutoffDate = '2026-12-16';
+  // Written as the last STEP of the refund schedule, which is where the closing
+  // date lives now. Assigned to the old key it would be a field nothing reads.
+  moved.registration.cancellationPolicy.tiers[
+    moved.registration.cancellationPolicy.tiers.length - 1].until = '2026-12-16';
   moved.registration.registrationFeeCutoffDate = '2026-12-01';
   github._files.set('activities/term.json', JSON.stringify(moved));
   api._internal._setReader(async (slug) => JSON.parse(github._files.get('activities/' + slug + '.json')));

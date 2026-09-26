@@ -28,9 +28,19 @@ const groups = require('./_activity-groups');
 const TYPES = ['course', 'dropin'];
 const DEFAULT_TYPE = 'course';
 
-// flat is the default because it works on an activity nobody has finished
-// scheduling. Prorated divides by the session list, so it is refused on save
-// unless that list resolves — see validateRegistration().
+// ⚠ LEGACY. These two were the whole cancellation policy: a mode, plus one
+// closing date, and the arithmetic in _credit.js branched on the mode.
+//
+// That WAS a two-tier refund schedule and could not say so — 100% until the
+// first session, then 50% or remaining÷total until the closing date, then
+// nothing. The schedule is editable now (see the tier block below), and these
+// survive for exactly one purpose: translating a record written before it into
+// the new vocabulary. legacyTiers() is the only reader.
+//
+// Nothing writes them any more. normaliseRegistration() stops carrying them
+// from a record's next save, the way migrate() dropped ctaUrl — and _credit.js
+// never stops understanding them, because frozen blocks written last month are
+// read forever.
 const CANCELLATION_MODES = ['flat', 'prorated'];
 const DEFAULT_MODE = 'flat';
 
@@ -101,6 +111,158 @@ function positiveInt(value) {
   return i > 0 ? i : null;
 }
 
+// --- the refund schedule ---------------------------------------------------
+//
+// A LIST OF STEPS, EARLIEST FIRST, and the list order IS the policy order.
+//
+//   [ { until: 'start',      percent: 100 },
+//     { until: '2026-11-04', percent: 50  } ]
+//
+// Each step says what comes back if a family cancels before its boundary. Past
+// the LAST boundary nothing is creditable — which is what the single
+// `cancellationCutoffDate` used to be, and the reason it is gone: a closing date
+// beside a table of steps is two fields that can contradict each other, and
+// something then has to decide which wins. Here the contradiction is not
+// representable, exactly as it is not for a cutoff's three states.
+//
+// `until` reuses those three states and adds one token:
+//
+//   'start'       the moment the group's first session begins
+//   '2026-11-04'  the end of that day in Asia/Nicosia
+//   'none'        this rate never stops. Credit does not close.
+//   null          never configured. Only meaningful on the LAST step, where
+//                 defaultIfBlank() fills it and resolveTiers() computes it per
+//                 group — the same thing the closing date has always done.
+//
+// `percent` is an integer 0-100, or 'remaining' for a step that credits the
+// sessions a family has not had. That is proration, and it is a VALUE here
+// rather than a mode, which is what makes a legacy record expressible: see
+// legacyTiers() below.
+const AT_START = 'start';
+const PRORATED = 'remaining';
+
+// ⚠ SIX, AND THE LIMIT IS THE FAMILY RATHER THAN THE STORAGE.
+//
+// Nothing structural caps this — the frozen copy is a few bytes and no metadata
+// field is involved. What caps it is that the schedule has to be readable in
+// three languages in an email with no stylesheet, and six steps is already five
+// dates plus "nothing after that". Past that an admin is drawing a curve by
+// hand, and the curve already has a name: a prorated last step is the unlimited
+// case in one row. The refusal says so rather than only saying no.
+const MAX_TIERS = 6;
+
+function boundary(value) {
+  if (value === AT_START) return AT_START;
+  return cutoff(value);
+}
+
+function tierPercent(value) {
+  if (value === PRORATED) return PRORATED;
+  const n = num(value);
+  if (n == null) return null;
+  const i = Math.round(n);
+  return i >= 0 && i <= 100 ? i : null;
+}
+
+// Nothing typed at all. An admin who pressed "+" and changed their mind has not
+// made a mistake, so a wholly empty row is dropped in silence — where a row with
+// a rate and no date is refused on save, because that one IS a mistake and
+// dropping it quietly is how normaliseBundles() once let an activity publish
+// with nothing on offer.
+function tierIsBlank(t) {
+  if (!t || typeof t !== 'object') return true;
+  const hasUntil = t.until !== undefined && t.until !== null && String(t.until).trim() !== '';
+  const hasPct = t.percent !== undefined && t.percent !== null && String(t.percent).trim() !== '';
+  return !hasUntil && !hasPct;
+}
+
+// ⚠ A HALF-TYPED ROW IS KEPT, NOT DROPPED, AND THE REASON IS WHERE validate()
+// RUNS. It is handed the MERGED record, which this function has already
+// normalised — so anything dropped here is gone before there is anybody to refuse
+// it, and an admin who typed a date and cleared the percentage would watch the
+// step vanish on save with nothing said. That is the silent loss this codebase
+// keeps meeting, in the one panel where the value is money.
+//
+// So the rate survives as null, validateTiers() refuses it, and bandFor() reads
+// it the generous way. A wholly empty row is still dropped in silence: pressing
+// "+" and changing your mind is not a mistake.
+//
+// The slice is a HARD CEILING rather than the policy cap, for the same reason:
+// truncating at MAX_TIERS would silently discard a seventh step instead of
+// refusing it. This bounds what a hostile client can commit to git and sits well
+// above anything validation allows.
+const TIER_CEILING = 50;
+
+function normaliseTiers(raw) {
+  const out = [];
+  (Array.isArray(raw) ? raw : []).forEach((t) => {
+    if (tierIsBlank(t)) return;
+    out.push({ until: boundary(t.until), percent: tierPercent(t.percent) });
+  });
+  return out.slice(0, TIER_CEILING);
+}
+
+// ⚠ THE OLD POLICY, IN THE NEW VOCABULARY, and it is exact rather than
+// approximate — which is the whole reason the schedule was designed as a
+// generalisation of the mode rather than as a replacement for it.
+//
+// share(cents, 50, 100) and share(cents, 1, 2) agree on every cent value, so a
+// flat activity translated this way credits the same figure it always did. A
+// test asserts that across the whole range rather than trusting the algebra.
+function legacyTiers(policy) {
+  const p = policy || {};
+  const mode = CANCELLATION_MODES.indexOf(p.mode) !== -1 ? p.mode : DEFAULT_MODE;
+  return [
+    { until: AT_START, percent: 100 },
+    { until: cutoff(p.cancellationCutoffDate), percent: mode === 'prorated' ? PRORATED : 50 }
+  ];
+}
+
+// ⚠ ABSENT AND EMPTY ARE DIFFERENT ANSWERS, and conflating them would either
+// re-invent a policy an admin deleted or silently ignore one they never had.
+//
+//   no `tiers` key   a record written before the schedule existed -> translate
+//   `tiers: []`      an admin deleted every step. Credit never closes and the
+//                    whole of what was paid comes back, which is what a blank
+//                    resolves to everywhere else in this system.
+function tiersOf(policy) {
+  const p = policy || {};
+  return Array.isArray(p.tiers) ? normaliseTiers(p.tiers) : legacyTiers(p);
+}
+
+// The boundary past which nothing is creditable: the last step's. Null when
+// there are no steps, which reads as "never closes" the way every blank here
+// does — see past() in _credit.js, which is the one place that decides.
+function closingBoundary(tiers) {
+  const list = Array.isArray(tiers) ? tiers : [];
+  return list.length ? list[list.length - 1].until : null;
+}
+
+// ⚠ AN OPTIONAL EXPLANATION, IN THREE LANGUAGES, AND IT IS WORDS.
+//
+// Asked for alongside the schedule, for the case that looks like a bug and is
+// not: a closing date BEFORE the course starts, because costs were committed on
+// the family's behalf — materials, books, tickets bought in advance. A date like
+// that cannot account for itself, and the schedule is where somebody reads it.
+//
+// Blank means nothing is shown anywhere. It is the only thing in the
+// registration block that is words rather than structure, which is why
+// mergeRegistration() takes the languages a session may edit — a role permitted
+// to translate must be able to translate this, and must not be able to move a
+// percentage. That gap is the one LANG_SUBKEYS was invented for, arriving in a
+// block that had never had a word in it.
+const NOTE_LANGS = ['he', 'en', 'ru'];
+const NOTE_MAX = 400;
+function noteBag(raw) {
+  const src = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const out = {};
+  NOTE_LANGS.forEach((l) => {
+    out[l] = String(src[l] == null ? '' : src[l]).replace(/\s+/g, ' ').trim().slice(0, NOTE_MAX);
+  });
+  return out;
+}
+const noteIsEmpty = (bag) => NOTE_LANGS.every((l) => !(bag && bag[l]));
+
 // The canonical shape, applied on every read and every save, exactly as
 // normaliseFacts does for facts. An old client cannot reintroduce an old shape,
 // and a record that has never carried a registration block gets the defaults
@@ -115,9 +277,15 @@ function normaliseRegistration(raw, type) {
     autoApprove: r.autoApprove === true,
     pendingExpiryDays: positiveInt(r.pendingExpiryDays),
     registrationFeeCutoffDate: cutoff(r.registrationFeeCutoffDate),
+    // ⚠ `mode` AND `cancellationCutoffDate` ARE NOT WRITTEN BACK. tiersOf()
+    // translates them when they are the only thing a record carries, and the
+    // canonical shape then holds the schedule alone — so the record stops
+    // carrying the old pair from its next save and there is never a moment when
+    // both are present and could disagree. The second pass finds what the first
+    // wrote, which is the idempotence rule migrate() follows.
     cancellationPolicy: {
-      mode: CANCELLATION_MODES.indexOf(policy.mode) !== -1 ? policy.mode : DEFAULT_MODE,
-      cancellationCutoffDate: cutoff(policy.cancellationCutoffDate)
+      tiers: tiersOf(policy),
+      note: noteBag(policy.note)
     },
     // What the two dates above were computed FROM, the one time they were
     // computed. Kept so the form can NOTICE the inputs have changed and offer
@@ -217,12 +385,20 @@ function defaultIfBlank(activity) {
     const d = agreed((gid) => minusDays(groups.durationFor(activity, gid).startDate, FEE_CUTOFF_DAYS) || null);
     if (d) { reg.registrationFeeCutoffDate = d; filled = true; }
   }
-  // A drop-in has no term to withdraw from, so it has no cancellation cutoff to
-  // compute. Leaving it null keeps the field meaningless rather than filling it
+  // A drop-in has no term to withdraw from, so it has no closing date to
+  // compute. Leaving it null keeps the step meaningless rather than filling it
   // with a date that governs nothing.
-  if (type !== 'dropin' && reg.cancellationPolicy.cancellationCutoffDate == null) {
+  //
+  // ⚠ ONLY THE LAST STEP, and only when it was never configured. Every step
+  // above it names a date an admin typed, and there is no formula for a boundary
+  // in the middle of a schedule — which is why validateRegistration() refuses a
+  // blank anywhere else. This is the same fill the single closing date has always
+  // had, now addressed by position rather than by name.
+  const tiers = reg.cancellationPolicy.tiers;
+  const last = tiers.length ? tiers[tiers.length - 1] : null;
+  if (type !== 'dropin' && last && last.until == null) {
     const d = agreed((gid) => thirtyPercentPoint(activity, gid));
-    if (d) { reg.cancellationPolicy.cancellationCutoffDate = d; filled = true; }
+    if (d) { last.until = d; filled = true; }
   }
   const duration = groups.durationFor(activity, groups.groupList(activity)[0]
     ? groups.groupList(activity)[0].groupId : undefined);
@@ -256,15 +432,37 @@ function defaultIfBlank(activity) {
 function resolveCutoffs(activity, groupId) {
   const type = normaliseType(activity && activity.type);
   const reg = normaliseRegistration(activity && activity.registration, type);
-  const policy = reg.cancellationPolicy || {};
   return {
     registrationFeeCutoffDate: reg.registrationFeeCutoffDate != null
       ? reg.registrationFeeCutoffDate
       : (minusDays(groups.durationFor(activity, groupId).startDate, FEE_CUTOFF_DAYS) || null),
-    cancellationCutoffDate: policy.cancellationCutoffDate != null
-      ? policy.cancellationCutoffDate
-      : (type === 'dropin' ? null : thirtyPercentPoint(activity, groupId))
+    // DERIVED from the schedule rather than stored beside it. The closing date is
+    // the last step's boundary, so there is one value and nothing to reconcile —
+    // and every existing caller (the publish fallout, the ledger basis, the
+    // "credit window closed on" sentence) keeps reading the same field name.
+    cancellationCutoffDate: closingBoundary(resolveTiers(activity, groupId))
   };
+}
+
+// ⚠ THE SCHEDULE A PARTICULAR FAMILY IS HELD TO, per group, at the one moment
+// the group is known. Every step is exactly what the admin typed except a last
+// boundary nobody configured, which is computed from THIS group's calendar — the
+// same thing the single closing date has always done, and for the same reason:
+// two groups sold the same hours across four meetings and six have different
+// third sessions, so one activity-level date would govern the other group's
+// families plausibly and invisibly.
+function resolveTiers(activity, groupId) {
+  const type = normaliseType(activity && activity.type);
+  const reg = normaliseRegistration(activity && activity.registration, type);
+  const tiers = (reg.cancellationPolicy || {}).tiers || [];
+  return tiers.map((t, i) => {
+    if (t.until != null) return { until: t.until, percent: t.percent };
+    const isLast = i === tiers.length - 1;
+    const computed = isLast && type !== 'dropin' ? thirtyPercentPoint(activity, groupId) : null;
+    // Unresolvable stays null, which past() reads as "not reached" — the
+    // generous direction every blank in this system falls in.
+    return { until: computed, percent: t.percent };
+  });
 }
 
 // Have the inputs moved since the dates were computed? Detect it, offer it,
@@ -318,39 +516,173 @@ function validateRegistration(activity) {
   if (type !== undefined && TYPES.indexOf(type) === -1) {
     errors.push(`Unknown activity type "${type}". It is either "course" or "dropin".`);
   }
-  const reg = normaliseRegistration(activity && activity.registration, normaliseType(type));
-  const raw = (activity && activity.registration) || {};
-  const rawPolicy = raw.cancellationPolicy || {};
-  if (rawPolicy.mode !== undefined && CANCELLATION_MODES.indexOf(rawPolicy.mode) === -1) {
-    errors.push(`Unknown cancellation mode "${rawPolicy.mode}". It is either "flat" or "prorated".`);
+  validateTiers(activity, errors);
+  return errors;
+}
+
+// The first meeting, as a date. What `until: 'start'` resolves to for ordering —
+// the calendar's own first session, falling back to the typed start date, which
+// is the same precedence thirtyPercentPoint() uses.
+function firstSessionDate(activity, groupId) {
+  const duration = groups.durationFor(activity, groupId);
+  const rows = sessions.scheduled(duration.sessionDates);
+  if (rows.length) return rows[0].date;
+  return sessions.parseISO(duration.startDate) != null ? duration.startDate : null;
+}
+
+// A sortable key for a boundary, resolved for one group. Infinity for a boundary
+// that never passes, null for one that cannot be resolved at all.
+//
+// ⚠ 'start' SORTS BEFORE A DATE ON THE SAME DAY, and the half-day is not
+// decoration: a date boundary passes at the END of its day in Asia/Nicosia,
+// where 'start' passes the moment the session begins. Two steps ending on one
+// day are ordered by that difference and nothing else.
+function boundaryKey(until, activity, groupId) {
+  if (until == null || until === OFF) return Infinity;
+  const iso = until === AT_START ? firstSessionDate(activity, groupId) : until;
+  const t = sessions.parseISO(iso);
+  // ⚠ AN UNRESOLVABLE BOUNDARY IS "NOT REACHED", NOT AN ERROR — and refusing it
+  // was a real bug for the length of one test run: 'start' on an activity with no
+  // start date and no calendar is EVERY activity somebody has just created, and
+  // this refused all of them.
+  //
+  // It resolves the generous way, and not as a concession: hasStarted() on an
+  // empty session list is false, so the step never closes and the whole of what
+  // was paid comes back. That is exactly what flat mode did on an unscheduled
+  // activity, which is the reason flat was the default. The schedule inherits it
+  // rather than needing a rule of its own.
+  if (t == null) return Infinity;
+  return t + (until === AT_START ? 0 : 0.5);
+}
+
+const stepName = (i, t) => 'step ' + (i + 1) +
+  (t && t.percent === PRORATED ? ' (prorated)' : t ? ' (' + t.percent + '%)' : '');
+
+// ⚠ A DROP-IN'S SCHEDULE IS INERT AND IS NOT CHECKED, which is a deliberate
+// change of answer rather than an omission.
+//
+// The old rule refused a prorated MODE on a drop-in, because "a mode saved and
+// never read is a mode somebody will later believe is in force". That was right
+// about the danger and produced a trap: the form does not draw the policy on a
+// drop-in, and mergeRegistration() keeps it across a type switch on purpose — so
+// a prorated course switched to a drop-in could not be published, and there was
+// no control anywhere to fix it.
+//
+// Keeping a value across a switch and refusing to save it are incompatible, and
+// the value genuinely governs nothing here: creditFor() returns at the top on
+// `frozen.type === 'dropin'`, which is a property of the code rather than a rule
+// anybody has to remember. So the schedule rides along unread, and what a
+// drop-in's cancellation actually obeys — sessionCancelHours — is validated as
+// the positive integer it is.
+function validateTiers(activity, errors) {
+  const type = normaliseType(activity && activity.type);
+  if (type === 'dropin') return;
+
+  const rawPolicy = ((activity && activity.registration) || {}).cancellationPolicy || {};
+  // Read off the RAW request, not the canonical shape: normaliseTiers() drops a
+  // half-typed row to keep the stored shape clean, and a drop that is right on
+  // read is silent on save. That is how normaliseBundles() once let an activity
+  // publish with nothing on offer while the form still showed what was typed.
+  // ⚠ CHECKED ON THE CANONICAL SHAPE, not on the raw request. validate() is handed
+  // the merged record, so a rule that could only read the raw body would never
+  // fire in the one place it matters — which is how the first draft of this
+  // function passed while refusing nothing.
+  const tiers = (normaliseRegistration(activity && activity.registration, type)
+                  .cancellationPolicy || {}).tiers || [];
+  if (!tiers.length) return;
+
+  if (tiers.length > MAX_TIERS) {
+    errors.push('A refund schedule of more than ' + MAX_TIERS + ' steps is one no family will read. ' +
+      'For a sliding scale, make the last step prorated — it credits the sessions still to come, ' +
+      'which is every step at once.');
   }
 
-  // Prorated divides sessions remaining by sessions total. Without a resolved
-  // calendar the formula divides by a number that is not there, at the moment a
-  // family is cancelling — which is the worst possible moment to discover a
-  // configuration gap. Flat has no such requirement, which is a second reason
-  // it is the default.
-  if (reg.cancellationPolicy.mode === 'prorated') {
-    // Every group needs one, not just the first: proration divides by the
-    // calendar the family was sold, so a group without one is a family whose
-    // cancellation divides by nothing at the moment they are cancelling.
-    const list = groups.groupList(activity);
-    const without = list.filter(
-      (g) => !sessions.scheduled(groups.durationFor(activity, g.groupId).sessionDates).length);
-    if (!list.length || without.length) {
-      errors.push('Prorated cancellation needs a session calendar to divide by, and this activity has none. ' +
-        'Generate the sessions on the Schedule panel, or use flat cancellation.');
+  tiers.forEach((t, i) => {
+    if (t.percent == null) {
+      errors.push('Refund step ' + (i + 1) + ' has no percentage. It is a whole number from 0 to 100, ' +
+        'or prorated.');
+    }
+  });
+
+  tiers.forEach((t, i) => {
+    const last = i === tiers.length - 1;
+    // A boundary that never passes makes everything below it unreachable, and a
+    // blank one has no formula except on the last step, where it is the closing
+    // date the system has always computed.
+    if (!last && t.until === OFF) {
+      errors.push('Refund ' + stepName(i, t) + ' never stops, so the steps after it can never apply. ' +
+        'Give it a date, or make it the last step.');
+    }
+    if (!last && t.until == null) {
+      errors.push('Refund ' + stepName(i, t) + ' needs a date. Only the last step can be left blank, ' +
+        'and that one is filled in when you save.');
+    }
+    if (t.percent === PRORATED) {
+      if (!last) {
+        errors.push('Only the last refund step can be prorated: it already decreases to nothing on its ' +
+          'own, so a step after it would be a jump in the middle of a slope.');
+      }
+      // ⚠ AND IT MAY ONLY FOLLOW STEPS THAT CREDIT IN FULL. Prorated credits the
+      // sessions still to come, which just after its band opens is nearly all of
+      // them — so after a 50% step the credit would RISE, which is the one thing
+      // the ordering rule below exists to forbid. Today's prorated mode is
+      // exactly [100% until it starts, prorated], so nothing in use is affected.
+      if (tiers.slice(0, i).some((p) => p.percent !== 100)) {
+        errors.push('A prorated step credits the sessions still to come, which as it opens is nearly ' +
+          'all of them — so it can only follow steps that credit in full.');
+      }
+    }
+  });
+
+  // ⚠ CREDIT MAY NEVER RISE BY WAITING. A later step crediting more than an
+  // earlier one rewards delay and makes the sentence above it false: "cancel by
+  // the 30th for the whole of it" cannot be true if the 15th of November is
+  // worth more. Equal is allowed — two steps crediting the same amount are
+  // redundant rather than contradictory, and refusing redundancy is a form
+  // fighting somebody who is halfway through an edit.
+  for (let i = 1; i < tiers.length; i++) {
+    const before = tiers[i - 1].percent;
+    const after = tiers[i].percent;
+    if (before === PRORATED || after === PRORATED) continue;
+    if (Number(after) > Number(before)) {
+      errors.push('Refund ' + stepName(i, tiers[i]) + ' credits more than ' + stepName(i - 1, tiers[i - 1]) +
+        ' before it. A family cannot get more back by cancelling later.');
     }
   }
 
-  // A drop-in has no term price to prorate and no term to withdraw from, so a
-  // cancellation policy on one is a setting that governs nothing. Refused
-  // rather than ignored: a mode saved and never read is a mode somebody will
-  // later believe is in force.
-  if (normaliseType(type) === 'dropin' && rawPolicy.mode === 'prorated') {
-    errors.push('A drop-in activity has no course to prorate. Use the per-session cancellation window instead.');
+  // Per group, because both of these resolve per group: 'start' is that group's
+  // first meeting, and proration divides by the calendar that group was sold.
+  // Two groups under the equal-hours rule can meet four times and six.
+  const list = groups.groupList(activity);
+  const ids = list.length ? list.map((g) => g.groupId) : [undefined];
+  const named = (gid) => {
+    const g = list.filter((x) => x.groupId === gid)[0];
+    const n = g && g.name ? (g.name.he || g.name.en || g.name.ru) : '';
+    return list.length > 1 ? ' (' + (n || gid) + ')' : '';
+  };
+
+  if (tiers.some((t) => t.percent === PRORATED)) {
+    const without = ids.filter(
+      (gid) => !sessions.scheduled(groups.durationFor(activity, gid).sessionDates).length);
+    if (!list.length || without.length) {
+      errors.push('A prorated refund step needs a session calendar to divide by, and this activity has ' +
+        'none. Generate the sessions on the Schedule panel, or give that step a percentage instead.');
+    }
   }
-  return errors;
+
+  ids.forEach((gid) => {
+    const resolved = resolveTiers(activity, gid);
+    let prev = -Infinity;
+    let prevIdx = -1;
+    resolved.forEach((t, i) => {
+      const k = boundaryKey(t.until, activity, gid);
+      if (k <= prev) {
+        errors.push('Refund ' + stepName(i, t) + ' ends before ' + stepName(prevIdx, resolved[prevIdx]) +
+          ' above it' + named(gid) + '. The schedule runs earliest first.');
+      }
+      if (k !== Infinity) { prev = k; prevIdx = i; }
+    });
+  });
 }
 
 // --- the Registration panel ------------------------------------------------
@@ -375,14 +707,21 @@ const FIELDS = [
       hint: 'One date, the same for every family however late they registered. Leave it blank ' +
             'and it is filled in WHEN YOU SAVE, ' + FEE_CUTOFF_DAYS + ' days before the start ' +
             'date \u2014 so it stays empty until then, and needs a start date to compute from.' },
-    { key: 'cancellationPolicy.mode', kind: 'mode', types: ['course'],
-      label: 'How a cancellation is credited',
-      hint: 'Flat credits a fixed share. Prorated divides the sessions remaining by the sessions total, and needs a session calendar.' },
-    { key: 'cancellationPolicy.cancellationCutoffDate', kind: 'cutoff', types: ['course'],
-      label: 'Nothing is creditable after',
-      hint: 'Leave it blank and it is filled in WHEN YOU SAVE, to the date of session ' +
-            Math.round(CANCEL_FRACTION * 100) + '% of the way through \u2014 so it stays empty ' +
-            'until then, and needs a session calendar to count.' },
+    { key: 'cancellationPolicy.tiers', kind: 'tiers', types: ['course'],
+      label: 'What a cancellation credits',
+      hint: 'A step says what comes back if a family cancels before its date, and the list runs ' +
+            'earliest first. Past the LAST date nothing is creditable \u2014 that step is the closing ' +
+            'date. Leave the last date blank and it is filled in WHEN YOU SAVE, to the date of ' +
+            'session ' + Math.round(CANCEL_FRACTION * 100) + '% of the way through. A prorated step ' +
+            'credits the sessions still to come instead of a fixed share, and needs a session ' +
+            'calendar. At most ' + MAX_TIERS + ' steps: past that, use prorated. ' +
+            'Cancelling itself is always allowed \u2014 this is only what it is worth.' },
+    { key: 'cancellationPolicy.note', kind: 'langtext',
+      label: 'Why these dates (optional)',
+      hint: 'Shown to families wherever the cancellation terms are \u2014 the registration form, their ' +
+            'own page, and the confirmation emails. For a date that cannot account for itself: a ' +
+            'closing date before the course starts, because materials or tickets were bought in ' +
+            'advance. Leave it blank and nothing is shown anywhere.' },
     { key: 'sessionCancelHours', kind: 'days', types: ['dropin'], unit: 'hours',
       label: 'A session can be cancelled up to',
       hint: 'Before it starts. Leave blank to allow cancelling right up to the start time.' }
@@ -423,8 +762,28 @@ function setPath(obj, key, value) {
 // rather than from a list the client sends, so it needs no trust.
 //
 // Switch a course to a drop-in and back, and the term settings are still there.
-function mergeRegistration(base, incoming, type) {
+function mergeRegistration(base, incoming, type, langs) {
   const t = normaliseType(type);
+
+  // ⚠ ONE WORD IN A BLOCK OF STRUCTURE, AND IT HAS TO BE TRANSLATABLE.
+  //
+  // Everything else here is a number, a date or a flag: one answer for all three
+  // languages, so a role permitted to edit only Russian keeps the stored value
+  // and sends nothing. The explanation note is copy a family reads, and a
+  // translator who cannot reach it is the exact gap LANG_SUBKEYS was invented to
+  // close for facts and mergeGroups() for a group's name — arriving in the one
+  // block that had never held a word.
+  //
+  // So a restricted session keeps the schedule, the cutoffs and every flag
+  // exactly as stored, and may write the note in the languages it is allowed.
+  const allowed = Array.isArray(langs) ? langs : NOTE_LANGS;
+  if (!NOTE_LANGS.every((l) => allowed.indexOf(l) !== -1)) {
+    const kept = normaliseRegistration(base, t);
+    const sent = noteBag((((incoming || {}).cancellationPolicy) || {}).note);
+    allowed.forEach((l) => { if (NOTE_LANGS.indexOf(l) !== -1) kept.cancellationPolicy.note[l] = sent[l]; });
+    return kept;
+  }
+
   const from = normaliseRegistration(base, t);
   const to = normaliseRegistration(incoming, t);
   const out = normaliseRegistration(base, t);
@@ -512,9 +871,12 @@ function keepUndrawnFactKeys(factKey, current, incoming, type) {
 module.exports = {
   TYPES, DEFAULT_TYPE, CANCELLATION_MODES, DEFAULT_MODE,
   DEFAULT_EXPIRY_DAYS, FEE_CUTOFF_DAYS, CANCEL_FRACTION, OFF,
+  AT_START, PRORATED, MAX_TIERS, NOTE_LANGS, NOTE_MAX,
   normaliseType, normaliseRegistration, validateRegistration,
   defaultIfBlank, basisChanged, resolveExpiryDays,
   thirtyPercentPoint, minusDays, cutoff,
+  normaliseTiers, legacyTiers, tiersOf, closingBoundary, noteBag, noteIsEmpty,
+  firstSessionDate, boundaryKey,
   FIELDS, draws, mergeRegistration, keepUndrawnFactKeys, TYPE_SCOPED_FACT_KEYS,
-  resolveCutoffs
+  resolveCutoffs, resolveTiers
 };

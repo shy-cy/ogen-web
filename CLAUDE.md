@@ -969,8 +969,8 @@ activity is**; `priceRows()` was already built out of "if there is a fee", "if
 there is a term price", so a drop-in is one more conditional row.
 
 **`registration`** is what a registration system will read: `autoApprove`,
-`pendingExpiryDays`, `registrationFeeCutoffDate`, `cancellationPolicy.{mode,
-cancellationCutoffDate}`, and `sessionCancelHours` on a drop-in. It lives in
+`pendingExpiryDays`, `registrationFeeCutoffDate`, `cancellationPolicy.{tiers,
+note}`, and `sessionCancelHours` on a drop-in. It lives in
 `_activity-registration.js`, which is **pure and does not arm the legal gate** —
 the gate matches a filename *starting* with `registration`, and this module holds
 nobody's data. Do not rename it to something that begins with that word.
@@ -1496,8 +1496,8 @@ feeds does, and is not built.
 **It reads one registration and one timestamp, and nothing else** — no activity
 lookup, no GitHub call, no live schedule, no `Date.now()`. That is not style: the
 cancellation policy is **frozen onto the registration at submission**, so an
-admin who switches an activity from flat to prorated in March cannot change what
-a family who registered in January is owed. Once the terms are frozen, the
+admin who rewrites an activity's refund schedule in March cannot change what a
+family who registered in January is owed. Once the terms are frozen, the
 calculation has nothing to reach that could have moved. The failure mode to watch
 for is somebody later "simplifying" it by reading the activity — which gives the
 same answer almost always.
@@ -1508,18 +1508,17 @@ one is what `basisFor()` sells — a family credited 150 out of 350 will ask why
 and the ledger entry carries the mode, both dates, sessions remaining over
 sessions total, and the two figures that were added.
 
-**Three thresholds, and they are not one timeline.** The fee answers to its own
-date and to nothing else; the course answers to the first session and to the hard
-cutoff. The fee's cutoff can fall before registration closes or after the course
-ends, so there is no ordering between them to rely on.
+**Two pots, and they are not one timeline.** The fee answers to its own date and
+to nothing else; the course answers to the **refund schedule** (the section below).
+The fee's cutoff can fall before registration closes or after the course ends, so
+there is no ordering between them to rely on.
 
 | | Course | Fee |
 |---|---|---|
-| Before the first session | 100% | — |
-| After it | 50% flat, or remaining ÷ total | — |
+| Inside a step of the schedule | that step's percentage, or the sessions still to come | — |
 | Before `registrationFeeCutoffDate` | — | 100% |
 | After it | — | 0% |
-| After `cancellationCutoffDate` | 0% | 0% |
+| Past the schedule's last boundary | 0% | 0% |
 
 Four rules carry the weight:
 
@@ -1537,10 +1536,13 @@ Four rules carry the weight:
   after — `formatToParts` has no millisecond field, so resolving an instant
   already carrying `.999` came back a second short and put the end of the day one
   second inside the next one.
-- **Flat is proration with a fixed ratio.** `share(cents, 1, 2)` versus
-  `share(cents, remaining, total)` — one division, one guard, one rounding rule,
-  rounded **up**. Two formulas can round differently, and the difference surfaces
-  when two families compare receipts.
+- **A percentage is proration with a fixed ratio.** `share(cents, 50, 100)`
+  versus `share(cents, remaining, total)` — one division, one guard, one rounding
+  rule, rounded **up**. Two formulas can round differently, and the difference
+  surfaces when two families compare receipts. It is also what made replacing the
+  old `flat` mode exact rather than approximate: `share(c, 50, 100)` and
+  `share(c, 1, 2)` agree on every cent value, and a test checks all 200,000 of
+  them rather than trusting the algebra.
 - **The fee is split off, never stored.** `splitPaid()` takes the fee first,
   capped at the frozen fee; the remainder is the course. Two stored fields would
   need `paidFee + paidCourse === paidCents` to hold on a store with no
@@ -1598,6 +1600,254 @@ Three things followed from the same edit:
   credit is positive the instant before and zero the instant after — while
   `guardianMayCancel` stays true on both sides.
 - An admin cancelling was never refused and is unchanged.
+
+### ⚠ The refund schedule: a table of steps, where there were two modes
+
+The cancellation policy was a **mode** — flat or prorated — plus one closing date,
+and `creditFor()` branched on the mode. Asked for as a fully modular tiered
+schedule: an admin configures a list of steps, each with its own date and its own
+percentage, with a "+" to add more.
+
+⚠ **THE OLD PAIR WAS ALREADY A TWO-STEP SCHEDULE AND COULD NOT SAY SO**, and that
+is the whole shape of this change. Written out, flat mode is *100% until the first
+session, then 50% until the closing date, then nothing*, and prorated mode is the
+same with *the sessions still to come* in the second step. So this is a
+generalisation of the rule that was there rather than a replacement for it — which
+is what makes the migration exact, the default unchanged, and the admin panel a
+picture of the policy the site has always had.
+
+```
+registration.cancellationPolicy = {
+  tiers: [ { until: 'start',      percent: 100 },
+           { until: '2026-11-04', percent: 50  } ],
+  note: { he: '', en: '', ru: '' }
+}
+```
+
+`until` reuses the three states a cutoff already had and adds one token: `'start'`
+(the group's first session), an ISO date, `'none'` (this rate never stops), or
+`null` (never configured — only meaningful on the last step, where
+`defaultIfBlank()` fills it and `resolveTiers()` computes it per group, exactly as
+the single closing date always did). `percent` is an integer 0-100 or
+`'remaining'`.
+
+⚠ **THE CLOSING DATE IS THE LAST STEP'S BOUNDARY, not a field beside the table.**
+A closing date of its own could contradict the last step, and something would then
+have to decide which wins; here the contradiction is not representable. That is
+the same argument the three-state cutoff is built on. `closingOf()` in `_credit.js`
+is the one place it is read, and `resolveCutoffs()` still answers under the old
+field name so the publish fallout and the ledger basis needed no edit.
+
+**Prorated is a VALUE, not a mode, and it stays.** Dropping it was the other
+option and it is the wrong one twice over: it is a real policy a family
+understands (*the classes you haven't had*), and it is **the answer to "I need
+more steps"** — a prorated last step is the unlimited case in one row, which is
+what makes the cap on steps defensible rather than arbitrary.
+
+Two rules keep it honest, and both are about credit never rising:
+
+- **Only the last step may be prorated.** It already descends to nothing, so a
+  step after it is a jump in the middle of a slope.
+- ⚠ **And it may only follow steps that credit in full.** Prorated credits the
+  sessions still to come, which as its band opens is nearly all of them — so
+  after a 50% step the credit would **rise**. Today's prorated mode is exactly
+  `[100% until it starts, prorated]`, so nothing in use is affected.
+
+⚠ **THE LAST BOUNDARY THAT HAS PASSED DECIDES WHICH STEP APPLIES**, and the
+obvious rule — *the first step whose boundary has not passed* — is wrong in a case
+Ogen deliberately wants. A closing date **before** the course starts is a real
+policy (costs committed on the family's behalf: materials, books, tickets bought
+in advance). Under the obvious rule, `[100% until it starts, 50% until 1
+September]` on a course beginning on the 15th credits **everything** on the 5th —
+the first step's boundary has not been reached, so the loop stops there and never
+notices the closing date went by. A full refund out of a policy written to
+withhold one. The single hard cutoff got this right for the reason stated beside
+it — *"the hard cutoff answers for everything, and comes first"* — and the same
+thing happens on any activity nobody has scheduled yet, where `'start'` resolves
+to "never reached" and every boundary above it is invisible. So the rule is not
+about ordering at all: whichever boundaries have passed, the step that applies is
+the one after the last of them.
+
+⚠ **AND AN EMPTY SCHEDULE CREDITS EVERYTHING.** Walking the steps and returning
+nought when none matches is the natural shape and it reads a blank as *every
+deadline has passed* — the one place in `_credit.js` where an unconfigured value
+would resolve **against** the family, in the one file where that costs them money.
+`tiersFrom()` supplies a single 100%-for-ever step instead. `tiers: []` (an admin
+deleted every step) and no `tiers` key at all (a record written before this
+existed) are deliberately **different answers**.
+
+**Migration is a translation on read, and it is permanent.** `legacyTiers()` turns
+a stored mode-and-date into two steps; `normaliseRegistration()` then stops
+carrying the old pair from a record's next save, the way `migrate()` dropped
+`ctaUrl`. A **frozen block** is never rewritten — `tiersFrom()` translates it
+every time it is read, for as long as that registration exists, because the terms
+a family agreed to are not ours to rewrite. ⚠ The translation lives in
+**one** function and `_credit.js` calls it: it was written out in both places for
+one bite-check, and that check found it — reverting the rule in one copy left the
+other correct and half the suite went on passing.
+
+`tests/a-frozen-policy-means-what-it-meant.js` is the migration. It writes the old
+band-selection logic out again and compares the two arithmetics across **13,824
+combinations** of mode × session list × closing date × fee date × amount paid ×
+fee-charged × instant, and every figure has to agree **to the cent**.
+
+**Validation refuses six things, and every one is asserted in both directions** —
+"this is refused" alone passes on a function that refuses everything, and that
+failure is only found by an admin who can no longer publish. Boundaries must
+increase (resolved **per group**, because `'start'` and a prorated denominator
+both are); credit may never rise (equal is allowed — redundancy is not a
+contradiction); prorated only last and only after full-credit steps; a middle step
+may not never-close or be blank; at most **six steps**; and a row with a date and
+no percentage is refused.
+
+⚠ **SIX, AND THE CAP IS THE FAMILY RATHER THAN THE STORAGE.** Nothing structural
+limits it. What does is that the schedule has to be readable in three languages in
+an email with no stylesheet, and six steps is already five dates plus "nothing
+after that". The refusal names the thing that IS the unlimited case.
+
+⚠ **AND THE CAP REFUSES RATHER THAN TRUNCATING.** `normaliseTiers()` sliced to six
+at first, which meant a seventh step vanished on save with nothing said — and
+because `validate()` is handed the **merged** record, the refusal could never fire
+at all. Both halves of that were wrong in the same way: the slice is a hard
+ceiling far above the policy cap (to bound what a hostile client can commit), and
+every rule is checked on the canonical shape.
+
+⚠ **AND A HALF-TYPED ROW IS KEPT, NOT DROPPED**, for the same reason. An admin who
+typed a date and cleared the percentage would otherwise watch the step disappear on
+save. `normaliseTiers()` keeps `percent: null`, validation refuses it, and
+`bandFor()` reads it as **100** — the generous direction every blank in that file
+takes, and deliberately not `|| 0`. It can only exist on a draft, and a draft has
+no page and no registrations.
+
+⚠ **An unscheduled activity is not refused.** `'start'` with no start date and no
+calendar is every activity somebody has just created, and refusing it blocked every
+first publish for the length of one test run. It resolves the generous way:
+`hasStarted()` on an empty list is false, so the step never closes and everything
+comes back — which is exactly what flat mode did, and the reason flat was the
+default.
+
+#### What a family reads
+
+⚠ **SENTENCES FOR THE CLASSIC SHAPE, A TABLE FOR EVERYTHING ELSE — and the test is
+the SHAPE, not the number of steps.** Counting steps was the obvious rule and it
+lies: a two-step schedule of 75% then 50% is not *"cancel before the first session
+and the whole fee comes back"*. The three sentences describe one specific
+schedule, so they are used for exactly that schedule and no other — which also
+means every page and every email on the site today is byte-identical to before,
+because every activity on it holds precisely that shape.
+
+```
+Cancellation terms
+You can cancel this registration at any time. What comes back depends on when:
+
+   until it starts          the whole activity fee
+   until 15 October 2026    75%
+   until 4 November 2026    50%
+   after that               nothing
+```
+
+`termsFor()` returns an array whose items are strings **or one `{schedule: [...]}`
+object**, so the page draws a `<dl class="acc-terms-steps">` and the email an
+inline-styled table while the words stay in one module. `termsText()` flattens it
+for a caller with no room for two columns. Three details: 100 / 0 / prorated are
+**words rather than figures** ("100% of what" is the question the words answer);
+the closing boundary becomes **a row** rather than a clause, so the lead sentence
+stops carrying a date; and a schedule that never closes prints **no** closing row,
+because there is nothing after it.
+
+⚠ **THE CANCEL DIALOG DOES NOT SHOW THE TABLE.** Terms are reference material; the
+last thing somebody reads before an action that cannot be undone is not the place
+for one. It names **the step you are in and what the next one is worth**:
+
+```
+Cancelling credits €150.00.
+At this point in the schedule 50% of the activity cost is credited.
+This step applies until 4 November 2026. After that, nothing is credited.
+```
+
+That second line is the generalised `whyLessCredit()` — its `'flat'` key became
+`'tier'`, and a **function** of the band, because there is no fixed half any more
+and a sentence with "half" baked in would be right on the activities that say 50
+and quietly wrong on the rest. The third line is new and is the thing a family
+actually wants: *is it worth deciding today*. Three rules on it:
+
+- **It is a phrase, not a date.** The commonest step of all ends *when it starts*,
+  and a dialog that could only interpolate a date went silent in exactly the case
+  a family most wants it. `boundaryText()` in `_cancellation-terms.js` owns the
+  wording, because a client assembling "until 4 November 2026" would be a second
+  date formatter in a third grammar.
+- ⚠ **Only when there is money at stake.** `band` is withheld when nothing has
+  been paid: a warning about what waiting costs, on a registration nobody has
+  paid for, is a warning about losing nothing.
+- **Said even when the whole of it comes back**, which is the one sentence that
+  breaks the *a figure explains itself* rule on purpose.
+
+#### The optional explanation
+
+Asked for alongside the schedule, for the date that cannot account for itself: a
+closing date **before** the course starts. It is `cancellationPolicy.note`, a
+`{he, en, ru}` bag, and **blank means nothing is shown anywhere**. It falls back
+through the usual chain, so a note typed in one language shows everywhere until
+somebody translates it — the same choice `groupSize.overrideText` makes. A drop-in
+has one too: *the hall is paid for on the day* cannot account for itself either.
+
+⚠ **IT IS FROZEN WITH THE DATES IT EXPLAINS**, unlike the address and unlike a
+drop-in's window. It justifies a *particular* deadline, so an admin rewording it
+for next term would otherwise hand an existing family a justification for a policy
+they do not hold — the failure the whole freeze exists on the other side of,
+arriving in the one field written to explain it. When a publish moves the dates
+onto a live registration the note travels with them. The deliberate limit: a note
+edited **on its own** does not propagate, because the trigger is the two dates and
+mailing every family to say a sentence was reworded is noise.
+
+⚠ **AND IT IS THE FIRST WORDS EVER TO LIVE IN THAT BLOCK.** Everything else in
+`registration` is structure — numbers, dates and flags — so a restricted role kept
+the stored block whole and sent nothing. A translator who cannot reach the one
+field of copy in it is the exact gap `LANG_SUBKEYS` closed for facts and
+`mergeGroups()` for a group's name. So `mergeRegistration()` takes the languages a
+session may edit, keeps every figure exactly as stored, and lets those languages
+through. ⚠ The unit check passes on a call site that never hands the languages
+over — a bite-check proved it — so the suite drives the **real handler** with a
+Russian-reviewer session that also tries to make every cancellation free.
+
+#### What a publish does, and does not do
+
+Only the fee date and the **closing boundary** propagate onto registrations
+already taken, loudly and with an email, exactly as the two cutoff dates always
+did. The percentages and the steps above the last one do **not**: they are what a
+family agreed to, in the same way the price and the mode always were.
+
+⚠ **A CHANGED SCHEDULE IS NOT A CHANGED CUTOFF, AND IT STILL HAS TO BE COUNTED.**
+Editing a percentage moves nothing onto anybody — that is the decision — so the
+fallout would have read no registrations and said nothing at all. An admin who has
+just rewritten a refund schedule needs to be told how many families are still on
+the old one, or the choice not to propagate is a choice nobody can see.
+`olderSchedules()` counts them, after the dates have been carried across so a
+moved closing date is not reported as a different schedule, and the publish notice
+and the audit line both name the figure. ⚠ And `writeClosing()` writes into the
+shape the record is **already** in — a legacy block keeps its single field — because
+converting one to steps would be this publish rewriting the structure of terms a
+family agreed to, which is the one thing it may not do.
+
+#### The admin panel, and one trap it closed
+
+The mode select and the closing-date box are replaced by rows of
+`Refund [ 50 ]% until [ a date ▾ ][2026-11-04]`, with up/remove controls, a
+`+ Add a step` that is disabled at the cap, and **a live summary line** built from
+the boxes as they currently read — the same discipline as the price preview
+mirroring `priceRows()`. "Prorate instead" is offered **only on the last row**,
+which is where validation allows it: a control that cannot offer an invalid state
+is worth more than a refusal explaining one. The cap is **sent** rather than
+written twice, because here it can be.
+
+⚠ **AND IT CLOSED A LATENT TRAP.** The old rule refused a prorated **mode** on a
+drop-in, which was right about the danger and produced an unpublishable activity:
+the form does not draw the policy on a drop-in, `mergeRegistration()` keeps it
+across a type switch on purpose, so a prorated course switched to a drop-in could
+not be published and no control anywhere could fix it. Keeping a value across a
+switch and refusing to save it are incompatible. A drop-in's schedule is now
+carried unread, and what makes that safe is structural rather than a rule:
+`creditFor()` returns at the top on `frozen.type === 'dropin'`.
 
 ## Legal pages, and the two gates on them
 
@@ -3037,14 +3287,16 @@ What the code does instead is make it impossible to do quietly:
   October;
 - the publish response and the **audit line** both name how many records moved.
 
-⚠ **ONLY THE TWO CUTOFF DATES.** The frozen block also carries the mode and the
-whole session list, and neither is touched — the mode is what `creditFor()`
-branches on and the list is the **denominator** of a prorated credit, so rewriting
-either would re-price a term nobody re-agreed to. A test switches the activity
-from flat to prorated and excludes a session **in the same publish** as the cutoff
-change, and asserts the family still holds flat and still holds four sessions.
-Without that the assertion is vacuous, which is how the first draft passed with
-the rule reverted.
+⚠ **ONLY THE FEE DATE AND THE CLOSING BOUNDARY.** The frozen block also carries
+the refund schedule's percentages and the whole session list, and neither is
+touched — the percentages are what `creditFor()` applies and the list is the
+**denominator** of a prorated step, so rewriting either would re-price a term
+nobody re-agreed to. A test moves the second step from 50% to prorated and excludes
+a session **in the same publish** as the date change, and asserts the family still
+holds 100-then-50 and still holds four sessions. Without that the assertion is
+vacuous, which is how the first draft passed with the rule reverted. A changed
+schedule is instead **counted and named** on the publish notice — see
+**The refund schedule**.
 
 ⚠ **AND THE TRIGGER IS THE STORED FIELD, NOT THE RESOLVED DATE.**
 `resolveCutoffs()` computes a default off the group's calendar when nobody set
@@ -5151,8 +5403,8 @@ under a picker offering two is the same class of mistake as the schedule tag a
 listing card drops, and worse here, because the number is a deadline about money.
 
 ⚠ **THE REGISTRATION READS THE FROZEN BLOCK AND NEVER THE ACTIVITY.** That is the
-whole reason the terms are frozen: an admin switching a course from flat to
-prorated in March must not change what a January family agreed to. A footnote
+whole reason the terms are frozen: an admin rewriting a refund schedule in March
+must not change what a January family agreed to. A footnote
 rebuilt from the live activity would quietly re-quote the new policy at the old
 family — that rule broken by the one screen written to explain it. A test moves
 the activity's cutoffs afterwards and asserts the family still reads the date
@@ -5161,8 +5413,8 @@ they agreed to while somebody registering today is quoted today's.
 ⚠ **THAT IS A RULE ABOUT READING, AND IT IS UNCHANGED.** What changed is that a
 **publish** may now write the two cutoff dates onto the block — deliberately,
 loudly, and with an email — so the figure a family reads is still whatever the
-block says and never a live lookup. The mode is still frozen for good, which is
-what keeps the sentence above literally true about flat and prorated. See
+block says and never a live lookup. The refund schedule's PERCENTAGES are still
+frozen for good, which is what keeps the sentence above literally true. See
 **Publishing an activity reaches the registrations already on it**.
 
 Four details carry the rest:

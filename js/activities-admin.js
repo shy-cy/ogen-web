@@ -521,6 +521,164 @@
     ]);
   }
 
+  // ⚠ THE REFUND SCHEDULE, WHICH WAS A MODE SELECT AND ONE DATE.
+  //
+  // Those two were already a two-step schedule and could not say so: 100% until
+  // the first session, then 50% or by-sessions-remaining until one closing date.
+  // So this panel is not showing an admin a new policy, it is showing them the
+  // policy they have always had, in rows they can edit.
+  //
+  // The model is S.tiers while the form is open, the same reason primeGroups()
+  // holds the group list: adding, removing or moving a row REDRAWS, and a redraw
+  // that has not captured what was just typed eats it. Every structural change
+  // reads the rows back first.
+  // ⚠ READ FROM THE SCHEMA, NOT WRITTEN HERE. The cap is a server rule — it is
+  // what validate() refuses a save over — and a second copy in the browser is the
+  // shape MIN_PASSWORD and the activities menu's status groups are pinned against
+  // by tests, because a browser cannot require a Netlify function. Here it can
+  // simply be sent, so it is.
+  function tierMax() { return Number(S.schema.maxRefundTiers) || 6; }
+  function primeTiers() {
+    var stored = ((S.record.registration || {}).cancellationPolicy || {}).tiers;
+    S.tiers = (Array.isArray(stored) ? stored : []).map(function (t) {
+      return { until: t.until === undefined ? null : t.until, percent: t.percent };
+    });
+  }
+
+  function readTierRows() {
+    var box = $('reg-tier-rows');
+    if (!box) return (S.tiers || []).slice();
+    var out = [];
+    Array.prototype.forEach.call(box.children, function (row) {
+      if (!row._pct) return;
+      var kind = row._kind.value;
+      out.push({
+        percent: row._pro && row._pro.checked ? 'remaining'
+               : (row._pct.value === '' ? null : Number(row._pct.value)),
+        until: kind === 'start' ? 'start' : kind === 'none' ? 'none' : (row._date.value || null)
+      });
+    });
+    return out;
+  }
+
+  // ⚠ WHAT IS TRUE RIGHT NOW, SO IT STAYS ON SCREEN. The manual is behind the (i)
+  // per this admin's own rule; this is the schedule as the boxes above currently
+  // read, which is the thing an admin is checking. It is a rendering of the form's
+  // own state rather than a second copy of the family's sentence — those words are
+  // in _cancellation-terms.js, in three languages, and a browser cannot require a
+  // Netlify function.
+  function tierSummary(tiers) {
+    if (!tiers.length) return 'No steps: the whole of what was paid comes back, at any time.';
+    var closes = tiers[tiers.length - 1].until;
+    var bits = tiers.map(function (t) {
+      var worth = t.percent === 'remaining' ? 'the sessions still to come'
+                : t.percent == null ? '?'
+                : t.percent + '%';
+      var when = t.until === 'start' ? 'until it starts'
+               : t.until === 'none' ? 'at any time'
+               : t.until ? 'until ' + t.until
+               : 'until the date computed on save';
+      return worth + ' ' + when;
+    });
+    if (closes != null && closes !== 'none') bits.push('nothing after that');
+    return bits.join(' \u00b7 ');
+  }
+
+  function tiersField(d, value) {
+    primeTiers();
+    var rows = el('div', { id: 'reg-tier-rows', class: 'tier-rows' });
+    var summary = el('div', { class: 'hint tier-summary' });
+    var add = el('button', { type: 'button', class: 'add-btn', text: '+ Add a step' });
+
+    function paint() {
+      rows.innerHTML = '';
+      S.tiers.forEach(function (t, i) {
+        rows.appendChild(tierRow(t, i, i === S.tiers.length - 1, redraw));
+      });
+      summary.textContent = tierSummary(S.tiers);
+      add.disabled = S.tiers.length >= tierMax();
+    }
+    function redraw(mutate) {
+      S.tiers = readTierRows();
+      if (mutate) mutate(S.tiers);
+      S.dirty = true;
+      paint();
+    }
+    rows.addEventListener('input', function () { summary.textContent = tierSummary(readTierRows()); });
+    rows.addEventListener('change', function () { summary.textContent = tierSummary(readTierRows()); });
+    add.addEventListener('click', function () {
+      redraw(function (list) {
+        // A new step starts where the one above it left off rather than at 100%:
+        // the list is non-increasing, so anything else is a value the save will
+        // refuse the moment it is added.
+        var prev = list.length ? list[list.length - 1] : null;
+        list.push({ until: null, percent: prev && prev.percent !== 'remaining' ? prev.percent : 50 });
+      });
+    });
+
+    paint();
+    return el('div', { class: 'span-all' }, [
+      withHelp(el('div', { class: 'field-label', text: d.label }), d.hint),
+      rows, add, summary
+    ]);
+  }
+
+  function tierRow(t, i, last, redraw) {
+    var row = el('div', { class: 'tier-row' });
+    var pct = el('input', { type: 'number', min: '0', max: '100', step: '1',
+                            'aria-label': 'Refund percentage for step ' + (i + 1) });
+    pct.value = t.percent === 'remaining' ? '' : (t.percent == null ? '' : t.percent);
+
+    var kind = el('select', { 'aria-label': 'When step ' + (i + 1) + ' ends' });
+    [['date', 'until a date'], ['start', 'until it starts'], ['none', 'never stops']]
+      .forEach(function (o) {
+        kind.appendChild(el('option', { value: o[0], text: o[1],
+          selected: (t.until === 'start' ? 'start' : t.until === 'none' ? 'none' : 'date') === o[0] || null }));
+      });
+    var date = el('input', { type: 'date', 'aria-label': 'Date step ' + (i + 1) + ' ends' });
+    date.value = (t.until && t.until !== 'start' && t.until !== 'none') ? t.until : '';
+    var syncKind = function () { date.hidden = kind.value !== 'date'; };
+    kind.addEventListener('change', syncKind);
+    syncKind();
+
+    // ⚠ OFFERED ONLY ON THE LAST STEP, because that is the only place the save
+    // allows it: prorated already descends to nothing, so a step after it would
+    // be a jump in the middle of a slope. A control that cannot offer an invalid
+    // state is worth more than a refusal explaining one.
+    var pro = null;
+    if (last) {
+      pro = el('input', { type: 'checkbox', id: 'reg-tier-prorated' });
+      pro.checked = t.percent === 'remaining';
+      var syncPro = function () { pct.disabled = pro.checked; };
+      pro.addEventListener('change', function () { syncPro(); S.dirty = true; });
+      syncPro();
+    }
+
+    row._pct = pct; row._kind = kind; row._date = date; row._pro = pro;
+    row.appendChild(el('span', { class: 'tier-lead', text: 'Refund' }));
+    row.appendChild(pct);
+    row.appendChild(el('span', { class: 'tier-unit', text: '%' }));
+    row.appendChild(kind);
+    row.appendChild(date);
+    if (pro) {
+      row.appendChild(el('label', { for: 'reg-tier-prorated', class: 'check-row tier-pro' },
+        [pro, el('span', { text: 'by sessions remaining' })]));
+    }
+    var acts = el('span', { class: 'tier-acts' });
+    if (i > 0) {
+      acts.appendChild(el('button', { type: 'button', 'aria-label': 'Move step up', title: 'Move up',
+        text: '\u2191', onclick: function () {
+          redraw(function (l) { var x = l[i - 1]; l[i - 1] = l[i]; l[i] = x; });
+        } }));
+    }
+    acts.appendChild(el('button', { type: 'button', class: 'no', 'aria-label': 'Remove this step',
+      title: 'Remove', text: '\u2715', onclick: function () {
+        redraw(function (l) { l.splice(i, 1); });
+      } }));
+    row.appendChild(acts);
+    return row;
+  }
+
   function regField(d, reg) {
     var value = regGet(reg, d.key);
     if (d.kind === 'cutoff') return cutoffField(d, value);
@@ -533,14 +691,16 @@
                  d.hint)
       ]);
     }
-    if (d.kind === 'mode') {
-      var sel = el('select', { id: regId(d.key) });
-      (S.schema.cancellationModes || []).forEach(function (m) {
-        sel.appendChild(el('option', { value: m, selected: m === value || null,
-          text: m === 'flat' ? 'Flat — a fixed share' : 'Prorated — by sessions remaining' }));
-      });
-      sel.addEventListener('change', function () { S.dirty = true; });
-      return el('div', {}, [withHelp(el('label', { for: regId(d.key), text: d.label }), d.hint), sel]);
+    if (d.kind === 'tiers') return tiersField(d, value);
+    if (d.kind === 'langtext') {
+      // Trilingual, through the one builder every translatable field uses — which
+      // also means canEdit(lang) disables the boxes this role may not touch, and
+      // the server's merge keeps the stored value for exactly those. The note is
+      // the only WORDS in the registration block, so it is the only field here
+      // that a Russian-only role can reach at all.
+      return el('div', { class: 'span-all' }, [
+        fieldRow({ label: d.label, textarea: true, hint: d.hint }, value, regId(d.key))
+      ]);
     }
     // 'days' — a number and a unit. The label ends in "after" and the unit
     // follows the box, which is what keeps it from being read as the fee
@@ -609,13 +769,19 @@
           var feeDate = minusDaysLocal(firstGroupDuration().startDate, FEE_CUTOFF_DAYS);
           var cancelDate = thirtyPercentLocal();
           regSetInput('registrationFeeCutoffDate', feeDate);
-          regSetInput('cancellationPolicy.cancellationCutoffDate', cancelDate);
+          // ⚠ THE LAST STEP'S BOUNDARY, which is what the single closing date
+          // became. It writes into the row rather than into a field of its own,
+          // and it never adds or removes a step: recomputing a date is a
+          // suggestion about a date, and inventing a step would be this button
+          // rewriting a policy nobody asked it to.
+          setClosingInput(cancelDate);
           S.dirty = true;
           // ⚠ SAY WHICH ONES ACTUALLY MOVED. "Both dates recomputed" was untrue
           // for a year and nothing on screen contradicted it; a message about
           // money has to report what happened rather than what was attempted.
           var moved = [feeDate ? 'fee cutoff' : null,
-                       cancelDate ? 'cancellation cutoff' : null].filter(Boolean);
+                       cancelDate && $('reg-tier-rows') && $('reg-tier-rows').children.length
+                         ? 'closing date' : null].filter(Boolean);
           if (!moved.length) {
             message('err', 'Neither date could be computed — this activity has no ' +
                            'start date and no session calendar to compute from.');
@@ -642,6 +808,19 @@
         ]));
       }
     }
+  }
+
+  // The closing date lives in the last row of the schedule. Written through the
+  // DOM like regSetInput(), so the summary line under it updates from the same
+  // input event an admin typing would raise.
+  function setClosingInput(value) {
+    var box = $('reg-tier-rows');
+    if (!box || !value) return;
+    var row = box.children[box.children.length - 1];
+    if (!row || !row._date) return;
+    row._kind.value = 'date';
+    row._date.hidden = false;
+    row._date.value = value;
   }
 
   function regSetInput(key, value) {
@@ -726,7 +905,8 @@
         regSet(out, d.key, off && off.checked ? offValue : ((node && node.value) || null));
         return;
       }
-      if (d.kind === 'mode') { regSet(out, d.key, (node && node.value) || 'flat'); return; }
+      if (d.kind === 'tiers') { regSet(out, d.key, readTierRows()); return; }
+      if (d.kind === 'langtext') { regSet(out, d.key, readLangField(regId(d.key))); return; }
       regSet(out, d.key, node && node.value !== '' ? Number(node.value) : null);
     });
     return out;
@@ -2951,6 +3131,20 @@
       out.push('⚠ ' + t.changed + ' registration' + (t.changed === 1 ? '' : 's') +
         ' now follow' + (t.changed === 1 ? 's' : '') + ' the new cutoff dates, and ' +
         t.emailed + ' famil' + (t.emailed === 1 ? 'y has' : 'ies have') + ' been emailed.');
+    }
+    // ⚠ WHO IS STILL ON THE OLD SCHEDULE. The percentages are frozen terms and a
+    // publish deliberately does not rewrite them — which, said nowhere, is a
+    // decision nobody can see: an admin who has just replaced a refund schedule
+    // would reasonably assume everybody is now on it. The count is the whole
+    // point of the sentence, and it is neither a warning nor a failure.
+    var sc = f.schedule || {};
+    if (sc.older) {
+      out.push(sc.older + ' registration' + (sc.older === 1 ? '' : 's') +
+        ' still follow' + (sc.older === 1 ? 's' : '') + ' the refund schedule ' +
+        (sc.older === 1 ? 'it was' : 'they were') + ' taken under. Percentages are ' +
+        'frozen terms, so only the closing date and the fee date are ever moved.');
+    } else if (f.schedule) {
+      out.push('The refund schedule changed, and no registration was taken under the old one.');
     }
     (r.groups || []).forEach(function (g) {
       var where = g.name ? groupLabel(g) : 'the class';
