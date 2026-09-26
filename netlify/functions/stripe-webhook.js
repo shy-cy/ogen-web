@@ -83,9 +83,28 @@ async function runWebhook(event, mode) {
     : (event.body || '');
   const sig = (event.headers || {})['stripe-signature'] || (event.headers || {})['Stripe-Signature'];
 
+  // ⚠ THE CLIENT IS BUILT OUTSIDE THE SIGNATURE CHECK, and that is a diagnostic
+  // rule rather than a functional one. `stripe(mode)` throws when this mode's
+  // secret key is missing or is a key for the OTHER mode — the one
+  // misconfiguration that is both catastrophic and silent, which is why it is
+  // checked at all. Built inside the try below, that throw was caught by the
+  // signature handler and answered `400 Bad signature`: the guard fired, said
+  // the right thing to a log nobody was reading, and reported itself from
+  // outside as the one failure it is not. A probe could not then tell a wrongly
+  // configured endpoint from a bad body — which is exactly the question anybody
+  // sends a probe to answer. It is the sibling of the missing-signing-secret
+  // branch above and answers the same way.
+  let client;
+  try {
+    client = S.stripe(mode);
+  } catch (err) {
+    console.error('stripe-webhook[' + mode + ']: ' + err.message);
+    return json(500, { error: 'Not configured' });
+  }
+
   let stripeEvent;
   try {
-    stripeEvent = S.stripe(mode).webhooks.constructEvent(raw, sig, secret);
+    stripeEvent = client.webhooks.constructEvent(raw, sig, secret);
   } catch (err) {
     // The ONE case that is not a 200. An unverified body is not from Stripe.
     console.error('stripe-webhook: signature verification failed:', err.message);

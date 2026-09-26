@@ -154,20 +154,21 @@ function makeGithub(seedFiles) {
 }
 
 // Install the doubles and load a freshly-required module under test.
+//
+// ⚠ EVERY FUNCTION FILE IS CLEARED, NOT A HAND-KEPT LIST OF THEM. It was a list,
+// and the list fell behind: `stripe-webhook`, `_bundle-store`, `_registration-open`
+// and `_spend-credit` were never on it, so a second loadWithStubs() in one suite
+// handed back the FIRST call's copy — closed over the FIRST call's store. The way
+// that surfaced was a section failing because a record it had just written could
+// not be found; the way it does not surface is a section passing while it exercises
+// a handler bound to a store nobody is looking at. A list that is correct today and
+// becomes a silent staleness tomorrow is the shape to avoid, so the directory is
+// the list.
+const FN_DIR = path.join(__dirname, '..', 'netlify', 'functions');
 function loadWithStubs({ github, blobs, modules }) {
-  [ '_github', '_blobs', '_activity-template', '_activity-index', '_activity-index',
-    '_session-store', '_user-store', '_roles', '_audit', 'activities-admin',
-    'admin-login', 'admin-users',
-    '_account-store', '_member-session', '_account-email', '_email-shell', '_email',
-    '_email-log', 'account-auth',
-    '_participant-store', '_guardian-store', 'account-family', 'admin-family',
-    '_registration', '_registration-store', '_registration-email',
-    '_waitlist', '_registration-fallout',
-    '_registration-sweep', '_registration-cancel', '_credit', '_credit-ledger',
-    '_session-attendance', 'account-registrations', 'admin-registrations',
-    'registration-sweep', '_pay-link', '_checkout', 'pay-link', '_stripe' ].forEach((m) => {
-    try { delete require.cache[fnPath(m)]; } catch (err) { /* not all exist in every test */ }
-  });
+  fs.readdirSync(FN_DIR)
+    .filter((f) => f.endsWith('.js'))
+    .forEach((f) => { delete require.cache[path.join(FN_DIR, f)]; });
 
   if (github) require.cache[fnPath('_github')] = { id: fnPath('_github'), filename: fnPath('_github'), loaded: true, exports: github };
   if (blobs) require.cache[fnPath('_blobs')] = { id: fnPath('_blobs'), filename: fnPath('_blobs'), loaded: true, exports: blobs };

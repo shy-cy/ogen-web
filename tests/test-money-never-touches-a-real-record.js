@@ -299,8 +299,16 @@ H.ok(/exports\.handler = async \(event\) => runWebhook\(event, 'live'\)/.test(ho
   'the live endpoint names its own mode');
 H.ok(/const secret = S\.webhookSecret\(mode\)/.test(hook),
   'each verifies with ITS OWN signing secret, which is what makes the mode unforgeable');
-H.ok(/S\.stripe\(mode\)\.webhooks\.constructEvent\(raw, sig, secret\)/.test(hook),
+H.ok(/client\.webhooks\.constructEvent\(raw, sig, secret\)/.test(hook),
   'and with its own client');
+// ⚠ AND THE CLIENT IS BUILT OUTSIDE THAT try. Inside it, a key set to the wrong
+// mode was caught by the signature handler and answered `400 Bad signature` —
+// the guard fired and then described itself, from outside, as the one failure it
+// is not. Asserted by shape AND executed below, because the ordering of two
+// try blocks is exactly what reading proves nothing about.
+H.ok(hook.indexOf('client = S.stripe(mode)') < hook.indexOf('client.webhooks.constructEvent'),
+  '⚠ and builds it BEFORE the signature try, so a wrongly configured key does not ' +
+  'report itself as a bad body');
 H.ok(/S\.modeOfEvent\(stripeEvent\) !== mode/.test(hook),
   'Stripe’s own livemode is checked against the endpoint it arrived on');
 // Every settle path is handed the mode.
@@ -456,6 +464,64 @@ console.log('\n[running it: a rehearsal’s credit cannot pay for a real class]'
     'and the payment on the record is frozen as test money');
   H.eq(await L.balanceFor('a-1', 'test'), 5000, 'the test balance fell');
   H.eq(await L.balanceFor('a-1', 'live'), 0, 'and the real one never moved');
+}
+
+console.log('\n[running it: a misconfigured endpoint does not answer "bad signature"]');
+{
+  // ⚠ THE QUESTION A PROBE IS SENT TO ANSWER. A wrongly configured endpoint and a
+  // body that is not from Stripe are the two things somebody curling this URL is
+  // trying to tell apart, and for a release they answered identically — because
+  // S.stripe(mode) was constructed inside the signature try, so the key guard's
+  // message went to a log and the wire said `400 Bad signature`. Both halves are
+  // driven here rather than read: this is an ordering between two try blocks, and
+  // reading one proves only that it is self-consistent.
+  const post = (mod, body) => mod.handlerFor('test')({
+    httpMethod: 'POST', body: body || '{}',
+    headers: { 'stripe-signature': 't=1,v1=deadbeef' }
+  });
+
+  const savedKey = process.env.STRIPE_TEST_SECRET_KEY;
+  const savedSec = process.env.STRIPE_TEST_WEBHOOK_SECRET;
+  process.env.STRIPE_TEST_WEBHOOK_SECRET = 'whsec_pretend';
+
+  // A LIVE key in the test variable — the direction that charges a real card
+  // during a rehearsal, and the reason the prefix is checked at all.
+  process.env.STRIPE_TEST_SECRET_KEY = 'sk_live_wrongmode';
+  {
+    const mods = H.loadWithStubs({ blobs: H.makeBlobs(), modules: ['stripe-webhook'] });
+    const res = await post(mods['stripe-webhook']);
+    H.eq(res.statusCode, 500,
+      '⚠ a key set to the OTHER mode answers 500 Not configured, like a missing ' +
+      'signing secret — never 400, which claims the body was the problem');
+    H.eq(JSON.parse(res.body).error, 'Not configured', '   and says so');
+  }
+
+  // A missing key, same answer — it is the same class of thing.
+  delete process.env.STRIPE_TEST_SECRET_KEY;
+  {
+    const mods = H.loadWithStubs({ blobs: H.makeBlobs(), modules: ['stripe-webhook'] });
+    H.eq((await post(mods['stripe-webhook'])).statusCode, 500,
+      'and so does a key that is not set at all');
+  }
+
+  // And with the configuration right, a body that will not verify still gets the
+  // 400 — or this fix has quietly swallowed the one refusal that must survive.
+  process.env.STRIPE_TEST_SECRET_KEY = 'sk_test_fine';
+  {
+    const mods = H.loadWithStubs({ blobs: H.makeBlobs(), modules: ['_stripe', 'stripe-webhook'] });
+    mods['_stripe']._internal.setClient({
+      webhooks: { constructEvent: () => { throw new Error('No signatures found'); } }
+    }, 'test');
+    const res = await post(mods['stripe-webhook']);
+    H.eq(res.statusCode, 400,
+      'while a properly configured endpoint handed an unsigned body still refuses it');
+    H.eq(JSON.parse(res.body).error, 'Bad signature', '   as a bad signature');
+  }
+
+  if (savedKey === undefined) delete process.env.STRIPE_TEST_SECRET_KEY;
+  else process.env.STRIPE_TEST_SECRET_KEY = savedKey;
+  if (savedSec === undefined) delete process.env.STRIPE_TEST_WEBHOOK_SECRET;
+  else process.env.STRIPE_TEST_WEBHOOK_SECRET = savedSec;
 }
 
 console.log('\n[running it: a test-mode payment settles nothing on a real booking]');

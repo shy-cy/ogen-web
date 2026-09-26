@@ -35,8 +35,28 @@ H.ok(/return json\(400, \{ error: 'Bad signature' \}\)/.test(bare),
 // Every OTHER path must end 200. A 5xx is what makes Stripe retry for days.
 const handler = bare.slice(bare.indexOf('exports.handler'), bare.indexOf('async function settle'));
 const codes = (handler.match(/json\((\d{3})/g) || []).map((s) => s.slice(5));
-H.eq(codes.filter((c) => c === '500').length, 1,
-  'exactly one 500, and it is the missing-secret case — a misconfiguration, not an event');
+// ⚠ EVERY 500 IS A MISCONFIGURATION, AND IS RAISED BEFORE THE EVENT EXISTS. This
+// counted them and expected one, which broke the day a second configuration
+// refusal was added for the same reason as the first — a key set to the other
+// mode, which used to be reported as a bad signature. Counting was the wrong
+// test: what matters is not how many there are but that none of them is about an
+// EVENT, because a 5xx over an event makes Stripe retry for days and then
+// disable the endpoint. So each one has to sit above the signature check, where
+// there is no event yet to be wrong about.
+const verifyAt = handler.indexOf('constructEvent');
+H.ok(verifyAt !== -1, 'the handler verifies the signature');
+let from = 0, fives = 0;
+for (;;) {
+  const at = handler.indexOf('json(500', from);
+  if (at === -1) break;
+  fives += 1;
+  H.ok(at < verifyAt,
+    '500 #' + fives + ' is raised before the body is verified — a configuration ' +
+    'refusal, never a verdict on an event');
+  from = at + 1;
+}
+H.ok(fives >= 1 && fives === codes.filter((c) => c === '500').length,
+  'and those are all of them (' + fives + ')');
 H.ok(/return json\(200, \{ received: true \}\)/.test(handler),
   'the handler ends by acknowledging');
 H.ok(/catch[\s\S]{0,200}console\.error[\s\S]{0,120}\n\s*\}\n\s*return json\(200/.test(handler),
