@@ -546,6 +546,60 @@ every language is free of both.
 | Cost per lesson | `fullPrice ÷ (sessionCount × sessionMinutes ÷ 45)`, or `perHourOverride`; **off unless `showPerLesson`** |
 | Cost per semester | `fullPrice`, qualified by "(N sessions × M lessons)" |
 
+### ⚠ A yearly course was priced by the semester
+
+Reported beside the wall of dates and for the same reason — a card stating
+something it could not know: *"Cost per Semester — another issue, as some
+courses, like intro to Judaism, is a Yearly Course."*
+
+The label was hard-coded in three languages **because it was true once**. *"A
+slug is one semester"* is written into `_activity-series.js`, the migration and
+the no-total argument below, and it is true of hebrew4kids: the spring term is a
+second record with its own dates and its own page. It is not true of
+`intro-into-judaism`, whose twenty-four evenings run October to October. No
+figure on that card was wrong; the word beside the figure was.
+
+`price.termUnit` is a **closed list** — `semester | year | course | month |
+custom` — rendered per language in `_activity-facts.js`, for the reason
+`instructionLanguage` and `prerequisites` are closed lists: a typed label is one
+language published, three pages that can disagree about what somebody is buying,
+and "Semester" spelled four ways across four activities. The list is **sent** to
+the form rather than written twice. `custom` is the escape hatch and is the one
+value that reads `price.termLabel`, a `{he,en,ru}` bag falling back the usual way.
+
+⚠ **THE DEFAULT IS TODAY'S MEANING.** Every record written before this said
+semester by saying nothing, so nothing on the site moves until an admin picks
+otherwise — asserted on the live records, not only on a fixture.
+
+⚠ **IT LABELS THE FIGURE AND NEVER BILLS IT**, and that is the sentence to keep.
+`feeApplies()` is still per participant, per activity, per **academic year**
+whatever this says; a course set to `month` still takes its whole `fullPrice`
+once, because **nothing in this system bills monthly** — the fee waiver, the
+frozen price and the refund schedule all assume one payment per registration.
+`month` is offered because an activity that quotes a monthly rate is a real thing
+to describe and describing it wrongly is worse. A test greps every function file
+and asserts exactly three read `termUnit`: the shape that stores it, the label
+that prints it, and the form that sets it. A money path learning to read it fails
+that check.
+
+Three smaller rules:
+
+- **The row keeps its key.** The listing card picks its headline figure by
+  `term`, precisely so a reworded label cannot break it silently.
+- ⚠ **A blank `custom` is refused at publish and falls back to "for the course"
+  at render** — deliberately **not** to "semester", which is a period nobody
+  chose. The refusal is the same string the draft is warned with, through the one
+  `validate()`, and the suite executes both rather than reading them.
+- ⚠ **The words survive the boxes being hidden.** They are read back with a
+  fallback to what was stored, or picking another period to see what it looks
+  like would wipe them — the undrawn-field trap, inside one fact rather than
+  across a type switch. Same for the unit itself on a drop-in, which draws
+  neither control because a session **is** the period.
+
+The unit is structure and the label is words: `LANG_SUBKEYS` gains
+`price: ['termLabel']`, so a Russian-only role may translate it and may not
+decide that this course is sold by the year.
+
 **There is deliberately no total.** The card used to end with one, computed
 rather than typed so it could not drift from the two numbers above it — but
 computing it was never the problem, adding those two numbers at all was. The

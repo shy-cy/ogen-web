@@ -183,6 +183,17 @@ const FIELD_SCHEMA = {
   instructionLanguages: FACTS.INSTRUCTION_LANGUAGES.map((c) => ({ key: c, label: FACTS.LANGUAGE_NAMES.en[c] })),
   levels: FACTS.LEVELS.map((k) => ({ key: k, label: FACTS.LEVEL_NAMES.en[k] })),
   frequencies: FREQUENCIES,
+  // What a full price buys, sent rather than written twice — the select and the
+  // renderer must not come to disagree about what a value means. The LABELS in
+  // the select are English because the admin is English-only; the three the
+  // public page prints live in _activity-facts.js.
+  priceUnits: [
+    { key: 'semester', label: 'Semester' },
+    { key: 'year', label: 'Year' },
+    { key: 'course', label: 'The whole course' },
+    { key: 'month', label: 'Month' },
+    { key: 'custom', label: 'Something else — write it' }
+  ],
   weeksOfMonth: WEEKS_OF_MONTH,
   visibilities: ['public', 'members'],
   defaultVisibility: DEFAULT_VISIBILITY,
@@ -474,6 +485,10 @@ function imagePathsOf(activity) {
 // list was written to end.
 const LANG_SUBKEYS = {
   location: ['text'], address: ['text'], groupSize: ['overrideText'],
+  // The words a `custom` price unit prints. Which UNIT it is stays structure,
+  // like the figure it labels — a translator may say "per academic year" in
+  // Russian and cannot decide that this course is sold by the year.
+  price: ['termLabel'],
   // Words describing when a class meets — a translator's job. Which DAYS it
   // meets on is the sessions list beside it and stays out of reach, exactly as
   // a group's size is out of reach beside its override.
@@ -768,6 +783,17 @@ function validate(activity) {
   // stored list — if it has one from before a type switch — is not being edited.
   if (activity.type === 'dropin') {
     BUNDLE.validateBundles(((activity.facts) || {}).price).forEach((m) => errors.push(m));
+  }
+  // ⚠ A `custom` PRICE UNIT WITH NOTHING WRITTEN IN IT. The select offers
+  // "something else — write it", and an admin who picks it and does not write
+  // anything has asked for a label nobody supplied. Rendering falls back to
+  // "for the course", which is true of any course and is not what they meant;
+  // refusing at publish is what makes that fallback a safety net rather than
+  // the silent answer. It is a warning on a draft, like every other rule here.
+  const priceFact = ((activity.facts) || {}).price || {};
+  if (priceFact.termUnit === 'custom' && !hasAnyText(langObject(priceFact.termLabel))) {
+    errors.push('The price is set to be labelled "something else" — write that label in at ' +
+                'least one language, or pick a period instead.');
   }
   // ⚠ EQUAL TOTAL INSTRUCTIONAL HOURS, AND A NAME ONCE THERE IS A CHOICE.
   //

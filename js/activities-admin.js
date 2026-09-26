@@ -1220,6 +1220,67 @@
       input
     ]);
   }
+  // ⚠ WHAT THE FULL PRICE BUYS, AND THE LABEL WAS THE ONLY THING NOT SAYING IT.
+  //
+  // The term row was hard-labelled "Cost per semester" in three languages
+  // because a slug IS one semester — true of hebrew4kids, false of
+  // intro-into-judaism, whose twenty-four evenings run October to October. The
+  // live card quoted a yearly course by the semester, and no figure on it was
+  // wrong.
+  //
+  // A closed list rather than a text box, for the reason the level and the
+  // instruction languages are closed lists: a typed label is one language
+  // published and three pages that can disagree about what somebody is buying.
+  // The list is SENT by the server, so the select and the renderer cannot come
+  // to disagree about what a value means.
+  //
+  // Drop-in only draws the per-session price, which needs no period — a session
+  // is the period. The undrawn value is kept by the server as usual.
+  function termUnitField(fact) {
+    var id = 'fact-price-termUnit';
+    var sel = el('select', { id: id, disabled: !canEditAll() || null });
+    (S.schema.priceUnits || []).forEach(function (o) {
+      sel.appendChild(el('option', { value: o.key, text: o.label,
+        selected: o.key === (fact.termUnit || 'semester') || null }));
+    });
+    // Redrawn rather than toggled, because picking "something else" has to bring
+    // the three boxes with it and putting them back is the same draw.
+    //
+    // ⚠ THE FACTS ARE MERGED INTO THE MODEL FIRST, exactly as the type select
+    // does it and for exactly the same reason: readFacts() returns only what is
+    // DRAWN, so assigning it would discard whatever this panel is not currently
+    // showing. Only the Price panel is redrawn — renderFacts() is what owns it.
+    sel.addEventListener('change', function () {
+      S.record.facts = keepUndrawnFacts(S.record.facts, readFacts().facts);
+      S.dirty = true;
+      renderFacts();
+    });
+    return el('div', {}, [
+      withHelp(el('label', { for: id, text: 'The price buys' }),
+        'What period the full price covers, printed as the label beside it — "Cost per '
+        + 'semester", "Cost per year". It is a LABEL and changes no arithmetic: the yearly '
+        + 'registration fee is still one per participant per activity per academic year '
+        + 'whichever period this names, and a course set to Month still takes its whole price '
+        + 'once, because nothing here bills monthly. Pick "something else" to write your own '
+        + 'in all three languages.'),
+      sel
+    ]);
+  }
+
+  // Only when the select asks for it. A permanently visible text box beside a
+  // select that usually answers the question is the clutter the (i) rule was
+  // written against, and worse: it invites somebody to fill it in and wonder
+  // why nothing changed.
+  function termLabelField(fact) {
+    return fieldRow({
+      label: 'Write the price label',
+      hint: 'Replaces "Cost per semester" outright, per language. A language left blank falls '
+          + 'back to one that is filled in, the same way every other trilingual override does '
+          + '— so the same words in the wrong language beat three pages disagreeing about what '
+          + 'this costs. Publishing is refused while all three are empty.'
+    }, langObj(fact.termLabel), 'fact-price-termLabel');
+  }
+
   function checkField(id, label, value, hint) {
     var input = el('input', { type: 'checkbox', id: id });
     input.checked = value === true;
@@ -1817,8 +1878,10 @@
           isDropin
             ? numField('fact-price-perSessionPrice', 'Price per session (€)', fact.perSessionPrice)
             : numField('fact-price-fullPrice', 'Full course price (€)', fact.fullPrice),
+          isDropin ? null : termUnitField(fact),
           numField('fact-price-perHourOverride', 'Per hour — manual override (€)', fact.perHourOverride)
         ]),
+        isDropin || fact.termUnit !== 'custom' ? null : termLabelField(fact),
         checkField('fact-price-showPerLesson', 'Show cost per lesson', fact.showPerLesson === true,
                    'Off by default. The other price lines are unaffected either way.'),
         el('div', { class: 'perhour is-ok', id: 'price-preview' }),
@@ -2332,7 +2395,20 @@
           price: readNum(p + '-price-late-price')
         };
         out.bundles = syncBundles();
-      } else out.fullPrice = readNum(p + '-price-fullPrice');
+      } else {
+        out.fullPrice = readNum(p + '-price-fullPrice');
+        // ⚠ BOTH, AND THE LABEL WHETHER OR NOT ITS BOXES ARE DRAWN. The unit
+        // and the words are one setting: read only when `custom` is showing,
+        // the words would be wiped the moment somebody tried another period and
+        // came back — the undrawn-field trap, inside one fact rather than
+        // across a type switch. `previous` is what the form was given, so an
+        // undrawn box sends back exactly what was stored.
+        var unitNode = $(p + '-price-termUnit');
+        out.termUnit = unitNode ? unitNode.value : (previous.termUnit || 'semester');
+        out.termLabel = $(p + '-price-termLabel-he')
+          ? readLangField(p + '-price-termLabel')
+          : (previous.termLabel || { he: '', en: '', ru: '' });
+      }
     } else out = {};
 
     // Carry the legacy sentence through untouched. It is what the page still

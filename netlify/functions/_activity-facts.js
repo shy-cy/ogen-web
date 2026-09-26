@@ -822,6 +822,43 @@ function priceRows(f, lang, duration) {
   // break silently the next time one is reworded.
   const row = (key, label, value, note) => ({ key, label, note: note || '', value });
 
+  // ⚠ WHAT THE FULL PRICE BUYS, AND THE LABEL IS THE ONLY THING THAT SAYS IT.
+  //
+  // The term row was hard-labelled "Cost per semester" in three languages
+  // because a slug IS one semester — which is true of hebrew4kids and false of
+  // intro-into-judaism, whose twenty-four evenings run October to October. The
+  // card quoted a yearly course by the semester, and no figure on it was wrong.
+  //
+  // A closed list, per language here, for the reason `instructionLanguage` and
+  // `prerequisites` are closed lists: a typed label is one language published
+  // and three pages that can disagree about what somebody is buying. `custom` is
+  // the escape hatch and is the one value that reads the words beside it.
+  //
+  // ⚠ IT CHANGES NO ARITHMETIC ANYWHERE. feeApplies() is still per participant,
+  // per activity, per ACADEMIC YEAR, and a course labelled "per year" is still
+  // one registration paying its fullPrice once. The label describes the figure;
+  // it does not bill it. Nothing reads termUnit but this function.
+  const TERM_LABELS = {
+    he: { semester: 'עלות לסמסטר', year: 'עלות לשנה',
+          course: 'עלות לקורס', month: 'עלות לחודש' },
+    en: { semester: 'Cost per semester', year: 'Cost per year',
+          course: 'Cost for the course', month: 'Cost per month' },
+    ru: { semester: 'Стоимость семестра', year: 'Стоимость за год',
+          course: 'Стоимость курса', month: 'Стоимость за месяц' }
+  };
+  function termLabel() {
+    const unit = String(f.termUnit || 'semester');
+    if (unit === 'custom') {
+      const said = pick(f.termLabel, lang);
+      // ⚠ A BLANK CUSTOM LABEL FALLS BACK TO "the course", NOT to "semester".
+      // validate() refuses publishing one, so this can only be an older record
+      // or a draft — and the wrong answer to reach for is the one that states a
+      // period nobody chose. "For the course" is true of every course there is.
+      return said || (TERM_LABELS[lang] || TERM_LABELS.en).course;
+    }
+    return (TERM_LABELS[lang] || TERM_LABELS.en)[unit] || L.term;
+  }
+
   // ⚠ "REGISTRATION FEE", NOT "YEARLY REGISTRATION FEE". The label carried the
   // scope for a while, on the argument that annual-ness is the one thing about
   // the fee a family cannot infer from the number. It is still the one thing
@@ -911,7 +948,9 @@ function priceRows(f, lang, duration) {
         ? `(${sessions} ${ruPlural(sessions, 'занятие', 'занятия', 'занятий')} × ${lessons} ${ruPlural(lessons, 'урок', 'урока', 'уроков')})`
         : `(${sessions} ${sessions === 1 ? L.session[0] : L.session[1]} × ${lessons} ${lessons === 1 ? L.unit[0] : L.unit[1]})`;
     }
-    rows.push(row('term', L.term, money(full), note));
+    // The KEY stays `term` whatever the label says. The listing card picks its
+    // headline figure by key precisely so a reworded label cannot break it.
+    rows.push(row('term', termLabel(), money(full), note));
   }
 
   // There is deliberately NO total. The two numbers are on different cycles --

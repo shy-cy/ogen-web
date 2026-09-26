@@ -27,6 +27,18 @@ const { GROUP_FACTS, ACTIVITY_FACTS } = groupsModule;
 
 const LANGS = ['he', 'en', 'ru'];
 
+// What period a full price buys. Written here because this is where the shape
+// that stores it lives; _activity-facts.js turns each into a label in three
+// languages, and activities-admin.js sends the list to the form so the select
+// and the renderer cannot come to disagree about what a value means.
+//
+// ⚠ 'month' IS A LABEL AND NOT A BILLING MODEL. Nothing in this system bills
+// monthly — the fee waiver, the frozen price and the refund schedule all assume
+// one payment per registration — so an activity set to it still takes its whole
+// fullPrice once. It is here because an activity that quotes a monthly rate is a
+// real thing to describe, and describing it wrongly is worse.
+const PRICE_UNITS = ['semester', 'year', 'course', 'month', 'custom'];
+
 const emptyLang = () => ({ he: '', en: '', ru: '' });
 
 function langObject(value) {
@@ -209,6 +221,21 @@ const SHAPES = {
   price: (f) => ({
     registrationFee: num(f.registrationFee),
     fullPrice: num(f.fullPrice),
+    // ⚠ WHAT PERIOD THE FULL PRICE BUYS. The term row was hard-labelled "Cost
+    // per semester" in three languages, and intro-into-judaism runs October to
+    // October — so the card quoted a yearly course by the semester. A closed
+    // list rather than free text, for the reason instructionLanguage and
+    // prerequisites are closed lists: a typed label is one language published
+    // and three pages that can disagree. `custom` is the escape hatch and is
+    // the one value that reads the bag beside it.
+    //
+    // Defaults to 'semester', which is what every record written before this
+    // meant, so nothing on the site moves until an admin says so.
+    termUnit: PRICE_UNITS.indexOf(f.termUnit) !== -1 ? f.termUnit : 'semester',
+    // Read ONLY when termUnit is 'custom'. Kept whatever the unit says, the
+    // same way lateDropIn keeps its figures when it is switched off: an admin
+    // who tries 'custom' and goes back to 'year' has not lost what they wrote.
+    termLabel: langObject(f.termLabel),
     perHourOverride: num(f.perHourOverride),
     // What one session costs on a pay-per-session activity. It is the drop-in
     // counterpart of fullPrice, not an extra line beside it: a course quotes
@@ -680,5 +707,5 @@ function migrate(record, options) {
 module.exports = {
   migrate, normaliseFacts, normaliseFact, normaliseGroups, normaliseGroupFacts,
   normaliseVisibility, SOLE_GROUP_ID,
-  isLangObject, parseAgeRange, langObject, isoDate, SHAPES
+  isLangObject, parseAgeRange, langObject, isoDate, SHAPES, PRICE_UNITS
 };
