@@ -441,6 +441,77 @@ function movedMessage(reg, account, fromName, toName) {
   return { to: account.email, subject: T.subject(child, act, to), html: html, text: strip(html) };
 }
 
+// --- one evening is off, for this family ------------------------------------
+//
+// ⚠ AN ADMIN CANCELS ONE EVENING AND THE FAMILY HAS TO BE TOLD, which is the
+// difference between this and the family cancelling it themselves. A guardian
+// pressing their own cancel button already knows; nobody else does. Silent, an
+// admin correcting a register — or doing it because a family rang and asked —
+// leaves somebody turning up on Tuesday to a place that is no longer theirs,
+// and leaves a credit in an account nobody mentioned.
+//
+// That is the group-move gap exactly: `moveGroup` saved the record, wrote the
+// history, and told nobody for a release.
+//
+// ⚠ NO DRAFT, for the reason a move has none. A rejection and a term
+// cancellation are reviewed because approval carries no reason code and a
+// figure is about to be sent; one evening is a fact — this date, this family,
+// and what it credits — and a panel asking somebody to approve a sentence they
+// cannot usefully change is a step that teaches them to press through.
+//
+// The credit line is present only when there IS one, exactly as CANCELLED does
+// it: "credited €0.00" reads as a decision taken against the family rather than
+// as the arithmetic of an evening nobody had paid for. And there is no sentence
+// about the deadline — why the figure is what it is belongs in the dialog the
+// admin confirmed, and a family told after the fact that they were too late is
+// being argued with.
+
+const SESSION_CANCELLED = {
+  he: {
+    subject: (child, act, when) => `המפגש ב-${when} בוטל · ${act}`,
+    heading: 'המפגש בוטל',
+    body: (child, act, when) => `${child} כבר לא רשום/ה למפגש ב-${when} ב${act}.`,
+    credited: (amount) => `זוכיתם ב-${amount}. הסכום שמור בחשבון שלכם וניתן להשתמש בו בהרשמה הבאה.`,
+    next: 'שאר המפגשים שנרשמתם אליהם לא השתנו, ואפשר לראות אותם בעמוד ההרשמה.',
+    talk: 'אם זה נעשה בטעות, השיבו להודעה הזו ונתקן.',
+    button: 'לפרטי ההרשמה'
+  },
+  en: {
+    subject: (child, act, when) => `The session on ${when} is cancelled \u00b7 ${act}`,
+    heading: 'The session is cancelled',
+    body: (child, act, when) => `${child} is no longer booked for the session on ${when} of ${act}.`,
+    credited: (amount) => `${amount} has been credited to your account. It stays there and can be used towards a future booking.`,
+    next: 'The other sessions you have booked are unchanged, and they are listed on the registration page.',
+    talk: 'If this was a mistake, reply to this message and we will put it right.',
+    button: 'Open the registration'
+  },
+  ru: {
+    subject: (child, act, when) => `Занятие ${when} отменено \u00b7 ${act}`,
+    heading: 'Занятие отменено',
+    body: (child, act, when) => `${child} больше не записан(а) на занятие ${when} — ${act}.`,
+    credited: (amount) => `На ваш счёт зачислено ${amount}. Эта сумма сохраняется и может быть использована при следующей записи.`,
+    next: 'Остальные занятия, на которые вы записаны, не изменились — они перечислены на странице записи.',
+    talk: 'Если это произошло по ошибке, ответьте на это письмо — мы исправим.',
+    button: 'Открыть запись'
+  }
+};
+
+// ⚠ `when` IS AN ISO DATE AND IS FORMATTED HERE, for the reason waitingMessage()
+// carries above: the caller is a request handler running in the language of the
+// ADMIN'S SCREEN, and this is written in the language of the ACCOUNT.
+function sessionCancelledMessage(reg, account, when, creditCents) {
+  const l = lang(((account || {}).profile || {}).preferredLanguage);
+  const T = SESSION_CANCELLED[l];
+  const child = childOf(reg), act = titleOf(reg, l);
+  const said = when ? dayAndMonth(when, l) || when : '';
+  const lines = [T.body(child, act, said)];
+  if (creditCents > 0) lines.push(T.credited(money(creditCents)));
+  lines.push(T.next, T.talk);
+  const html = shell(l, T.heading, lines.map(esc),
+    { href: registrationHref(reg, l, ''), label: T.button });
+  return { to: account.email, subject: T.subject(child, act, said), html: html, text: strip(html) };
+}
+
 // --- the terms moved under a registration that already existed -------------
 //
 // ⚠ THE ONE MESSAGE ABOUT SOMETHING A FAMILY ALREADY AGREED TO.
@@ -970,6 +1041,13 @@ const sendMoved = (reg, account, fromName, toName) =>
     email.send(movedMessage(reg, account, fromName, toName),
       as('registration-moved', account, reg)));
 
+// Only the ADMIN path sends this. A family cancelling their own evening from
+// their own page is not told what they just did.
+const sendSessionCancelled = (reg, account, when, creditCents) =>
+  email.settle('session-cancelled', account.email, () =>
+    email.send(sessionCancelledMessage(reg, account, when, creditCents),
+      as('session-cancelled', account, reg)));
+
 const sendTermsChanged = (reg, account, sessionCancelHours) =>
   email.settle('registration-terms-changed', account.email, () =>
     email.send(termsChangedMessage(reg, account, sessionCancelHours),
@@ -984,10 +1062,11 @@ const sendPaid = (reg, account, paidCents, outstandingCents) =>
 module.exports = {
   payUrlFor,
   sendReceived, sendApproved, sendRejected, sendExpired, sendCancelled,
-  sendWaiting, sendPlaceOpen, sendMoved, sendTermsChanged,
+  sendWaiting, sendPlaceOpen, sendMoved, sendTermsChanged, sendSessionCancelled,
   receivedMessage, approvedMessage, rejectedMessage, expiredMessage, rejectedDraft,
   cancelledMessage, cancelledDraft, waitingMessage, placeOpenMessage,
-  movedMessage, termsChangedMessage,
+  movedMessage, termsChangedMessage, sessionCancelledMessage,
   RECEIVED, APPROVED, REJECTED, EXPIRED, CANCELLED, WAITING, PLACE_OPEN, MOVED, TERMS_CHANGED,
+  SESSION_CANCELLED,
   paidMessage, sendPaid
 };

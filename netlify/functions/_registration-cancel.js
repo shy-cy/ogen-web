@@ -26,6 +26,7 @@ const credit = require('./_credit');
 const ledger = require('./_credit-ledger');
 const store = require('./_registration-store');
 const attendance = require('./_session-attendance');
+const waitlist = require('./_waitlist');
 const R = require('./_registration');
 
 const REASON = {
@@ -33,16 +34,77 @@ const REASON = {
   admin: 'registration-cancelled-by-admin'
 };
 
-// ⚠ THERE IS NO `entitled` PARAMETER ANY MORE, and its removal is the rule.
+// ⚠ ONE EVENING, GIVEN BACK — AND THIS WAS WRITTEN TWICE BEFORE IT WAS WRITTEN
+// ONCE.
 //
-// It let the caller zero a credit, and existed because the two paths genuinely
-// differed: past the hard cutoff a guardian could not cancel AT ALL, while an
-// admin could and credited nothing. The cutoff now ends the credit for both and
-// stops neither — a family who is not coming back has to be able to say so, and
-// the per-evening path has always worked that way. So `entitled` had one
-// possible value, and a parameter that can only be true is a policy nobody can
-// read. The zero comes from creditFor(), which is the only thing that should
-// ever have been deciding it.
+// This file opens by saying that the guardian's cancellation and the admin's
+// are one function because two copies can round differently and the difference
+// surfaces when two families compare receipts. That argument is
+// about a TERM, and the per-evening version of the same arithmetic had quietly
+// grown two copies of its own: the family's own `cancelSession` in
+// account-registrations.js, and the loop below. The admin had none at all,
+// which is the gap this closes — so the third caller is what forced the
+// extraction rather than a tidy-up for its own sake.
+//
+// The order is the module's order: creditForSession(), the ledger, then the
+// record. A credit not written is money lost with nobody able to tell.
+//
+// ⚠ IT REFUSES ANYTHING BUT `booked`, and the refusal is the safety rather than
+// a validation. `cancelled` run through here a second time would credit a
+// second time, into an append-only ledger, and nothing would say so; `attended`
+// is a session that happened; and `waiting` holds no seat, owes nothing and had
+// no price frozen, so there is nothing here to work out — leaving an evening's
+// queue is not a cancellation and is handled where it is asked for.
+//
+// ⚠ AND THE SEAT IS ANNOUNCED HERE, WHICH THE LOOP BELOW NEVER DID. Cancelling
+// a whole drop-in registration releases every evening ahead of it, each one a
+// seat somebody may be queueing for, and not one of those queues was ever told
+// — the family's own single-evening cancellation announced and this did not,
+// which is precisely the kind of split one function exists to make impossible.
+// Guarded, because _waitlist.js's own contract is that it is best effort and
+// never blocks: the record is already saved by then, so a failure here costs an
+// announcement and never a cancellation. The bare `await` at the old call site
+// made that stated contract false.
+async function cancelOneSession(att, { by, source, note, historyNote, now }) {
+  if (!att || att.status !== 'booked') {
+    throw Object.assign(new Error('Only a booked evening can be cancelled'),
+      { reason: 'not-booked', status: att && att.status });
+  }
+  const at = now == null ? Date.now() : now;
+  const owed = credit.creditForSession(att, at);
+  let entry = null;
+  if (owed.credit > 0) {
+    entry = await ledger.append({
+      accountId: att.accountId,
+      type: 'credit',
+      amountCents: owed.credit,
+      reason: REASON[source] || REASON.admin,
+      relatedRegistrationKey: R.key(att.participantId, att.activityId),
+      // Which evening, and what decided the figure. "credited 7.00" against a
+      // term somebody has five bookings on answers nothing six weeks later.
+      basis: { perSession: true, sessionDate: att.sessionDate,
+               startsAt: att.frozen.startsAt, cancelHours: att.frozen.cancelHours,
+               paidCents: att.payment.paidCents, reason: owed.reason },
+      note: note || null, createdAt: at, createdBy: by || null
+    });
+  }
+  const next = attendance.transition(att, {
+    status: 'cancelled', by: by, note: historyNote || null
+  });
+  next.payment = Object.assign({}, next.payment, {
+    creditedCents: (next.payment.creditedCents || 0) + owed.credit,
+    creditedToAccountId: owed.credit > 0 ? att.accountId : next.payment.creditedToAccountId,
+    status: owed.credit > 0 ? 'credited' : next.payment.status
+  });
+  await attendance.saveAttendance(next);
+  // ⚠ THIS EVENING'S QUEUE, NOT THE ACTIVITY'S. Waiting for Tuesday says
+  // nothing about Thursday — the room is per date and so is the list.
+  try {
+    await waitlist.seatOpened(att.activityId, att.sessionDate);
+  } catch (e) { /* the seat is already free; the announcement is not the seat */ }
+  return { session: next, credit: owed, entry: entry };
+}
+
 // Cancelling a DROP-IN registration credits nothing and instead releases the
 // evenings that have not happened yet, each judged on its own deadline.
 //
@@ -60,35 +122,24 @@ async function releaseFutureSessions(reg, { by, source, at, note }) {
     .filter((a) => a.status === 'booked');
   const out = [];
   for (const att of rows) {
-    const owed = credit.creditForSession(att, at);
-    let entry = null;
-    if (owed.credit > 0) {
-      entry = await ledger.append({
-        accountId: att.accountId,
-        type: 'credit',
-        amountCents: owed.credit,
-        reason: REASON[source] || REASON.admin,
-        relatedRegistrationKey: R.key(reg.participantId, reg.activityId),
-        basis: { perSession: true, sessionDate: att.sessionDate,
-                 startsAt: att.frozen.startsAt, cancelHours: att.frozen.cancelHours,
-                 paidCents: att.payment.paidCents, reason: owed.reason },
-        note: note || null, createdAt: at, createdBy: by || null
-      });
-    }
-    const next = attendance.transition(att, {
-      status: 'cancelled', by: by, note: 'registration ended'
+    const done = await cancelOneSession(att, {
+      by: by, source: source, note: note, historyNote: 'registration ended', now: at
     });
-    next.payment = Object.assign({}, next.payment, {
-      creditedCents: (next.payment.creditedCents || 0) + owed.credit,
-      creditedToAccountId: owed.credit > 0 ? att.accountId : next.payment.creditedToAccountId,
-      status: owed.credit > 0 ? 'credited' : next.payment.status
-    });
-    await attendance.saveAttendance(next);
-    out.push({ sessionDate: att.sessionDate, credit: owed.credit, entry: entry });
+    out.push({ sessionDate: att.sessionDate, credit: done.credit.credit, entry: done.entry });
   }
   return out;
 }
 
+// ⚠ THERE IS NO `entitled` PARAMETER ANY MORE, and its removal is the rule.
+//
+// It let the caller zero a credit, and existed because the two paths genuinely
+// differed: past the hard cutoff a guardian could not cancel AT ALL, while an
+// admin could and credited nothing. The cutoff now ends the credit for both and
+// stops neither — a family who is not coming back has to be able to say so, and
+// the per-evening path has always worked that way. So `entitled` had one
+// possible value, and a parameter that can only be true is a policy nobody can
+// read. The zero comes from creditFor(), which is the only thing that should
+// ever have been deciding it.
 async function cancelAndCredit(reg, { by, source, note, now }) {
   const at = now == null ? Date.now() : now;
   // ⚠ THE YEAR'S FEE OUTLIVES ONE TERM OF IT, so the credit needs one fact that
@@ -149,4 +200,4 @@ async function cancelAndCredit(reg, { by, source, note, now }) {
   return { registration: next, credit: owed, entry: entry, basis: basis, sessions: sessions };
 }
 
-module.exports = { cancelAndCredit, releaseFutureSessions, REASON };
+module.exports = { cancelAndCredit, releaseFutureSessions, cancelOneSession, REASON };

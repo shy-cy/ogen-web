@@ -3125,10 +3125,15 @@ open-ended hold.
 
 **Where a freed place is announced from**: a family's cancellation, an admin's
 cancellation, a rejection (easy to forget — it is the one decision that does not
-feel like one), a cancelled evening, the nightly sweep's expiry pass, and ⚠ **a
-group's capacity being raised** — see **Publishing an activity reaches the
-registrations already on it**, which is the only one of the six that happens on
-the activities form rather than in the registrations domain. The sweep is the only
+feel like one), a cancelled evening, ⚠ **a drop-in registration ending**, the
+nightly sweep's expiry pass, and ⚠ **a group's capacity being raised** — see
+**Publishing an activity reaches the registrations already on it**, which is the
+only one of the seven that happens on the activities form rather than in the
+registrations domain. The drop-in one was silent until the per-evening
+cancellation became one function: `releaseFutureSessions()` frees every evening
+ahead of the registration and announced none of them, while the family's own
+single-evening cancellation always had — two copies of one piece of work, with
+the announcement in one of them. The sweep is the only
 freeing with no human action behind it, and without it a lapsed hold would free a
 place nobody was ever told about. ⚠ A **lapsed claim** reopens
 a place silently — nothing fires at a derived moment — and the next natural event
@@ -3574,7 +3579,7 @@ time — it only ever rewrites what the derived rule already released.
 **The expiry email apologises.** The thing that expired is a request *we* did not
 answer, so "your request expired" — which reads as the family having let
 something lapse — is the wrong sentence. **Only the confirmation is resendable**
-out of the ten messages in `_registration-email.js`: a family
+out of the eleven messages in `_registration-email.js`: a family
 legitimately loses "you have a place", whereas re-delivering a refusal a
 fortnight later is the clearest case in that table of a resend doing harm.
 
@@ -3718,7 +3723,9 @@ and its only caller.
 ```
 netlify/functions/
   _credit-ledger.js       ogen-account-credits; append-only, no cached balance
-  _registration-cancel.js cancelAndCredit() — the one function both cancel paths call
+  _registration-cancel.js cancelAndCredit() and cancelOneSession() — one function
+                          per unit, called by every path that ends a term or an
+                          evening, whoever is asking
 ```
 
 Plus `feeApplies()` / `owedCentsFor()` in `_registration.js`, `seriesId` on the
@@ -4367,6 +4374,84 @@ on the live roster, and of a **waiting** row being marked as owing when a queue
 owes nothing by definition. The **filters beside it already derived the bucket
 for exactly this reason**, so one table could file a row under *nothing to pay*
 and label it OWED. One `payBucket()`, read by the cell and by the filter.
+
+### ⚠ And an admin could not cancel one evening
+
+The family has been able to cancel their own Tuesday since Phase 7. An admin had
+`cancel`, which ends the whole **registration** — and on a drop-in that releases
+every evening ahead of it — and nothing for one of them. So a family who rang and
+asked for one evening to come off was answered either by being told to go and
+press it themselves, or by an admin ending the registration and rebuilding it,
+which re-freezes the price at today's figure and re-decides the yearly fee. The
+third instance of the same shape in one group of work, after `markAttendance`
+before the register screen existed and `recordSessionPayment` before the money
+panel did.
+
+⚠ **AND THE ARITHMETIC HAD ALREADY BEEN WRITTEN TWICE.**
+`_registration-cancel.js` opens by insisting that a term's cancellation is one
+function because two copies can round differently and the difference surfaces
+when two families compare receipts. The **per-evening** version of it had quietly
+grown two copies inside that same argument: the family's own `cancelSession`, and
+the release loop in that very file. A third copy in the admin handler is what
+forced `cancelOneSession()` out — the credit, the ledger line before the record,
+the payment stamp and the seat announcement, in one place, called by all three.
+
+⚠ **AND THE EXTRACTION FOUND A BUG THE SPLIT WAS HIDING.**
+`releaseFutureSessions()` never announced any of the seats it freed, while the
+family's own single-evening cancellation always did — so ending a drop-in
+registration released six evenings and told six queues nothing. One function
+cannot be right in one copy and wrong in the other. The announcement is also
+**guarded** now, because `_waitlist.js`'s own stated contract is that it is best
+effort and never blocks: the record is already saved by then, and the bare
+`await` at the old call site made that sentence false.
+
+Five rules carry the admin's half:
+
+- ⚠ **`booked` AND NOTHING ELSE, refused in the shared function rather than at
+  each call site.** A `cancelled` evening run through a second time would credit
+  a second time into a ledger that cannot be edited, and nothing would say so;
+  `attended` happened; and a **waiting** row holds no seat, owes nothing and had
+  no price frozen, so there is nothing to give back — which is why the evening's
+  waiting table still offers nothing that hands one out. Each refusal is its own
+  sentence: *"This booking is waiting"* is a status report, and what is true is
+  that a queue holds no seat.
+- ⚠ **THE FIGURE ON THE SCREEN IS THE FIGURE THAT IS WRITTEN, and
+  `expectCreditCents` is REQUIRED rather than checked-when-offered.** The term
+  cancellation learned this guard with days between its boundaries; here the
+  deadline is **hours** before a start time, so a register left open through an
+  afternoon crosses one as a matter of course, and the family would be told a
+  number nobody credited them. Optional-in-syntax is the trap five callers of
+  `creditFor()` fell into, so a caller that cannot say what it is about to credit
+  is refused with a 400 — and the check runs **before** anything is written, like
+  the optimistic lock.
+- ⚠ **THE FAMILY IS TOLD.** `session-cancelled` is the eleventh message, and the
+  need for it is the group-move gap exactly: a silent version leaves somebody
+  turning up on Tuesday and a credit in an account nobody mentioned. It is the
+  one place the two directions differ on purpose — a guardian pressing their own
+  cancel button already knows, so their own path sends nothing. **No draft**, for
+  the reason a move has none: one evening is a fact, and a panel asking somebody
+  to approve a sentence they cannot usefully change teaches them to press
+  through. The credit line is absent at nought, as `CANCELLED`'s is.
+- **The row carries what cancelling would credit, and why.** Read from the same
+  `creditForSession()` the cancellation will use, for the rule the family's own
+  screen follows — what is offered is what happens — computed against **one clock
+  for the whole table**, or two rows of one register could straddle the same
+  hour. ⚠ And the **reason** travels with it, because a zero has to say why it is
+  a zero: *too late*, *already started* and *nothing was ever paid* are three
+  different conversations and the admin pressing this is the person who will have
+  whichever one it is. ⚠ **"Nothing paid" wins over any deadline**, the same
+  ordering `whyNoCredit()` uses on the family's dialog — both can be true at once,
+  and *"you were late"* implies money was lost when none ever moved.
+- **Neither button on the dialog says "Cancel" on its own.** Everywhere else here
+  the quiet button is labelled Cancel and means *do not*; on this one panel the
+  action is **also** called cancelling, so the word would appear twice meaning
+  opposite things, on a dialog about money that cannot be undone. It is *Keep the
+  booking* against *Cancel this evening*.
+
+The control is **disabled rather than absent** on a row that cannot take it,
+because this screen is a table so that the eye can run down its columns, and a
+control that appears and disappears per row destroys that. It is behind
+`canCancel`, cosmetically, and the server re-decides.
 
 ### Cancelling one evening is all or nothing
 
@@ -6960,8 +7045,9 @@ endpoint is not: nobody presses it, nothing 400s, and the capability is simply
 absent from the product while its code sits in the repository passing its tests.
 An unreachable action is allowed and has to be **named** in `UNREACHED` with its
 reason, so writing an endpoint is no longer enough to consider a thing built. It
-prints what is left on every run &mdash; **`recordSessionPayment`**, cash at the
-desk for one evening.
+prints what is left on every run, and the list is **empty** &mdash; which is the
+state to keep it in, since the next endpoint written without a door reappears
+there on its own.
 
 ⚠ **`register` AND `markAttendance` CAME OFF THAT LIST, and how is the point.**
 The gap they named &mdash; no admin screen for an evening &mdash; was found from
@@ -7207,8 +7293,8 @@ building the screen it was for. Two things came out of closing it:
   roster on a slug would lose a family's whole history the first time an activity
   was renamed, silently.
 - **One helper, not ten call sites.** `as(template, account, reg)` in
-  `_registration-email.js` builds what the log records, because ten senders is
-  ten places to forget the field again — which is how it came to be forgotten in
+  `_registration-email.js` builds what the log records, because eleven senders is
+  eleven places to forget the field again — which is how it came to be forgotten in
   all ten.
 
 `'registration-terms-changed'` had **no line in `TEMPLATES`**, so `templateLabel()`

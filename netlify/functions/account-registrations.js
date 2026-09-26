@@ -28,7 +28,7 @@ const R = require('./_registration');
 const credit = require('./_credit');
 const ledger = require('./_credit-ledger');
 const spend = require('./_spend-credit');
-const { cancelAndCredit } = require('./_registration-cancel');
+const { cancelAndCredit, cancelOneSession } = require('./_registration-cancel');
 const attendance = require('./_session-attendance');
 const B = require('./_bundle');
 const groups = require('./_activity-groups');
@@ -1516,31 +1516,17 @@ exports.handler = async (event) => {
         // deadline, nothing — and the booking is released either way, because a
         // family can always say they are not coming. The same split between
         // entitlement and the ability to act that the course cutoff makes.
-        const owed = credit.creditForSession(att, Date.now());
-        let entry = null;
-        if (owed.credit > 0) {
-          // Ledger first, for the reason it is always first here: a credit not
-          // written is money lost with nobody able to tell.
-          entry = await ledger.append({
-            accountId: att.accountId, type: 'credit', amountCents: owed.credit,
-            reason: 'registration-cancelled-by-guardian',
-            relatedRegistrationKey: R.key(att.participantId, att.activityId),
-            basis: { perSession: true, sessionDate: att.sessionDate,
-                     startsAt: att.frozen.startsAt, cancelHours: att.frozen.cancelHours,
-                     paidCents: att.payment.paidCents, reason: owed.reason },
-            createdBy: me.accountId
-          });
-        }
-        const next = attendance.transition(att, { status: 'cancelled', by: me.accountId });
-        next.payment = Object.assign({}, next.payment, {
-          creditedCents: (next.payment.creditedCents || 0) + owed.credit,
-          creditedToAccountId: owed.credit > 0 ? att.accountId : next.payment.creditedToAccountId,
-          status: owed.credit > 0 ? 'credited' : next.payment.status
+        //
+        // ⚠ THROUGH THE SHARED FUNCTION, which is where all of that now lives:
+        // the credit, the ledger line before the record, the payment stamp and
+        // this evening's queue being told. It was written out here and again in
+        // _registration-cancel.js's release loop, and an admin had no version at
+        // all — three copies of one piece of arithmetic about money is the shape
+        // cancelAndCredit() exists one function over to refuse.
+        const done = await cancelOneSession(att, {
+          by: me.accountId, source: 'guardian', historyNote: 'cancelled by the family'
         });
-        await attendance.saveAttendance(next);
-        // ⚠ THIS EVENING'S QUEUE, NOT THE ACTIVITY'S. Waiting for Tuesday says
-        // nothing about Thursday — the room is per date and so is the list.
-        await waitlist.seatOpened(att.activityId, att.sessionDate);
+        const next = done.session, owed = done.credit, entry = done.entry;
         return json(200, { ok: true, session: next, credit: owed, entry: entry,
                            balance: await ledger.balanceFor(me.accountId) });
       }

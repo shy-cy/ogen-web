@@ -1181,7 +1181,137 @@
     // The same `.acts` idiom the queue rows use, rather than a second set of
     // row buttons with their own styling — one table, one shape for the controls
     // in it.
-    return el('div', { class: 'acts' }, kids.concat([eveningMoney(r), mailButton(r)]));
+    return el('div', { class: 'acts' }, kids.concat([eveningCancel(r), eveningMoney(r), mailButton(r)]));
+  }
+
+  // ⚠ A ZERO HAS TO SAY WHY IT IS A ZERO, and the ORDERING is the rule rather
+  // than the sentences.
+  //
+  // "NOTHING PAID" WINS OVER ANY DEADLINE. Both can be true at once — an unpaid
+  // evening cancelled after its window — and "this is past the deadline" then
+  // implies money was lost when none ever moved. The kinder sentence is also the
+  // more accurate one, which is the same decision whyNoCredit() makes on the
+  // family's own dialog; the difference is only who is reading it, and an admin
+  // is about to have whichever conversation this names.
+  var NO_CREDIT = {
+    'too-late': 'Nothing is credited: this is past the cancellation deadline for this evening.',
+    started: 'Nothing is credited: the session has already started.'
+  };
+  function noCreditWhy(r) {
+    if (!(r.payment && r.payment.paidCents > 0)) {
+      return 'Nothing was paid for this evening, so there is nothing to credit.';
+    }
+    return NO_CREDIT[r.cancelReason] || 'Nothing is credited for this evening.';
+  }
+
+  // ⚠ CANCELLING ONE EVENING ON A FAMILY'S BEHALF, which the family could do
+  // from their own page and an admin could not do at all.
+  //
+  // What an admin had was `cancel`, which ends the whole REGISTRATION — on a
+  // drop-in that releases every evening ahead of it. So a family who rang to ask
+  // for one Tuesday to come off was answered either by being told to go and
+  // press it themselves, or by the term being ended and rebuilt. Same shape as
+  // Present before the register screen existed.
+  //
+  // ⚠ ENABLED ON `booked` ONLY, and disabled rather than absent on the rest, for
+  // the reason this screen is a table: the columns line up so the eye runs down
+  // them, and a control that appears and disappears per row breaks that. The
+  // tooltip says which state refused it.
+  function eveningCancel(r) {
+    if (r.status === 'waiting') return null;
+    return iconButton('cancel', 'Cancel this evening',
+      'the seat is given back and any credit is written to their account, which cannot be '
+      + 'undone. It ends this evening only, never the registration',
+      'no', !S.canCancel || r.status !== 'booked',
+      function () { openEveningCancel(r); });
+  }
+
+  // ⚠ A CONFIRMATION, NOT A DRAFT, and the difference is what there is to word.
+  //
+  // A rejection and a term cancellation open the review panel because approval
+  // carries no reason code and an admin may have something to say. One evening
+  // is a fact — this date, this family, this figure — so there is nothing to
+  // reword, and a panel asking somebody to approve a sentence they cannot
+  // usefully change is a step that teaches them to press through. The family is
+  // still emailed; it is simply not editable.
+  //
+  // It is built from the classes the review panel already has rather than a set
+  // of its own. A class with no rule behind it is a layout nobody designed —
+  // this project shipped `acc-evening-acts` and `ghost` that way.
+  function openEveningCancel(r) {
+    var back = el('div', { class: 'modal-back' });
+    var close = function () { if (back.parentNode) back.parentNode.removeChild(back); };
+    var note = el('input', { type: 'text', class: 'modal-subject' });
+    var go = el('button', { class: 'no', text: 'Cancel this evening' });
+    var waiting = ((S.register && S.register.waiting) || []).length;
+
+    var panel = el('div', { class: 'modal' }, [
+      el('h3', { text: 'Cancel ' + shortDate(r.sessionDate) + ' \u00b7 ' + r.name }),
+      // What the ledger will record, on its own line rather than left to be
+      // spotted in the prose — and ⚠ WHY, when it is nothing. A zero has to say
+      // why it is a zero: "too late" and "they never paid" are two different
+      // conversations, and the admin pressing this is the person who will have
+      // to have whichever one it is.
+      r.cancelCredit > 0
+        ? el('p', { class: 'modal-credit', text: 'Credits ' + money(r.cancelCredit) })
+        : el('p', { class: 'hint', style: 'margin-top:0;', text: noCreditWhy(r) }),
+      // State rather than a manual, so it stays on screen: cancelling frees the
+      // seat, and everybody queueing for THIS evening is emailed that it has.
+      waiting
+        ? el('p', { class: 'hint', style: 'margin-top:6px;', text: waiting === 1
+            ? 'One family is waiting for this evening and will be emailed that a seat has opened.'
+            : waiting + ' families are waiting for this evening and will be emailed that a '
+              + 'seat has opened.' })
+        : null,
+      el('p', { class: 'hint', style: 'margin-top:6px;', text:
+        'The family is emailed that this evening is off. Their other bookings are untouched.' }),
+      el('label', { class: 'modal-label', text: 'Why (recorded internally, not sent)' }),
+      note,
+      el('div', { class: 'modal-acts' }, [
+        // ⚠ NEITHER BUTTON SAYS "Cancel" ON ITS OWN. On every other panel here
+        // the quiet button is labelled Cancel and means "do not do it" — on this
+        // one the action is ALSO called cancelling, so the two would read as the
+        // same word twice with opposite meanings, on a dialog about money that
+        // cannot be undone.
+        el('button', { onclick: close, text: 'Keep the booking' }), go
+      ])
+    ]);
+    back.appendChild(panel);
+    back.addEventListener('click', function (e) { if (e.target === back) e.stopPropagation(); });
+    document.body.appendChild(back);
+
+    go.addEventListener('click', function () {
+      go.disabled = true;
+      send({
+        action: 'cancelSession', participantId: r.participantId,
+        activityId: S.queue.activity.activityId, sessionDate: r.sessionDate,
+        note: note.value || undefined,
+        // ⚠ THE FIGURE THIS PANEL SHOWED. The deadline is hours before a start
+        // time, so a register left open through an afternoon will cross one —
+        // and then the family would be told a number nobody credited them. The
+        // server compares and refuses rather than writing a different figure
+        // than the one on the screen.
+        expectCreditCents: r.cancelCredit || 0
+      }).then(function (res) {
+        if (!res.ok) {
+          go.disabled = false;
+          return message('err', (res.data && res.data.error) || 'That did not work');
+        }
+        close();
+        var said = 'Cancelled ' + shortDate(r.sessionDate) + ' \u00b7 ' + r.name
+          + (res.data.entry ? ' \u00b7 credited ' + money(res.data.entry.amountCents) : '');
+        // Loudly when the message did not go, exactly as a rejection reports it:
+        // an admin left believing a family was told something nobody told them
+        // will not follow it up another way.
+        if (res.data.emailed === false) {
+          message('err', said + ' \u2014 but the email did NOT go. Tell them another way.');
+        } else {
+          message('ok', said);
+        }
+        // The strip follows: a freed seat changes how full the evening is.
+        loadRegister(S.date);
+      });
+    });
   }
 
   // ⚠ CASH AT THE DESK FOR ONE EVENING, which had a server action since Phase 7

@@ -82,7 +82,11 @@ const TEMPLATES = {
   // 'registration-terms-changed' and an admin reading the log met a key rather
   // than a sentence. Not resendable: it says two dates that govern refunds have
   // moved, and a second copy a fortnight later reads as them having moved again.
-  'registration-terms-changed': { label: 'Cancellation dates changed', resend: false }
+  'registration-terms-changed': { label: 'Cancellation dates changed', resend: false },
+  // One evening, taken off a family's list by an admin. Not resendable: it
+  // names a date and a figure, and a second copy a fortnight later reads as a
+  // second evening cancelled — the family would go looking for which one.
+  'session-cancelled': { label: 'Session cancelled', resend: false }
 };
 
 function templateLabel(t) { return (TEMPLATES[t] && TEMPLATES[t].label) || String(t || 'Email'); }

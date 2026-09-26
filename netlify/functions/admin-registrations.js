@@ -1,8 +1,9 @@
 // /api/admin-registrations — the approval queue.
 //
 // Actions: queue | approve | reject | cancel | moveGroup | givePlace | register |
-//          markAttendance | mail | checkinCodes | bundles | recordPayment |
-//          applyCredit | adjustCredit | recordSessionPayment | ledger | sweep
+//          markAttendance | cancelSession | mail | checkinCodes | bundles |
+//          recordPayment | applyCredit | adjustCredit | recordSessionPayment |
+//          ledger | sweep
 //
 // IT AUTHENTICATES THROUGH THE ADMIN STORE, which is the only reason it is a
 // separate function from account-registrations.js. One handler serving both
@@ -34,7 +35,7 @@ const R = require('./_registration');
 const credit = require('./_credit');
 const ledger = require('./_credit-ledger');
 const spend = require('./_spend-credit');
-const { cancelAndCredit } = require('./_registration-cancel');
+const { cancelAndCredit, cancelOneSession } = require('./_registration-cancel');
 const { openRegistration } = require('./_registration-open');
 const attendance = require('./_session-attendance');
 const groups = require('./_activity-groups');
@@ -704,9 +705,14 @@ exports.handler = async (event) => {
         // same way the family's own picker gets its list.
         const all = await attendance.forActivity(activity.activityId);
         const rows = [];
+        // ⚠ ONE CLOCK FOR THE WHOLE TABLE. creditForSession() measures against a
+        // deadline in hours, so reading Date.now() per row would let two rows of
+        // one register straddle the same boundary and disagree.
+        const now = Date.now();
         for (const att of all.filter((a) => !date || a.sessionDate === date)) {
           const account = await accounts.getAccount(att.accountId);
           const p = await participants.getParticipant(att.participantId);
+          const giveBack = att.status === 'booked' ? credit.creditForSession(att, now) : null;
           rows.push({
             participantId: att.participantId, sessionDate: att.sessionDate,
             name: p ? [p.firstName, p.lastName].filter(Boolean).join(' ') : att.participantId,
@@ -716,7 +722,20 @@ exports.handler = async (event) => {
             // table is read in, and it survives the claim, so "waited since
             // Tuesday" is still true on the booking it became.
             waitingSince: att.waitingSince || null,
-            startsAt: att.frozen.startsAt, history: att.history
+            startsAt: att.frozen.startsAt, history: att.history,
+            // ⚠ WHAT CANCELLING WOULD CREDIT, RIGHT NOW, from the same pure
+            // function the cancellation itself will use — the rule the family's
+            // own screen has always followed, so what is offered is what
+            // happens. `null` on anything that is not a live booking, because
+            // there is nothing there to give back. It costs no read: the record
+            // is already in hand and creditForSession() opens no store.
+            cancelCredit: giveBack ? giveBack.credit : null,
+            // ⚠ AND WHY IT IS THAT FIGURE. A zero has to say why it is a zero —
+            // the family area's own rule — and here the reader is the admin who
+            // is about to answer the family's question about it. `too-late`,
+            // `started` and `nothing paid at all` are three different
+            // conversations and the figure alone cannot tell them apart.
+            cancelReason: giveBack ? giveBack.reason : null
           });
         }
         return json(200, {
@@ -934,6 +953,94 @@ exports.handler = async (event) => {
           body.participantId + '__' + body.activityId + '__' + body.sessionDate, 'ok',
           { detail: body.status });
         return json(200, { ok: true, session: next });
+      }
+
+      // ⚠ ONE EVENING, CANCELLED ON A FAMILY'S BEHALF — the other half of a
+      // capability the family has had since Phase 7 and the admin had not.
+      //
+      // A family can cancel their own Tuesday from their own page. An admin
+      // could cancel the whole REGISTRATION, which on a drop-in releases every
+      // evening ahead of it, and could do nothing at all about one of them. So
+      // a family who rang and asked for Tuesday to come off was answered either
+      // by being told to go and press it themselves, or by an admin ending the
+      // registration and re-creating it. Same shape as markAttendance before the
+      // register screen existed, and recordSessionPayment before the money panel
+      // did: the mechanism written, tested, and reachable from one side only.
+      //
+      // It goes through cancelOneSession(), which is the family's own path — so
+      // the deadline, the ledger-before-the-record ordering, the payment stamp
+      // and this evening's queue being told are all still written once.
+      //
+      // ⚠ ON `booked` AND NOTHING ELSE, and each refusal is its own sentence.
+      // An `attended` evening happened; a `cancelled` one run through again
+      // would credit twice into a ledger that cannot be edited; and a `waiting`
+      // row holds no seat and owes nothing, so there is nothing to give back —
+      // which is why the evening's waiting table has no controls on it.
+      case 'cancelSession': {
+        if (!canCancel(session)) {
+          return json(403, { error: 'Your role may approve but not cancel' });
+        }
+        const att = await attendance.getAttendance(
+          body.participantId, body.activityId, body.sessionDate);
+        if (!att) return json(404, { error: 'No such booking.' });
+        if (att.status === 'waiting') {
+          return json(409, { error: 'This family is waiting for this evening rather than ' +
+                                    'holding a seat on it, so there is nothing to cancel.' });
+        }
+        if (att.status !== 'booked') {
+          return json(409, { error: 'This booking is ' + att.status + '.' });
+        }
+
+        // ⚠ THE FIGURE ON THE SCREEN MUST STILL BE THE FIGURE THAT IS WRITTEN,
+        // and it is REQUIRED rather than checked when offered.
+        //
+        // The term cancellation learned this with days between its boundaries:
+        // a panel opened at 23:59 and sent at 00:01 straddles one, and the
+        // family is told a number nobody credited them. Here the deadline is
+        // HOURS before a start time, so the straddle is not an edge case — an
+        // admin with the register open through the afternoon will cross one.
+        //
+        // Optional-in-syntax is the trap this codebase already met with the
+        // clock argument to creditFor(): five call sites omitted it and every
+        // screen lied. A caller that cannot say what it is about to credit has
+        // no business cancelling, and the figure is on the row it pressed.
+        const want = credit.creditForSession(att, Date.now()).credit;
+        if (body.expectCreditCents === undefined || body.expectCreditCents === null) {
+          return json(400, { error: 'Send the credit this was shown as earning, so it can be ' +
+                                    'checked against what will actually be written.' });
+        }
+        if (Number(body.expectCreditCents) !== want) {
+          return json(409, {
+            error: 'What cancelling this evening credits has changed since the register was ' +
+                   'loaded. Re-open it and check the figure.',
+            reason: 'credit-moved', creditCents: want
+          });
+        }
+
+        const done = await cancelOneSession(att, {
+          by: session.email, source: 'admin',
+          note: body.note ? String(body.note).slice(0, 500) : null,
+          historyNote: 'cancelled by an admin'
+        });
+
+        // After the record, never before — the money rule wins over the email
+        // rule — and with the figure the ENTRY recorded rather than the one
+        // predicted above. The REGISTRATION is what the message is built from:
+        // an attendance row knows the date and the participant id and nothing
+        // about what to call either of them.
+        let emailed = null;
+        const account = await accounts.getAccount(att.accountId);
+        const reg = await store.getRegistration(att.participantId, att.activityId);
+        if (account && reg) {
+          emailed = await mail.sendSessionCancelled(reg, account, att.sessionDate,
+            (done.entry && done.entry.amountCents) || 0);
+        }
+        await recordAudit(session, 'registrations.cancelSession',
+          body.participantId + '__' + body.activityId + '__' + body.sessionDate, 'ok',
+          { detail: (done.entry ? 'credited ' + done.entry.amountCents + 'c' : 'no credit') +
+                    (body.note ? ' \u00b7 ' + body.note : '') });
+        return json(200, { ok: true, session: done.session, credit: done.credit,
+                           entry: done.entry, emailed: emailed });
       }
 
       // Money for ONE evening. Its own action rather than a flag on
