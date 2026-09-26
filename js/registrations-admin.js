@@ -1617,36 +1617,27 @@
                 activityId: r.activityId, amountCents: cents, note: note };
         }, r, false, evening));
 
-      // ⚠ THE CREDIT FORM IS THE TERM'S, AND AN EVENING SAYS SO RATHER THAN
-      // DRAWING A CONTROL THAT WOULD SETTLE THE WRONG DEBT. `applyCredit` looks
-      // up a REGISTRATION and spends against it; pointed at an evening it would
-      // pay down the term's bill while the €7 stayed owed, with both figures
-      // internally consistent. _spend-credit.js already knows how to spend on an
-      // evening — the family's own page does it — so this is a door that was
-      // never built rather than a rule, and the panel names the route that
-      // exists instead of offering one that is subtly wrong.
-      if (date) {
-        box.appendChild(el('div', { style: 'margin-top:16px;padding-top:14px;border-top:1px solid #f0ece1;' }, [
-          el('div', { class: 'label-row' }, [
-            el('div', { class: 'field-label', text: 'Spending credit on one evening' }),
-            window.AdminHelp.badge('There is no admin action for it yet. The family can spend their '
-              + 'own credit on an evening from their registration page, which is the route to point '
-              + 'them at. To do it here, debit the credit below with a note saying which evening, '
-              + 'and record the payment above \u2014 two entries, both in the ledger, which is what an '
-              + 'append-only record is for.')
-          ]),
-          el('p', { class: 'hint', style: 'margin:6px 0 0;',
-            text: 'Not built. Debit the credit below and record the payment above \u2014 both lines stay '
-                + 'in the ledger.' })
-        ]));
-      } else {
-        box.appendChild(amountForm('Spend credit on this registration',
-          'Writes a debit on the ledger and the same amount onto the registration, in one action — separately they would disagree about the same euros.',
-          S.canCancel && d.balanceCents > 0, function (cents, note) {
-            return { action: 'applyCredit', participantId: r.participantId,
-                     activityId: r.activityId, amountCents: cents, note: note };
-          }, r));
-      }
+      // ⚠ THE SAME FORM, POINTED AT THE SAME DEBT THE ONE ABOVE IT IS. A family
+      // who rings and asks somebody to put their balance towards Tuesday was
+      // answered by a screen that could settle their term and not their evening
+      // — while the family's own page has been able to do exactly this since
+      // they could spend credit at all. _spend-credit.js takes `kind: 'session'`
+      // and writes the ledger line with the date on it; only the admin's door
+      // was missing.
+      box.appendChild(amountForm(
+        date ? 'Spend credit on this evening' : 'Spend credit on this registration',
+        date
+          ? 'Writes a debit on the ledger and the same amount onto this evening\u2019s booking, in '
+            + 'one action \u2014 separately they would disagree about the same euros. The ledger line '
+            + 'carries the date, so a family read it back six weeks later knows which evening it '
+            + 'went on. It is refused past what this evening owes or what the account holds.'
+          : 'Writes a debit on the ledger and the same amount onto the registration, in one action — separately they would disagree about the same euros.',
+        S.canCancel && d.balanceCents > 0, function (cents, note) {
+          var out = { action: 'applyCredit', participantId: r.participantId,
+                      activityId: date ? aid : r.activityId, amountCents: cents, note: note };
+          if (date) out.sessionDate = date;
+          return out;
+        }, r, false, evening));
 
       box.appendChild(amountForm('Adjust the credit',
         'A correction is an entry, never an edit: the ledger is append-only, so the opposite line is written and both stay in the record. A note is required.',

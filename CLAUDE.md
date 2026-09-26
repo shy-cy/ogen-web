@@ -4156,14 +4156,35 @@ in cash afterwards, and an evening that was paid for and then given back has to
 be recordable before it can be credited. Somebody waiting holds no booking and
 owes nothing by definition, so there is no debt for a payment to land on.
 
-⚠ **THE TERM'S CREDIT FORM IS NOT DRAWN THERE, AND THE PANEL SAYS SO.**
-`applyCredit` looks up a **registration** and spends against it; pointed at an
-evening it would pay down the term's bill while the €7 stayed owed, with both
-figures internally consistent. `_spend-credit.js` already knows how to spend on
-an evening — `kind: 'session'`, which the family's own page uses — so this is a
-**door that was never built** rather than a rule. The panel names the two routes
-that do exist (the family's own page, or a debit plus a recorded payment, both
-lines staying in the ledger) instead of offering a control that is subtly wrong.
+### ⚠ And the family could spend credit on one evening while the admin could not
+
+Asked as a question — *is this already working on the family's side and only
+missing on the admin's?* — and it was, at all three layers:
+`_spend-credit.js` takes `kind: 'session'`, saves through
+`attendance.transition()` and writes the ledger line with
+`basis: { perSession: true, sessionDate }`; `useCredit` branches on
+`body.sessionDate`; and `js/member-account.js` draws `creditButton()` on every
+evening row. **`applyCredit` on the admin side loaded a registration and nothing
+else.** So a family who rang and asked somebody to put their balance towards
+Tuesday was answered by a screen that could settle their term and not their
+evening — something they could have done themselves from their own page. The same
+shape as `markAttendance` before the register existed and `recordSessionPayment`
+before this panel did: the mechanism written, tested, and reachable from one side
+only.
+
+It is `sessionDate` on `applyCredit`, decided exactly as the family's own action
+decides it, through the same spender — so the cap at what is owed, the cap at
+what is held, the ledger-before-the-record ordering and the part-payment rule are
+all still written once. Pointed at a term it answers under `registration` and at
+an evening under `session`, which are the two names this handler already uses, so
+the client needs no third branch.
+
+⚠ **THE ONE ASYMMETRY IS DELIBERATE AND STAYS: WHO NAMES THE AMOUNT.** A
+family's is decided server-side — `spendable(record, balance)`, the smaller of
+the two — because a client that names its own figure is a client that can name
+somebody else's balance. An **admin** names one, because part of a debt is a real
+thing to settle at a desk. Both go through the same two caps, and a test asserts
+no handler writes a `credit-applied` entry of its own.
 
 ⚠ **The row in hand is stale the moment the payment lands.** Both money actions
 hand back the record they just wrote, so the panel reopens on those figures

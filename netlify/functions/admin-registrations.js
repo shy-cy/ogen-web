@@ -999,20 +999,40 @@ exports.handler = async (event) => {
       }
 
       // Money from the family's own credit, which is a DEBIT on the ledger and a
-      // payment on the registration — one action, because doing either alone
-      // leaves the two disagreeing about the same euros.
+      // payment on the record — one action, because doing either alone leaves
+      // the two disagreeing about the same euros.
+      //
+      // ⚠ A TERM OR ONE EVENING, decided by `sessionDate`, exactly as the
+      // family's own `useCredit` decides it. _spend-credit.js has handled
+      // `kind: 'session'` since the family could spend their own credit at all —
+      // it writes the ledger line with `basis.sessionDate` so a family read it
+      // back six weeks later knows WHICH evening — and the admin half simply
+      // never asked for it. A family who rings and asks somebody to do it for
+      // them was answered by a screen that could settle their term and not
+      // their Tuesday.
+      //
+      // ONE SPENDER, two callers, and that is what stops the two disagreeing
+      // about the same euros: the cap at what is owed, the cap at what is held,
+      // the ledger-before-the-record ordering and the part-payment rule are all
+      // written once. What the two callers legitimately differ on is the AMOUNT.
+      // A family's is decided server-side — `spendable(record, balance)`, the
+      // smaller of the two — because a client that names its own figure is a
+      // client that can name somebody else's balance. An admin names one,
+      // because part of a debt is a real thing to settle at a desk, and
+      // spendCredit() refuses anything past either cap.
       case 'applyCredit': {
         if (!canCancel(session)) return json(403, { error: 'Your role may not move credit' });
-        const reg = await store.getRegistration(body.participantId, body.activityId);
-        if (!reg) return json(404, { error: 'No such registration.' });
-        // ONE SPENDER, two callers. A family can spend their own credit now, and
-        // two implementations would be two that can cap differently or write the
-        // two halves in a different order — which surfaces when a family reads
-        // their balance to the admin reading theirs.
+        const onDate = body.sessionDate ? String(body.sessionDate) : null;
+        const record = onDate
+          ? await attendance.getAttendance(body.participantId, body.activityId, onDate)
+          : await store.getRegistration(body.participantId, body.activityId);
+        if (!record) {
+          return json(404, { error: onDate ? 'No such booking.' : 'No such registration.' });
+        }
         let done;
         try {
           done = await spend.spendCredit({
-            record: reg, kind: 'registration',
+            record: record, kind: onDate ? 'session' : 'registration',
             cents: body.amountCents, by: session.email, note: body.note || null
           });
         } catch (err) {
@@ -1021,9 +1041,14 @@ exports.handler = async (event) => {
                               balanceCents: err.balanceCents, owedCents: err.owedCents });
         }
         await recordAudit(session, 'registrations.applyCredit',
-          body.participantId + '__' + body.activityId, 'ok', { detail: done.spentCents + 'c' });
-        return json(200, { ok: true, registration: done.record, entry: done.entry,
-                           balanceCents: done.balanceCents });
+          body.participantId + '__' + body.activityId + (onDate ? '__' + onDate : ''),
+          'ok', { detail: done.spentCents + 'c' });
+        // Under the key the caller's own screen reads. `session` and
+        // `registration` are the two names every other action on this handler
+        // already uses for the two records, so the client needs no third branch.
+        return json(200, Object.assign({ ok: true, entry: done.entry,
+                                         balanceCents: done.balanceCents },
+          onDate ? { session: done.record } : { registration: done.record }));
       }
 
       // A correction, and it is an ENTRY rather than an edit. The ledger is

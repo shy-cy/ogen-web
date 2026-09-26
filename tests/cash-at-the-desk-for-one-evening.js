@@ -249,10 +249,9 @@ const src = read('js/registrations-admin.js');
   H.ok(forms.indexOf('Record a payment for this evening') !== -1,
     'the form says what it records: ' + forms.join(' | '));
   H.ok(forms.indexOf('Spend credit on this registration') === -1,
-    '⚠ and the TERM\'s credit form is not drawn here — applyCredit looks up a ' +
-    'registration and would pay down the term while the evening stayed owed');
-  H.ok(/Not built/.test(body.textContent),
-    '⚠ said out loud rather than left as a missing control, with the route that does exist');
+    '⚠ and the TERM\'s credit form is not drawn here — it would pay down the term ' +
+    'while the evening stayed owed. The evening has its own, and its own suite: ' +
+    'an-admin-can-spend-a-familys-credit-on-one-evening.js');
 
   // Euros in the box, cents on the wire.
   const inputs = D.byTag(body, 'input');
