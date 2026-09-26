@@ -3784,6 +3784,21 @@ address rather than `self`. A **cancelled** booking is not markable: the evening
 was given back, and marking somebody present for a place they do not hold would
 put them in a room they are not counted in.
 
+⚠ **AND PRESENT IS NOT OFFERED BEFORE THE CLASS HAS STARTED.** "Present" says
+somebody walked into a room, and before the session begins there is no room to
+have walked into — so the control offered a way to record something that cannot
+have happened, which is the same shape as the register listing a family who
+holds no seat. The instant is the **frozen** `startsAt`, the same one the late
+price and the per-session cancellation window are measured from, so the
+register, the charge and the deadline cannot disagree about when an evening
+begins. ⚠ An **unknown** start is allowed: `freezeSession()` freezes `null` for a
+date the calendar does not hold, and reading that as "not started" would lock
+the register on exactly the evening somebody most needs to take by hand. It is
+cosmetic, deliberately — a clock a few minutes out must not stand between a
+teacher in a doorway and the register, and marking attendance moves no money.
+**No-show is left alone** for now, though it is the same question asked the
+other way.
+
 **A no-show frees the place and still owes for it.** Those are two questions and
 `capacityForDate()` answers only the first — somebody who did not come is not in
 the room, and whether they are billed for it lives on their own record. A test

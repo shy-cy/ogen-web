@@ -51,7 +51,8 @@ const IDS = ['messages', 'picker', 'queue-panel', 'queue-title', 'capacity', 'da
 const seat = (over) => Object.assign({
   participantId: 'p-1', sessionDate: '2026-10-05', name: 'Adf Asfsdf',
   accountId: 'a-1', accountEmail: 'michal+test1@ogen.cy', groupId: null,
-  status: 'booked', waitingSince: null, startsAt: null, history: [],
+  status: 'booked', waitingSince: null, startsAt: Date.parse('2020-10-05T16:00:00Z'),
+  history: [],
   payment: { owedCents: 700, paidCents: 700, currency: 'EUR', status: 'owed', creditedCents: 0 }
 }, over || {});
 
@@ -281,6 +282,56 @@ function choose(sel, value) {
     'both filters are forgotten when the activity changes');
   H.ok(!/S\.eveFilter = newEveFilter\(\)[\s\S]{0,200}loadRegister/.test(src),
     'and the evening filter is not reset by a date change');
+
+  console.log('\n[\u26a0 Present is not offered before the class has started]');
+  //
+  // "Present" says somebody walked into a room. Before the session begins there
+  // is no room to have walked into, so the control was offering a way to record
+  // something that cannot have happened — the same shape as the register listing
+  // a family who holds no seat.
+  const buttonsOn = (dom, name) => {
+    const t = D.byTag(dom.byId('queue'), 'table')
+      .filter((x) => (D.byTag(x, 'th')[0] || {}).textContent === 'Participant')[0];
+    const row = D.byTag(t, 'tr').filter((tr) => tr.textContent.indexOf(name) !== -1)[0];
+    return D.byTag(row, 'button');
+  };
+  const byLabel = (btns, label) => btns.filter((b) => b.textContent === label)[0];
+
+  {
+    // The fixture's evening began in 2020, so the register is markable.
+    const past = boot();
+    await settle();
+    const b = buttonsOn(past, 'Adf Asfsdf');
+    H.eq(byLabel(b, 'Present').getAttribute('disabled'), null,
+      'a session that has begun can be marked present');
+  }
+  {
+    const ahead = boot({ register: () => ({ ok: true, data: Object.assign({}, REG_ANSWER, {
+      register: REGISTER.map((r) => Object.assign({}, r,
+        { startsAt: Date.now() + 3600e3 })) }) }) });
+    await settle();
+    const b = buttonsOn(ahead, 'Adf Asfsdf');
+    H.ok(byLabel(b, 'Present').getAttribute('disabled'), '\u26a0 one that has not cannot');
+    H.eq(byLabel(b, 'Present').getAttribute('title'), 'This session has not started yet',
+      'and says why, rather than greying out with no account of itself');
+  }
+  {
+    // ⚠ AN UNKNOWN START IS ALLOWED. freezeSession() freezes null for a date the
+    // calendar does not hold, and reading that as "not started" would lock the
+    // register on exactly the evening somebody most needs to take by hand.
+    const unknown = boot({ register: () => ({ ok: true, data: Object.assign({}, REG_ANSWER, {
+      register: REGISTER.map((r) => Object.assign({}, r, { startsAt: null })) }) }) });
+    await settle();
+    H.eq(byLabel(buttonsOn(unknown, 'Adf Asfsdf'), 'Present').getAttribute('disabled'), null,
+      'an evening with no frozen start is markable — absent resolves towards the register');
+  }
+  // It is the frozen instant, which is the same one the late price and the
+  // per-session cancellation window are measured from, so the register, the
+  // charge and the deadline cannot disagree about when an evening begins.
+  H.ok(/startsAt: att\.frozen\.startsAt/.test(api), 'the row carries the frozen start');
+  H.ok(/function notYet\(r, status\)/.test(src), 'and the screen reads it');
+  H.ok(/if \(status !== 'attended'\) return false;/.test(src),
+    'for Present only — No-show is a separate question and was not asked');
 
   H.done();
 })();

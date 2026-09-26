@@ -1052,13 +1052,43 @@
     ]);
   }
 
+  // ⚠ PRESENT IS NOT OFFERED BEFORE THE CLASS HAS STARTED.
+  //
+  // "Present" is a statement that somebody walked into a room, and before the
+  // session begins there is no room to have walked into — so the control was
+  // offering an admin a way to record something that cannot have happened. It
+  // is the same shape as the register itself listing a family who holds no
+  // seat: a button whose meaning is false at the moment it can be pressed.
+  //
+  // The instant is the FROZEN one, `frozen.startsAt`, which is the same value
+  // the late price and the per-session cancellation window are measured from —
+  // so the register, the charge and the deadline cannot disagree about when an
+  // evening begins.
+  //
+  // ⚠ AN UNKNOWN START IS ALLOWED. freezeSession() freezes `null` for a date
+  // the calendar does not hold, and reading that as "not started yet" would
+  // lock the register on exactly the evening somebody most needs to take it by
+  // hand. Absent resolves towards letting the teacher mark the register, which
+  // is the direction every other blank in this system falls.
+  //
+  // Cosmetic, like every check on this side. The server does not refuse it: a
+  // clock that is a few minutes out must not be what stands between a teacher
+  // in a doorway and the register, and marking attendance moves no money.
+  function notYet(r, status) {
+    if (status !== 'attended') return false;
+    var at = r.startsAt;
+    return typeof at === 'number' && isFinite(at) && Date.now() < at;
+  }
+
   function mark(r, status, label) {
+    var early = notYet(r, status);
     return el('button', {
       type: 'button',
       class: status === 'attended' ? 'go' : '',
+      title: early ? 'This session has not started yet' : null,
       // Pressing the state it is already in is a no-op rather than a round trip
       // that changes nothing and rewrites a history entry saying so.
-      disabled: r.status === status || null,
+      disabled: r.status === status || early || null,
       onclick: function () {
         send({ action: 'markAttendance', participantId: r.participantId,
                activityId: S.queue.activity.activityId, sessionDate: r.sessionDate,
