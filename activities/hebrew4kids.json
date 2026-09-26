@@ -94,11 +94,11 @@
       "logo": "/images/activities/hebrew4kids-sponsors-spo-mtd1o2lk-3-a52febae.png"
     }
   ],
-  "isoUpdated": "2026-09-26T07:00:34.272Z",
+  "isoUpdated": "2026-09-26T07:01:08.445Z",
   "isoCreated": "2026-08-28T14:55:38.930Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
-  "lastPublishedAt": "2026-09-26T07:00:34.272Z",
+  "lastPublishedAt": "2026-09-26T07:01:08.445Z",
   "factVisibility": {
     "ages": "public",
     "schedule": "public",
@@ -132,8 +132,8 @@
       "groupId": "g-default",
       "name": {
         "he": "חוג עברית לילדים בגילאי 6-10",
-        "en": "",
-        "ru": ""
+        "en": "Hebrew Classes for Children",
+        "ru": "Уроки иврита для детей"
       },
       "capacity": 20,
       "teacherIds": [],
