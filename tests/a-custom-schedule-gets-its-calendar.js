@@ -272,23 +272,58 @@ function customGroup(dates, over) {
     'restricted role\u2019s save safe rather than a hole in the permission model');
 
   // ----------------------------------------------------------- the live data --
-  console.log('\n[the three live custom activities, as they stand]');
-  const live = {};
+  console.log('\n[the three live custom activities, asked as the rule]');
+  // ⚠ ASKED AS THE RULE, NOT AS A SNAPSHOT. This pinned today's figures —
+  // beit-midrash-ayeka's nine dates, intro-into-judaism's twenty-four, and the one
+  // 2021 typo `strayDates()` had just surfaced. Every one of those was a fact about
+  // the data on the day it was written, and an admin then did exactly what this
+  // feature exists to make possible: generated the calendar and corrected the typo.
+  // A test that fails when somebody USES the thing is a test that gets edited
+  // rather than read.
+  //
+  // So what is checked on the live records is the three-way rule itself, which
+  // holds whatever an admin does next: a group that already has a calendar is left
+  // alone, one with dates and no calendar is filled from exactly those dates, and
+  // one with no dates at all gets nothing and is told why. The figures are printed
+  // rather than asserted.
   ['beit-midrash', 'beit-midrash-ayeka', 'intro-into-judaism'].forEach((slug) => {
     const rec = JSON.parse(read('activities/' + slug + '.json'));
-    live[slug] = rec.groups.map((g) => SESSIONS.autoFill(g.facts));
+    rec.groups.forEach((g, i) => {
+      const where = slug + ' g' + i;
+      const facts = g.facts || {};
+      const sched = facts.schedule || {};
+      const had = ((facts.duration || {}).sessionDates || []).length;
+      const rows = (sched.sessions || []).filter((r) => r && r.date);
+      const out = SESSIONS.autoFill(facts);
+      if (String(sched.frequency || '') !== 'custom') {
+        H.eq(out, null, where + ' is not a custom schedule, so this does not touch it');
+      } else if (had) {
+        H.eq(out, null,
+          where + ' already has a calendar (' + had + ' dates), so nothing is filled — ' +
+          'it never overwrites');
+      } else if (!rows.length) {
+        H.ok(out && out.undated,
+          where + ' holds a weekday and no dates, so it gets NO calendar and is told why');
+      } else {
+        H.eq(SESSIONS.scheduled(out.sessionDates).length, rows.length,
+          where + ' gets exactly the ' + rows.length + ' dates it already lists, and no others');
+      }
+    });
+    // Whatever state it is in, a date outside the term's own dates is NAMED and
+    // never corrected: filtering would drop a date somebody typed on purpose, and
+    // the two dates it is compared against may themselves be the wrong ones.
+    const g0 = (rec.groups[0] || {}).facts || {};
+    const stray = SESSIONS.strayDates((g0.duration || {}).sessionDates, g0.duration);
+    console.log('        ' + slug + ': ' + ((g0.duration || {}).sessionDates || []).length +
+      ' dates, ' + (stray.length ? 'stray: ' + stray.join(',') : 'none outside the term'));
   });
-  H.ok(live['beit-midrash'].every((x) => x && x.undated),
-    '⚠ beit-midrash holds a weekday and no dates, so it gets NO calendar and is told why');
-  H.eq(live['beit-midrash-ayeka'][0].sessionDates.length, 9,
-    'beit-midrash-ayeka gets the nine dates it already lists');
-  H.eq(live['intro-into-judaism'][0].sessionDates.length, 24,
-    'intro-into-judaism gets its twenty-four');
-  const introRec = JSON.parse(read('activities/intro-into-judaism.json'));
-  H.eq(SESSIONS.strayDates(live['intro-into-judaism'][0].sessionDates,
-    introRec.groups[0].facts.duration).join(','), '2021-05-05',
-    '⚠ AND ITS ONE TYPO IS NAMED: a 2021 date in a run of 2027 ones, invisible until ' +
-    'now because that activity had no calendar to print it');
+  // And the reporter itself, on a record built for it rather than on whatever the
+  // live data happens to hold this week.
+  H.eq(SESSIONS.strayDates(
+    [{ date: '2021-05-05', status: 'scheduled' }, { date: '2027-04-21', status: 'scheduled' }],
+    { startDate: '2027-04-01', endDate: '2027-05-19' }).join(','), '2021-05-05',
+    '⚠ and a date outside the term is still NAMED rather than dropped — which is how ' +
+    'intro-into-judaism\u2019s 2021 typo was found in the first place');
 
   // ---------------------------------------------------------------- client ---
   console.log('\n[the client says what it generated, and puts it on screen]');

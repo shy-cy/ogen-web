@@ -59,9 +59,22 @@ H.eq(termRow({}, 'he').label, 'עלות לסמסטר', 'and prints exactly what 
 H.eq(termRow({}, 'en').label, 'Cost per semester', 'in English');
 H.eq(termRow({}, 'ru').label, 'Стоимость семестра', 'and in Russian');
 // The live records, which is the half a fixture cannot prove.
+//
+// ⚠ ASKED AS THE RULE, NOT AS A SNAPSHOT. This listed the live records and
+// asserted each read `semester`, which was true on the day it was written and
+// stopped being true the moment somebody used the feature: `intro-into-judaism`
+// is twenty-four evenings from October to October and an admin has set it to
+// `year`, which is the whole point of the field existing. A test that fails when
+// the feature is USED is a test that has to be edited every time, and the next
+// person edits it without reading why. What has to hold is the DEFAULT: a record
+// that has never said otherwise still says semester.
 ['hebrew4kids', 'bnei-mitzvah-2027', 'intro-into-judaism'].forEach((slug) => {
-  const a = migrate(JSON.parse(read('activities/' + slug + '.json')));
-  H.eq(a.facts.price.termUnit, 'semester', slug + ' reads as semester until somebody says otherwise');
+  const raw = JSON.parse(read('activities/' + slug + '.json'));
+  const a = migrate(raw);
+  const chose = ((raw.facts || {}).price || {}).termUnit;
+  H.eq(a.facts.price.termUnit, chose || 'semester',
+    chose ? slug + ' reads as the ' + chose + ' an admin chose'
+          : slug + ' has never said otherwise, so it reads as semester');
 });
 
 console.log('\n[and every unit prints in all three]');
