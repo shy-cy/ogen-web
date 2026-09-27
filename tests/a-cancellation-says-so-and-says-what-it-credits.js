@@ -204,7 +204,12 @@ action: 'signup', email: 'dana@example.com', password: 'password-123', termsAcce
   const guardian = read('netlify/functions/account-registrations.js');
   H.ok(guardian.indexOf('await cancelAndCredit(') < guardian.indexOf('mail.sendCancelled'),
     'the guardian path sends AFTER the ledger, never before');
-  H.ok(/sendCancelled\(done\.registration, me,\s*\n?\s*\(done\.entry && done\.entry\.amountCents\) \|\| 0\)/.test(guardian),
+  // ⚠ THE FIGURE IS STILL THE ENTRY'S, whatever else rides along. The call gained
+  // `done.credit` when the message learned to say that a linked term is holding
+  // the yearly fee — see a-fee-held-by-another-term-was-never-explained.js — and
+  // that object decides only WHETHER a sentence is said. The amount may not come
+  // from it, so this pins the amount and deliberately not the arity.
+  H.ok(/sendCancelled\(done\.registration, me,\s*\n?\s*\(done\.entry && done\.entry\.amountCents\) \|\| 0[,)]/.test(guardian),
     'with the figure the ENTRY recorded');
   H.ok(!/creditFor/.test(guardian.slice(guardian.indexOf('mail.sendCancelled'))),
     'and never recomputes it afterwards');

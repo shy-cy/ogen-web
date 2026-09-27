@@ -332,6 +332,36 @@ const REJECTED = {
 // second call to creditFor(). Two computations of one figure is how an email and
 // a ledger come to disagree about what somebody is owed, and the family reads
 // the email.
+//
+// ⚠ AND IT SAYS WHEN THE YEARLY FEE IS BEING HELD BY ANOTHER TERM.
+//
+// Reported from QA on exactly this message: EUR 22.00 credited against EUR 33.00
+// paid, with nothing anywhere saying where the other EUR 11.00 went — "explain
+// why the registration fee wasn't given back although it's still within the
+// right timing, as it shares reg fees with another course". Both figures were
+// right. test12's seriesId points at test11, so the fee paid on the autumn is
+// what the spring is standing on, and giving it back would leave a live term
+// with no fee paid anywhere. That is `feeHeldByLiveTerm()` working.
+//
+// ⚠ AND IT IS THE ONE REASON A FAMILY CANNOT WORK OUT, which is why it is the
+// only one said here. Every other way a credit comes back smaller — the step
+// that applies, the fee's own cutoff — is a rule about THIS registration, and
+// it is already in front of them twice: the cancel dialog says it before
+// anything is confirmed, and the terms footnote is in the confirmation and the
+// approval. This one is a fact about a DIFFERENT record, appears on no screen
+// they have ever seen, and reads as a deduction when it is not: the money is
+// still theirs and is still doing its job on the other term.
+//
+// It is also the one that is not a reproach. SESSION_CANCELLED states the other
+// half of this rule below — "a family told after the fact that they were too
+// late is being argued with" — and that stands; this is not a deadline anybody
+// missed.
+//
+// ⚠ THE WORDS ARE THE DIALOG'S, CHARACTER FOR CHARACTER. A browser cannot
+// require a Netlify function, so the sentence exists twice, and a test pins the
+// two against each other the way MIN_PASSWORD and the activities menu's status
+// groups are pinned. Two wordings of one fact is two accounts of where a
+// family's money went.
 
 const CANCELLED = {
   he: {
@@ -339,6 +369,10 @@ const CANCELLED = {
     heading: 'ההרשמה בוטלה',
     body: (child, act) => `ההרשמה של ${child} ל${act} בוטלה.`,
     credited: (amount) => `זוכיתם ב-${amount}. הסכום שמור בחשבון שלכם וניתן להשתמש בו בהרשמה הבאה.`,
+    feeHeld: 'דמי ההרשמה אינם כלולים בסכום הזה: הם נגבים פעם בשנה עבור הפעילות הזו, '
+           + 'ועדיין קיימת הרשמה פעילה למחזור אחר.',
+    feeHeldAll: 'כל מה ששולם על ההרשמה הזו הוא דמי ההרשמה, הנגבים פעם בשנה עבור הפעילות '
+              + 'הזו — ועדיין קיימת הרשמה פעילה למחזור אחר, ולכן הם נשארים בתוקף.',
     talk: 'אם זה נעשה בטעות או שתרצו לחזור, השיבו להודעה הזו ונשמח לעזור.',
     button: 'לפעילויות נוספות'
   },
@@ -347,6 +381,11 @@ const CANCELLED = {
     heading: 'The registration has been cancelled',
     body: (child, act) => `${child}'s place in ${act} has been cancelled.`,
     credited: (amount) => `${amount} has been credited to your account. It stays there and can be used towards a future registration.`,
+    feeHeld: 'The registration fee is not part of this: it is charged once a year for '
+           + 'this activity, and another term is still registered.',
+    feeHeldAll: 'Everything paid on this registration was the registration fee, which is '
+              + 'charged once a year for this activity — and another term is still '
+              + 'registered, so it stays paid.',
     talk: 'If this was a mistake, or you would like to come back, reply to this message and we will help.',
     button: 'Other activities'
   },
@@ -355,6 +394,11 @@ const CANCELLED = {
     heading: 'Запись отменена',
     body: (child, act) => `Запись ${child} на ${act} отменена.`,
     credited: (amount) => `На ваш счёт зачислено ${amount}. Эта сумма сохраняется и может быть использована при следующей записи.`,
+    feeHeld: 'Регистрационный взнос в эту сумму не входит: он взимается один раз в год '
+           + 'за это занятие, а другой семестр остаётся оформленным.',
+    feeHeldAll: 'Всё, что оплачено по этой записи, — это регистрационный взнос. Он взимается '
+              + 'один раз в год за это занятие, а другой семестр остаётся оформленным, '
+              + 'поэтому взнос сохраняется.',
     talk: 'Если это произошло по ошибке или вы захотите вернуться, ответьте на это письмо — мы поможем.',
     button: 'Другие занятия'
   }
@@ -826,12 +870,30 @@ function rejectedMessage(reg, account, override) {
 
 // The paragraphs, in the family's language. `creditCents` is what the ledger
 // entry actually recorded — 0, or absent, means no credit line at all.
-function cancelledLines(reg, account, creditCents) {
+//
+// ⚠ `credit` IS creditFor()'S ANSWER, THE SAME OBJECT THE LEDGER ENTRY'S BASIS
+// WAS BUILT FROM — never a second call to it. It decides only WHETHER the fee
+// sentence is said and which of the two it is; the FIGURE above still comes from
+// the entry, so the email and the ledger cannot arrive at two numbers.
+//
+// Absent reads as "no fee is being held", which is the silent direction — so a
+// call site that forgets it drops the sentence with nothing erroring. That is
+// the shape five callers of creditFor() once had with the clock, and it is
+// answered the same way: a test greps every call site for it.
+function cancelledLines(reg, account, creditCents, credit) {
   const l = lang(((account || {}).profile || {}).preferredLanguage);
   const T = CANCELLED[l];
   const child = childOf(reg), act = titleOf(reg, l);
   const lines = [T.body(child, act)];
   if (creditCents > 0) lines.push(T.credited(money(creditCents)));
+  // ⚠ TWO SENTENCES, BECAUSE THE FEE BEING PART OF A FIGURE AND THE FEE BEING
+  // THE WHOLE OF IT ARE DIFFERENT THINGS TO READ. With course money in it the
+  // family is looking at a credit and asking what is missing from it; with only
+  // the fee paid there is no credit line at all, and the message would otherwise
+  // never mention money they have handed over.
+  if (credit && credit.feeHeldElsewhere) {
+    lines.push(creditCents > 0 ? T.feeHeld : T.feeHeldAll);
+  }
   lines.push(T.talk);
   return { l: l, T: T, child: child, act: act, lines: lines };
 }
@@ -839,8 +901,8 @@ function cancelledLines(reg, account, creditCents) {
 // Bare <p>, like the rejection draft: the editor strips styles and so does the
 // sanitiser, so the shell applies the spacing on the way out and what the editor
 // opens on is what it can hand back unchanged.
-function cancelledDraft(reg, account, creditCents) {
-  const { l, T, child, act, lines } = cancelledLines(reg, account, creditCents);
+function cancelledDraft(reg, account, creditCents, credit) {
+  const { l, T, child, act, lines } = cancelledLines(reg, account, creditCents, credit);
   return {
     lang: l,
     subject: T.subject(child, act),
@@ -850,8 +912,8 @@ function cancelledDraft(reg, account, creditCents) {
   };
 }
 
-function cancelledMessage(reg, account, creditCents, override) {
-  const { l, T, child, act, lines } = cancelledLines(reg, account, creditCents);
+function cancelledMessage(reg, account, creditCents, override, credit) {
+  const { l, T, child, act, lines } = cancelledLines(reg, account, creditCents, credit);
   const cta = { href: pathFor(l, '/activities'), label: T.button };
   const html = (override && override.bodyHtml)
     ? shellRaw(l, T.heading, override.bodyHtml, cta)
@@ -1057,9 +1119,9 @@ const sendExpired = (reg, account) =>
 // immediately with no review, because nobody is at a screen to review it; an
 // admin cancelling somebody else's gets the panel first, exactly as a rejection
 // does. The difference is one optional argument, not a second message.
-const sendCancelled = (reg, account, creditCents, override) =>
+const sendCancelled = (reg, account, creditCents, override, credit) =>
   email.settle('registration-cancelled', account.email, () =>
-    email.send(cancelledMessage(reg, account, creditCents, override),
+    email.send(cancelledMessage(reg, account, creditCents, override, credit),
       as('registration-cancelled', account, reg)));
 
 const sendWaiting = (reg, account, when) =>

@@ -1847,8 +1847,12 @@ exports.handler = async (event) => {
         // Nobody reviews this one because nobody is at a screen: the person who
         // pressed cancel is the person it is about. The admin's cancellation
         // goes through a panel, which is the only difference between the two.
+        // ⚠ AND `done.credit` SAYS WHETHER THE YEARLY FEE IS BEING HELD BY
+        // ANOTHER TERM — the one reason a credit comes back smaller that a
+        // family cannot work out from anything they have ever been shown. Same
+        // object the entry's basis was built from, never a second creditFor().
         await mail.sendCancelled(done.registration, me,
-          (done.entry && done.entry.amountCents) || 0);
+          (done.entry && done.entry.amountCents) || 0, null, done.credit);
 
         // ⚠ AFTER THE WRITE, AND IT CANNOT FAIL THE ACTION. The place is already
         // free — capacity is counted, so it opened the instant `cancelled` was

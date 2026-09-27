@@ -535,7 +535,7 @@ exports.handler = async (event) => {
           { feeHeldElsewhere: R.feeHeldByLiveTerm(reg, siblings) });
         return json(200, Object.assign(
           { ok: true, to: account.email, feeHeldElsewhere: owed.feeHeldElsewhere },
-          mail.cancelledDraft(reg, account, owed.total)));
+          mail.cancelledDraft(reg, account, owed.total, owed)));
       }
 
       case 'cancel': {
@@ -612,8 +612,12 @@ exports.handler = async (event) => {
         let emailed = null;
         const account = await accounts.getAccount(reg.accountId);
         if (account) {
+          // ⚠ `done.credit` IS THE OBJECT THE ENTRY CAME OUT OF, not a second
+          // creditFor(). It decides only whether the yearly fee is being held by
+          // another term, which is the one thing about this figure a family
+          // cannot work out; the amount is still the entry's.
           emailed = await mail.sendCancelled(done.registration, account,
-            (done.entry && done.entry.amountCents) || 0, override);
+            (done.entry && done.entry.amountCents) || 0, override, done.credit);
         }
         await recordAudit(session, 'registrations.cancel',
           body.participantId + '__' + body.activityId, 'ok',
