@@ -7939,8 +7939,18 @@ remember when they last published.
 
 The fix is a new PAT — **Contents: Read and write** on `shy-cy/ogen-web` alone —
 set with `netlify env:set GITHUB_TOKEN`, and then a **deploy**, because an env
-change does not reach deployed functions until the next one. Set an expiry you
-will be told about, or expect this again.
+change does not reach deployed functions until the next one.
+
+⚠ **AND READ IS NOT THE THING TO CHECK.** A publish *writes*, so a token granted
+Contents: Read passes every check somebody would think to run — the family area
+comes back, the Roster comes back — and then the CMS fails on the one action
+that matters, days later, to whoever presses Publish. GitHub states the answer
+without anything being written: `GET /repos/shy-cy/ogen-web` returns a
+`permissions` object, and **`push: true`** is the one to look for.
+
+The same response carries `github-authentication-token-expiration`, which is the
+half worth writing down rather than rediscovering. **The current token expires
+2027-09-26 21:00 UTC.**
 
 ⚠ **The two Stripe pairs are set independently and neither falls back to the
 other.** An activity whose listing is `test` cannot take a payment until the test
@@ -8059,12 +8069,11 @@ share image, Formspree wiring, domain) is done. Open items:
   loudly on its first payment attempt rather than quietly charging a real card,
   which is the intended failure. Remember an env change does not reach deployed
   functions until the next deploy.
-- ⚠ **`GITHUB_TOKEN` IS EXPIRED AND THE FAMILY AREA IS DOWN.** GitHub answers
-  **401 Bad credentials**, so every screen that reads an activity — the family's
-  own pages, the admin roster and the CMS — says *"something went wrong"*. It was
-  still good at 06:00 UTC on 27 Sep (the sweep read 13 activities) and dead by
-  09:56. A new PAT, `netlify env:set`, and a deploy; see **A dead `GITHUB_TOKEN`
-  looks like a broken family area** for why nothing else on the site noticed.
-- **Rotate the setup credentials.** The GitHub PAT and Netlify token were pasted
-  into a chat transcript during setup. Minting the replacement above closes the
-  GitHub half of this.
+- **Rotate the Netlify token.** It was pasted into a chat transcript during
+  setup. ⚠ The **GitHub half is done**: the PAT expired on 27 Sep 2026 and took
+  the family area, the Roster and the CMS down with it, and the replacement
+  minted that day is a fresh secret the transcript never saw. See **A dead
+  `GITHUB_TOKEN` looks like a broken family area**.
+- **`ADMIN_PASSWORD` is still set** and does nothing: it is the bootstrap
+  password, refused from the moment one admin account exists. A live credential
+  with no remaining job is one more thing to leak, so unset it.
