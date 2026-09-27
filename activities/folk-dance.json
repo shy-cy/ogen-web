@@ -112,12 +112,12 @@
     }
   ],
   "sponsors": [],
-  "isoUpdated": "2026-09-27T13:42:52.775Z",
+  "isoUpdated": "2026-09-27T13:43:52.870Z",
   "isoCreated": "2026-09-18T15:36:40.995Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
   "activityId": "act-a17993ff6a2b4f4f",
-  "lastPublishedAt": "2026-09-27T13:42:52.775Z",
+  "lastPublishedAt": "2026-09-27T13:43:52.870Z",
   "groups": [
     {
       "groupId": "g-default",
@@ -126,7 +126,7 @@
         "en": "Folk Dancing",
         "ru": "Folk Dancing"
       },
-      "capacity": 3,
+      "capacity": 50,
       "teacherIds": [],
       "facts": {
         "ages": {
@@ -202,16 +202,16 @@
           "text": {
             "he": "לימסול",
             "en": "Limassol",
-            "ru": "Limassol"
+            "ru": "Лимассол"
           }
         },
         "address": {
           "text": {
-            "he": "",
-            "en": "",
-            "ru": ""
+            "he": "PASYSY - Anastasi Sioukri, Limassol, Lemesos 3035, Cyprus",
+            "en": "PASYSY - Anastasi Sioukri, Limassol, Lemesos 3035, Cyprus",
+            "ru": "PASYSY - Anastasi Sioukri, Limassol, Lemesos 3035, Cyprus"
           },
-          "mapUrl": ""
+          "mapUrl": "https://maps.app.goo.gl/66NBScZDP1BxtJAL9"
         }
       }
     }
