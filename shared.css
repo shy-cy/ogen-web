@@ -210,7 +210,6 @@ html[lang="he"] .nav-signout svg{ transform:scaleX(-1); }
      own line by here — so this only keeps the second row from wrapping. */
   #page > nav{ padding-inline:14px; }
   .nav-right{ gap:10px; }
-  .lang-toggle button{ padding:6px 7px; }
 }
 
 /* ⚠ ON A PHONE THE LOGO GETS ITS OWN LINE, ABOVE THE CONTROLS.
@@ -245,13 +244,53 @@ html[lang="he"] .nav-signout svg{ transform:scaleX(-1); }
   .nav-right{ flex:0 0 auto; width:100%; justify-content:center; }
 }
 
-.lang-toggle{ display:flex; gap:6px; }
-.lang-toggle button{
-  font-family: var(--font-latin); font-size:12px; font-weight:700; letter-spacing:0.05em;
-  border:1px solid var(--stone); background: var(--paper); color: var(--navy);
-  padding:6px 10px; border-radius:6px; cursor:pointer;
+/* ⚠ ONE GLOBE WHERE THERE WERE THREE LABELLED BUTTONS, and the width is the
+   reason. Measured at 320/375/414 signed in, the toggle was 130px of a controls
+   row holding a 74px chip and a 32px hamburger: the widest thing in the bar, and
+   more than half of it on the narrowest phone. This is 32px — the hamburger's
+   own size — and hands back about 98px.
+
+   The list is what keeps the rule the old toggle was built on: the reader who
+   needs a language control most is the one who cannot read what is on screen,
+   so the names are ENDONYMS rather than the codes `עב` / `EN` / `RU`, two of
+   which were Latin whichever language you read.
+
+   ⚠ THE PANEL DOES NOT MIRROR, AND THAT IS THE TOGGLE'S OWN RULE INHERITED.
+   .nav-right is forced direction:ltr so the control keeps one place and one
+   order in all three languages, and this list sits inside it — so it is
+   right-aligned under the globe whichever language is on screen, and the three
+   names stay in a fixed order. `inset-inline-end` rather than `right` because
+   the declaration should say what it means; inside an ltr ancestor the two
+   resolve the same, and the day .nav-right stops forcing ltr this follows.
+
+   Note `lang` on each option is for PRONUNCIATION, not direction — it tells a
+   screen reader which language to say the name in. It sets no direction at all;
+   `dir` would, and is not wanted here, because every option is one word and the
+   list is deliberately one fixed order. */
+.lang-pick{ position:relative; display:flex; }
+.lang-globe{
+  width:32px; height:32px; display:flex; align-items:center; justify-content:center;
+  background:none; border:none; padding:0; cursor:pointer; color: var(--navy);
+  border-radius:8px;
 }
-.lang-toggle button.active{ background: var(--navy); color: var(--paper); border-color: var(--navy); }
+.lang-globe svg{ width:22px; height:22px; display:block; }
+.lang-globe:hover{ background: var(--stone); }
+.lang-globe[aria-expanded="true"]{ background: var(--stone); }
+.lang-menu{
+  position:absolute; top:calc(100% + 8px); inset-inline-end:0; z-index:101;
+  display:flex; flex-direction:column; min-width:148px;
+  background: var(--paper); border:1px solid var(--stone); border-radius:10px;
+  padding:6px; box-shadow:0 10px 26px rgba(30,42,56,0.14);
+}
+.lang-menu[hidden]{ display:none; }
+.lang-menu button{
+  text-align:start; font-size:15px; font-weight:600; color: var(--navy);
+  background:none; border:none; padding:9px 12px; border-radius:7px; cursor:pointer;
+}
+.lang-menu button:hover{ background: var(--stone); }
+/* The one you are reading, marked rather than removed: a list that drops your
+   own language is a list you have to count to read. */
+.lang-menu button[aria-current="true"]{ background: var(--navy); color: var(--paper); }
 .hamburger{ width:32px; height:32px; display:flex; flex-direction:column; justify-content:center; gap:5px; cursor:pointer; background:none; border:none; }
 .hamburger span{ display:block; height:2px; background: var(--navy); border-radius:2px; }
 .mobile-menu{

@@ -41,15 +41,15 @@
     he: { about:'אודות', activities:'פעילויות', contact:'צור קשר', menu:'תפריט', alt:'עוגן',
           account:'אזור המשפחה', signIn:'כניסה / הרשמה', signOut:'יציאה',
           seeAll:'לכל הפעילויות', running:'פעיל', archived:'ארכיון',
-          soon:'בקרוב', waitlist:'רשימת המתנה' },
+          soon:'בקרוב', waitlist:'רשימת המתנה', language:'שפה' },
     en: { about:'About', activities:'Activities', contact:'Contact', menu:'Menu', alt:'Ogen',
           account:'My family', signIn:'Sign in / Register', signOut:'Sign out',
           seeAll:'See all activities', running:'Currently Running', archived:'Archived',
-          soon:'Coming soon', waitlist:'Waiting list' },
+          soon:'Coming soon', waitlist:'Waiting list', language:'Language' },
     ru: { about:'О нас', activities:'Занятия', contact:'Контакты', menu:'Меню', alt:'Оген',
           account:'Моя семья', signIn:'Вход / Регистрация', signOut:'Выйти',
           seeAll:'Все занятия', running:'Активные', archived:'Архив',
-          soon:'Скоро', waitlist:'Лист ожидания' }
+          soon:'Скоро', waitlist:'Лист ожидания', language:'Язык' }
   }[lang];
 
   const navHTML = `
@@ -60,10 +60,22 @@
   </a>
   <div class="nav-right">
     <div class="nav-account" id="nav-account"></div>
-    <div class="lang-toggle">
-      <button class="${lang === 'he' ? 'active' : ''}" onclick="setLang('he')">עב</button>
-      <button class="${lang === 'en' ? 'active' : ''}" onclick="setLang('en')">EN</button>
-      <button class="${lang === 'ru' ? 'active' : ''}" onclick="setLang('ru')">RU</button>
+    <div class="lang-pick">
+      <button class="lang-globe" id="lang-globe" type="button" aria-haspopup="true"
+              aria-expanded="false" aria-controls="lang-menu"
+              aria-label="${L.language}" title="${L.language}" onclick="toggleLang()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="9"></circle>
+          <path d="M3 12h18"></path>
+          <path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18"></path>
+        </svg>
+      </button>
+      <div class="lang-menu" id="lang-menu" role="menu" hidden>
+        <button role="menuitem" type="button" lang="he" onclick="setLang('he')"${lang === 'he' ? ' aria-current="true"' : ''}>עברית</button>
+        <button role="menuitem" type="button" lang="en" onclick="setLang('en')"${lang === 'en' ? ' aria-current="true"' : ''}>English</button>
+        <button role="menuitem" type="button" lang="ru" onclick="setLang('ru')"${lang === 'ru' ? ' aria-current="true"' : ''}>Русский</button>
+      </div>
     </div>
     <button class="hamburger" id="hamburger" onclick="toggleMenu()" aria-label="${L.menu}">
       <span></span><span></span><span></span>
@@ -230,8 +242,65 @@
   window.toggleMenu = function() {
     document.getElementById('mobile-menu').classList.toggle('open');
     document.getElementById('hamburger').classList.toggle('open');
+    // Two panels hanging off one bar, and only one of them may be open: the
+    // language list is anchored under the globe and the menu drops across the
+    // whole width underneath it, so together they overlap.
+    closeLang();
     loadActivities();
   };
+
+  // ---- the language list ---------------------------------------------------
+  //
+  // ⚠ THREE LABELLED BUTTONS BECAME ONE GLOBE, AND THE WIDTH IS THE REASON.
+  // Measured at 320/375/414 signed in: the toggle was 130px of a controls row
+  // holding a 74px chip and a 32px hamburger — the widest thing in the bar, and
+  // more than half of it on the narrowest phone. The globe is 32px, the
+  // hamburger's own size, and hands back about 98px.
+  //
+  // ⚠ AND THE READER WHO NEEDS THIS MOST IS THE ONE WHO CANNOT READ THE PAGE,
+  // which is the rule that made the old toggle three always-visible buttons in
+  // a fixed order. It is not broken by this — it is what decided the shape of
+  // the list. `עב` / `EN` / `RU` are abbreviations, and two of the three are
+  // Latin whichever language you read; the list spells the ENDONYMS out —
+  // עברית · English · Русский — each carrying its own `lang` so a screen reader
+  // pronounces it in that language rather than in the page's. What costs one
+  // tap buys a name somebody can actually recognise as their own.
+  //
+  // One control at every width rather than a globe on phones and buttons on a
+  // desktop. Two controls is two behaviours to keep in step, and the endonyms
+  // are the better answer on a desktop too.
+  function closeLang() {
+    const b = document.getElementById('lang-globe');
+    const m = document.getElementById('lang-menu');
+    if (!b || !m) return;
+    m.hidden = true;
+    b.setAttribute('aria-expanded', 'false');
+  }
+
+  window.toggleLang = function() {
+    const b = document.getElementById('lang-globe');
+    const m = document.getElementById('lang-menu');
+    if (!b || !m) return;
+    const open = m.hidden;
+    if (open) {
+      // The hamburger's panel starts directly under the bar and would sit on
+      // top of this one.
+      const menu = document.getElementById('mobile-menu');
+      if (menu && menu.classList.contains('open')) window.toggleMenu();
+    }
+    m.hidden = !open;
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+  };
+
+  // Escape and a click elsewhere, because a panel with no way out but the
+  // control that opened it is a panel people close by reloading.
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeLang();
+  });
+  document.addEventListener('click', function (e) {
+    const pick = document.querySelector('.lang-pick');
+    if (pick && !pick.contains(e.target)) closeLang();
+  });
 
   // ---- the Activities group ------------------------------------------------
   //

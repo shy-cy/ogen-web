@@ -86,8 +86,8 @@ console.log('\n[the chip joins the pinned group rather than mirroring away from 
 H.ok(/<div class="nav-account" id="nav-account"><\/div>/.test(nav), 'the slot exists');
 const navRightBlock = nav.slice(nav.indexOf('<div class="nav-right">'), nav.indexOf('</nav>'));
 H.ok(navRightBlock.indexOf('nav-account') !== -1, 'inside .nav-right');
-H.ok(navRightBlock.indexOf('nav-account') < navRightBlock.indexOf('lang-toggle'),
-  'and before the language toggle, so the hamburger keeps the edge it already owns');
+H.ok(navRightBlock.indexOf('nav-account') < navRightBlock.indexOf('lang-pick'),
+  'and before the language control, so the hamburger keeps the edge it already owns');
 H.ok(/\.nav-right\{[^}]*direction:ltr/.test(cssCode),
   '.nav-right is still forced ltr — the chip inherits a deliberate non-mirroring');
 // The inside of the chip is the part that flips.
@@ -97,7 +97,7 @@ H.ok(/html\[lang="he"\] \.nav-signout svg\{ transform:scaleX\(-1\); \}/.test(css
   'and the exit arrow points the way the language reads');
 
 console.log('\n[no physical inset anywhere in the chip]');
-const block = cssCode.slice(cssCode.indexOf('.nav-account{'), cssCode.indexOf('.lang-toggle{'));
+const block = cssCode.slice(cssCode.indexOf('.nav-account{'), cssCode.indexOf('.lang-pick{'));
 H.ok(block.length > 800, 'the block is there');
 H.eq((block.match(/(^|[^-])(left|right)\s*:/g) || []).length, 0,
   'padding and margins are logical, so the rounded end follows the label in both directions');

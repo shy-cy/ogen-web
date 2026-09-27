@@ -142,6 +142,13 @@ function makeDom(opts) {
         if (i === -1) throw new Error('replaceChild: the old node is not a child');
         n.childNodes[i] = fresh; fresh.parentNode = n; old.parentNode = null; return old;
       },
+      // ⚠ TRUE OF THE NODE ITSELF, which is what the DOM says and what the
+      // click-outside test in js/nav.js turns on: a press on the control that
+      // opened a panel is not a press outside it.
+      contains(other) {
+        for (let x = other; x; x = x.parentNode) if (x === n) return true;
+        return false;
+      },
       // Class selectors only, which is all this script uses. Anything else
       // throws rather than returning null — a selector that silently matches
       // nothing is how a test passes against a screen that renders nothing.
