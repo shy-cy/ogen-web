@@ -21,7 +21,7 @@
       "ru": "Изучаем Библию вместе с Ифат Халад, открывая знакомые истории с новых и неожиданных сторон. Открытый Бейт-Мидраш для учёбы, обсуждения и поиска новых смыслов, с отдельными группами для молодых людей 15–25 лет и взрослых."
     },
     "cardImage": "/images/activities/beit-midrash-card-04cf96e7.jpg",
-    "testActivity": false,
+    "listing": "listed",
     "isoUpdated": "2026-09-23T16:37:06.012Z"
   },
   {
@@ -46,7 +46,7 @@
       "ru": "Ежемесячные встречи на русском языке, посвящённые изучению недельной главы Торы и поиску её связи с современной жизнью."
     },
     "cardImage": "/images/activities/beit-midrash-ayeka-card-8c260c28.jpg",
-    "testActivity": false,
+    "listing": "listed",
     "isoUpdated": "2026-09-26T10:51:02.007Z"
   },
   {
@@ -71,7 +71,7 @@
       "ru": "Совместный путь взросления и поиска себя через семейные истории, еврейскую культуру, ценности, дружбу и чувство принадлежности - к своей собственной значимой церемонии."
     },
     "cardImage": "/images/activities/bnei-mitzvah-2027-card-0a618b5b.jpg",
-    "testActivity": false,
+    "listing": "listed",
     "isoUpdated": "2026-09-19T11:43:09.093Z"
   },
   {
@@ -96,7 +96,7 @@
       "ru": "Танцуем под израильскую музыку, разучиваем любимые народные танцы и знакомимся с новыми. Лёгкая, дружелюбная и весёлая атмосфера. Подходит для всех, независимо от уровня подготовки."
     },
     "cardImage": "/images/activities/folk-dance-card-8c92d249.jpg",
-    "testActivity": false,
+    "listing": "listed",
     "isoUpdated": "2026-09-23T20:49:24.764Z"
   },
   {
@@ -121,7 +121,7 @@
       "ru": "Занятия ивритом для детей 6–10 лет в игровой форме: учим язык, творим и знакомимся с культурой Израиля."
     },
     "cardImage": "/images/activities/hebrew4kids-card-a1f8d75e.jpg",
-    "testActivity": false,
+    "listing": "listed",
     "isoUpdated": "2026-09-26T07:02:43.390Z"
   },
   {
@@ -146,7 +146,7 @@
       "ru": "Знакомство с иудаизмом, его историей, верованиями, культурой и традициями, которые продолжают жить и развиваться сегодня."
     },
     "cardImage": "/images/activities/intro-into-judaism-card-a63c87a4.jpg",
-    "testActivity": false,
+    "listing": "listed",
     "isoUpdated": "2026-09-26T15:30:26.720Z"
   },
   {
@@ -171,7 +171,7 @@
       "ru": "Далеко-далеко за словесными горами в стране гласных и согласных живут рыбные тексты. Вдали от всех живут"
     },
     "cardImage": "/images/activities/qa-course-card-c8031266.jpg",
-    "testActivity": true,
+    "listing": "test",
     "isoUpdated": "2026-09-24T13:35:53.149Z"
   },
   {
@@ -196,7 +196,7 @@
       "ru": "Test 1"
     },
     "cardImage": "/images/activities/test1-card-c8031266.jpg",
-    "testActivity": true,
+    "listing": "test",
     "isoUpdated": "2026-09-24T13:08:17.737Z"
   },
   {
@@ -221,8 +221,33 @@
       "ru": ""
     },
     "cardImage": null,
-    "testActivity": true,
+    "listing": "test",
     "isoUpdated": "2026-09-24T21:33:49.505Z"
+  },
+  {
+    "slug": "test11",
+    "activityId": "act-662a9e6f52eb7761",
+    "seriesId": "act-662a9e6f52eb7761",
+    "type": "course",
+    "status": "open",
+    "langs": [
+      "he",
+      "en",
+      "ru"
+    ],
+    "title": {
+      "he": "טסט 11",
+      "en": "Test 11",
+      "ru": "Test 11"
+    },
+    "summary": {
+      "he": "",
+      "en": "",
+      "ru": ""
+    },
+    "cardImage": "/images/activities/test11-card-04cf96e7.jpg",
+    "listing": "test",
+    "isoUpdated": "2026-09-27T12:48:53.195Z"
   },
   {
     "slug": "test2",
@@ -246,7 +271,7 @@
       "ru": "Test"
     },
     "cardImage": "/images/activities/test2-card-c8031266.jpg",
-    "testActivity": true,
+    "listing": "test",
     "isoUpdated": "2026-09-25T15:19:29.492Z"
   },
   {
@@ -271,7 +296,7 @@
       "ru": "Далеко-далеко за словесными горами в стране гласных и согласных живут рыбные тексты. Вдали от всех живут"
     },
     "cardImage": "/images/activities/test3-card-c8031266.jpg",
-    "testActivity": true,
+    "listing": "test",
     "isoUpdated": "2026-09-24T21:42:26.233Z"
   },
   {
@@ -296,7 +321,7 @@
       "ru": "Далеко-далеко за словесными горами в стране гласных и согласных живут рыбные тексты. Вдали от всех живут"
     },
     "cardImage": "/images/activities/test4-card-c8031266.jpg",
-    "testActivity": true,
+    "listing": "test",
     "isoUpdated": "2026-09-25T07:14:38.048Z"
   },
   {
@@ -321,7 +346,7 @@
       "ru": ""
     },
     "cardImage": "/images/activities/test8-card-d4b8b680.png",
-    "testActivity": true,
+    "listing": "test",
     "isoUpdated": "2026-09-25T10:19:28.043Z"
   }
 ]

@@ -1,0 +1,180 @@
+{
+  "slug": "test11",
+  "status": "open",
+  "motif": "ring",
+  "corner": "tl",
+  "cardImage": "/images/activities/test11-card-04cf96e7.jpg",
+  "shareImage": null,
+  "robots": "index",
+  "listing": "test",
+  "type": "course",
+  "registration": {
+    "autoApprove": true,
+    "pendingExpiryDays": null,
+    "registrationFeeCutoffDate": "2026-09-30",
+    "cancellationPolicy": {
+      "tiers": [],
+      "note": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      }
+    },
+    "defaultBasis": null
+  },
+  "seriesId": "act-662a9e6f52eb7761",
+  "title": {
+    "he": "טסט 11",
+    "en": "Test 11",
+    "ru": "Test 11"
+  },
+  "summary": {
+    "he": "",
+    "en": "",
+    "ru": ""
+  },
+  "about": {
+    "he": "",
+    "en": "",
+    "ru": ""
+  },
+  "metaTitle": {
+    "he": "",
+    "en": "",
+    "ru": ""
+  },
+  "metaDescription": {
+    "he": "",
+    "en": "",
+    "ru": ""
+  },
+  "facts": {
+    "groupSize": {
+      "overrideText": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      }
+    },
+    "price": {
+      "registrationFee": 11,
+      "fullPrice": 22,
+      "termUnit": "semester",
+      "termLabel": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      },
+      "perHourOverride": null,
+      "perSessionPrice": null,
+      "showPerLesson": false,
+      "lateDropIn": {
+        "enabled": false,
+        "hoursBefore": null,
+        "price": null
+      },
+      "bundles": []
+    }
+  },
+  "groups": [
+    {
+      "groupId": "g-mujt4qvmiv5v",
+      "name": {
+        "he": "טסט 11",
+        "en": "Test 11",
+        "ru": "Test 11"
+      },
+      "capacity": 1,
+      "teacherIds": [],
+      "facts": {
+        "ages": {
+          "min": 1,
+          "max": 111
+        },
+        "schedule": {
+          "frequency": "weekly",
+          "overrideText": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          },
+          "sessions": [
+            {
+              "day": 0,
+              "time": "12:00"
+            }
+          ]
+        },
+        "duration": {
+          "startDate": "2026-10-01",
+          "endDate": "2026-10-31",
+          "sessionCount": 2,
+          "sessionMinutes": 90,
+          "sessionDates": [
+            {
+              "date": "2026-10-04",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-10-11",
+              "status": "scheduled"
+            }
+          ]
+        },
+        "instructionLanguage": {
+          "codes": [
+            "he"
+          ],
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "prerequisites": {
+          "level": "beginner",
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "location": {
+          "text": {
+            "he": "לימסול",
+            "en": "Limassol",
+            "ru": "Лимассол"
+          }
+        },
+        "address": {
+          "text": {
+            "he": "PASYSY - Anastasi Sioukri, Limassol, Lemesos 3035, Cyprus",
+            "en": "PASYSY - Anastasi Sioukri, Limassol, Lemesos 3035, Cyprus",
+            "ru": "PASYSY - Anastasi Sioukri, Limassol, Lemesos 3035, Cyprus"
+          },
+          "mapUrl": "https://maps.app.goo.gl/66NBScZDP1BxtJAL9"
+        }
+      }
+    }
+  ],
+  "factVisibility": {
+    "ages": "public",
+    "schedule": "public",
+    "duration": "public",
+    "groupSize": "public",
+    "instructionLanguage": "public",
+    "prerequisites": "public",
+    "location": "public",
+    "address": "members",
+    "price": "public"
+  },
+  "faq": [],
+  "teachers": [],
+  "sponsors": [],
+  "isoUpdated": "2026-09-27T12:48:53.195Z",
+  "isoCreated": "2026-09-27T12:48:53.195Z",
+  "lastEditedBy": "michal@ogen.cy",
+  "lastEditedByName": "Michal",
+  "activityId": "act-662a9e6f52eb7761",
+  "lastPublishedAt": "2026-09-27T12:48:53.195Z"
+}
