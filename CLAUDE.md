@@ -5828,6 +5828,68 @@ breaks on a cosmetic edit is a test people learn to edit rather than read. It
 anchors on the **calls** now — `dayMonth(s.date)` and `[eveningAction(` — and
 takes the line each starts on.
 
+### ⚠ A balance spent, and still advertised
+
+Reported from a phone as *"I see credit - but there is no credit"*, with two
+screenshots: an evening offering `שימוש בזיכוי · €7.00`, and the refusal
+`אין יתרת זיכוי בחשבון הזה.` under the heading.
+
+**There was no credit, and the screen was a minute out of date.** The ledger for
+that account holds exactly two entries — a €7.00 credit at 12:23:58Z and a €7.00
+debit at 12:49:59Z, `credit-applied` — netting to nought in both modes, with the
+screenshot taken at 15:50 local, **one minute after the debit**. `balanceFor()`
+against the live store agrees, and the deployed client is byte-identical to
+local. ⚠ Note the ledger's timestamps are **UTC** and Cyprus is three hours
+ahead; read as local they make the report look impossible, which is what it
+first looked like.
+
+**The balance arrives once, with the `registration` call, and `renderEvenings`
+re-fetches only the EVENINGS.** So the closure held the figure from page load:
+the moment one row spent the whole €7.00, every other row went on offering the
+same €7.00 out of an account holding nothing, and the refusal that followed was
+correct and unexplainable.
+
+⚠ **IT IS THE FAMILY-AREA TWIN OF A RULE THE ADMIN ALREADY KEEPS** — *"the row
+in hand is stale the moment the payment lands, so both money actions hand back
+the record they just wrote"*. Here **both actions already answered with the new
+balance** and the screen read neither, so the whole fix is client-side.
+
+⚠ **TWO NAMES FOR ONE FACT, and both of them are the server's.** `useCredit`
+answers `balanceCents` and `cancelSession` answers `balance`. `balanceIn(res)` is
+the one reader, because a call site that remembers the wrong one fails **silently**
+— by going on advertising money that is gone, which is this bug again. The test
+asserts by shape that neither handler names either key itself.
+
+Three parts, and the middle one is the half worth keeping:
+
+- **The figure travels back into the panel.** `renderEvenings.draw(nextBalance)`
+  updates the closure, so spending on one row takes the offer off the others.
+- ⚠ **THE REFUSAL CARRIES IT TOO.** A screen that has just been told it is wrong
+  is the one screen that must not be left with the same dead button on it. It is
+  the one moment we know for certain the figure on screen is stale.
+- ⚠ **AND CANCELLING PUTS IT BACK**, which was broken the other way round:
+  cancelling an evening is what **writes** the credit, and no row could offer it
+  until a full reload.
+
+⚠ **THE MESSAGE IS SAID AFTER THE REDRAW, NOT BEFORE.** One caller's `onDone` is
+`renderActivity()`, which reassigns the notice node the moment it runs — so a
+message said first is written into a div discarded in the same repaint. That is
+the bug this file already records one screen over (*"your request has been sent"*,
+said and then thrown away by the reboot that followed it), arriving in the code
+written to explain a figure.
+
+⚠ **AND IT IS INVISIBLE ON THE OTHER CALLER**, which is why the test exercises a
+**course**. An evening's button hands `onDone` a function that repaints one panel
+and leaves the notice alone, so both orderings pass there; only the cost card's
+block, whose `onDone` is `renderActivity`, can tell them apart. The first version
+of the suite pressed the evening button for both, and a bite-check of the two
+orderings is what found it — two survivors out of nine.
+
+The suite **executes the sequence** — presses the button and watches the other
+row — because reading the source is precisely what missed this: each side is
+self-consistent, and a closure holding a stale number looks exactly like a
+closure holding a fresh one.
+
 ### ⚠ A class nobody styled is a layout nobody designed
 
 The evenings table wrapped its three controls — pay, use credit, cancel — in a

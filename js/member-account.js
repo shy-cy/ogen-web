@@ -833,6 +833,18 @@
   // The control itself. A row of per-evening actions wants a link beside the
   // others; the cost card wants the block below. One handler either way, so the
   // two cannot come to send different things.
+  // ⚠ TWO NAMES FOR ONE FACT, and both of them are the server's: `useCredit`
+  // answers `balanceCents` and `cancelSession` answers `balance`. Read through
+  // one function rather than remembering which is which at the call site — the
+  // one that forgets is the one that goes on advertising money that is gone.
+  function balanceIn(res) {
+    var d = res && res.data;
+    if (!d) return null;
+    if (typeof d.balanceCents === 'number') return d.balanceCents;
+    if (typeof d.balance === 'number') return d.balance;
+    return null;
+  }
+
   function creditButton(owing, balance, body, onDone, cls) {
     if (!(owing > 0) || !(balance > 0)) return null;
     var btn = el('button', { type: 'button', class: cls || 'acc-link',
@@ -841,9 +853,19 @@
         var done = busy(btn);
         post(REGS, Object.assign({ action: 'useCredit' }, body)).then(function (res) {
           done();
-          if (!res.ok) return say('err', failure(res));
+          // ⚠ WHAT IS LEFT TRAVELS BACK, ON THE REFUSAL AS WELL AS ON THE
+          // SUCCESS. This screen held the balance it was handed at page load and
+          // spent it without ever asking again, so every OTHER row went on
+          // offering the same €7.00 — and the refusal that followed was correct
+          // and unexplainable. The refusal carries the figure for exactly this
+          // reason: it is the one moment we know the screen is wrong.
+          var left = balanceIn(res);
+          // ⚠ SAID AFTER THE REDRAW, NOT BEFORE. One caller's onDone is
+          // renderActivity(), which replaces the notice this would be written
+          // into — the same repaint that swallowed "your request has been sent".
+          if (!res.ok) { if (left !== null) onDone(left); say('err', failure(res)); return; }
+          onDone(left);
           say('ok', T.creditUsed);
-          onDone();
         });
       } });
     return btn;
@@ -3304,7 +3326,13 @@
     S.redrawEvenings = draw;
     if (seed) paint(seed); else draw();
 
-    function draw() {
+    // ⚠ THE BALANCE IS SPENT, NOT CONSTANT. It arrives once with the page and
+    // this panel re-fetches only the evenings, so before this it could not
+    // notice its own controls having emptied the account. Every caller that
+    // MOVES it hands the new figure in; one that only reorders the table calls
+    // this with nothing and the figure stands.
+    function draw(nextBalance) {
+      if (typeof nextBalance === 'number') balance = nextBalance;
       clear(panel);
       panel.appendChild(section(T.sessionsTitle, [skeleton('table')]));
       post(REGS, { action: 'sessions', participantId: r.participantId, slug: act.slug })
@@ -3418,7 +3446,9 @@
           post(REGS, { action: 'cancelSession', participantId: r.participantId,
                        activityId: r.activityId, sessionDate: s.date }).then(function (c) {
             if (!c.ok) return say('err', failure(c));
-            redraw();
+            // Cancelling moves the balance UP — it is what writes the credit —
+            // so the rows that could not offer it a moment ago now can.
+            redraw(balanceIn(c));
           });
           });
         } }));
