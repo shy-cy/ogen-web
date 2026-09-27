@@ -5928,6 +5928,48 @@ beside `€0.00` from the client's `money()`. ⚠ **That mismatch still exists
 wherever both appear on one screen**; `priceRows()` is the published page's
 format and is not changed here.
 
+### ⚠ A label and a sentence are not one treatment
+
+`.acc-date-why` explains a figure that disagrees with the published price —
+*late booking · usually €7.00* — and it sits beside that figure in the price
+column, `white-space:nowrap`, because it is a **label**. When the full-evening
+tick needed explaining too (*ticking this joins the waiting list. Nothing is
+charged.*) it was given the same class, on the reasoning that one explanation of
+one row deserves one treatment.
+
+That is right about the intent and wrong about the shape. ⚠ **A sentence is not
+a label.** In the price column it inherited `nowrap` inside a `flex:0 0 auto`
+box, so it pushed the row wider than `.acc-dates`, which carries
+`overflow:hidden` for its rounded corners — and the sentence was simply **cut**.
+Reported from a phone: the English read *"ticking this joins the waiting"* and
+stopped, the Hebrew ran into the date, and the squeezed `.acc-date-when` wrapped
+*"Monday 5 October"* onto three lines beside half a sentence.
+
+So `.acc-date-note` is its own class: `flex:1 0 100%` for a line of its own,
+`white-space:normal` because it is prose, indented `padding-inline-start:29px`
+past the tick it is about (18px box + the 11px gap). `.acc-date` gained
+`flex-wrap:wrap`, or a full-width line has nowhere to go. The qualifier keeps
+`nowrap` and its place beside the number. A test executes the picker and asserts
+the note is a **direct child of the row** rather than of the price column.
+
+### ⚠ A password box you cannot read
+
+Five password fields in the family area and not one reveal between them. Worst
+on the two screens asking for a password the person does not have yet — sign-up
+and reset, where the minimum is eight characters, a typo cannot be found by
+reading a row of dots, and on the reset screen getting it wrong used to spend
+the link. A phone keyboard is where a password is mistyped.
+
+The eye is wired in **`field()`**, the one builder all five go through, for the
+reason `setCustomValidity()` is: a sixth box added next year inherits it rather
+than having to remember. It flips the input's own `type`, so nothing is copied
+anywhere and the value never leaves the field. ⚠ `type="button"` is
+load-bearing — the default inside a form is submit, so revealing the password
+would post the form, the same trap the admin's (i) badge met beside a `<label>`.
+It carries `aria-pressed` and an `aria-label` that changes with the state, and
+sits at `inset-inline-end`, so it is on the left in Hebrew and the right in
+English with no per-language override.
+
 ### ⚠ A deadline nobody was told about
 
 Every rule was there. `freezeCancellation()` writes the cutoffs onto the record

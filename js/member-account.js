@@ -149,6 +149,7 @@
               + 'מתעדכנים, אפשר לרענן בעוד דקה, ואם גם אז לא, כתבו לנו.',
       waitLead: 'ההרשמה בוצעה — התשלום ייפתח בקרוב',
       lateWhy: 'הרשמה מאוחרת · רגיל {price}',
+      showPassword: 'הצגת הסיסמה', hidePassword: 'הסתרת הסיסמה',
       eveningsBooked: 'מפגשים שנקבעו', noEveningsYet: 'עוד לא נקבעו מפגשים, ולכן אין מה לשלם עדיין.',
       waitBody: '{name} נרשם/ה. אנחנו משלימים כמה פרטים אחרונים, והתשלום ייפתח כאן. '
               + 'נעדכן אתכם במייל ברגע שאפשר.',
@@ -353,6 +354,7 @@
               + 'they still have not.',
       waitLead: 'Registered — payment opens soon',
       lateWhy: 'late booking \u00b7 usually {price}',
+      showPassword: 'Show password', hidePassword: 'Hide password',
       eveningsBooked: 'Sessions booked', noEveningsYet: 'No sessions booked yet, so there is nothing to pay.',
       waitBody: '{name} is registered. We\u2019re confirming the last few details, and payment '
               + 'will open here. We\u2019ll email you the moment it does.',
@@ -546,6 +548,7 @@
               + 'напишите нам.',
       waitLead: 'Запись оформлена — оплата откроется скоро',
       lateWhy: 'поздняя запись \u00b7 обычно {price}',
+      showPassword: 'Показать пароль', hidePassword: 'Скрыть пароль',
       eveningsBooked: 'Записанные занятия', noEveningsYet: 'Пока нет записанных занятий, поэтому платить нечего.',
       waitBody: '{name} записан(а). Мы уточняем последние детали, оплата откроется здесь. '
               + 'Напишем вам, как только всё будет готово.',
@@ -1248,10 +1251,38 @@
                                           tipId ? { 'aria-describedby': tipId } : {},
                                           attrs || {}));
     guardNative(input);
+    // ⚠ EVERY PASSWORD BOX GETS AN EYE, from the one builder rather than at the
+    // five call sites — the same reason setCustomValidity is wired here and not
+    // per form. A sixth password field added next year inherits it.
+    var wrapped = (attrs && attrs.type === 'password')
+      ? el('div', { class: 'acc-pw' }, [input, revealToggle(input)])
+      : input;
     return { row: el('div', { class: 'acc-field' }, [
-      el('label', { for: id, text: label }), input,
+      el('label', { for: id, text: label }), wrapped,
       hint ? el('p', { class: 'acc-hint', id: tipId, text: hint }) : null
     ]), input: input };
+  }
+
+  // The eye. It flips the input's own type, which is the whole mechanism —
+  // nothing is copied anywhere and the value never leaves the field.
+  function revealToggle(input) {
+    var btn = el('button', { class: 'acc-pw-eye', type: 'button' });
+    function paint() {
+      var shown = input.getAttribute('type') === 'text';
+      btn.innerHTML = '';
+      btn.appendChild(lucide(shown ? EYE_OFF : EYE, 18));
+      btn.setAttribute('aria-pressed', shown ? 'true' : 'false');
+      btn.setAttribute('aria-label', shown ? T.hidePassword : T.showPassword);
+      btn.setAttribute('title', shown ? T.hidePassword : T.showPassword);
+    }
+    btn.onclick = function (e) {
+      if (e && e.preventDefault) e.preventDefault();
+      input.setAttribute('type', input.getAttribute('type') === 'text' ? 'password' : 'text');
+      paint();
+      if (input.focus) input.focus();
+    };
+    paint();
+    return btn;
   }
 
   // Any row of buttons. One helper rather than a margin on each button, so the
@@ -2095,8 +2126,13 @@
           el('span', { class: 'acc-date-when', text: longDate(s.date) }),
           el('span', { class: 'acc-date-what' }, [
             el('span', { text: why }),
-            why2 ? el('span', { class: 'acc-date-why', text: why2 }) : null
-          ])
+            // A qualifier on the figure, beside the figure.
+            late ? el('span', { class: 'acc-date-why', text: why2 }) : null
+          ]),
+          // ⚠ AND A SENTENCE GETS ITS OWN LINE. Squeezed into the price column
+          // beside a nowrap rule it was cut off at the edge of the card — see
+          // .acc-date-note in shared.css.
+          (!late && why2) ? el('span', { class: 'acc-date-note', text: why2 }) : null
         ]));
         if (!off) {
           rows.push({ date: s.date, price: s.full ? 0 : (s.priceCents || 0),
@@ -2146,6 +2182,14 @@
   // why it can be executed by the DOM shim at all, and adding an HTML parser to
   // that shim to draw one tick would be the wrong trade.
   var SVG_NS = 'http://www.w3.org/2000/svg';
+  // Lucide eye / eye-off. The eye's pupil is Lucide's <circle>, written as a
+  // path because lucide() draws paths and one element type is fewer than two.
+  var EYE = ['M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0',
+             'M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0'];
+  var EYE_OFF = ['M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49',
+                 'M14.084 14.158a3 3 0 0 1-4.242-4.242',
+                 'M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143',
+                 'm2 2 20 20'];
   function lucide(d, size) {
     var svg = window.document.createElementNS(SVG_NS, 'svg');
     [['viewBox', '0 0 24 24'], ['width', size], ['height', size], ['fill', 'none'],

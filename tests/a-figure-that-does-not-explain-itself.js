@@ -100,6 +100,25 @@ const css = read('shared.css');
   H.ok(rules.some((r) => r.sel === '.acc-date-when' && /flex\s*:\s*1/.test(r.body)),
     'and the date grows, which is what pushes the price to the far end');
 
+  // ⚠ A LABEL AND A SENTENCE ARE NOT THE SAME TREATMENT, and for a release they
+  // shared one. `late booking · usually €7.00` qualifies a figure and sits
+  // beside it, nowrap; `ticking this joins the waiting list. Nothing is
+  // charged.` is prose, and nowrap in the price column pushed the row past a
+  // card with overflow:hidden, so a phone showed half of it.
+  H.ok(/flex-wrap\s*:\s*wrap/.test(dateRow.body),
+    'the row wraps, or a full-width line under it has nowhere to go');
+  const why = rules.filter((r) => r.sel === '.acc-date-why')[0];
+  const note = rules.filter((r) => r.sel === '.acc-date-note')[0];
+  H.ok(why && /white-space\s*:\s*nowrap/.test(why.body),
+    'the qualifier keeps nowrap — it is a label beside a number');
+  H.ok(note, '.acc-date-note has a rule of its own');
+  H.ok(/flex\s*:\s*1 0 100%/.test(note.body),
+    'and takes a whole line of the row rather than a share of it');
+  H.ok(/white-space\s*:\s*normal/.test(note.body),
+    'and is allowed to wrap, which is the half that was actually broken');
+  H.ok(/padding-inline-start/.test(note.body) && !/padding-(left|right)/.test(note.body),
+    'indented past the tick with a logical property, so it lines up in all three languages');
+
   // =========================================================================
   console.log('\n[1 and 4: the payload, from real records]');
 

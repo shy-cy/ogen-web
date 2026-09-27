@@ -200,6 +200,25 @@ const has = (dom, s) => dom.mount.textContent.indexOf(s) !== -1;
   H.ok(has(dom, 'full'), 'and the full one still says it is full');
   H.ok(has(dom, 'ticking this joins the waiting list'),
     'and says what ticking it would mean, before it is ticked');
+  // ⚠ AND THAT SENTENCE IS ON ITS OWN LINE, which is not a nicety. It shared a
+  // class and a slot with the late-price qualifier — `late booking · usually
+  // €7.00` — on the reasoning that one explanation of one row deserves one
+  // treatment. Right about the intent, wrong about the shape: a qualifier is a
+  // label and belongs beside the figure, a sentence is prose. Sat in the price
+  // column it inherited `white-space:nowrap` inside a `flex:0 0 auto` box, so
+  // it pushed the row past a container with `overflow:hidden` and was simply
+  // CUT — reported from a phone reading "ticking this joins the waiting" and
+  // stopping. It also squeezed the date to three lines beside half a sentence.
+  const noteRow = D.byClass(dom.mount, 'acc-date')
+    .filter((r) => D.byClass(r, 'acc-date-note').length)[0];
+  H.ok(noteRow, 'the full evening carries an .acc-date-note');
+  const note = D.byClass(noteRow, 'acc-date-note')[0];
+  H.ok(note.textContent.indexOf('waiting list') !== -1, 'and it is the waiting sentence');
+  H.ok(note.parentNode === noteRow,
+    '⚠ as a DIRECT CHILD of the row, so it can span it — inside the price column ' +
+    'it is clipped by the card it sits in');
+  H.eq(D.byClass(noteRow, 'acc-date-why').length, 0,
+    'and NOT wearing .acc-date-why, which is the nowrap label treatment a figure wants');
   H.ok(has(dom, '€12.00'), 'the rest carry their price');
   // The price comes from the same function that freezes it at booking, with the
   // same bookedAt — so a screen quoting the standard price cannot be followed by

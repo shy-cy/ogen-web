@@ -1184,6 +1184,28 @@ html[lang="he"] .thankyou h1{ font-family: var(--font-he); font-weight:700; }
   outline:2px solid var(--terracotta); outline-offset:1px; border-color:var(--terracotta);
 }
 
+/* ⚠ A PASSWORD BOX WITH NO WAY TO SEE WHAT IS IN IT. Five of them in the family
+   area and not one reveal between them, which is worst on the two screens that
+   ask for a password the person does not have yet: sign-up and reset, where the
+   rule is eight characters, a typo cannot be found by reading, and on the reset
+   screen getting it wrong used to cost the link. A phone keyboard with
+   autocorrect and a shifted layout is exactly where a password is mistyped.
+   The button is a real <button type="button"> — in the tab order, carrying
+   aria-pressed and an aria-label that changes with the state — and type="button"
+   is load-bearing: the default is submit, so revealing the password would post
+   the form. inset-inline-end, so the eye follows the reading end in Hebrew with
+   nothing per-language to get wrong. */
+.acc-pw{ position:relative; display:flex; }
+.acc-pw input{ padding-inline-end:44px; }
+.acc-pw-eye{
+  position:absolute; inset-inline-end:2px; top:2px; bottom:2px; width:40px;
+  display:flex; align-items:center; justify-content:center;
+  padding:0; background:none; border:0; border-radius:7px;
+  color:var(--camel); cursor:pointer;
+}
+.acc-pw-eye:hover{ color:var(--terracotta); }
+.acc-pw-eye:focus-visible{ outline:2px solid var(--terracotta); outline-offset:-2px; }
+
 /* The rule a field expects, said UNDER the input rather than as a refusal after
    it. --navy at 10.8:1 on paper, never --muted-warm or --camel: those are
    backgrounds chosen to sit under white text and fail as foregrounds, which is
@@ -1202,7 +1224,9 @@ html[lang="he"] .thankyou h1{ font-family: var(--font-he); font-weight:700; }
    and source order give for free. */
 .acc-dates{ border:1px solid var(--stone); border-radius:10px; overflow:hidden; background:#fff; }
 .acc-date{
-  display:flex; align-items:center; gap:11px;
+  /* ⚠ IT WRAPS, because one of the two things that can sit on a row is a
+     SENTENCE. See .acc-date-note below. */
+  display:flex; flex-wrap:wrap; align-items:center; gap:5px 11px;
   padding:11px 13px; border-bottom:1px solid var(--stone);
   font-size:15px; cursor:pointer;
 }
@@ -1222,6 +1246,25 @@ html[lang="he"] .thankyou h1{ font-family: var(--font-he); font-weight:700; }
    tokens are backgrounds chosen to sit under white text and fail as
    foregrounds, the same trap the listing card's tag labels were fixed out of. */
 .acc-date-why{ font-size:12px; color:var(--navy); font-weight:600; white-space:nowrap; }
+/* ⚠ AND WHAT TICKING A FULL EVENING MEANS IS A SENTENCE, NOT A LABEL — which is
+   why it is not the rule above. It was: both explanations were given one class,
+   on the reasoning that one sentence about one row deserves one treatment. That
+   is right about the intent and wrong about the shape. `late booking · usually
+   €7.00` is a qualifier on a figure and belongs beside it, nowrap and all;
+   `ticking this joins the waiting list. Nothing is charged.` is a whole
+   sentence, and nowrap inside a flex:0 0 auto column forced the row wider than
+   its container — which has overflow:hidden for its rounded corners, so the
+   sentence was simply CUT. Reported from a phone: the English read "ticking
+   this joins the waiting" and stopped, and the Hebrew ran into the date.
+   It also squeezed .acc-date-when to nothing, so "Monday 5 October" wrapped
+   onto three lines beside half a sentence.
+   So it gets its own line under the date, indented past the tick it is about
+   (18px box + the 11px gap), and it is allowed to wrap like the prose it is. */
+.acc-date-note{
+  flex:1 0 100%; padding-inline-start:29px;
+  font-size:12.5px; line-height:1.4; color:var(--navy); font-weight:600;
+  white-space:normal;
+}
 /* A date that cannot be taken is dimmed and not pressable, and still says why —
    "full" and "already booked" are different answers and a family should not
    have to work out which one applies. */
