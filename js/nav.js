@@ -60,6 +60,11 @@
   </a>
   <div class="nav-right">
     <div class="nav-account" id="nav-account"></div>
+    <!-- ⚠ THE GLOBE AND THE HAMBURGER TRAVEL TOGETHER. On a phone the controls
+         row is pushed apart — who you are at one end, the ways OUT of this page
+         at the other — and without a wrapper space-between would put three gaps
+         between three items instead of one gap between two groups. -->
+    <div class="nav-ways">
     <div class="lang-pick">
       <button class="lang-globe" id="lang-globe" type="button" aria-haspopup="true"
               aria-expanded="false" aria-controls="lang-menu"
@@ -80,6 +85,7 @@
     <button class="hamburger" id="hamburger" onclick="toggleMenu()" aria-label="${L.menu}">
       <span></span><span></span><span></span>
     </button>
+    </div>
   </div>
 </nav>
 <div class="mobile-menu" id="mobile-menu">

@@ -154,6 +154,18 @@ html[lang="ru"] div[data-lang="ru"] { display:block; }
    squashing or cropping it. Drop either and a narrow bar distorts the logo. */
 .logo-mark img{ height:var(--logo-h); width:auto; max-width:100%; object-fit:contain; display:block; }
 .nav-right{ flex:1 1 0; display:flex; align-items:center; justify-content:flex-end; gap:18px; direction:ltr; }
+/* ⚠ A GROUP, NOT A LAYOUT. The globe and the hamburger are the two ways OFF
+   this page, and on a phone they sit together at one end of the row. Everywhere
+   else the wrapper is a plain flex row that changes nothing.
+
+   ⚠ AND IT IS DECLARED HERE, ABOVE THE PHONE QUERY, RATHER THAN BESIDE THE
+   GLOBE. It was written next to .lang-pick, which sits AFTER the 600px block —
+   and the query narrows this same gap, at the same specificity, so the later
+   rule won and the phone's 12px never applied. Nothing looked wrong; two pixels
+   is not a thing anybody sees. It is the collision `.acc-field > label` and
+   `.queue .who span` already paid for, arriving through source ORDER rather
+   than through specificity. */
+.nav-ways{ display:flex; align-items:center; gap:14px; }
 /* ---- the account chip -------------------------------------------------------
    It lives INSIDE .nav-right, which is pinned to the physical right and forced
    direction:ltr in every language. That is deliberate and the chip inherits it:
@@ -241,7 +253,21 @@ html[lang="he"] .nav-signout svg{ transform:scaleX(-1); }
     flex-direction:column; justify-content:center; row-gap:6px; padding-block:10px;
   }
   .nav-spacer{ display:none; }
-  .nav-right{ flex:0 0 auto; width:100%; justify-content:center; }
+  /* ⚠ PUSHED APART, NOT CENTRED. Asked for from a phone: "the menu and the globe
+     align to one side and the login/logout + family section to the other".
+     Centred, the four controls read as one undifferentiated clump; apart, the
+     row says what it is — who you are at one end, the ways off this page at the
+     other, and the space between them is the thing that says they are different
+     kinds of control.
+
+     ⚠ THE SIDES DO NOT SWAP BETWEEN LANGUAGES, and that is .nav-right's own rule
+     inherited rather than an oversight: it is forced direction:ltr so these
+     controls keep ONE place whatever is on screen, because the reader who most
+     needs the language control is the one who cannot read the page. So the chip
+     is at the physical start and the hamburger at the physical end in all three
+     — which is also the order they were already in. */
+  .nav-right{ flex:0 0 auto; width:100%; justify-content:space-between; }
+  .nav-ways{ gap:12px; }
 }
 
 /* ⚠ ONE GLOBE WHERE THERE WERE THREE LABELLED BUTTONS, and the width is the

@@ -167,4 +167,54 @@ H.eq(padB * 2 + logoH + gap + burger, navH,
 H.ok(navH > 96, 'and the phone bar is the taller of the two');
 H.ok(logoH < 78, 'with a shorter logo than the desktop one, which is what pays for the row');
 
+// ⚠ AND THE SECOND ROW IS PUSHED APART, NOT CENTRED.
+//
+// Asked for from a phone: "the menu and the globe align to one side and the
+// login/logout + family section align to the other". Centred, the four controls
+// read as one undifferentiated clump; apart, the row says what it is — who you
+// are at one end, the ways OFF this page at the other — and the space between
+// them is what says they are different kinds of control.
+console.log('\n[the controls row is two groups, not one clump]');
+const navJs = nav;
+// ⚠ THE BASE RULE, NOT JUST THE NAME. The phone query below carries a second
+// `.nav-ways{ gap:… }`, so merely finding the class in the stylesheet passes with
+// the base rule deleted — and without `display:flex` the wrapper is a block and
+// the globe sits ABOVE the hamburger. A bite-check found exactly that.
+const waysRule = rule('.nav-ways');
+H.ok(waysRule, '.nav-ways has a rule — a class with none is a layout nobody designed');
+H.ok(/display:\s*flex/.test(waysRule),
+  '⚠ and it is a flex ROW, or the two controls stack on top of each other');
+H.ok(/align-items:\s*center/.test(waysRule), 'with them on one line');
+H.ok(/gap:/.test(waysRule), 'and a gap, so they are two controls rather than one blob');
+// ⚠ AND IT IS DECLARED ABOVE THE PHONE QUERY. The query narrows this same gap at
+// the SAME specificity, so a base rule written after it wins at every width and
+// the phone's figure never applies. It was, and nothing looked wrong — two pixels
+// is not something anybody sees. The collision `.acc-field > label` and
+// `.queue .who span` already paid for, arriving through source ORDER instead.
+H.ok(bare.indexOf('.nav-ways{') < qAt,
+  '⚠ the base rule comes before the phone query, or the query loses to it');
+H.ok(/\.nav-ways\{[^}]*gap:\s*12px/.test(q),
+  'and the query is what narrows the gap on a phone');
+H.ok(/<div class="nav-ways">/.test(navJs), 'and the markup uses it');
+// ⚠ IT WRAPS THE TWO WAYS OFF THE PAGE, and not the chip. Without a wrapper,
+// space-between puts three gaps between three items instead of one gap between
+// two groups — which is the same clump, spread out.
+const ways = navJs.slice(navJs.indexOf('<div class="nav-ways">'), navJs.indexOf('</nav>'));
+H.ok(ways.indexOf('lang-pick') !== -1, 'the globe is inside it');
+H.ok(ways.indexOf('hamburger') !== -1, 'and so is the hamburger');
+H.ok(ways.indexOf('nav-account') === -1,
+  '⚠ and the account chip is NOT — it is the other group, or there is nothing to push apart');
+const right = navJs.slice(navJs.indexOf('<div class="nav-right">'), navJs.indexOf('</nav>'));
+H.ok(right.indexOf('nav-account') < right.indexOf('nav-ways'),
+  'the chip leads, so it lands at the physical start and the hamburger keeps the end');
+H.ok(/justify-content:space-between/.test(q.replace(/\s+/g, '')),
+  '⚠ and the phone row pushes them apart');
+// ⚠ THE SIDES DO NOT SWAP BETWEEN LANGUAGES. .nav-right is forced ltr so these
+// controls keep ONE place whatever is on screen — the rule the language toggle
+// was built on, and the reason the chip is at the physical start in all three.
+H.ok(/\.nav-right\{[^}]*direction:ltr/.test(bare),
+  'with .nav-right still forced ltr, so neither group changes side per language');
+H.eq((rule('.nav-ways').match(/(^|[^-])(left|right)\s*:/g) || []).length, 0,
+  'and nothing in the wrapper is physical');
+
 H.done();

@@ -2490,7 +2490,43 @@
       if (!d) return;
       e.facts[key] = readFactEditor(d, GROUP_PREFIX, e.facts[key]);
     });
+    // ⚠ AND THE ONE FIELD THE LOOP ABOVE SKIPS. `schedule` is excluded because
+    // commitOwnerEdit() rebuilds it from the rows — but the override sentence is
+    // not a row, it is typed prose, and reading it only on commit meant every
+    // redraw between typing it and pressing Back threw it away. Reported as
+    // "when I click on regenerate dates, the text in these fields disappears";
+    // regenerating was simply the redraw somebody happened to notice.
+    if ($(GROUP_PREFIX + '-schedule-overrideText-he')) {
+      e.facts.schedule = Object.assign({}, e.facts.schedule,
+        { overrideText: readLangField(GROUP_PREFIX + '-schedule-overrideText') });
+    }
     return e;
+  }
+
+  // ⚠ EVERY REDRAW OF THIS PAGE CAPTURES THE FORM FIRST.
+  //
+  // The page is redrawn by five things — regenerating the calendar, changing the
+  // frequency, adding or removing a schedule row, and deleting or clearing
+  // dates — and only ONE of them read the form before throwing the DOM away. So
+  // changing the frequency after typing a group's name lost the name, and every
+  // one of them lost the override sentence. Nothing errored; the boxes were
+  // simply empty again.
+  //
+  // This is the undrawn-field trap in its other direction: not a field the form
+  // did not draw, but a field the form drew and nobody read back. One door, so a
+  // sixth redraw added next year inherits the capture rather than having to
+  // remember it — and a test asserts by SHAPE that nothing else calls the
+  // painter, because a rule with call sites to count is a rule that grows an
+  // exception.
+  //
+  // `mutate` runs BETWEEN the capture and the paint, which is the whole reason
+  // it exists: adding or removing a row has to change the list the capture just
+  // produced, and doing it the other way round captures the old list back over
+  // the change.
+  function redrawOwnerPage(page, mutate) {
+    var e = readOwnerEdit();
+    if (mutate && e) mutate(e);
+    drawOwnerPage(page);
   }
 
   // Back into the model the save reads.
@@ -2503,8 +2539,11 @@
     // drops. facts.schedule is REBUILT from scratch on every commit rather than
     // merged, so a key left out of this line is gone — the same trap
     // SHAPES.schedule has on the server side, one layer up.
+    // ⚠ FROM THE MODEL, which readOwnerEdit() above has just filled from the DOM.
+    // Reading the boxes a second time here is what made this the ONLY path that
+    // preserved the sentence; one reader means every path does.
     facts.schedule = { frequency: e.freq, sessions: rows,
-                       overrideText: readLangField(GROUP_PREFIX + '-schedule-overrideText') };
+                       overrideText: (e.facts.schedule || {}).overrideText || null };
     if (e.freq === 'monthly') facts.schedule.weekOfMonth = e.weekOfMonth;
     facts.duration = Object.assign({}, facts.duration, { sessionDates: e.dates || [] });
 
@@ -2597,10 +2636,8 @@
       freqSel.appendChild(el('option', { value: f.key, text: f.label, selected: f.key === e.freq || null }));
     });
     freqSel.addEventListener('change', function () {
-      e.sessions = readScheduleRows(GROUP_PREFIX, e.sessions.length);
-      e.freq = freqSel.value;
       S.dirty = true;
-      drawOwnerPage(page);
+      redrawOwnerPage(page, function (cur) { cur.freq = freqSel.value; });
     });
 
     // Which week of the month, for a monthly activity only. 'last' is a real
@@ -2637,14 +2674,14 @@
       prefix: GROUP_PREFIX, freq: e.freq, sessions: e.sessions,
       onChange: function () { S.dirty = true; },
       onAdd: wanted ? null : function () {
-        e.sessions = readScheduleRows(GROUP_PREFIX, e.sessions.length);
-        e.sessions.push({ day: null, time: '', date: null });
-        S.dirty = true; drawOwnerPage(page);
+        S.dirty = true;
+        redrawOwnerPage(page, function (cur) {
+          cur.sessions.push({ day: null, time: '', date: null });
+        });
       },
       onRemove: wanted ? null : function (i) {
-        e.sessions = readScheduleRows(GROUP_PREFIX, e.sessions.length);
-        e.sessions.splice(i, 1);
-        S.dirty = true; drawOwnerPage(page);
+        S.dirty = true;
+        redrawOwnerPage(page, function (cur) { cur.sessions.splice(i, 1); });
       }
     }));
 
@@ -2684,9 +2721,9 @@
       generateLabel: { generate: 'Generate the dates', regenerate: 'Regenerate from the schedule' },
       onGenerate: function () { generateOwnerSessions(page); },
       onChange: function (next, o) {
-        e.dates = next;
         S.dirty = true;
-        if (!(o && o.quiet)) drawOwnerPage(page);
+        if (o && o.quiet) { e.dates = next; return; }
+        redrawOwnerPage(page, function (cur) { cur.dates = next; });
       }
     }));
     page.appendChild(calBox);
@@ -2756,11 +2793,12 @@
           'on the schedule above instead.');
         return;
       }
-      e.dates = rows.map(function (r) {
-        return { date: r.date, status: r.status, reason: r.reason || '' };
-      });
       S.dirty = true;
-      drawOwnerPage(page);
+      redrawOwnerPage(page, function (cur) {
+        cur.dates = rows.map(function (r) {
+          return { date: r.date, status: r.status, reason: r.reason || '' };
+        });
+      });
       // The disagreement between a typed count and the span it is supposed to
       // cover, surfaced while an admin is here to settle it.
       message(res.data.note ? 'warn' : 'ok',
@@ -3282,8 +3320,18 @@
           return { date: r.date, status: r.status === 'excluded' ? 'excluded' : 'scheduled',
                    reason: r.reason || '' };
         });
+        // ⚠ CAPTURE FIRST, THEN LET THE SERVER'S CALENDAR WIN. The other order
+        // reads the form back over the dates that were just handed to us.
         var page = $('group-page');
-        if (page && !page.hidden) drawOwnerPage(page);
+        if (page && !page.hidden) {
+          redrawOwnerPage(page, function (cur) {
+            cur.facts.duration = JSON.parse(JSON.stringify(mine.facts.duration));
+            cur.dates = ((mine.facts.duration.sessionDates) || []).map(function (r) {
+              return { date: r.date, status: r.status === 'excluded' ? 'excluded' : 'scheduled',
+                       reason: r.reason || '' };
+            });
+          });
+        }
       }
     });
     // The group list summarises each group's timetable, so it says what was true

@@ -125,9 +125,15 @@ H.eq(JSON.stringify(migrate(round)), JSON.stringify(round), 'and a second pass c
 
 // 2. The client rebuilds facts.schedule from scratch on commit.
 const client = read('js/activities-admin.js');
-H.ok(/facts\.schedule = \{[\s\S]{0,200}overrideText: readLangField\(GROUP_PREFIX \+ '-schedule-overrideText'\)/
+// ⚠ THE READ MOVED, AND THE RULE DID NOT. facts.schedule is still rebuilt from
+// scratch on commit, so a key left out of that line is still gone — but the
+// sentence is now read into the working copy by readOwnerEdit(), because reading
+// it off the DOM here made Back the only path that kept it. Four other redraws
+// threw it away: see a-redraw-that-ate-what-you-typed.js. So what this asserts is
+// that commit still CARRIES it, wherever it is read.
+H.ok(/facts\.schedule = \{[\s\S]{0,240}overrideText: \(e\.facts\.schedule \|\| \{\}\)\.overrideText/
   .test(client),
-  '⚠ the commit reads it back — facts.schedule is REBUILT there, so a field left out ' +
+  '⚠ the commit carries it — facts.schedule is REBUILT there, so a field left out ' +
   'is an input an admin types into and a save drops');
 H.ok(/GROUP_PREFIX \+ '-schedule-overrideText'/.test(client) &&
      /Instead of the schedule line/.test(client),

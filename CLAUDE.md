@@ -187,6 +187,21 @@ form are injected at runtime into `<div id="page">`:
   sets pronunciation and **not direction**; `dir` would, and is not wanted, since
   every option is one word in a deliberately fixed order.
 
+  ⚠ **AND ON A PHONE THE CONTROLS ROW IS PUSHED APART.** Asked for in the same
+  breath: *"the menu and the globe align to one side and the login/logout +
+  family section align to the other"*. Centred, the four controls read as one
+  undifferentiated clump; apart, the row says what it is — who you are at one
+  end, the ways **off** this page at the other, with the space between them doing
+  the saying. `.nav-ways` wraps the globe and the hamburger so `space-between`
+  puts one gap between two groups rather than three gaps between three items;
+  everywhere else that wrapper is a plain flex row and changes nothing.
+
+  ⚠ **THE SIDES DO NOT SWAP BETWEEN LANGUAGES**, and that is `.nav-right`'s own
+  rule inherited rather than an oversight: it is forced `direction:ltr` so these
+  controls keep **one** place whatever is on screen. The chip is at the physical
+  start and the hamburger at the physical end in all three — which is the order
+  they were already in.
+
   **One control at every width**, not a globe on phones and buttons on a desktop.
   Two controls is two behaviours to keep in step — the trap rule 2 names for
   per-language overrides, arriving as a per-width one — and the endonyms are the
@@ -1343,6 +1358,31 @@ Nothing is shared. A half-shared pair is the shape that produces a test card
 charging real money, because the piece that was shared is the piece nobody
 checked.
 
+⚠ **WHAT THE CHECKOUT HEADER READS, MEASURED OFF THE LIVE ACCOUNT.** Asked as
+*"which details control the area in the checkout?"*, looking at Stripe's Public
+details page. `GET /v1/account` on `acct_1TQZTsQ4AsHDrsQv` says:
+
+| | |
+|---|---|
+| `business_profile.name` | **null** — the customer-facing name, and it is empty |
+| `settings.dashboard.display_name` | `SHY Services` — the name shown **inside** the Dashboard, not to a payer |
+| `settings.payments.statement_descriptor` | `SHTYM` — what a **bank statement** says, not the page |
+
+So Checkout falls back to the **legal business name**, which is why a family sees
+*Shirat HaYam LTD.* The trading name in the Dashboard is a different field from
+the one Checkout reads, which is the whole reason the screen looks misconfigured
+when nothing is.
+
+⚠ **AND SETTING IT WOULD NOT SOLVE IT**, which is the part worth keeping. The
+public business name is **account-level** and the account is shared, so any value
+put there is what *Shirat HaYam's* payers see too — and Checkout has no
+per-session override for the merchant name (the statement descriptor and
+`custom_text` are the only per-payment strings, and neither is the header). A
+page that says Ogen for Ogen's payments needs a **separate Stripe account**, or
+Connect. The stopgaps that work today are naming Ogen in the **product line**,
+which already renders under the merchant name, and a `custom_text` sentence above
+the Pay button.
+
 ⚠ **THE SUFFIX IS THE ONE GENUINE ASYMMETRY.** A statement descriptor is what a
 **cardholder reads on a bank statement**, and a test payment reaches none — so on
 a rehearsal it is a value with no reader. It is also the half of `_stripe.js` that
@@ -1931,6 +1971,44 @@ If it comes back, the rule it carried is the part worth keeping: a schedule is a
 pattern ("Wednesdays at 16:00") and copies anywhere, a calendar is absolute dates,
 and last year's term copied into this one is a page of dates nobody meets on —
 quietly and plausibly.
+
+### ⚠ A redraw that ate what you typed
+
+Reported as *"when I click on regenerate dates, the text in these fields
+disappears"*, on the trilingual **Instead of the schedule line** boxes.
+Regenerating was simply the redraw somebody happened to notice.
+
+The group sub-page is repainted by **five** things — regenerating the calendar,
+changing the frequency, adding a schedule row, removing one, and deleting or
+clearing dates — and only **one** of them read the form back before throwing the
+DOM away. So changing the frequency after typing a group's **name** lost the
+name, and every one of them lost the override sentence. Nothing errored; the
+boxes were simply empty again, which reads as a control that does not work.
+
+Two faults, and the second is what made the first survive:
+
+- **Four handlers repainted without capturing.** This is the undrawn-field trap
+  in its other direction — not a field the form did not draw, but a field the
+  form drew and nobody read back.
+- ⚠ **AND THE OVERRIDE SENTENCE WAS READ ONLY ON COMMIT.** `readOwnerEdit()`
+  skips `schedule` on purpose, because `commitOwnerEdit()` rebuilds it from the
+  rows — but the sentence is not a row, it is typed prose, and reading it off the
+  DOM a second time in commit made **Back** the only path that preserved it.
+
+`redrawOwnerPage(page, mutate)` is the one door now: it captures, runs the
+caller's change against what it captured, then paints. ⚠ The `mutate` argument is
+the whole reason it exists — adding or removing a row has to change the list the
+capture just produced, and doing it the other way round reads the old list back
+over the change. The only direct call to the painter left is the one that
+**opens** the page, where there is nothing on screen yet to capture, and a test
+asserts that **by shape** rather than by counting call sites.
+
+⚠ **`js/activities-admin.js` HAS NEVER BEEN EXECUTED BY ANYTHING** — the state
+`js/registrations-admin.js` was in before `tests/_dom.js` grew enough to run it.
+Every suite touching it reads it as text, which is why five redraw paths could
+disagree about what they preserve with everything green. The check for this is
+structural for that reason, and running this client is the obvious next thing to
+pay for.
 
 ⚠ **NOTHING ABOUT A GROUP IS READ BACK OFF THE MAIN FORM.** Not a name, a
 capacity, a teacher list, a fact, a schedule or a calendar — none of it has an

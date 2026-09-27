@@ -348,6 +348,15 @@ function customGroup(dates, over) {
     $: (id) => ({ id: id, hidden: false }),
     drawGroups: () => drawn.push('groups'),
     drawOwnerPage: () => drawn.push('ownerPage'),
+    // ⚠ THE CAPTURING REDRAW, stubbed faithfully: it reads the form into the
+    // working copy, runs the caller's change against it, and paints. Every
+    // repaint of the sub-page goes through it now, because four of them used to
+    // throw away whatever had been typed — see a-redraw-that-ate-what-you-typed.js.
+    // With no DOM here the capture is the working copy itself.
+    redrawOwnerPage: (page, mutate) => {
+      if (mutate) mutate(ctx2.S.ownerEdit);
+      drawn.push('ownerPage');
+    },
     out: null
   };
   vm.createContext(ctx2);
