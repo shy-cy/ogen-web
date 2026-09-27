@@ -38,7 +38,8 @@ console.log('[the bar is a row, so the items are in each other’s way]');
 const navRule = rule('#page > nav');
 H.ok(navRule !== null, 'the nav rule is there');
 H.ok(/display:\s*flex/.test(navRule), 'the nav is a flex row rather than a positioning context');
-H.ok(/height:\s*96px/.test(navRule), 'and is still 96px — .hero, .mobile-menu and .thankyou key off it');
+H.ok(/height:\s*var\(--nav-h\)/.test(navRule),
+  'and its height is the token — .hero, .mobile-menu and .thankyou all key off it');
 
 // ⚠ THE CAUSE, NAMED. Either of these going back out of flow reopens the bug,
 // and it reopens SILENTLY: nothing errors, nothing overflows, the two boxes just
@@ -85,7 +86,11 @@ H.eq(imgRules.length, 1, 'there is exactly one .logo-mark img rule');
 const img = imgRules[0].replace(/\s+/g, ' ');
 H.ok(/max-width:\s*100%/.test(img), 'it caps the box at the space available');
 H.ok(/object-fit:\s*contain/.test(img), 'and scales the artwork inside it rather than distorting it');
-H.ok(/height:\s*78px/.test(img), 'at the height the desktop bar has always used');
+// ⚠ AND THE HEIGHT IS A TOKEN, NOT A SECOND RULE. The phone bar needs a
+// shorter logo, and the obvious way to get one is `.logo-mark img{height:54px}`
+// inside the media query — which is a second rule, which is exactly how a pair
+// gets split. There is nothing to split if the query moves a variable.
+H.ok(/height:\s*var\(--logo-h\)/.test(img), 'at whatever height the token says');
 
 console.log('\n[nothing directional was introduced]');
 // The bar is laid out physically on purpose — the toggle must not move between
@@ -96,5 +101,70 @@ H.ok(/padding-inline/.test(navRule) && !/padding-(left|right)/.test(navRule),
 H.ok(/direction:\s*ltr/.test(navRule),
   'and is forced ltr, so [עב][EN][RU] keeps one place in all three languages');
 H.ok(/direction:\s*ltr/.test(rule('.nav-right')), '.nav-right still says so itself');
+
+// --------------------------------------------------------------------------
+// ⚠ SEVEN RULES USED TO CARRY THE LITERAL 96px, with a convention saying to
+// change them together. A convention is a discipline, and the phone bar below
+// is what a discipline loses to: the bar grows there, and a .hero still
+// starting at 96px slides under it with nothing erroring.
+console.log('\n[the height is declared once and read everywhere]');
+H.ok(/:root\{[^}]*--nav-h:\s*96px/.test(bare), '--nav-h is the desktop height');
+H.ok(/:root\{[^}]*--logo-h:\s*78px/.test(bare), 'and --logo-h the desktop logo');
+// By shape rather than by listing the seven: any literal left behind is a rule
+// that has stopped following the bar.
+H.eq((bare.match(/\b96px/g) || []).length, 1,
+  'and 96px appears exactly once in the whole stylesheet — the token itself');
+// The two jump targets used to say 112px, which is the bar plus 16 written out.
+H.ok((bare.match(/scroll-margin-block-start:[^;]*/g) || [])
+       .every((d) => /var\(--nav-h\)/.test(d)),
+  'and every scroll margin clears the bar by reading it rather than by restating it');
+[['.mobile-menu', 'top'], ['.hero', 'margin-top'], ['.page-header', 'margin-top'],
+ ['.thankyou', 'margin-top'], ['.activity-group[id]', 'scroll-margin-block-start'],
+ ['.acc-card[id]', 'scroll-margin-block-start']
+].forEach(([sel, prop]) => {
+  const r = rule(sel);
+  H.ok(r !== null, sel + ' is there');
+  H.ok(new RegExp(prop + ':\\s*(calc\\()?var\\(--nav-h\\)').test(r),
+    sel + ' takes its ' + prop + ' from the token');
+});
+H.ok(/min-height:\s*calc\(100vh - var\(--nav-h\)\)/.test(rule('.thankyou')),
+  'and .thankyou subtracts the same one from the viewport');
+
+// --------------------------------------------------------------------------
+// ⚠ THE LOGO GETS ITS OWN LINE ON A PHONE. One row resolved the collision and
+// then charged the logo for it: .logo-mark is the only item with min-width:0,
+// so it is the one that yields, and at 375px it yielded down to about 87px —
+// the wordmark readable and the tagline under it not. The row runs out at about
+// 592px, which is why this is a measurement rather than a preference.
+console.log('\n[below the breakpoint the bar is two rows]');
+const qAt = bare.indexOf('@media (max-width:600px)');
+H.ok(qAt !== -1, 'there is a phone query');
+const q = bare.slice(qAt, bare.indexOf('\n}', qAt) + 2);
+H.ok(/flex-direction:\s*column/.test(q), 'the bar becomes a column, so the logo is on its own line');
+H.ok(/\.nav-spacer\{[^}]*display:\s*none/.test(q),
+  'and the empty spacer goes — align-items centres the logo for nothing once they are stacked');
+H.ok(/\.nav-right\{[^}]*width:\s*100%/.test(q), 'the controls take the second row whole');
+H.ok(!/position:\s*absolute/.test(q), 'and nothing in it goes back out of flow');
+
+// ⚠ THE SUM, COMPUTED. The height is DECLARED rather than measured — everything
+// on the page is pushed down by --nav-h — so contents taller than the number
+// overlap the hero, silently, at a width nobody opens a laptop to.
+const px = (re, where) => {
+  const m = (where || q).match(re);
+  H.ok(m !== null, 'read ' + re);
+  return m ? parseFloat(m[1]) : NaN;
+};
+const navH  = px(/--nav-h:\s*(\d+(?:\.\d+)?)px/);
+const logoH = px(/--logo-h:\s*(\d+(?:\.\d+)?)px/);
+const padB  = px(/padding-block:\s*(\d+(?:\.\d+)?)px/);
+const gap   = px(/row-gap:\s*(\d+(?:\.\d+)?)px/);
+// The tallest thing in the second row. Read from its own rule rather than
+// typed here, or the sum stops describing the bar the moment it is restyled.
+const burger = px(/height:\s*(\d+(?:\.\d+)?)px/, rule('.hamburger'));
+H.eq(padB * 2 + logoH + gap + burger, navH,
+  'the two rows and the padding add up to --nav-h exactly (' + padB + '*2 + ' +
+  logoH + ' + ' + gap + ' + ' + burger + ' = ' + navH + ')');
+H.ok(navH > 96, 'and the phone bar is the taller of the two');
+H.ok(logoH < 78, 'with a shorter logo than the desktop one, which is what pays for the row');
 
 H.done();

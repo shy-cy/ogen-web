@@ -145,6 +145,35 @@ form are injected at runtime into `<div id="page">`:
   `.mobile-menu` is a **sibling** of `<nav>`, not a child, so it is untouched.
   A test pins all of it, including that neither box may go back to
   `position:absolute` — which is the thing that would reopen this silently.
+
+  ⚠ **AND ON A PHONE THE LOGO HAS ITS OWN LINE, ABOVE THE CONTROLS.** The row
+  resolves the collision and then charges the logo for it: `.logo-mark` is the
+  only item carrying `min-width:0`, deliberately, so it is the one that yields —
+  and at 375px it yielded to about **87px**, the wordmark readable and the
+  tagline under it not. Reported from a phone, twice: *"We might consider either
+  making the logo lower or moving things into the menu"*, then *"the logo should
+  be either above or below the nav and other indicators (I think above is
+  better)."*
+
+  The breakpoint is **measured, not judged**: one row needs 48px of padding,
+  24px of gaps, a 246px Hebrew lockup and 274px of controls, so it genuinely
+  runs out at about 592px. Below **600px** the bar is a column — `--nav-h` goes
+  to 112, the logo to 54, the empty spacer to `display:none` (its one job is
+  keeping the logo centred against `.nav-right`'s width, and `align-items` does
+  that for nothing once they are stacked), and `.nav-right` takes the second row
+  whole. Measured at 320/375/414/599 signed **in**, in all three languages:
+  nothing leaves the bar, and the logo goes from 87px to 171px.
+
+  A **mark-only phone logo** was the other answer and was not taken: it needs an
+  asset that does not exist, where this needs 16px of bar. Moving the sign-out
+  into the hamburger was refused outright — leaving has to be one click from
+  anywhere, because shared family devices are normal here.
+
+  ⚠ **THE HEIGHT IS DECLARED RATHER THAN MEASURED**, since everything on the
+  page is pushed down by `--nav-h`, so contents taller than the number overlap
+  the hero — silently, at a width nobody opens a laptop to. `10 + 54 + 6 + 32 +
+  10 = 112`, and a test **computes that sum** from those same declarations
+  (including the hamburger's own height) rather than trusting the comment.
 - **`js/footer.js`** — tagline logo → divider → partner logo row → copyright.
 - **`js/contact-form.js`** — builds the form, lazy-loads `intl-tel-input` from
   CDN (Cyprus default country), and AJAX-POSTs to Formspree. Language comes from
@@ -229,8 +258,19 @@ in every section; reuse the same inline SVG rather than re-sourcing it. Offer
 cards use `book-open` / `music` / `users` / `graduation-cap`, colored olive /
 terracotta / navy / gold in that order.
 
-**7. Nav height is 96px** and several things key off it (`.hero` margin-top,
-`.mobile-menu` top, `.thankyou` min-height). Change all of them together.
+**7. Nav height is `--nav-h`**, and seven rules key off it — `.mobile-menu` top,
+`.hero` and `.page-header` margin-top, `.thankyou`'s margin **and** its
+`calc(100vh - …)`, and the two jump targets' `scroll-margin-block-start`, which
+is `calc(--nav-h + 16px)` rather than the 112px it used to spell out.
+
+⚠ **It was the literal 96px in all seven, under a rule saying to change them
+together** — and a rule saying that is a discipline, which is exactly what the
+phone bar below would have beaten: the bar grows there, and a `.hero` still
+starting at 96px slides under it with nothing erroring. One declaration moves
+all of it now, and a test asserts `96px` appears **once** in the whole
+stylesheet. `--logo-h` is a token for the same reason plus one more: there must
+stay exactly one `.logo-mark img` rule, or `max-width:100%` and
+`object-fit:contain` can be split across a media query.
 
 **8. Design tokens** live in `:root` in `shared.css` — olive, camel, terracotta,
 gold, navy, paper, stone, ink. Hebrew uses Heebo, EN/RU use Mulish, switched via
@@ -7861,7 +7901,7 @@ functions until the next deploy**.
 
 | Var | For |
 |---|---|
-| `GITHUB_TOKEN` | fine-grained PAT, Contents R/W on `shy-cy/ogen-web` |
+| `GITHUB_TOKEN` | fine-grained PAT, Contents R/W on `shy-cy/ogen-web`. ⚠ **It expires** — see below |
 | `GITHUB_REPO` / `GITHUB_BRANCH` | `shy-cy/ogen-web` / `main` |
 | `NETLIFY_BLOBS_SITE_ID` / `NETLIFY_BLOBS_TOKEN` | Blobs |
 | `ADMIN_PASSWORD` | bootstrap only — stops being accepted the moment one account exists |
@@ -7869,6 +7909,38 @@ functions until the next deploy**.
 | `STRIPE_WEBHOOK_SECRET` | `whsec_…` for the endpoint registered at `/api/stripe-webhook` in **live** mode |
 | `STRIPE_TEST_SECRET_KEY` | the TEST key. Must begin `sk_test_` / `rk_test_` |
 | `STRIPE_TEST_WEBHOOK_SECRET` | `whsec_…` for a **second** endpoint, registered at `/api/stripe-webhook-test` in Stripe's **test** mode |
+
+### ⚠ A dead `GITHUB_TOKEN` looks like a broken family area
+
+A fine-grained PAT has an expiry date, and when this one reached it the whole
+family area answered **"something went wrong"** on every activity a family
+opened. Nothing about the failure named the cause: three functions read the
+repository through the GitHub API — `account-registrations`, `admin-registrations`
+and `activities-admin` — so the family's own pages, the roster and the CMS all
+stopped at once, while `/pay`, check-in and the whole static site carried on
+perfectly, because none of them reads the repo.
+
+It took a log to find. The handler catches, logs the stack and answers a
+`server-error` the family can read, which is right — a family is not told a
+credential expired — so **the log is the only place it is visible**:
+
+```
+netlify logs --source functions --function account-registrations --since 6h
+  → Error: GitHub GET /contents/activities/test10.json?ref=main → 401:
+    { "message": "Bad credentials" }
+```
+
+Two things make it harder than it sounds. The endpoint still answers **200** to
+anything that does not touch the repo — signing in, the dashboard's own rows —
+so the site looks half alive. And the **nightly sweep is the earliest witness**:
+`{"activities":{"considered":13}}` in its 06:00 line means the token was good at
+06:00, which brackets the failure to a few hours without anyone having to
+remember when they last published.
+
+The fix is a new PAT — **Contents: Read and write** on `shy-cy/ogen-web` alone —
+set with `netlify env:set GITHUB_TOKEN`, and then a **deploy**, because an env
+change does not reach deployed functions until the next one. Set an expiry you
+will be told about, or expect this again.
 
 ⚠ **The two Stripe pairs are set independently and neither falls back to the
 other.** An activity whose listing is `test` cannot take a payment until the test
@@ -7987,5 +8059,12 @@ share image, Formspree wiring, domain) is done. Open items:
   loudly on its first payment attempt rather than quietly charging a real card,
   which is the intended failure. Remember an env change does not reach deployed
   functions until the next deploy.
+- ⚠ **`GITHUB_TOKEN` IS EXPIRED AND THE FAMILY AREA IS DOWN.** GitHub answers
+  **401 Bad credentials**, so every screen that reads an activity — the family's
+  own pages, the admin roster and the CMS — says *"something went wrong"*. It was
+  still good at 06:00 UTC on 27 Sep (the sweep read 13 activities) and dead by
+  09:56. A new PAT, `netlify env:set`, and a deploy; see **A dead `GITHUB_TOKEN`
+  looks like a broken family area** for why nothing else on the site noticed.
 - **Rotate the setup credentials.** The GitHub PAT and Netlify token were pasted
-  into a chat transcript during setup.
+  into a chat transcript during setup. Minting the replacement above closes the
+  GitHub half of this.

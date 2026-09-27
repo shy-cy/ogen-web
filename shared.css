@@ -31,6 +31,13 @@
      pending pill: keep the hue, compute the value against the ground the
      letters actually sit on. */
   --camel-ink: #8A6C43;
+  /* ⚠ THE NAV'S HEIGHT IS A TOKEN, BECAUSE SEVEN RULES KEY OFF IT. It was the
+     literal 96px in all seven, with a convention saying to change them
+     together — which is a discipline, and a discipline is what the phone
+     layout below would have broken silently: the bar grows there, and a .hero
+     still starting at 96px slides under it. One declaration moves all of it. */
+  --nav-h: 96px;
+  --logo-h: 78px;
   --font-latin: 'Mulish', sans-serif;
   --font-he: 'Heebo', sans-serif;
 }
@@ -105,7 +112,7 @@ html[lang="ru"] div[data-lang="ru"] { display:block; }
 /* Scoped to the injected site nav (a direct child of #page) so it cannot
    capture other <nav> landmarks, e.g. the breadcrumb inside .page-header. */
 #page > nav{
-  position:fixed; top:0; left:0; right:0; height:96px;
+  position:fixed; top:0; left:0; right:0; height:var(--nav-h);
   background: rgba(251,250,246,0.92); backdrop-filter: blur(6px);
   border-bottom: 1px solid var(--stone);
   z-index:100;
@@ -145,7 +152,7 @@ html[lang="ru"] div[data-lang="ru"] { display:block; }
    aspect-ratio have on the activity picture: the box is allowed to be narrower
    than the artwork, and `contain` then scales the artwork inside it instead of
    squashing or cropping it. Drop either and a narrow bar distorts the logo. */
-.logo-mark img{ height:78px; width:auto; max-width:100%; object-fit:contain; display:block; }
+.logo-mark img{ height:var(--logo-h); width:auto; max-width:100%; object-fit:contain; display:block; }
 .nav-right{ flex:1 1 0; display:flex; align-items:center; justify-content:flex-end; gap:18px; direction:ltr; }
 /* ---- the account chip -------------------------------------------------------
    It lives INSIDE .nav-right, which is pinned to the physical right and forced
@@ -198,11 +205,44 @@ html[lang="he"] .nav-signout svg{ transform:scaleX(-1); }
   .nav-account-chip{ padding-inline:6px; }
 }
 @media (max-width:420px){
-  /* Every pixel taken back here is a pixel the logo keeps, since it is the one
-     item that gives way. */
-  #page > nav{ padding-inline:14px; column-gap:10px; }
+  /* The controls are six targets on a 320px row, and below this they are what
+     the bar is short of. Nothing is taken from the logo any more — it has its
+     own line by here — so this only keeps the second row from wrapping. */
+  #page > nav{ padding-inline:14px; }
   .nav-right{ gap:10px; }
   .lang-toggle button{ padding:6px 7px; }
+}
+
+/* ⚠ ON A PHONE THE LOGO GETS ITS OWN LINE, ABOVE THE CONTROLS.
+   One row resolves the collision and then charges the logo for it. .logo-mark
+   is the only item carrying min-width:0, deliberately — the toggle and the chip
+   are the reason the bar exists at a narrow width — so it is the one that gives
+   way, and at 375px it gave way to about 87px: the wordmark legible, the
+   tagline under it not. The row genuinely runs out at about 592px (48 padding,
+   24 of gaps, a 246px Hebrew lockup and 274px of controls), so this is not a
+   taste threshold.
+
+   A column costs 16px of bar and hands the logo the whole width. The empty
+   spacer goes: its one job is keeping the logo centred against .nav-right's
+   width, and align-items does that for nothing once they are stacked.
+
+   ⚠ AND THE ARITHMETIC HAS TO ADD UP, because the height is declared rather
+   than measured: everything else on the page is pushed down by --nav-h, so a
+   bar whose contents are taller than it says overlaps the hero. 10 + 54 + 6 +
+   32 + 10 = 112. A test computes that sum from these same declarations rather
+   than trusting the comment.
+
+   ⚠ AND THE LOGO'S HEIGHT IS A TOKEN TOO, rather than a second .logo-mark img
+   rule here. There is exactly one of those on purpose — max-width:100% and
+   object-fit:contain have to travel together, and a media query restating one
+   of a pair is how this codebase has split a pair before. */
+@media (max-width:600px){
+  :root{ --nav-h: 112px; --logo-h: 54px; }
+  #page > nav{
+    flex-direction:column; justify-content:center; row-gap:6px; padding-block:10px;
+  }
+  .nav-spacer{ display:none; }
+  .nav-right{ flex:0 0 auto; width:100%; justify-content:center; }
 }
 
 .lang-toggle{ display:flex; gap:6px; }
@@ -215,7 +255,7 @@ html[lang="he"] .nav-signout svg{ transform:scaleX(-1); }
 .hamburger{ width:32px; height:32px; display:flex; flex-direction:column; justify-content:center; gap:5px; cursor:pointer; background:none; border:none; }
 .hamburger span{ display:block; height:2px; background: var(--navy); border-radius:2px; }
 .mobile-menu{
-  position:fixed; top:96px; left:0; right:0; background: var(--paper);
+  position:fixed; top:var(--nav-h); left:0; right:0; background: var(--paper);
   border-bottom: 1px solid var(--stone); display:none; flex-direction:column;
   padding:16px 28px; gap:14px; z-index:99;
 }
@@ -284,11 +324,11 @@ html[lang="he"] .nav-signout svg{ transform:scaleX(-1); }
 .activity-index .activity-group:first-of-type{ margin-block-start:0; }
 /* #past is a jump target from the menu, and the nav is 96px of fixed overlay —
    without this the heading lands underneath it. */
-.activity-group[id]{ scroll-margin-block-start:112px; }
+.activity-group[id]{ scroll-margin-block-start:calc(var(--nav-h) + 16px); }
 
 /* ============================== HERO ============================== */
 .hero{
-  margin-top:96px; position:relative;
+  margin-top:var(--nav-h); position:relative;
   background-image: url('/images/hp-bg.jpg');
   background-size:cover; background-position:center;
   display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
@@ -505,7 +545,7 @@ footer .foot-line{ font-size:13px; color: var(--olive); }
    MOTIFS block above and js/motifs.js.
    ======================================================================== */
 .page-header{
-  margin-top:96px; background: var(--stone); padding:50px 24px 40px;
+  margin-top:var(--nav-h); background: var(--stone); padding:50px 24px 40px;
   text-align:center; position:relative; overflow:hidden;
 }
 .breadcrumb{ font-size:13px; color: var(--olive); font-weight:700; margin-bottom:14px; }
@@ -811,7 +851,7 @@ html[lang="he"] .credit-group-label{ text-transform:none; letter-spacing:0; font
   .activity-credits .credit-item{ flex:0 1 auto; }
 }
 
-/* Sticky facts sidebar. 112px = 96px nav + 16px breathing room. */
+/* Sticky facts sidebar. */
 /* No position:sticky here. It was `sticky; top:112px` and it had stopped doing
    anything: sticky only engages while the element is shorter than the viewport,
    and this column passed that the day the card image was added — measured at
@@ -1106,7 +1146,7 @@ html[lang="he"] .fact-card-head h2{ text-transform:none; letter-spacing:0; font-
 .activity-empty{ text-align:center; font-size:16px; color: var(--camel); padding:40px 0; }
 
 /* ============================== CONFIRMATION / 404 ============================== */
-.thankyou{ margin-top:96px; min-height:calc(100vh - 96px); display:flex; align-items:center; justify-content:center; padding:60px 24px; text-align:center; }
+.thankyou{ margin-top:var(--nav-h); min-height:calc(100vh - var(--nav-h)); display:flex; align-items:center; justify-content:center; padding:60px 24px; text-align:center; }
 .thankyou-inner{ max-width:520px; }
 .thankyou .check{ width:70px; height:70px; border-radius:50%; background: var(--olive); color:#fff; display:flex; align-items:center; justify-content:center; font-size:34px; margin:0 auto 26px; }
 .thankyou h1{ font-family: var(--font-latin); font-size:34px; font-weight:800; color: var(--olive); margin-bottom:16px; }
@@ -1713,7 +1753,7 @@ td .acc-actions{ gap:14px; }
 .acc-bundle-count{ font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; }
 /* Every message about money links to #pay, and the nav is a fixed 96px — without
    this the card it scrolls to arrives under the bar. */
-.acc-card[id]{ scroll-margin-block-start:112px; }
+.acc-card[id]{ scroll-margin-block-start:calc(var(--nav-h) + 16px); }
 /* The qualifier — "(10 sessions × 2 lessons)". Its own quiet line, because it is
    neither the label nor the figure, and glued onto either it reads as a second
    label or as part of the number. */
