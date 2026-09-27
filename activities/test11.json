@@ -5,7 +5,7 @@
   "corner": "tl",
   "cardImage": "/images/activities/test11-card-04cf96e7.jpg",
   "shareImage": null,
-  "robots": "index",
+  "robots": "noindex",
   "listing": "test",
   "type": "course",
   "registration": {
@@ -171,10 +171,10 @@
   "faq": [],
   "teachers": [],
   "sponsors": [],
-  "isoUpdated": "2026-09-27T12:48:53.195Z",
+  "isoUpdated": "2026-09-27T12:53:32.923Z",
   "isoCreated": "2026-09-27T12:48:53.195Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
   "activityId": "act-662a9e6f52eb7761",
-  "lastPublishedAt": "2026-09-27T12:48:53.195Z"
+  "lastPublishedAt": "2026-09-27T12:53:32.923Z"
 }
