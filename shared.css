@@ -1019,6 +1019,27 @@ html[lang="he"] .fact-card-head h2{ text-transform:none; letter-spacing:0; font-
 
 /* 940px, not 780: the two columns stop fitting at about 915px, so the switch
    to a single column has to happen above that, not 130px below it. */
+/* ⚠ THE REGISTER BUTTON PINNED TO THE BOTTOM, ONCE IT HAS SCROLLED AWAY.
+
+   Measured rather than judged: on hebrew4kids at 375px the real button is
+   2651px into a 4342px page — 61% down, four viewports of scrolling — and three
+   screens down at 768px. The stacked order that puts it there is correct (what
+   it is, when it is, what it costs, THEN act); what is wrong is that a family
+   who has decided has to go and find the control again.
+
+   It exists only below 939px, which is the breakpoint the grid ALREADY uses to
+   stack — not a new number. Above it the aside leads the trailing column and
+   the button is about one screen down, so there is nothing to solve and a bar
+   would only take 64px of viewport.
+
+   js/activity.js draws it only from the branch that builds a real link, and
+   only while the real button is off screen, so it is never a second choice on
+   screen beside the first and never a dead button that cannot be scrolled past.
+
+   `padding-block-end` on the body is what stops it covering the last of the
+   page — a fixed bar over a footer is a fixed bar over the footer's links. */
+.activity-sticky{ display:none; }
+
 @media (max-width:939px){
   /* One column, and only the area names change — the picture leads the page,
      then the two cards, then the article, then the rest. The <figure> is not
@@ -1078,6 +1099,39 @@ html[lang="he"] .fact-card-head h2{ text-transform:none; letter-spacing:0; font-
      directional here and no per-language rule; below the cap the aside fills the
      column and the auto margins simply have nothing to do. */
   .activity-aside{ width:100%; max-width:480px; margin-inline:auto; }
+
+  /* The pinned register button. Inside the query the grid already stacks in,
+     rather than a second @media with the same condition. */
+  /* ⚠ THE BAR'S HEIGHT IS A TOKEN, FOR THE REASON --nav-h IS ONE. Two rules key
+     off it — the bar itself, and the room the page has to leave underneath so
+     the footer is not sitting behind it — and the first version spelled 72px
+     into the second while the bar measured 74, which put the footer's last 3px
+     under a fixed panel. Measured in real Chrome over CDP, because headless
+     virtual time does not deliver IntersectionObserver callbacks and will
+     happily show a bar that the browser hides. One declaration moves both now,
+     and a test computes the sum from these same declarations. */
+  :root{ --sticky-h: 74px; --sticky-pad: 10px; }
+  .activity-sticky{
+    display:block; position:fixed; inset-inline:0; bottom:0; z-index:98;
+    box-sizing:border-box;
+    height: calc(var(--sticky-h) + env(safe-area-inset-bottom, 0px));
+    padding: var(--sticky-pad) 20px calc(var(--sticky-pad) + env(safe-area-inset-bottom, 0px));
+    background: rgba(251,250,246,0.94); backdrop-filter: blur(6px);
+    border-block-start:1px solid var(--stone);
+  }
+  .activity-sticky[hidden]{ display:none; }
+  /* Shorter than the one in the flow: this is a bar rather than a section, and
+     the in-flow button's 14px is sized against the price card above it.
+     10 + 26 + 21 line + 10 + 1 border = 74, which is --sticky-h. */
+  .activity-sticky .sidebar-cta{
+    box-sizing:border-box; height: calc(var(--sticky-h) - var(--sticky-pad) * 2 - 1px);
+    padding:0; font-size:16px; line-height: calc(var(--sticky-h) - var(--sticky-pad) * 2 - 1px);
+  }
+  /* The SAME token, or the footer ends up underneath the bar by whatever the
+     two disagree by — which is exactly how this started. */
+  body:has(.activity-sticky){
+    padding-block-end: calc(var(--sticky-h) + env(safe-area-inset-bottom, 0px));
+  }
 }
 @media (max-width:780px){
   .page-header h1{ font-size:28px; }

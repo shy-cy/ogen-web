@@ -169,6 +169,34 @@ form are injected at runtime into `<div id="page">`:
   into the hamburger was refused outright — leaving has to be one click from
   anywhere, because shared family devices are normal here.
 
+  ⚠ **AND THE LANGUAGE CONTROL IS A GLOBE, NOT THREE BUTTONS.** Asked for from a
+  phone: *"the lang selector can be replaced by a globe icon -> click can open
+  the 3 languages to change. this will give more space to more needed
+  functionalities in the top nav."* Measured at 320/375/414 signed in, the
+  toggle was **130px** against a 74px account chip and a 32px hamburger — the
+  widest item in the bar and more than half the controls row on the narrowest
+  phone. The globe is **32px**, the hamburger's own size, and hands back 98px.
+
+  ⚠ **THE RULE THE OLD TOGGLE WAS BUILT ON IS WHAT DECIDED THE SHAPE OF THE
+  LIST**, rather than being broken by it: the reader who needs a language control
+  most is the one who cannot read what is on screen. `עב` / `EN` / `RU` are
+  abbreviations and two of the three are Latin whichever language you read; the
+  list spells the **endonyms** out — עברית · English · Русский — each carrying
+  its own `lang` so a screen reader says the name in that language rather than in
+  the page's. One tap buys a name somebody can recognise as their own. Note `lang`
+  sets pronunciation and **not direction**; `dir` would, and is not wanted, since
+  every option is one word in a deliberately fixed order.
+
+  **One control at every width**, not a globe on phones and buttons on a desktop.
+  Two controls is two behaviours to keep in step — the trap rule 2 names for
+  per-language overrides, arriving as a per-width one — and the endonyms are the
+  better answer on a desktop too. The options still go through `setLang()` rather
+  than becoming hrefs built at paint: the query string is the entire point on
+  `/account/verify`, `/account/reset` and `/account/guardian-invite`, and dropping
+  it once already turned valid invitations into dead links. `.lang-toggle` left
+  the markup and the stylesheet **together**, because a class with no rule is a
+  layout nobody designed.
+
   ⚠ **THE HEIGHT IS DECLARED RATHER THAN MEASURED**, since everything on the
   page is pushed down by `--nav-h`, so contents taller than the number overlap
   the hero — silently, at a width nobody opens a laptop to. `10 + 54 + 6 + 32 +
@@ -506,6 +534,54 @@ keeping the column on the leading edge would need `order` or `column-reverse`,
 which splits visual from DOM order, and that is the rule this layout broke on
 before. The sidebar led the source until the redesign, when the required mobile
 order inverted it.
+
+### ⚠ The one control this page is for was four screens down
+
+Measured, not guessed: on hebrew4kids at 375px the register button sits **2651px
+into a 4342px page** — 61% down, four viewports of scrolling — and three screens
+down at 768px. Asked for as *"in activity page - to have a lower sticky button
+for registration"*.
+
+**The stacked order that puts it there is correct and did not change.** A family
+reads what it is, when it is and what it costs *before* they are asked to act —
+that order is the whole argument for `"pic" / "row" / "main" / "aside"`. What was
+wrong is that having decided, they had to go back and find the control.
+
+So `js/activity.js` draws a fixed copy of the same button, and four rules keep it
+from becoming a second control:
+
+- ⚠ **ONLY WHILE THE REAL ONE IS OFF SCREEN**, decided by an
+  `IntersectionObserver` on the real button. Two solid terracotta pills at once is
+  the pairing the credit block was rebuilt to avoid, and a duplicate of the
+  primary CTA sitting over the primary CTA reads as two choices rather than one.
+- ⚠ **ONLY WHEN THERE IS SOMETHING TO PRESS.** It is reached from the one branch
+  that builds a real link, so the four banner statuses cannot acquire one — and
+  neither can `closed`, which *does* render a button and renders it **disabled**.
+  Pinning a dead button to the bottom of a viewport, where it cannot be scrolled
+  away from, is worse than leaving it in the flow.
+- **The href and the words are passed in**, the same two values the real button
+  was built from, rather than read back out of the DOM. A second derivation of
+  the target is a second thing that can be wrong, and the target is what `ctaUrl`
+  got wrong twice.
+- **It is appended inside `#page`**, because rule 2 puts direction only there.
+
+⚠ **THE BAR'S HEIGHT IS A TOKEN, FOR THE REASON `--nav-h` IS ONE.** Two rules key
+off it — the bar, and the room the page leaves underneath so the footer is not
+behind a fixed panel — and the first version spelled `72px` into the second while
+the bar measured 74, putting the footer's last three pixels under it. `--sticky-h`
+now moves both, and a test computes `10 + 53 + 10 + 1 = 74` from those same
+declarations. It lives **inside the existing 939px query** rather than in a second
+one with the same condition: above that width the aside leads the trailing column,
+the button is about one screen down, and a bar would only cost viewport.
+
+⚠ **AND IT COULD NOT BE MEASURED THE USUAL WAY.** Chrome headless under
+`--virtual-time-budget` does **not deliver `IntersectionObserver` callbacks**, so
+a screenshot showed the bar sitting on top of the real button and the DOM agreed
+it was visible — both wrong, and both would have been read as a bug in the page.
+Driven over CDP against real Chrome with real frames (Node's global `WebSocket`,
+nothing installed) it is `display:none` with the button in view and back when it
+scrolls away. Worth remembering for the next thing on this site that reacts to
+scrolling: **the virtual-time harness cannot see it.**
 
 There is **no `position:sticky`** on the column. It was `sticky; top:112px` and
 had stopped engaging the day the card image was added — sticky only applies
@@ -4308,6 +4384,45 @@ on a live registration, which turns "paid in full" into a debt and would have to
 be explained in the dialog and the email before a family confirms. That was
 weighed and deferred, not missed; the suite says so at the top so nobody reads it
 as covered. Today an admin closes it with `adjustCredit`, which writes a note.
+
+⚠ **AND THE CANCELLATION EMAIL NOW SAYS IT.** Reported from QA on the message
+itself: *"explain why the registration fee wasn't given back although it's still
+within the right timing, as it shares reg fees with another course"* — €22.00
+credited against €33.00 paid, with nothing anywhere accounting for the other
+€11.00. Both figures were right; `test12`'s `seriesId` points at `test11`, so the
+fee paid on the autumn is what the spring is standing on. Reproduced off the real
+records before anything changed: €11 fee + €22 course, fee credit 0, course
+credit €22.
+
+⚠ **IT IS THE ONLY REASON THAT MESSAGE STATES, and that is the decision.** Every
+other way a credit comes back smaller — the step that applies, the fee's own
+cutoff — is a rule about **this** registration, and it is already in front of the
+family twice: the cancel dialog says it before anything is confirmed, and the
+terms footnote rides in the confirmation and the approval. This one is a fact
+about a **different record**, appears on no screen they have ever seen, and reads
+as a deduction when it is not — the money is still theirs and is still doing its
+job on the other term. It is also the only one that is not a **reproach**, which
+is what keeps `SESSION_CANCELLED`'s opposite rule intact: *a family told after
+the fact that they were too late is being argued with.*
+
+Three rules carry it:
+
+- ⚠ **THE WORDS ARE THE DIALOG'S, CHARACTER FOR CHARACTER.** A browser cannot
+  `require` a Netlify function, so the sentence exists twice and a test pins the
+  two against each other, as `MIN_PASSWORD` and the activities menu's status
+  groups are. Two wordings of one fact is two accounts of where a family's money
+  went.
+- **Two sentences, not one.** The fee being part of a figure and the fee being
+  the whole of it read differently — and with only the fee paid there is no
+  credit line at all, so without the second the message would never mention money
+  the family handed over.
+- ⚠ **THE FIGURE IS STILL THE LEDGER ENTRY'S.** The credit object decides whether
+  a sentence is said and which one, and nothing else; it is the same object the
+  entry's `basis` came from, never a second `creditFor()`. Absent reads as *no
+  fee is being held*, so a caller that forgets it drops the sentence with nothing
+  erroring — the shape five callers of `creditFor()` once had with the clock, and
+  grepped for the same way. The probe written to verify the fix forgot it on its
+  first run.
 
 Two smaller gaps that come with withholding, both known:
 

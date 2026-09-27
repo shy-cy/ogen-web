@@ -140,7 +140,60 @@
       const note = cfg.note ? `<p class="sidebar-note">${esc(pick(cfg.note))}</p>` : '';
       ctaSlot.innerHTML =
         `<a class="sidebar-cta is-${status}" href="${esc(href)}">${esc(pick(cfg.cta))}</a>${note}`;
+      stickyCta(href, pick(cfg.cta), status);
     }
+  }
+
+  // --- 1b. the same button, pinned, once it has scrolled away ------------
+  //
+  // ⚠ THE ONE CONTROL THIS PAGE EXISTS FOR IS FOUR SCREENS DOWN ON A PHONE.
+  // Measured rather than guessed: on hebrew4kids at 375px the register button
+  // sits 2651px into a 4342px page — 61% down, four viewports of scrolling — and
+  // 3 screens down at 768px. That is the stacked order working exactly as
+  // designed (picture, facts, article, price, BUTTON, staff), and the order is
+  // right: a family reads what it is, when it is and what it costs before they
+  // are asked to act. What is wrong is that having decided, they have to go and
+  // find the control again.
+  //
+  // Asked for as "in activity page - to have a lower sticky button for
+  // registration".
+  //
+  // ⚠ IT IS SHOWN ONLY WHILE THE REAL ONE IS OFF SCREEN. Two solid terracotta
+  // pills at once is the pairing the credit block was rebuilt to avoid — and a
+  // duplicate of the primary CTA sitting over the primary CTA reads as two
+  // choices rather than one. An IntersectionObserver on the real button decides
+  // it, so the bar is a shortcut back to a control that has scrolled away rather
+  // than a second control.
+  //
+  // ⚠ AND ONLY WHEN THERE IS SOMETHING TO PRESS. The four banner statuses have
+  // no button at all, and `closed` has a DISABLED one — pinning a dead button to
+  // the bottom of the viewport, where it cannot be scrolled away from, is worse
+  // than leaving it in the flow. This is reached from the one branch that builds
+  // a real link, so a status that offers nothing cannot acquire a bar.
+  //
+  // The href and the words are the SAME two values the real button was just
+  // built from, passed in rather than read back out of the DOM: a second
+  // derivation of the target is a second thing that can be wrong, and the
+  // target is the thing `data-cta-url` got wrong twice.
+  function stickyCta(href, label, status) {
+    if (!window.IntersectionObserver) return;   // fails open: no bar, page intact
+    const real = root.querySelector('.sidebar-cta');
+    if (!real) return;
+    const bar = document.createElement('div');
+    bar.className = 'activity-sticky';
+    bar.hidden = true;
+    const a = document.createElement('a');
+    a.className = 'sidebar-cta is-' + status;
+    a.href = href;
+    a.textContent = label;
+    bar.appendChild(a);
+    (document.getElementById('page') || document.body).appendChild(bar);
+    // ⚠ INSIDE #page, which is where direction lives. Putting it on <body> would
+    // pin it to a wrapper with no `dir`, and rule 2 says direction is set only
+    // on #page. Nothing in the bar is positioned against a side anyway.
+    new window.IntersectionObserver((entries) => {
+      entries.forEach((e) => { bar.hidden = e.isIntersecting; });
+    }, { rootMargin: '0px 0px -24px 0px' }).observe(real);
   }
 
   // --- 2. teachers + sponsors, from arrays ------------------------------

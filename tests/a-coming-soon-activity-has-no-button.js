@@ -39,28 +39,52 @@ function render(status, lang, pathname) {
   });
   const badge = el();
   const cta = el();
+  // The real button, for the branch that builds one — the pinned copy is drawn
+  // from it, and only from it.
+  const realCta = Object.assign(el(), { tagName: 'A' });
   const root = Object.assign(el(), {
     dataset: { status },
-    querySelector: (sel) => (sel === '[data-status-cta]' ? cta : null),
+    querySelector: (sel) => {
+      if (sel === '[data-status-cta]') return cta;
+      // ⚠ Only once the branch above has actually written one. A status that
+      // renders a banner has no .sidebar-cta in the page, so the pinned bar has
+      // nothing to observe and nothing to copy.
+      if (sel === '.sidebar-cta') return /sidebar-cta/.test(cta.innerHTML) ? realCta : null;
+      return null;
+    },
     querySelectorAll: () => []
   });
+  // ⚠ WHAT GETS PINNED TO THE BOTTOM OF THE VIEWPORT, captured. A bar is the
+  // most pressable thing a screen can carry, so "this status offers nothing to
+  // press" has to cover it too.
+  const pinned = [];
+  const pageEl = Object.assign(el(), { appendChild: (n) => { pinned.push(n); return n; } });
   const document = {
     documentElement: { lang },
-    getElementById: () => null,
+    getElementById: (id) => (id === 'page' ? pageEl : null),
+    createElement: (tag) => Object.assign(el(), {
+      tagName: tag.toUpperCase(), children: [],
+      appendChild(n) { this.children.push(n); return n; }
+    }),
     querySelector: (sel) => {
       if (sel === '.activity') return root;
       if (sel === '[data-status-badge]') return badge;
       return null;
     }
   };
+  const observed = [];
+  const window = { IntersectionObserver: function (fn) {
+    this.observe = (n) => observed.push({ node: n, fn: fn });
+  } };
   // The CTA's fallback is built from the URL now — the activity's slug, and the
   // language tree it is being read in — so the fake DOM has to carry a location.
   const location = {
     pathname: pathname || (lang === 'he' ? '/activities/hebrew4kids' : '/' + lang + '/activities/hebrew4kids'),
     href: ''
   };
-  vm.runInNewContext(activityJs, { document, console, location });
-  return { badge: badge.textContent, badgeClass: badge.className, cta: cta.innerHTML };
+  vm.runInNewContext(activityJs, { document, console, location, window });
+  return { badge: badge.textContent, badgeClass: badge.className, cta: cta.innerHTML,
+           pinned: pinned, observed: observed };
 }
 
 const STATUSES = ['draft', 'announcement', 'open', 'waitlist', 'closed', 'cancelled', 'completed'];
@@ -96,6 +120,44 @@ H.ok(soon.cta.indexOf('<a ') === -1, 'and nothing to click');
 H.ok(soon.cta.indexOf('href') === -1,
   'and no href of any kind — announcement leads nowhere by construction');
 H.ok(/is-announcement/.test(soon.cta), 'the banner is keyed to the status like every other one');
+
+// ⚠ AND NOTHING IS PINNED TO THE BOTTOM OF THE VIEWPORT EITHER.
+//
+// The register button is four screens down on a phone, so it now has a fixed
+// copy that appears once the real one scrolls away. A bar is the most pressable
+// thing a screen can carry — it cannot be scrolled past — so "this status offers
+// nothing to press" has to cover it, and `closed` is the one that would slip
+// through: it DOES render a button, and that button is disabled.
+console.log('\n[and nothing is pinned to the bottom of the viewport]');
+const BAR = { draft: false, announcement: false, cancelled: false, completed: false,
+              closed: false, open: true, waitlist: true };
+STATUSES.forEach((status) => {
+  const out = render(status, 'en');
+  H.eq(out.pinned.length, BAR[status] ? 1 : 0,
+    status + (BAR[status] ? ' → a pinned bar' : ' → nothing pinned'));
+  if (!BAR[status]) return;
+  H.eq(out.pinned[0].className, 'activity-sticky', status + ': and it is the bar');
+  H.eq(out.pinned[0].hidden, true,
+    status + ': ⚠ which starts HIDDEN — the real button is on screen at the top of the page');
+  H.eq(out.observed.length, 1, status + ': watching exactly one thing');
+  H.eq(out.pinned[0].children.length, 1, status + ': holding one control');
+  H.eq(out.pinned[0].children[0].href, '/en/account/activity?register=hebrew4kids',
+    status + ': ⚠ the SAME target the real button was built from, not a second derivation');
+});
+// The words are the status's own, so the bar cannot say something the page does
+// not. `waitlist` is the one where the two would be easy to let drift.
+H.eq(render('waitlist', 'en').pinned[0].children[0].textContent, 'Join the waiting list',
+  'the pinned copy says what the real button says');
+H.eq(render('waitlist', 'he').pinned[0].children[0].textContent, 'הצטרפות לרשימת המתנה',
+  'in Hebrew too');
+H.eq(render('open', 'ru').pinned[0].children[0].textContent, 'Записаться', 'and in Russian');
+// ⚠ IT SHOWS ONLY WHILE THE REAL BUTTON IS OFF SCREEN. Two solid terracotta
+// pills at once is the pairing the credit block was rebuilt to avoid.
+const live = render('open', 'en');
+live.observed[0].fn([{ isIntersecting: false }]);
+H.eq(live.pinned[0].hidden, false, '⚠ the real button scrolls away and the bar appears');
+live.observed[0].fn([{ isIntersecting: true }]);
+H.eq(live.pinned[0].hidden, true, 'and it goes again the moment the real one is back');
 
 console.log('\n[the badge is untouched, in all three languages]');
 H.eq(render('announcement', 'he').badge, 'בקרוב', 'Hebrew badge still reads בקרוב');
