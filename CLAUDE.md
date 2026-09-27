@@ -5764,6 +5764,70 @@ that the omission is now greppable and is grepped: a test scans every function
 file for a `creditFor` / `creditForSession` call and asserts each passes a second
 argument. Nine call sites today.
 
+### ⚠ A button broken into syllables
+
+Same table, same cell, one release later. `.acc-evening-acts` had no rule at all
+and the three controls rendered flush; they have a rule now and they rendered
+**vertically, a word or two per line**, in a cell 65px wide and half off the side
+of the screen. Reported from a phone with a screenshot: *"check the text with the
+links at the side. It's unclear what it says or what the action is."*
+
+⚠ **A TABLE COLUMN TAKES WHATEVER IS LEFT OVER, AND WHAT WAS LEFT OVER WAS THE
+COLUMN THE ROW EXISTS FOR.** Five columns — date, status, to pay, paid, controls
+— and the first four have a natural width the last one does not, so the cell
+holding *pay*, *use credit* and *cancel* is the one that collapses. Measured at
+375px: the table wanted 467px inside a 310px card.
+
+Two faults, and fixing either alone leaves the other:
+
+- **A control's label was allowed to fragment.** `.acc-actions` already wraps, so
+  there was never a reason for a label to break inside **itself**: the row should
+  give each control a line, not each control a syllable. `.acc-evenings
+  .acc-link` is `white-space:nowrap`.
+- **And the table then does not fit.** `.acc-scroll` turns that into a sideways
+  swipe — on the page whose whole job is paying, with the pay button behind a
+  gesture nobody is told about. That is the invite button labelled with a
+  description, one screen over: a control you must discover a gesture to reach is
+  a control nobody has.
+
+So **below 700px an evening is a block**: the date is its heading, each figure is
+a labelled line, and the controls sit underneath with the full width.
+
+⚠ **700 IS MEASURED, AND RUSSIAN SETS IT.** With the labels kept whole the
+table's min-content is **536px in Hebrew and English and 634px in Russian**, and
+the page and card cost 65px around it — so it stops fitting at 601px and at
+699px. **One** breakpoint at the widest language rather than three keyed off
+`html[lang]`, for the reason rule 2 gives: a per-language override is a second
+thing to get wrong, and Hebrew stacking a hundred pixels early costs a taller
+card and nothing else.
+
+Four details carry it:
+
+- ⚠ **The headings travel onto the cells, as the SAME strings.** The header row
+  is hidden, so `data-label` carries `T.statusCol`, `T.owes` and `T.paid` — the
+  keys the `<th>`s already use, never retyped, or a reworded column leaves the
+  stacked view naming something else. The date takes none, because it is the
+  block's heading; the controls take none, because they are controls.
+- ⚠ **`::before` is attribute-guarded.** `content:attr(data-label)` on a cell
+  with no label is an empty box, and an empty box in a flex row is a stray gap
+  before the date.
+- **Only this table stacks.** The other two `.acc-table`s — a course's session
+  list and a bundle's dates — are three short cells with no header row, and
+  stacking them would turn one readable line into three for nothing. The query is
+  scoped by `.acc-evenings` rather than applied to every table in the area.
+- **`.is-num` goes back to `text-align:start`.** End-aligned and tabular is right
+  in a column of figures and wrong on a labelled line, where the number belongs
+  next to the words that name it.
+
+⚠ **AND THE SUITE THAT LIFTS THIS ROW BROKE ON A COSMETIC EDIT.**
+`a-figure-that-does-not-explain-itself.js` slices the cells out of `paint()` so
+it cannot drift from the screen — anchored on two **exact copies of the source
+lines**. Adding a class and a `data-label` moved both, `indexOf` returned -1, and
+eight assertions failed at once over a change none of them was about. A test that
+breaks on a cosmetic edit is a test people learn to edit rather than read. It
+anchors on the **calls** now — `dayMonth(s.date)` and `[eveningAction(` — and
+takes the line each starts on.
+
 ### ⚠ A class nobody styled is a layout nobody designed
 
 The evenings table wrapped its three controls — pay, use credit, cancel — in a

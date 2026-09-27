@@ -3318,16 +3318,22 @@
 
     function paint(data) {
       clear(panel);
-      var table = el('table', { class: 'acc-table' });
-      table.appendChild(el('tr', {}, [
+      // ⚠ THE HEADINGS TRAVEL ONTO THE CELLS, because below 700px the header
+      // row is hidden and each evening becomes a block — see the .acc-evenings
+      // query in shared.css. They are the SAME four strings rather than a second
+      // set, so a reworded column cannot leave the stacked view naming something
+      // else. The date is the block's heading and the controls are controls, so
+      // neither takes one.
+      var table = el('table', { class: 'acc-table acc-evenings' });
+      table.appendChild(el('tr', { class: 'acc-thead' }, [
         el('th', { text: T.dateCol }), el('th', { text: T.statusCol }),
         el('th', { class: 'is-num', text: T.owes }), el('th', { class: 'is-num', text: T.paid }),
         el('th', {})
       ]));
       (data.sessions || []).forEach(function (s) {
         table.appendChild(el('tr', {}, [
-          el('td', { text: dayMonth(s.date) }),
-          el('td', {}, [s.status
+          el('td', { class: 'acc-td-date', text: dayMonth(s.date) }),
+          el('td', { 'data-label': T.statusCol }, [s.status
             ? el('span', { class: 'acc-pill is-s-' + s.status,
                            text: T.sessionStatus[s.status] || s.status })
             : el('span', { class: 'acc-meta', text: '—' })]),
@@ -3348,7 +3354,7 @@
           // explanation. And only when the two figures actually DIFFER — an
           // activity whose late price equals its standard one has nothing to
           // explain, and a note on every row is a note nobody reads.
-          el('td', { class: 'is-num' }, [
+          el('td', { class: 'is-num', 'data-label': T.owes }, [
             el('span', { text: s.priceBasis === 'bundle' ? T.fromBundle : money(s.owedCents) }),
             (s.priceBasis === 'late' && s.standardPriceCents != null &&
              s.standardPriceCents !== s.owedCents)
@@ -3356,8 +3362,8 @@
                              text: T.lateWhy.replace('{price}', money(s.standardPriceCents)) })
               : null
           ]),
-          el('td', { class: 'is-num', text: money(s.paidCents) }),
-          el('td', {}, [eveningAction(s, data, r, act, draw, balance)])
+          el('td', { class: 'is-num', 'data-label': T.paid, text: money(s.paidCents) }),
+          el('td', { class: 'acc-td-acts' }, [eveningAction(s, data, r, act, draw, balance)])
         ]));
       });
       panel.appendChild(section(T.sessionsTitle, [el('div', { class: 'acc-scroll' }, [table])]));

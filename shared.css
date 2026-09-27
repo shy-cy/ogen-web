@@ -1782,6 +1782,61 @@ td .acc-actions{ gap:14px; }
    already nowrap and end-aligned, so the note follows the figure it explains. */
 .acc-table .acc-date-why{ display:block; }
 
+/* ⚠ A CONTROL'S LABEL IS NEVER FRAGMENTED. The evenings table puts up to three
+   of them in one cell, and a table column takes whatever is left over — so at
+   375px "תשלום על המפגש" came back as three stacked fragments a character or two
+   wide, in the column the row exists for. Reported from a phone: "it's unclear
+   what it says or what the action is."
+   The row already wraps — .acc-actions is flex-wrap — so each control gets a
+   line of its own rather than a syllable of its own. */
+.acc-evenings .acc-link{ white-space:nowrap; }
+
+/* ⚠ AND BELOW 700px AN EVENING IS A BLOCK, NOT FIVE COLUMNS.
+   Keeping the labels whole is necessary and not sufficient: the table then
+   simply does not fit, and .acc-scroll hands a phone a sideways swipe to reach
+   the pay button — which on the page whose job is paying is the invite button
+   labelled with a description all over again. A control you have to discover a
+   gesture to find is a control nobody has.
+
+   ⚠ 700 IS MEASURED, AND IT IS RUSSIAN THAT SETS IT. With the labels whole the
+   table's min-content is 536px in Hebrew and English and 634px in Russian, and
+   the page and card cost 65px around it — so it stops fitting at 601px and at
+   699px respectively. One breakpoint at the widest language rather than three
+   keyed off html[lang], for the reason rule 2 gives: a per-language override is
+   a second thing to get wrong, and Hebrew stacking a hundred pixels early costs
+   a taller card and nothing else.
+
+   The header row is hidden, so every cell that was under a heading carries its
+   own `data-label` — the same four strings, from the one table, so a reworded
+   column cannot leave the stacked view naming something else. The date needs
+   none: it is the heading of the block. Nor do the controls. */
+@media (max-width:700px){
+  .acc-evenings, .acc-evenings tbody, .acc-evenings tr{ display:block; }
+  .acc-evenings .acc-thead{ display:none; }
+  .acc-evenings tr{
+    padding-block:13px; border-block-end:1px solid var(--stone);
+  }
+  .acc-evenings tr:last-child{ border-block-end:0; }
+  .acc-evenings td{
+    display:flex; flex-wrap:wrap; align-items:baseline; gap:3px 10px;
+    border-block-end:0; padding-block:2px; padding-inline-end:0;
+  }
+  /* Only where there is one. content:attr() on a missing attribute is an empty
+     box, and an empty box in a flex row is a stray gap. */
+  .acc-evenings td[data-label]::before{
+    content:attr(data-label);
+    font-size:12.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+    color:var(--camel);
+  }
+  .acc-evenings .acc-td-date{ font-size:16px; font-weight:700; padding-block-end:6px; }
+  /* End-aligned and tabular is right in a column of figures and wrong in a
+     labelled line, where the number belongs next to the words. */
+  .acc-evenings .is-num{ text-align:start; }
+  /* The late-price note keeps its own line, as it does in the picker. */
+  .acc-evenings .acc-date-why{ flex:1 0 100%; }
+  .acc-evenings .acc-td-acts{ margin-block-start:9px; }
+}
+
 /* The family-area link in the mobile menu, set apart because it is the one
    entry that leads somewhere private rather than to a section of this page. */
 .mobile-menu .menu-account{

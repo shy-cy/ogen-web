@@ -412,8 +412,16 @@ const css = read('shared.css');
       ui.slice(ui.indexOf('  function el(tag, attrs, kids) {'), ui.indexOf('  function clear(')) +
       'this.el = el;', ctx);
     // Lifted verbatim from paint(), so the test cannot drift from the screen.
-    const cells = ui.slice(ui.indexOf("          el('td', { text: dayMonth(s.date) }),"),
-                           ui.indexOf("          el('td', {}, [eveningAction("));
+    // ⚠ Anchored on the CALLS rather than on whole lines. The two ends used to
+    // be exact copies of the source lines, so adding a class or a data-label to
+    // a cell silently sliced from -1 and every assertion here failed at once —
+    // a test that breaks on a cosmetic edit teaches people to edit the test.
+    const lineAt = (needle) => {
+      const at = ui.indexOf(needle);
+      H.ok(at !== -1, 'paint() still has ' + needle);
+      return ui.lastIndexOf('\n', at) + 1;
+    };
+    const cells = ui.slice(lineAt('dayMonth(s.date)'), lineAt('[eveningAction('));
     vm.runInContext('var s = ' + JSON.stringify(session) + ';\n' +
                     'box.appendChild(el("tr", {}, [' + cells + 'null]));', ctx);
     return box.textContent;
