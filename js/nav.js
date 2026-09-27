@@ -54,6 +54,7 @@
 
   const navHTML = `
 <nav>
+  <div class="nav-spacer"></div>
   <a class="logo-mark" href="${home}" aria-label="${L.alt}">
     <img src="${logo}" alt="${L.alt}">
   </a>

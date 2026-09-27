@@ -110,6 +110,41 @@ form are injected at runtime into `<div id="page">`:
   and hamburger stay pinned to the physical right in a fixed `[עב][EN][RU]`
   order in all three languages. See **The account chip** below, and **The
   Activities group** for the one menu entry that is built rather than written.
+
+  ⚠ **THE BAR IS A FLEX ROW, AND IT USED TO BE TWO ABSOLUTELY POSITIONED
+  BOXES.** The logo was centred with `left:50%` and the controls pinned with
+  `right:24px` — both out of flow, so neither could know the other was there
+  and nothing pushed. Past a certain width they simply printed on top of each
+  other. Measured in a browser rather than argued about: in Hebrew, signed out,
+  they overlapped by **43px at 900, 109px at 768 and 134px at 500**, and were
+  clear only from about **1024px** up; signed in the chip is wider and it
+  started higher still. That is every phone, every tablet and a narrow laptop
+  window, with the `עב` button printed across the wordmark. It survived because
+  a nav is looked at on the machine it is built on, and it was reported from a
+  phone with a screenshot.
+
+  Three parts, and the middle one is the part that is easy to drop.
+  `.nav-spacer` is an **empty leading flex item**, and it is what keeps the logo
+  *centred* rather than merely out of the way: it and `.nav-right` are both
+  `flex:1 1 0`, so they resolve to the same width and the logo sits in the
+  middle of the bar — the desktop layout, pixel for pixel. Without it the only
+  way to push the controls to the end is an auto margin, which centres the logo
+  in what is **left** of the bar, half the controls' width off centre at every
+  size. `.logo-mark` carries `min-width:0` and `.nav-right` deliberately does
+  not, so the logo is the one thing that gives way: the toggle and the chip are
+  the reason the bar exists at a narrow width. And `max-width:100%` and
+  `object-fit:contain` travel together on the image, the same pairing
+  `height:auto` and `aspect-ratio` have on the activity picture — the box may be
+  narrower than the artwork and `contain` scales it inside rather than squashing
+  it. There is one `.logo-mark img` rule so the pair cannot be split.
+
+  The bar itself is `direction:ltr`, which is not a violation of rule 2 but the
+  same decision `.nav-right` already makes for the same reason: the toggle must
+  keep one place and one order whatever language is on screen. Nothing in the
+  bar is text except the chip's label, and `.nav-account` opts Hebrew back in.
+  `.mobile-menu` is a **sibling** of `<nav>`, not a child, so it is untouched.
+  A test pins all of it, including that neither box may go back to
+  `position:absolute` — which is the thing that would reopen this silently.
 - **`js/footer.js`** — tagline logo → divider → partner logo row → copyright.
 - **`js/contact-form.js`** — builds the form, lazy-loads `intl-tel-input` from
   CDN (Cyprus default country), and AJAX-POSTs to Formspree. Language comes from

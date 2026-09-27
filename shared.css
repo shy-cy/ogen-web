@@ -109,10 +109,44 @@ html[lang="ru"] div[data-lang="ru"] { display:block; }
   background: rgba(251,250,246,0.92); backdrop-filter: blur(6px);
   border-bottom: 1px solid var(--stone);
   z-index:100;
+  /* ⚠ THREE FLEX ITEMS, NOT TWO ABSOLUTELY POSITIONED BOXES. The logo was
+     centred with left:50% and the controls pinned with right:24px, and two
+     absolutely positioned boxes cannot know that the other is there — so
+     nothing pushed and they simply sat on top of each other. Measured in a
+     browser rather than guessed: in Hebrew, signed out, they overlap by 43px
+     at 900, 109px at 768 and 134px at 500, and are only clear from about
+     1024px up. Signed in the chip is wider and it starts higher still. That is
+     every phone, every tablet and a narrow laptop window, with the עב button
+     printed across the wordmark — and it was invisible on a desktop, which is
+     the only width it was ever looked at.
+     The bar is a row now, so the items are in each other's way and the layout
+     has to resolve it. */
+  display:flex; align-items:center; column-gap:12px; padding-inline:24px;
+  /* Laid out in PHYSICAL order in all three languages, for the same reason
+     .nav-right is forced ltr below: the language toggle must keep one place
+     and one [עב][EN][RU] order, because the reader who needs it most cannot
+     read what is currently on screen. Nothing in this bar is text except the
+     chip's label, and .nav-account opts Hebrew back in. */
+  direction:ltr;
 }
-.logo-mark{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); }
-.logo-mark img{ height:78px; display:block; }
-.nav-right{ position:absolute; right:24px; top:50%; transform:translateY(-50%); display:flex; align-items:center; gap:18px; direction:ltr; }
+/* ⚠ THE EMPTY LEADING ITEM IS WHAT KEEPS THE LOGO CENTRED rather than merely
+   out of the way. It and .nav-right are both `flex:1 1 0`, so they resolve to
+   the same width and the logo sits in the middle of the bar — the desktop
+   layout, unchanged. Without it the only way to push the controls to the end
+   is an auto margin, and that centres the logo in what is LEFT of the bar,
+   which is half the controls' width off centre at every size. */
+.nav-spacer{ flex:1 1 0; min-width:0; }
+/* `min-width:0` is load-bearing: a flex item will not shrink below its
+   content's own width without it, and the logo is the only thing here that
+   may give way. .nav-right deliberately does NOT have it — the controls are
+   the part that must stay whole. */
+.logo-mark{ flex:0 1 auto; min-width:0; display:flex; align-items:center; }
+/* max-width and object-fit travel together, the same pairing height:auto and
+   aspect-ratio have on the activity picture: the box is allowed to be narrower
+   than the artwork, and `contain` then scales the artwork inside it instead of
+   squashing or cropping it. Drop either and a narrow bar distorts the logo. */
+.logo-mark img{ height:78px; width:auto; max-width:100%; object-fit:contain; display:block; }
+.nav-right{ flex:1 1 0; display:flex; align-items:center; justify-content:flex-end; gap:18px; direction:ltr; }
 /* ---- the account chip -------------------------------------------------------
    It lives INSIDE .nav-right, which is pinned to the physical right and forced
    direction:ltr in every language. That is deliberate and the chip inherits it:
@@ -164,6 +198,9 @@ html[lang="he"] .nav-signout svg{ transform:scaleX(-1); }
   .nav-account-chip{ padding-inline:6px; }
 }
 @media (max-width:420px){
+  /* Every pixel taken back here is a pixel the logo keeps, since it is the one
+     item that gives way. */
+  #page > nav{ padding-inline:14px; column-gap:10px; }
   .nav-right{ gap:10px; }
   .lang-toggle button{ padding:6px 7px; }
 }
