@@ -250,6 +250,31 @@
     "isoUpdated": "2026-09-27T12:53:32.923Z"
   },
   {
+    "slug": "test12",
+    "activityId": "act-12cd9b7edb7fe6ea",
+    "seriesId": "act-662a9e6f52eb7761",
+    "type": "course",
+    "status": "open",
+    "langs": [
+      "he",
+      "en",
+      "ru"
+    ],
+    "title": {
+      "he": "טסט 12",
+      "en": "Test 12",
+      "ru": "Test 12"
+    },
+    "summary": {
+      "he": "",
+      "en": "",
+      "ru": ""
+    },
+    "cardImage": "/images/activities/test12-card-7cd1219d.png",
+    "listing": "test",
+    "isoUpdated": "2026-09-27T12:56:52.343Z"
+  },
+  {
     "slug": "test2",
     "activityId": "act-ca412442b8698dcf",
     "seriesId": "act-ca412442b8698dcf",

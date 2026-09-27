@@ -1,0 +1,190 @@
+{
+  "slug": "test12",
+  "status": "open",
+  "motif": "ring",
+  "corner": "tl",
+  "cardImage": "/images/activities/test12-card-7cd1219d.png",
+  "shareImage": null,
+  "robots": "noindex",
+  "listing": "test",
+  "type": "course",
+  "registration": {
+    "autoApprove": false,
+    "pendingExpiryDays": null,
+    "registrationFeeCutoffDate": "2026-09-30",
+    "cancellationPolicy": {
+      "tiers": [],
+      "note": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      }
+    },
+    "defaultBasis": null
+  },
+  "seriesId": "act-662a9e6f52eb7761",
+  "title": {
+    "he": "טסט 12",
+    "en": "Test 12",
+    "ru": "Test 12"
+  },
+  "summary": {
+    "he": "",
+    "en": "",
+    "ru": ""
+  },
+  "about": {
+    "he": "",
+    "en": "",
+    "ru": ""
+  },
+  "metaTitle": {
+    "he": "",
+    "en": "",
+    "ru": ""
+  },
+  "metaDescription": {
+    "he": "",
+    "en": "",
+    "ru": ""
+  },
+  "facts": {
+    "groupSize": {
+      "overrideText": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      }
+    },
+    "price": {
+      "registrationFee": 11,
+      "fullPrice": 22,
+      "termUnit": "semester",
+      "termLabel": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      },
+      "perHourOverride": null,
+      "perSessionPrice": null,
+      "showPerLesson": false,
+      "lateDropIn": {
+        "enabled": false,
+        "hoursBefore": null,
+        "price": null
+      },
+      "bundles": []
+    }
+  },
+  "groups": [
+    {
+      "groupId": "g-mujtl9h7lf3r",
+      "name": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      },
+      "capacity": null,
+      "teacherIds": [],
+      "facts": {
+        "ages": {
+          "min": null,
+          "max": null
+        },
+        "schedule": {
+          "frequency": "twice-weekly",
+          "overrideText": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          },
+          "sessions": [
+            {
+              "day": 1,
+              "time": "12:22"
+            },
+            {
+              "day": 3,
+              "time": "12:22"
+            }
+          ]
+        },
+        "duration": {
+          "startDate": "2026-12-01",
+          "endDate": "2026-12-31",
+          "sessionCount": 4,
+          "sessionMinutes": 45,
+          "sessionDates": [
+            {
+              "date": "2026-12-02",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-12-07",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-12-09",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-12-14",
+              "status": "scheduled"
+            }
+          ]
+        },
+        "instructionLanguage": {
+          "codes": [],
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "prerequisites": {
+          "level": null,
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "location": {
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          }
+        },
+        "address": {
+          "text": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          },
+          "mapUrl": "https://maps.app.goo.gl/66NBScZDP1BxtJAL9"
+        }
+      }
+    }
+  ],
+  "factVisibility": {
+    "ages": "public",
+    "schedule": "public",
+    "duration": "public",
+    "groupSize": "public",
+    "instructionLanguage": "public",
+    "prerequisites": "public",
+    "location": "public",
+    "address": "members",
+    "price": "public"
+  },
+  "faq": [],
+  "teachers": [],
+  "sponsors": [],
+  "isoUpdated": "2026-09-27T12:56:52.343Z",
+  "isoCreated": "2026-09-27T12:56:52.343Z",
+  "lastEditedBy": "michal@ogen.cy",
+  "lastEditedByName": "Michal",
+  "activityId": "act-12cd9b7edb7fe6ea",
+  "lastPublishedAt": "2026-09-27T12:56:52.343Z"
+}
