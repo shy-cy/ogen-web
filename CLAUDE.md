@@ -2877,6 +2877,74 @@ to be wrapped when it was copied.
 **Ordered lists are deliberately not converted.** Four things were asked for and
 four are built; `1.` stays literal, which is visible rather than silent.
 
+#### ⚠ And then a publish emptied one, and nothing said a word
+
+Reported as *"I refreshed and lost the HE copy"*, looking at an empty Hebrew
+About editor. **The refresh revealed it rather than causing it**, and git says
+what happened to the second:
+
+| | | |
+|---|---|---|
+| `4e75751` | 14:56:21Z | `about.he` = 1614 characters |
+| `086510d` | 14:56:52Z | `about.he` = `""` |
+
+The same publish changed `metaTitle.he` and `metaKeywords.he`, so somebody was
+editing Hebrew wording at the time. The body came back empty in that save,
+`activities/hebrew4kids.html` was regenerated with an empty
+`<div class="activity-main">` — there is no cross-language fallback for a body —
+and it was served to the public until the text was recovered out of git. What
+emptied the editor could not be established: `renderFields()` resets `S.editors`
+and mounts last, so a throw would have emptied all three languages rather than
+one, and `toEditorHtml()` cannot blank a non-empty value. The Hebrew Quill was
+simply empty on screen when Publish was pressed.
+
+⚠ **AND THE ASTERISK WAS A PROMISE NOTHING KEPT.** `about` is `required: true`
+in `FIELD_SCHEMA`; `js/activities-admin.js` renders that as the `*` on "About
+this activity" and checks nothing; `validate()` has enforced `title` since it was
+written and had never once enforced this. Three statements of one rule and only
+one of them ran.
+
+⚠ **THE OBVIOUS RULE — a published language must have an About — WAS NOT
+AVAILABLE.** `test8`, `test10`, `test11` and `test12` are published today with
+titles in all three languages and **no About at all**, so requiring one would
+make four live activities unpublishable by a rule they have never met, and the
+first person to find out would be whoever pressed Publish on an unrelated edit.
+What is refused is narrower and is the event that actually happened: **a language
+that HAD a body being handed an empty one**. A test asserts every record in the
+repository still republishes with nothing refused, on the real files rather than
+on a fixture, because the intent is the data.
+
+⚠ **IT IS MEASURED AGAINST WHAT WAS PUBLISHED, NEVER THE WORKING COPY.** A
+draft supersedes the published file in `currentRecord()`, so Save-then-Publish —
+the ordinary way this site is edited, and what those two timestamps describe —
+hands the comparison a record that is **already blank**, and it would report that
+nothing had moved. That is the same trap `_publishedBefore` exists for in
+`generate()`, and it cannot be seen by reading the source: the suite drives the
+real handlers through save, then publish, and asserts the second press is still
+refused and the page still has its body.
+
+⚠ **EMPTINESS IS TEXT, NOT MARKUP**, through the same `plainText()` the meta
+description and the listing blurb are built from — so *"there is a body"* means
+here exactly what it means there, rather than being a second opinion about it.
+Quill's own empty document is `<p><br></p>`, which is three tags and no words;
+a record written before the editor holds plain prose with no tags at all and is a
+body like any other. **Plain text goes on saving everywhere exactly as it does
+now**, and a value with nothing left to read is the only thing refused.
+
+⚠ **AND A LANGUAGE BEING TAKEN DOWN IS NOT A LANGUAGE BEING EMPTIED.** A page
+is published only while it has its own title, and `generate()` **deletes** the
+file for one that loses it — so clearing a title and its body together removes
+that page rather than gutting it, which is the honest way to retire a translation
+and must not be refused. The message names that as the remedy, beside pasting the
+text back.
+
+It lives in **`mergeFor()`**, for the reason that helper exists, and the
+published record is read **only when a blank is present** — the same discipline
+the series candidate set and the group scan follow one function up, so a save
+whose every published language has something to read asks GitHub nothing extra.
+Preview refuses too, or a preview renders what a publish would not; a **draft
+saves and is told**, in the publish's own string.
+
 ⚠ **A stored `&lt;p&gt;` is the bug by definition**, since nobody types that, so
 the suite asserts it of every published record **and** of every generated page —
 the check that would have caught this on the day it shipped, where reading either

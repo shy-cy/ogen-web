@@ -27,7 +27,7 @@ const { requireStore, optionalStore, readMany } = require('./_blobs');
 const { readJson, commitToBranch, mapConcurrent, CONCURRENCY } = require('./_github');
 const { recordAudit } = require('./_audit');
 const {
-  LANGS, STATUSES, MOTIFS, CORNERS, langsPresent, pick,
+  LANGS, STATUSES, MOTIFS, CORNERS, langsPresent, pick, plainText,
   filePathFor, pathFor, renderActivityPage,
   SUMMARY_CHARS: TEMPLATE_SUMMARY_CHARS
 } = require('./_activity-template');
@@ -319,7 +319,31 @@ async function mergeFor(record, incoming, session) {
     ? SERIES.applyFee(merged, await seriesCandidates())
     : { inherits: false };
   const groupsInUse = await groupRemovalProblems(record, merged);
-  return { merged, series, calendars, groupsInUse };
+  const bodiesEmptied = await emptiedBodiesFor(merged);
+  return { merged, series, calendars, groupsInUse, bodiesEmptied };
+}
+
+// ⚠ THE SECOND RECORD, WHICH THE PURE RULE MAY NOT FETCH FOR ITSELF.
+//
+// emptiedBodies() needs the record as it was PUBLISHED, and `record` here is the
+// working copy — a draft when there is one. So the published file is read on its
+// own rather than inferred from what the caller already has.
+//
+// ⚠ AND ONLY WHEN IT CAN MATTER. Every language this record publishes having
+// something to read costs nothing at all: the blank is what triggers the read,
+// and a blank is the only thing this rule is about. The same discipline the
+// series candidate set and the group scan follow, for the same reason — an
+// ordinary save, a reworded summary, a new photograph, asks GitHub nothing
+// extra.
+//
+// It is in mergeFor() for the reason mergeFor() exists: saveDraft, preview and
+// publish all merge, and the one that forgot would be the one where a live
+// page's whole body is published away in silence.
+async function emptiedBodiesFor(merged) {
+  if (!merged || !SLUG_RE.test(String(merged.slug || ''))) return [];
+  const now = langObject(merged.about);
+  if (!langsPresent(merged).some((l) => plainText(now[l]) === '')) return [];
+  return emptiedBodies(await getPublished(merged.slug), merged);
 }
 
 // ⚠ REMOVING A GROUP SOMEBODY IS REGISTERED TO, REFUSED HERE RATHER THAN FOUND
@@ -854,6 +878,62 @@ function mergeByPermission(current, incoming, session) {
   return out;
 }
 
+// ⚠ A PUBLISH THAT EMPTIES A BODY THE LIVE PAGE ALREADY CARRIES.
+//
+// `about` has been `required: true` in FIELD_SCHEMA since the schema was
+// written. The client renders that as the asterisk on "About this activity *"
+// and checks nothing; validate() has enforced `title` from the beginning and
+// has never once enforced this. So the asterisk was a promise nothing kept —
+// and a publish sent `about.he` back as the empty string, the Hebrew page was
+// regenerated with an empty `<div class="activity-main">`, and not one thing
+// said a word. The body had to be recovered out of git.
+//
+// ⚠ AND THE NAIVE RULE — a published language must have an About — IS NOT
+// AVAILABLE. test8, test10, test11 and test12 are published today with titles
+// in all three languages and no About at all, so requiring one would make four
+// live activities unpublishable by a rule they have never met, and the first
+// person to find out would be whoever pressed Publish on an unrelated edit.
+// What is refused is narrower and is the event that actually happened: a
+// language that HAD a body being handed an empty one. Nothing that publishes
+// today stops publishing.
+//
+// ⚠ AND IT IS MEASURED AGAINST WHAT WAS PUBLISHED, never the working copy. A
+// draft supersedes the published file in currentRecord(), so an admin who
+// blanks the body, presses Save and then presses Publish — the ordinary way
+// this site is edited — hands the comparison a record that is already blank,
+// and it would report that nothing had moved. It is the same trap
+// `_publishedBefore` exists for in generate(), and the same answer.
+//
+// ⚠ EMPTINESS IS TEXT, NOT MARKUP, through the same plainText() the meta
+// description and the listing blurb are built from — so "there is a body" means
+// here exactly what it means there. Quill's empty document is `<p><br></p>`,
+// which is three tags and no words, and a record written before the editor
+// holds plain text with no tags at all and is a body like any other. Plain text
+// goes on saving everywhere exactly as it does now; only a value with nothing
+// left to read is refused.
+//
+// ⚠ AND A LANGUAGE BEING TAKEN DOWN IS NOT A LANGUAGE BEING EMPTIED. A page is
+// published only while it has its own title, and generate() DELETES the file
+// for one that loses it — so clearing a title and its body together removes
+// that page rather than gutting it, which is the honest way to retire a
+// translation and must not be refused.
+const LANG_WORD = { he: 'Hebrew', en: 'English', ru: 'Russian' };
+
+function emptiedBodies(publishedBefore, next) {
+  if (!publishedBefore || !next) return [];
+  const was = langObject(publishedBefore.about);
+  const now = langObject(next.about);
+  const published = langsPresent(next);
+  return LANGS
+    .filter((l) => published.indexOf(l) !== -1)
+    .filter((l) => plainText(was[l]) !== '' && plainText(now[l]) === '')
+    .map((l) => LANG_WORD[l] + ': the About is empty, and the published ' + LANG_WORD[l] +
+      ' page has one — publishing this would leave that page with no body at all. ' +
+      'The text is still on the live page, so nothing is lost yet: paste it back in. ' +
+      'If that page should come down instead, clear its title, which removes the page ' +
+      'rather than emptying it.');
+}
+
 function validate(activity) {
   const errors = [];
   if (!activity.slug || !SLUG_RE.test(activity.slug)) {
@@ -1201,12 +1281,13 @@ exports.handler = async (event) => {
 
       case 'preview': {
         const { record } = await currentRecord(String(body.activity && body.activity.slug || ''));
-        const { merged, series, groupsInUse } = await mergeFor(record, body.activity || {}, session);
+        const { merged, series, groupsInUse, bodiesEmptied } = await mergeFor(record, body.activity || {}, session);
         // Refused on preview exactly as at publish: a preview that renders a fee
         // publish would not is a preview that lies, which is the one thing
         // preview-matches-publish forbids.
         if (series.problem) refuse(series.problem);
         if (groupsInUse.length) refuse(groupsInUse);
+        if (bodiesEmptied.length) refuse(bodiesEmptied);
         const out = await generate(merged, { commit: false, session });
         return json(200, { ok: true, dryRun: true, ...out });
       }
@@ -1250,7 +1331,8 @@ exports.handler = async (event) => {
         const slug = String(incoming.slug || '');
         if (!SLUG_RE.test(slug)) return json(400, { error: 'Bad slug' });
         const { record } = await assertFresh(slug, body.baseUpdatedAt, { overwrite: body.overwrite });
-        const { merged: draftRecord, series, calendars, groupsInUse } = await mergeFor(record, incoming, session);
+        const { merged: draftRecord, series, calendars, groupsInUse, bodiesEmptied } =
+          await mergeFor(record, incoming, session);
         const merged = stamp(draftRecord);
         merged.status = 'draft';
         await putDraft(merged);
@@ -1283,6 +1365,12 @@ exports.handler = async (event) => {
         // just deleted a group from the list has to find out now rather than
         // several screens and one decision later.
         groupsInUse.forEach((m) => warnings.push(m));
+        // ⚠ AND SO IS A BODY THE LIVE PAGE STILL CARRIES AND THIS SAVE DOES NOT.
+        // A draft commits nothing, so the page is untouched — but the blanking
+        // publish that prompted this rule was a Save followed by a Publish, and
+        // the moment to find out is while the editor is still open and the text
+        // is still one Ctrl-Z away. Same string the publish refuses with.
+        bodiesEmptied.forEach((m) => warnings.push(m));
         // ⚠ NEVER A SILENT BACKGROUND ACTION. A calendar appearing on a record
         // because somebody pressed Save is a change they did not ask for, and an
         // admin who is not told cannot tell it from the calendar having been
@@ -1302,9 +1390,11 @@ exports.handler = async (event) => {
         if (!SLUG_RE.test(slug)) return json(400, { error: 'Bad slug' });
 
         const { record, overwritten } = await assertFresh(slug, body.baseUpdatedAt, { overwrite: body.overwrite });
-        const { merged: toPublish, series, calendars, groupsInUse } = await mergeFor(record, incoming, session);
+        const { merged: toPublish, series, calendars, groupsInUse, bodiesEmptied } =
+          await mergeFor(record, incoming, session);
         if (series.problem) refuse(series.problem);
         if (groupsInUse.length) refuse(groupsInUse);
+        if (bodiesEmptied.length) refuse(bodiesEmptied);
         const merged = stamp(toPublish);
         if (merged.status === 'draft') {
           return json(400, { error: 'Set a status other than Draft to publish. Draft activities are never committed.' });
@@ -1435,7 +1525,8 @@ exports._internal = {
   // same reason preview does: a publish that renders through different code is
   // a publish that can differ from the one an admin would have made.
   generate, allPublished, getPublished,
-  validate, mergeByPermission, mergeFor, seriesCandidates, assertFresh, extractImages, decodeImage,
+  validate, emptiedBodies, mergeByPermission, mergeFor, seriesCandidates, assertFresh,
+  extractImages, decodeImage,
   sanitiseRich, RICH_KEYS,
   currentRecord, langObject, FIELD_SCHEMA, Conflict, SLUG_RE
 };

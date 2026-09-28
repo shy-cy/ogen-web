@@ -43,7 +43,9 @@ const H = require('./_helpers');
 
   console.log('\n[Michal saves first, and wins]');
   const michalEdit = Object.assign({}, michalLoad.body.activity);
-  michalEdit.about = { he: 'הטקסט של מיכל', en: "Michal's text", ru: '' };
+  // Every language keeps a body. Blanking one is refused now — see
+  // a-body-published-away-in-silence.js — and this suite is about the lock.
+  michalEdit.about = { he: 'הטקסט של מיכל', en: "Michal's text", ru: 'Текст Михаль' };
   const first = await H.call(admin.handler, Object.assign({
     action: 'publish', baseUpdatedAt: michalLoad.body.baseUpdatedAt, activity: michalEdit
   }, asMichal));
@@ -53,7 +55,7 @@ const H = require('./_helpers');
 
   console.log('\n[Dana saves with the timestamp she loaded — and is blocked]');
   const danaEdit = Object.assign({}, danaLoad.body.activity);
-  danaEdit.about = { he: 'הטקסט של דנה', en: "Dana's text", ru: '' };
+  danaEdit.about = { he: 'הטקסט של דנה', en: "Dana's text", ru: 'Текст Даны' };
   const commitsBefore = github._commits.length;
 
   const second = await H.call(admin.handler, Object.assign({
@@ -81,7 +83,7 @@ const H = require('./_helpers');
   const retry = await H.call(admin.handler, Object.assign({
     action: 'publish', baseUpdatedAt: reload.body.baseUpdatedAt,
     activity: Object.assign({}, reload.body.activity, {
-      about: { he: 'הטקסט של דנה', en: "Dana's text", ru: '' }
+      about: { he: 'הטקסט של דנה', en: "Dana's text", ru: 'Текст Даны' }
     })
   }, asDana));
   H.eq(retry.status, 200, 'after reloading, her save goes through');
@@ -93,7 +95,7 @@ const H = require('./_helpers');
   const forced = await H.call(admin.handler, Object.assign({
     action: 'publish', baseUpdatedAt: thirdBase, overwrite: true,
     activity: Object.assign({}, reload.body.activity, {
-      about: { he: 'דריסה מכוונת', en: 'Deliberate overwrite', ru: '' }
+      about: { he: 'דריסה מכוונת', en: 'Deliberate overwrite', ru: 'Намеренная перезапись' }
     })
   }, asMichal));
   H.eq(forced.status, 200, 'overwrite:true is honoured — a second, deliberate click');

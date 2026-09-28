@@ -836,7 +836,7 @@ ${cards}
 module.exports = {
   SUMMARY_CHARS, SITE, LANGS, STATUSES, OPEN_STATUSES, RUNNING_STATUSES, ARCHIVED_STATUSES, STATUS_GROUPS,
   MOTIFS, CORNERS, LABELS, FALLBACK,
-  esc, pick, has, langsPresent,
+  esc, pick, has, langsPresent, plainText,
   pathFor, filePathFor, indexPathFor, indexFilePathFor, homeFor,
   renderActivityPage, renderActivitiesIndexPage
 };
