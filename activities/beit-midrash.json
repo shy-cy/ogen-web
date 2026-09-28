@@ -10,7 +10,7 @@
   "registration": {
     "autoApprove": true,
     "pendingExpiryDays": null,
-    "registrationFeeCutoffDate": null,
+    "registrationFeeCutoffDate": "2026-10-18",
     "cancellationPolicy": {
       "tiers": [
         {
@@ -28,7 +28,10 @@
         "ru": ""
       }
     },
-    "defaultBasis": null,
+    "defaultBasis": {
+      "startDate": "2026-11-01",
+      "sessionCount": 6
+    },
     "sessionCancelHours": 1
   },
   "seriesId": "act-32b1222460c4f004",
@@ -116,12 +119,12 @@
     }
   ],
   "sponsors": [],
-  "isoUpdated": "2026-09-28T08:23:10.775Z",
+  "isoUpdated": "2026-09-28T08:26:02.673Z",
   "isoCreated": "2026-09-20T07:57:58.547Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
   "activityId": "act-32b1222460c4f004",
-  "lastPublishedAt": "2026-09-28T08:23:10.775Z",
+  "lastPublishedAt": "2026-09-28T08:26:02.673Z",
   "groups": [
     {
       "groupId": "g-mu9hqxm1klzk",
@@ -262,23 +265,74 @@
         "schedule": {
           "frequency": "custom",
           "overrideText": {
-            "he": "",
-            "en": "",
-            "ru": ""
+            "he": "פעם בחודש, בימי ראשון",
+            "en": "Once a month, on Sundays",
+            "ru": "Раз в месяц, по воскресеньям"
           },
           "sessions": [
             {
               "day": 0,
-              "time": "18:00"
+              "time": "18:00",
+              "date": "2026-11-22"
+            },
+            {
+              "day": 0,
+              "time": "18:00",
+              "date": "2026-12-20"
+            },
+            {
+              "day": 0,
+              "time": "18:00",
+              "date": "2027-01-24"
+            },
+            {
+              "day": 0,
+              "time": "18:00",
+              "date": "2027-02-21"
+            },
+            {
+              "day": 0,
+              "time": "18:00",
+              "date": "2027-03-21"
+            },
+            {
+              "day": 0,
+              "time": "18:00",
+              "date": "2027-04-25"
             }
           ]
         },
         "duration": {
-          "startDate": "",
-          "endDate": "",
+          "startDate": "2026-11-01",
+          "endDate": "2027-04-30",
           "sessionCount": 6,
           "sessionMinutes": 90,
-          "sessionDates": []
+          "sessionDates": [
+            {
+              "date": "2026-11-22",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-12-20",
+              "status": "scheduled"
+            },
+            {
+              "date": "2027-01-24",
+              "status": "scheduled"
+            },
+            {
+              "date": "2027-02-21",
+              "status": "scheduled"
+            },
+            {
+              "date": "2027-03-21",
+              "status": "scheduled"
+            },
+            {
+              "date": "2027-04-25",
+              "status": "scheduled"
+            }
+          ]
         },
         "instructionLanguage": {
           "codes": [
