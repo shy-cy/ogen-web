@@ -12,8 +12,21 @@
     "pendingExpiryDays": null,
     "registrationFeeCutoffDate": null,
     "cancellationPolicy": {
-      "mode": "flat",
-      "cancellationCutoffDate": null
+      "tiers": [
+        {
+          "until": "start",
+          "percent": 100
+        },
+        {
+          "until": null,
+          "percent": 50
+        }
+      ],
+      "note": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      }
     },
     "defaultBasis": null,
     "sessionCancelHours": 1
@@ -55,6 +68,12 @@
     "price": {
       "registrationFee": null,
       "fullPrice": null,
+      "termUnit": "semester",
+      "termLabel": {
+        "he": "",
+        "en": "",
+        "ru": ""
+      },
       "perHourOverride": null,
       "perSessionPrice": 25,
       "showPerLesson": false,
@@ -97,12 +116,12 @@
     }
   ],
   "sponsors": [],
-  "isoUpdated": "2026-09-23T16:37:06.012Z",
+  "isoUpdated": "2026-09-28T08:14:32.543Z",
   "isoCreated": "2026-09-20T07:57:58.547Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
   "activityId": "act-32b1222460c4f004",
-  "lastPublishedAt": "2026-09-23T16:37:06.012Z",
+  "lastPublishedAt": "2026-09-28T08:14:32.543Z",
   "groups": [
     {
       "groupId": "g-mu9hqxm1klzk",
@@ -120,6 +139,11 @@
         },
         "schedule": {
           "frequency": "custom",
+          "overrideText": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          },
           "sessions": [
             {
               "day": 0,
@@ -164,7 +188,8 @@
             "he": "",
             "en": "",
             "ru": ""
-          }
+          },
+          "mapUrl": ""
         }
       }
     },
@@ -184,6 +209,11 @@
         },
         "schedule": {
           "frequency": "custom",
+          "overrideText": {
+            "he": "",
+            "en": "",
+            "ru": ""
+          },
           "sessions": [
             {
               "day": 0,
@@ -228,9 +258,11 @@
             "he": "",
             "en": "",
             "ru": ""
-          }
+          },
+          "mapUrl": ""
         }
       }
     }
-  ]
+  ],
+  "listing": "listed"
 }
