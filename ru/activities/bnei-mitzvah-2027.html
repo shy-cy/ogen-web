@@ -70,14 +70,17 @@
         <ul class="sidebar-facts">
             <li data-fact="ages" data-fact-visibility="public"><strong>Возраст</strong><span>11-13</span></li>
             <li data-fact="groupSize" data-fact-visibility="public"><strong>Размер группы</strong><span>Занятия ב малых группах</span></li>
+            <li data-fact="prerequisites" data-fact-visibility="public"><strong>Требования к уровню</strong><span>Hebrew and English - with Dorit: Начинающие</span></li>
             <li data-fact="instructionLanguage" data-fact-visibility="public"><strong>Язык преподавания</strong><span>иврит · английский · русский</span></li>
         </ul>
       </div>
       <div class="fact-card" data-group="schedule">
         <div class="fact-card-head"><span class="fact-card-icon" style="background:var(--terracotta)"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg></span><h2>Когда и где</h2></div>
         <ul class="sidebar-facts">
-            <li data-fact="schedule" data-fact-visibility="public"><strong>Когда</strong><span>первый четверг каждого месяца, 18:00</span></li>
+            <li data-fact="schedule" data-fact-visibility="public"><strong>Когда</strong><span>Hebrew and English - with Dorit: Раз в месяц, в субботу вечером
+Russian and English - with Anat: первый четверг каждого месяца, 18:00</span></li>
             <li data-fact="duration" data-fact-visibility="public"><strong>Продолжительность</strong><span>январь 2027 - июнь 2027</span></li>
+            <li data-fact="location" data-fact-visibility="public"><strong>Место</strong><span>Лимассол</span></li>
         </ul>
       </div>
     </div>
@@ -90,9 +93,19 @@
         <p class="groups-choose"></p>
         <div class="group-card">
           <h3>Hebrew and English - with Dorit</h3>
+          <ul class="sidebar-facts">
+            <li data-fact="schedule"><strong>Когда</strong><span>Раз в месяц, в субботу вечером</span></li>
+            <li data-fact="instructionLanguage"><strong>Язык преподавания</strong><span>иврит · английский</span></li>
+            <li data-fact="prerequisites"><strong>Требования к уровню</strong><span>Начинающие</span></li>
+            <li data-fact="location"><strong>Место</strong><span>Лимассол</span></li>
+          </ul>
         </div>
         <div class="group-card">
           <h3>Russian and English - with Anat</h3>
+          <ul class="sidebar-facts">
+            <li data-fact="schedule"><strong>Когда</strong><span>первый четверг каждого месяца, 18:00</span></li>
+            <li data-fact="instructionLanguage"><strong>Язык преподавания</strong><span>иврит · английский · русский</span></li>
+          </ul>
         </div>
       </div>
     </div>
@@ -137,7 +150,19 @@
       <div class="fact-card session-columns" data-group="sessions">
         <div class="session-split">
           <table class="session-table">
-            <caption>Расписание занятий</caption>
+            <caption>Расписание занятий · Hebrew and English - with Dorit</caption>
+            <thead><tr><th scope="col">Занятие</th><th scope="col">День</th><th scope="col">Дата</th></tr></thead>
+            <tbody>
+              <tr><td>1</td><td>суббота</td><td>9 января</td></tr>
+              <tr><td>2</td><td>суббота</td><td>13 февраля</td></tr>
+              <tr><td>3</td><td>суббота</td><td>13 марта</td></tr>
+              <tr><td>4</td><td>суббота</td><td>10 апреля</td></tr>
+              <tr><td>5</td><td>суббота</td><td>8 мая</td></tr>
+              <tr><td>6</td><td>суббота</td><td>12 июня</td></tr>
+            </tbody>
+          </table>
+          <table class="session-table">
+            <caption>Расписание занятий · Russian and English - with Anat</caption>
             <thead><tr><th scope="col">Занятие</th><th scope="col">День</th><th scope="col">Дата</th></tr></thead>
             <tbody>
               <tr><td>1</td><td>четверг</td><td>7 января</td></tr>
