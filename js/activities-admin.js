@@ -229,6 +229,189 @@
       }).join('');
   }
 
+  // ⚠ MARKDOWN, ON PASTE, AND NOWHERE ELSE.
+  //
+  // Reported as "what happened?" over a Russian body pasted into the editor and
+  // sitting there as `# Взросление … ## О чём мы будем …` — literal hashes and
+  // asterisks — with "when I entered the EN text, in the same format, I didn't
+  // have an issue."
+  //
+  // Nothing was broken and nothing was lost: the record and the live page were
+  // both intact HTML. Quill has never understood Markdown and nothing here
+  // converted it. The English differed because of what was on the CLIPBOARD
+  // rather than what was typed: copy from something rendered and the clipboard
+  // carries `text/html`, which Quill turns into real headings and bold; copy from
+  // a plain-text view — a .md file, a code block, a "copy raw" — and it carries
+  // only `text/plain`, so `#` and `**` arrive as characters.
+  //
+  // ⚠ IT RUNS ON A PASTE AND NEVER ON A STORED VALUE, and that line is the whole
+  // safety argument. toEditorHtml() reads EVERY record on the way into the editor,
+  // and whatever it decides comes back out of `root.innerHTML` on the next save
+  // and BECOMES the record — which is exactly how a guess about leading tags ate
+  // three activities' bodies in eight language slots. A paste is a deliberate
+  // gesture on text that is not stored yet, Ctrl-Z undoes it, and a `#` at the
+  // start of a real stored sentence is never seen by any of this.
+
+  // ⚠ EVERY LEVEL BECOMES <h2>, AND THAT IS NOT LAZINESS. Three constraints
+  // agree: sanitiseRich() allows `h2` and `h3` and nothing else, so `#` to
+  // `######` cannot map one-to-one onto anything; `.activity-main` styles ONLY
+  // `h2`, so a pasted `h3` would land on the page at the browser's default size
+  // — the "a class nobody styled is a layout nobody designed" trap, one
+  // stylesheet over; and `[{ header: 2 }]` is the only heading this toolbar
+  // offers, so a pasted heading and a hand-made one have to be the same tag or
+  // one body ends up with two heading conventions. The body sits under the page's
+  // single <h1>, so one level below it is the outline the page actually has.
+  var MD_HEAD = /^ {0,3}(#{1,6})\s+(\S.*)$/;
+  var MD_BULLET = /^ {0,3}[-*+]\s+(\S.*)$/;
+  var MD_BOLD = /\*\*([^*\n]+)\*\*/;
+  // ⚠ A HEADING THIS LONG IS A FLATTENED DOCUMENT, NOT A HEADING, and refusing
+  // on it is the one guard that matters. The reported paste had lost its line
+  // breaks before it reached the clipboard — thousands of characters on a single
+  // line beginning `#`, with `##` and `###` stranded mid-sentence. A line-based
+  // reader honours the first marker and wraps the WHOLE document in one heading,
+  // which is worse than leaving it alone. No real heading in any of the three
+  // languages is 120 characters. Whole-document, so the answer is "nothing
+  // converted" rather than a half-converted body somebody has to unpick.
+  var MD_HEAD_MAX = 120;
+
+  // A line, split into bold and not-bold runs. Nothing is escaped here and
+  // nothing may be: these become Delta inserts, which carry TEXT, so `5 < 10`
+  // is five, a less-than and ten. Escaping would publish `5 &lt; 10`.
+  function mdRuns(line) {
+    var runs = [];
+    var rest = String(line);
+    var m;
+    while ((m = MD_BOLD.exec(rest))) {
+      if (m.index) runs.push({ text: rest.slice(0, m.index), bold: false });
+      runs.push({ text: m[1], bold: true });
+      rest = rest.slice(m.index + m[0].length);
+    }
+    if (rest) runs.push({ text: rest, bold: false });
+    return runs.length ? runs : [{ text: '', bold: false }];
+  }
+
+  // Returns an array of blocks, or null meaning "this is not Markdown, leave it
+  // to Quill" — which is today's behaviour exactly, and is what every paste that
+  // is not Markdown has to keep getting.
+  //
+  // PURE, and separate from the Delta below on purpose: this half is the rules
+  // and is unit-tested in plain Node, and the half that needs a live Quill is ten
+  // lines with no decisions in it.
+  function mdBlocks(text) {
+    var src = String(text == null ? '' : text).replace(/\r\n?/g, '\n');
+    if (!src.trim()) return null;
+    var lines = src.split('\n');
+    var heads = lines.filter(function (l) { return MD_HEAD.test(l); });
+    var bullets = lines.some(function (l) { return MD_BULLET.test(l); });
+    // Nothing to convert: no marker at a line start and no bold. Quill's own
+    // plain-text path is correct for that and is left alone.
+    if (!heads.length && !bullets && !MD_BOLD.test(src)) return null;
+    if (heads.some(function (l) { return l.trim().length > MD_HEAD_MAX; })) return null;
+
+    var out = [];
+    var i = 0;
+    while (i < lines.length) {
+      if (!lines[i].trim()) { i += 1; continue; }
+      var h = MD_HEAD.exec(lines[i]);
+      if (h) { out.push({ tag: 'h2', runs: mdRuns(h[2].trim()) }); i += 1; continue; }
+      if (MD_BULLET.test(lines[i])) {
+        out.push({ tag: 'li', runs: mdRuns(MD_BULLET.exec(lines[i])[1].trim()) });
+        i += 1;
+        continue;
+      }
+      // ⚠ A SINGLE NEWLINE INSIDE A PARAGRAPH IS A SPACE, which is what Markdown
+      // says and deliberately NOT what toEditorHtml() does with a stored value.
+      // There a lone newline is a line break an admin typed on purpose; here the
+      // text is wrapped prose, and keeping the wrapping would publish a paragraph
+      // broken at whatever width it happened to be copied at.
+      var buf = [];
+      while (i < lines.length && lines[i].trim() &&
+             !MD_HEAD.test(lines[i]) && !MD_BULLET.test(lines[i])) {
+        buf.push(lines[i].trim());
+        i += 1;
+      }
+      out.push({ tag: 'p', runs: mdRuns(buf.join(' ')) });
+    }
+    return out.length ? out : null;
+  }
+
+  // ⚠ A DELTA, NOT HTML, AND THAT IS NOT A STYLE CHOICE. Handing
+  // `dangerouslyPasteHTML` a string runs it back through Quill's clipboard
+  // matchers, and `matchSpacing` decides whether two blocks were separated in the
+  // source by MEASURING THEM — `offsetTop` against `offsetHeight * 1.5` in the
+  // hidden .ql-clipboard div. Quill's own stylesheet zeroes the margins on `p`
+  // there and on nothing else, so a paragraph followed by an `<h2>` or a `<ul>`
+  // cleared the threshold and an empty paragraph was invented between them. Read
+  // straight out of the browser: `<p>a</p><h2>B</h2>` converts to `a\n\n` plus the
+  // heading. We already know exactly where the blocks are, so there is nothing to
+  // infer from geometry.
+  function mdDelta(blocks) {
+    var Delta = window.Quill.import('delta');
+    var d = new Delta();
+    blocks.forEach(function (b) {
+      b.runs.forEach(function (r) {
+        if (r.text) d.insert(r.text, r.bold ? { bold: true } : {});
+      });
+      d.insert('\n', b.tag === 'h2' ? { header: 2 }
+                    : b.tag === 'li' ? { list: 'bullet' } : {});
+    });
+    return d;
+  }
+
+  // ⚠ A RICH CLIPBOARD WINS, and this is what keeps the working English path
+  // untouched. If the paste carries real formatting, Quill already does the right
+  // thing with it and this must not second-guess it. The test is the same closed
+  // tag list RICH_MARKUP uses, less `p` and `br`: a plain-text copy out of an
+  // editor often ships a `text/html` flavour too, but it is `<div>`s and
+  // `<span style>`s carrying no formatting at all — nothing the plain flavour
+  // does not already say — and Quill strips the styles and leaves the hashes.
+  var MD_RICH_HTML = /<\/?(?:h[1-6]|ul|ol|li|blockquote|strong|em|u|s|b|i|a)(?:\s[^>]*)?\/?>/i;
+
+  function wireMarkdownPaste(q, host) {
+    // ⚠ CAPTURE, ON THE CONTAINER, NOT ON THE EDITOR. Quill's own paste handler
+    // is bound to `q.root` at construction and opens with
+    // `if (e.defaultPrevented) return;` — but two listeners on the SAME node fire
+    // in registration order whatever their capture flag says, and Quill's was
+    // registered first. A capture listener on the parent runs before any listener
+    // on the target, which is what lets preventDefault() actually reach it.
+    host.addEventListener('paste', function (e) {
+      var cb = e.clipboardData;
+      if (!cb) return;
+      var rich = '';
+      try { rich = cb.getData('text/html') || ''; } catch (err) { rich = ''; }
+      if (MD_RICH_HTML.test(rich)) return;
+      var plain = '';
+      try { plain = cb.getData('text/plain') || ''; } catch (err) { plain = ''; }
+      var blocks = mdBlocks(plain);
+      if (!blocks) return;
+      e.preventDefault();
+      var Delta = window.Quill.import('delta');
+      var body = mdDelta(blocks);
+      // ⚠ AN EMPTY EDITOR IS SET, NOT INSERTED INTO. Every block here ends with
+      // its own '\n', and Quill's document always ends with one of its own — so
+      // inserting into a blank editor leaves that terminator behind as a trailing
+      // empty paragraph, which sanitiseRich() keeps and the published page renders
+      // as dead space at the foot of the article. Pasting into a blank box is the
+      // ordinary case here, and setContents owns the terminator.
+      if (q.getLength() <= 1) {
+        q.setContents(body, 'user');
+        q.setSelection(q.getLength() - 1, 0, 'silent');
+        return;
+      }
+      var range = q.getSelection(true) || { index: q.getLength() - 1, length: 0 };
+      // ⚠ A DOCUMENT PASTED MID-LINE STARTS A NEW BLOCK. Every block here ends
+      // with its own '\n', so the FIRST one has nothing in front of it and takes
+      // whatever line the cursor is standing in: pasting "## Added" at the end of
+      // "Existing." produced the single heading "Existing.Added". Verified in a
+      // browser, which is the only place it shows.
+      var lead = (range.index === 0 || q.getText(range.index - 1, 1) === '\n')
+        ? new Delta() : new Delta().insert('\n');
+      var change = new Delta().retain(range.index).concat(lead).concat(body).delete(range.length);
+      q.updateContents(change, 'user');
+      q.setSelection(range.index + lead.length() + body.length(), 0, 'silent');
+    }, true);
+  }
+
   // Quill writes '<p><br></p>' for an empty editor. Storing that would publish
   // an empty paragraph instead of nothing at all.
   function editorHtml(q) {
@@ -282,6 +465,9 @@
       q.root.style.textAlign = spec.lang === 'he' ? 'right' : 'left';
       if (spec.html) q.root.innerHTML = spec.html;
       q.on('text-change', function () { S.dirty = true; });
+      // ⚠ EDITABLE ONLY. A read-only editor takes no paste, and wiring one would
+      // be a second place the readOnly decision has to be remembered.
+      if (spec.editable) wireMarkdownPaste(q, spec.host);
       S.editors[spec.id] = q;
     });
   }

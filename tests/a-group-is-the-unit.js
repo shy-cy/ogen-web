@@ -126,9 +126,34 @@ H.eq(bnei.groups.map((g) => g.groupId).join(','), 'g-mu769dzbdoed,g-mu76aeufqfa3
 H.eq(bnei.groups[0].facts.ages.min, 11,
   'and each group is SEEDED with what the activity said, rather than blanked');
 H.eq(bnei.groups[1].facts.ages.min, 11, 'both of them');
-const beit = migrate(record('beit-midrash'));
-H.eq(beit.groups.length, 2, '⚠ beit-midrash has two named groups as well, not one');
-H.eq(G.totalCapacity(beit), 50, 'and its capacity is still the sum of them');
+// ⚠ AND THE SECOND HALF OF THIS IS ON A RECORD BUILT HERE, for the reason the
+// paragraph above already gives. It used to read beit-midrash, which had two
+// named groups of 20 and 30 — until an admin merged them into one group of 25.
+// An ordinary edit, through the form, and it broke a suite that is not about
+// beit-midrash at all: the same failure the uncapped rule had with folk-dance,
+// one assertion later, because that lesson was applied to one of the two and not
+// to the other. What migration DOES to a record is the rule; how many groups a
+// live activity has today is the admin's to change.
+const twoNamed = migrate({
+  slug: 'pair', activityId: 'act-0000000000000f1f', type: 'course',
+  facts: { groupSize: { named: [
+    { groupId: 'g-alpha', name: { he: '', en: 'Alpha', ru: '' }, capacity: 20 },
+    { groupId: 'g-beta', name: { he: '', en: 'Beta', ru: '' }, capacity: 30 }
+  ] } }
+});
+H.eq(twoNamed.groups.length, 2, 'a record with two named groups migrates to two');
+H.eq(twoNamed.groups.map((g) => g.groupId).join(','), 'g-alpha,g-beta',
+  '⚠ keeping both ids, because frozen registrations point at them');
+H.eq(G.totalCapacity(twoNamed), 50, 'and the capacity is the SUM of them, never one of them');
+
+// On the live records, only what an admin cannot quietly change: a second pass
+// finds what the first wrote, whatever shape they are in today.
+['beit-midrash', 'bnei-mitzvah-2027', 'hebrew4kids'].forEach((slug) => {
+  const once = migrate(record(slug));
+  H.eq(JSON.stringify(migrate(once).groups), JSON.stringify(once.groups),
+    slug + ': migrate is idempotent on the record as it stands');
+  H.ok(once.groups.length >= 1, 'and it always has at least one group');
+});
 
 console.log('\n[one group is not a choice; two is]');
 const one = F.course();

@@ -2797,6 +2797,86 @@ node** — the title line as it was pasted — which renders and is not what the
 Hebrew does (`<h3>`); it is left as written rather than tidied, because undoing
 corruption and rewriting somebody's copy are different acts.
 
+#### ⚠ And Markdown was never understood at all
+
+Reported as *"what happened?"* over a Russian body pasted into the About editor
+and sitting there as `# Взросление … ## О чём мы будем …` — literal hashes and
+asterisks in one run-on paragraph — with *"when I entered the EN text, in the same
+format, I didn't have an issue."*
+
+⚠ **NOTHING WAS BROKEN AND NOTHING WAS LOST**, and checking that first is what
+kept this from being diagnosed as the escaping bug above. The record held proper
+HTML in all three languages and the live Russian page rendered real `<h3>`s. This
+is a different thing: that was *HTML* escaped by a bad guess, this is **Markdown**,
+which was never handled at all, before or after.
+
+⚠ **THE ENGLISH DIFFERED BECAUSE OF THE CLIPBOARD, NOT THE TYPING.** Copy from
+something **rendered** — a document, a rendered reply, a web page — and the
+clipboard carries `text/html`, which Quill turns into real headings and bold. Copy
+from a **plain-text** view — a `.md` file, a code block, a "copy raw" — and it
+carries only `text/plain`, so `#` and `**` arrive as characters. One document, two
+ways of copying it, two results.
+
+⚠ **IT RUNS ON A PASTE AND NEVER ON A STORED VALUE**, and that one line is the
+whole safety argument. `toEditorHtml()` reads **every** record on the way into the
+editor, and whatever it decides comes back out of `root.innerHTML` on the next
+save and **becomes the record** — which is exactly how the leading-tag guess ate
+three activities' bodies in eight language slots. A paste is a deliberate gesture
+on text that is not stored yet, Ctrl-Z undoes it, and a `#` at the start of a real
+stored sentence is never seen by any of this. A test asserts `toEditorHtml` calls
+none of it.
+
+⚠ **EVERY HEADING LEVEL BECOMES `<h2>`, AND THREE CONSTRAINTS AGREE.**
+`sanitiseRich()` allows `h2` and `h3` and nothing else, so `#` to `######` cannot
+map one-to-one onto anything; `.activity-main` styles **only** `h2`, so a pasted
+`h3` would land on the page at the browser's default size — the *a class nobody
+styled is a layout nobody designed* trap, one stylesheet over; and `[{ header: 2 }]`
+is the only heading this toolbar offers, so a pasted heading and a hand-made one
+have to be one tag or a body ends up with two heading conventions.
+
+⚠ **AND THE INTERESTING HALF IS WHAT IT REFUSES.** The reported paste had lost
+its line breaks before reaching the clipboard: thousands of characters on one line
+beginning `#`, with `##` and `###` stranded mid-sentence. A line-based reader
+honours the first marker and wraps the **whole document** in one heading, which is
+worse than leaving it alone. So a heading line over **120 characters** refuses the
+**whole paste** — whole-document, because a half-converted body is worse than an
+unconverted one: nobody can see which half. Ordinary prose with no marker is
+refused too, so every paste that is not Markdown behaves exactly as it did.
+
+⚠ **A RICH CLIPBOARD WINS**, which is what keeps the working English path
+untouched — tested against the same closed tag list `RICH_MARKUP` uses, less `p`
+and `br`, because a plain-text copy often ships a `text/html` flavour too and it is
+`<div>`s and `<span style>`s saying nothing the plain flavour does not.
+
+⚠ **AND IT COULD ONLY BE GOT RIGHT IN A BROWSER.** Driven over CDP against real
+Chrome with a real clipboard and a real Ctrl+V, which found two faults no amount
+of reading would have:
+
+- **Quill's `matchSpacing` invents a blank line by MEASURING.** It compares
+  `offsetTop` against `offsetHeight * 1.5` in the hidden `.ql-clipboard` div, and
+  Quill's own stylesheet zeroes the margins on `p` there and on nothing else — so
+  a paragraph followed by an `<h2>` or a `<ul>` cleared the threshold and an empty
+  paragraph appeared between them. Read straight out of the browser:
+  `<p>a</p><h2>B</h2>` converts to `a\n\n` plus the heading. That is why this
+  builds a **Delta** rather than handing Quill HTML — the blocks are already
+  known, so there is nothing to infer from geometry, and `dangerouslyPasteHTML`
+  is not called anywhere.
+- **A document pasted at the end of a line merged into it.** Every block ends with
+  its own `\n`, so the first has nothing in front of it: `## Added` at the end of
+  `Existing.` produced the single heading `Existing.Added`. A leading newline when
+  the cursor is not at a line start fixes it.
+
+Two smaller rules: an **empty** editor is `setContents`'d rather than inserted
+into, or Quill's own document terminator is left behind as a trailing empty
+paragraph that `sanitiseRich()` keeps and the page renders as dead space; and a
+**single newline inside a paragraph is a space**, which is what Markdown says and
+deliberately *not* what `toEditorHtml()` does with a stored value — there a lone
+newline is a break an admin typed on purpose, here it is where the prose happened
+to be wrapped when it was copied.
+
+**Ordered lists are deliberately not converted.** Four things were asked for and
+four are built; `1.` stays literal, which is visible rather than silent.
+
 ⚠ **A stored `&lt;p&gt;` is the bug by definition**, since nobody types that, so
 the suite asserts it of every published record **and** of every generated page —
 the check that would have caught this on the day it shipped, where reading either
