@@ -87,7 +87,7 @@
         "en": "Irit Berger-Rozanski",
         "ru": "Irit Berger-Rozanski"
       },
-      "photo": "/images/activities/hebrew4kids-teachers-tea-mtd1nrnl-2-a903f601.jpg"
+      "photo": "/images/activities/hebrew4kids-teachers-tea-mtd1nrnl-2-6e2fab2a.jpg"
     }
   ],
   "sponsors": [
@@ -101,11 +101,11 @@
       "logo": "/images/activities/hebrew4kids-sponsors-spo-mtd1o2lk-3-a52febae.png"
     }
   ],
-  "isoUpdated": "2026-09-28T15:03:40.532Z",
+  "isoUpdated": "2026-09-28T15:10:51.657Z",
   "isoCreated": "2026-08-28T14:55:38.930Z",
-  "lastEditedBy": "system",
-  "lastEditedByName": "Ogen (restore)",
-  "lastPublishedAt": "2026-09-28T15:03:40.532Z",
+  "lastEditedBy": "michal@ogen.cy",
+  "lastEditedByName": "Michal",
+  "lastPublishedAt": "2026-09-28T15:10:51.657Z",
   "factVisibility": {
     "ages": "public",
     "schedule": "public",
@@ -270,5 +270,8 @@
       }
     }
   ],
-  "listing": "listed"
+  "listing": "listed",
+  "retiredImages": [
+    "images/activities/hebrew4kids-teachers-tea-mtd1nrnl-2-a903f601.jpg"
+  ]
 }
