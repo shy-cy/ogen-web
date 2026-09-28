@@ -83,17 +83,10 @@
       "showPerLesson": false,
       "lateDropIn": {
         "enabled": false,
-        "hoursBefore": 1,
-        "price": 30
+        "hoursBefore": null,
+        "price": null
       },
-      "bundles": [
-        {
-          "bundleId": "b-mu9iei9vwn55",
-          "entries": 6,
-          "pricePerEntry": 20,
-          "validityDays": 220
-        }
-      ]
+      "bundles": []
     }
   },
   "factVisibility": {
@@ -120,12 +113,12 @@
     }
   ],
   "sponsors": [],
-  "isoUpdated": "2026-09-28T14:51:12.275Z",
+  "isoUpdated": "2026-09-28T14:51:53.880Z",
   "isoCreated": "2026-09-20T07:57:58.547Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
   "activityId": "act-32b1222460c4f004",
-  "lastPublishedAt": "2026-09-28T14:51:12.275Z",
+  "lastPublishedAt": "2026-09-28T14:51:53.880Z",
   "groups": [
     {
       "groupId": "g-mu9hqxm1klzk",
@@ -250,8 +243,5 @@
       }
     }
   ],
-  "listing": "listed",
-  "retiredImages": [
-    "images/activities/beit-midrash-teachers-tea-mu9hpenq-1-8d0b4bcc.jpg"
-  ]
+  "listing": "listed"
 }
