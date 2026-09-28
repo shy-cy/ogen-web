@@ -120,12 +120,12 @@
     }
   ],
   "sponsors": [],
-  "isoUpdated": "2026-09-28T11:50:10.041Z",
+  "isoUpdated": "2026-09-28T11:53:40.240Z",
   "isoCreated": "2026-09-20T07:57:58.547Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
   "activityId": "act-32b1222460c4f004",
-  "lastPublishedAt": "2026-09-28T11:50:10.041Z",
+  "lastPublishedAt": "2026-09-28T11:53:40.240Z",
   "groups": [
     {
       "groupId": "g-mu9hqxm1klzk",
@@ -217,127 +217,6 @@
           "codes": [
             "he",
             "en"
-          ],
-          "text": {
-            "he": "",
-            "en": "",
-            "ru": ""
-          }
-        },
-        "prerequisites": {
-          "level": "beginner",
-          "text": {
-            "he": "",
-            "en": "",
-            "ru": ""
-          }
-        },
-        "location": {
-          "text": {
-            "he": "לימסול",
-            "en": "Limassol",
-            "ru": "Лимассол"
-          }
-        },
-        "address": {
-          "text": {
-            "he": "",
-            "en": "",
-            "ru": ""
-          },
-          "mapUrl": ""
-        }
-      }
-    },
-    {
-      "groupId": "g-mu9hrcjt42rt",
-      "name": {
-        "he": "קבוצת בוגרים",
-        "en": "Adult Group",
-        "ru": "Группа для взрослых"
-      },
-      "capacity": 30,
-      "teacherIds": [],
-      "facts": {
-        "ages": {
-          "min": 25,
-          "max": 120
-        },
-        "schedule": {
-          "frequency": "custom",
-          "overrideText": {
-            "he": "פעם בחודש, בימי ראשון",
-            "en": "Once a month, on Sundays",
-            "ru": "Раз в месяц, по воскресеньям"
-          },
-          "sessions": [
-            {
-              "day": 0,
-              "time": "18:00",
-              "date": "2026-11-22"
-            },
-            {
-              "day": 0,
-              "time": "18:00",
-              "date": "2026-12-20"
-            },
-            {
-              "day": 0,
-              "time": "18:00",
-              "date": "2027-01-24"
-            },
-            {
-              "day": 0,
-              "time": "18:00",
-              "date": "2027-02-21"
-            },
-            {
-              "day": 0,
-              "time": "18:00",
-              "date": "2027-03-21"
-            },
-            {
-              "day": 0,
-              "time": "18:00",
-              "date": "2027-04-25"
-            }
-          ]
-        },
-        "duration": {
-          "startDate": "2026-11-01",
-          "endDate": "2027-04-30",
-          "sessionCount": 6,
-          "sessionMinutes": 90,
-          "sessionDates": [
-            {
-              "date": "2026-11-22",
-              "status": "scheduled"
-            },
-            {
-              "date": "2026-12-20",
-              "status": "scheduled"
-            },
-            {
-              "date": "2027-01-24",
-              "status": "scheduled"
-            },
-            {
-              "date": "2027-02-21",
-              "status": "scheduled"
-            },
-            {
-              "date": "2027-03-21",
-              "status": "scheduled"
-            },
-            {
-              "date": "2027-04-25",
-              "status": "scheduled"
-            }
-          ]
-        },
-        "instructionLanguage": {
-          "codes": [
-            "he"
           ],
           "text": {
             "he": "",
