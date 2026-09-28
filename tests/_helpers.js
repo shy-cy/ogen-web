@@ -306,6 +306,25 @@ function adminHelpWindow(makeNode) {
   };
 }
 
+// ⚠ AND IT NOW INCLUDES js/admin-icons.js, WHICH IS RUN FOR REAL RATHER THAN
+// STUBBED.
+//
+// The glyph control moved out of the queue screen so the activities form's group
+// list could share it — "I would avoid buttons with long text, so here would
+// change it to icons" — and a stub returning a plain button would make every
+// assertion about it vacuous: that the picture is in the SVG namespace (an <svg>
+// made with createElement is an HTMLUnknownElement and draws nothing), that the
+// word survives in aria-label, data-tip and title, that a glyph nobody has
+// declared throws instead of drawing an empty box. The module is forty lines of
+// DOM calls the shim already answers, so running it costs nothing and keeps
+// those checks about the real thing.
+function runAdminIcons(ctx) {
+  const vm = require('vm');
+  const src = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'js', 'admin-icons.js'), 'utf8');
+  vm.runInContext(src, ctx, { filename: 'js/admin-icons.js' });
+}
+
 // Call a handler the way Netlify does.
 async function call(handler, body) {
   const res = await handler({ httpMethod: 'POST', body: JSON.stringify(body) });
@@ -315,5 +334,5 @@ async function call(handler, body) {
 module.exports = {
   ok, eq, done, fnPath, makeBlobs, makeGithub, loadWithStubs,
   superAdminSession, ruReviewerSession, seedRepo, call, installSession, confirmAddress, signUp,
-  adminHelpWindow
+  adminHelpWindow, runAdminIcons
 };

@@ -221,7 +221,10 @@ const src = read('js/registrations-admin.js');
       String: String, Number: Number, RegExp: RegExp, Promise: Promise, setTimeout: setTimeout,
       encodeURIComponent: encodeURIComponent, decodeURIComponent: decodeURIComponent
     });
-    vm.runInContext(src, ctx, { filename: 'js/registrations-admin.js' });
+    // The glyph control is its own shared module now, run for real rather than
+  // stubbed — see runAdminIcons().
+  H.runAdminIcons(ctx);
+  vm.runInContext(src, ctx, { filename: 'js/registrations-admin.js' });
     return dom;
   }
   const settle = () => new Promise((r) => setTimeout(r, 40));

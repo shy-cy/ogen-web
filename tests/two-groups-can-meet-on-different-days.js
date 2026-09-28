@@ -313,7 +313,12 @@ const adminJs = read('js/activities-admin.js');
 // tick-means-excluded bug came to be worded two different ways. Every owner of
 // a timetable, the activity included, opens the same sub-page now.
 H.ok(/function openGroupPage\(groupId\)/.test(adminJs), 'a group opens its own screen');
-H.ok(/text: 'Open this group \\u2192'/.test(adminJs), 'from a button on the one list of the groups');
+// ⚠ IT IS A GLYPH NOW, and the word survives in the aria-label rather than on
+// screen — "I would avoid buttons with long text, so here would change it to
+// icons". The shape and the three places the word lives are js/admin-icons.js's;
+// what matters here is only that the one list still offers the way in.
+H.ok(/AdminIcons\.button\('open', 'Open this group'/.test(adminJs),
+  'from a control on the one list of the groups');
 H.ok(/function drawOwnerPage/.test(adminJs), 'which draws the schedule and the calendar');
 H.ok(/function scheduleRowBox\(opts\)/.test(adminJs), 'built from ONE row builder');
 H.ok(/function sessionCalendarBox\(opts\)/.test(adminJs), 'and ONE calendar editor');

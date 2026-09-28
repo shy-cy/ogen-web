@@ -2031,6 +2031,122 @@ activity's old editor did and a group's did not, so a group could be set to
 "twice weekly" and given one day, which enumerates half a term with nothing
 erroring.
 
+### ⚠ A group could be deleted out from under the families in it
+
+Asked as *"is it true that there is no way to cancel/delete a sub-group?"* — and
+it was not true, which is how this was found. **Remove this group** existed on the
+group's own sub-page, in a `fact-grid` cell under a **blank label**
+(`el('label', { text: '\u00a0' })`) beside "Places in this group", correctly
+disabled when only one group remained. The list where anybody would look for it
+offered *Duplicate* and *Open this group →* and nothing else. That is this admin's
+own scar arriving again: **a control with no context of its own**, which is how a
+note about dates ended up in the group-size override box.
+
+So it read as missing. What it actually was is worse.
+
+⚠ **THE PUBLISH WENT THROUGH IN SILENCE.** Probed against the real handlers —
+register a child into `grp-bbbb`, then publish with that group removed:
+
+```
+publish with the group removed: 200
+  error   : (none)
+  warnings: null
+  fallout : {"terms":{"changed":0,"emailed":0},"room":{"groups":[],"told":0}}
+```
+
+⚠ **HALF OF WHAT FOLLOWED IS THE FREEZE WORKING**, and that half is not a bug.
+`frozen.groupName` kept the roster row and the family's own page reading
+**Advanced**, so nothing a family had been told became wrong. That is exactly what
+the freeze is for.
+
+⚠ **THE CAPACITY REPORT IS WHERE IT BITES.** `capacityReport()` buckets by id, so
+a registration whose `groupId` matches no surviving group falls through the named
+rows **and** through `unassigned`: counted in the activity total and in **no row**.
+The probe read `taken: 1`, `unassigned: 0`, and the surviving group at `taken: 0`
+— a full class reading as empty, word for word the failure this file already names
+in the other direction, where a pooled registration carrying `groupId: null` had to
+be counted **into** the single group or a full activity reported nought taken.
+
+And it was the one change an admin can make that reaches a live registration while
+saying nothing. A moved cutoff is counted and emailed, a raised capacity is counted
+and announced, a rewritten refund schedule is counted, a listing change is counted.
+This was not.
+
+⚠ **SO IT IS REFUSED, NOT RESOLVED.** The two alternatives are both worse:
+silently reassigning a family puts a child in a room nobody agreed to — under the
+equal-hours rule the other group can meet on a different day, at a different hour,
+in a different place, with different teachers — and orphaning them is the bug
+itself. The roster already has a **Move group** control, so the path is: move them,
+then remove the empty group, and the refusal **names that control** rather than
+leaving it to be found.
+
+Five rules carry it:
+
+- ⚠ **COUNTED WITH `holdsASpot()`, never the stored status** — the same derived
+  rule capacity counts by. A cancellation, a rejection, an expiry, a **lapsed
+  hold** and a place in a **queue** all stop blocking the removal on exactly the
+  schedule they stop being a place, rather than on a list of statuses a seventh
+  would have to be added to by somebody who remembered. Somebody waiting holds
+  nothing, so they do not block it — see the gap named below.
+- ⚠ **THE PREVIOUS LIST IS THE STORED RECORD'S, never the request's.** A hostile
+  client sending a short `groups` array is exactly the case being caught, so asking
+  the request what used to be there would let it answer *"nothing was removed"* and
+  delete whatever it liked.
+- ⚠ **IT READS ONLY WHEN IT CAN MATTER.** `removedGroupIds()` is pure and costs
+  nothing and is asked first, so an ordinary save — a reworded summary, a new
+  photograph — opens no store at all. Only a save that actually drops a group pays
+  for the scan. Same discipline the series candidate set follows.
+- ⚠ **ONE HELPER, NOT THREE CALL SITES.** It lives in `mergeFor()`, for the reason
+  `mergeFor()` exists: `saveDraft`, `preview` and `publish` all merge, and the one
+  that forgot would be the one where a group is deleted out from under a family.
+  Preview refuses too, or a preview renders what a publish would not.
+- **A draft saves and is told**, in the publish's own string, the way every other
+  rule on that form is said.
+
+The rule and its sentence are in **`_registration.js`**, beside `holdsASpot()`,
+which is what counts — not in `_activity-groups.js`, which requires nothing and
+would need an import cycle to reach it. What lives in `activities-admin.js` is the
+one thing a pure module may not do: read the registrations.
+
+⚠ **AND THE CONTROL MOVED TO WHERE PEOPLE LOOK.** It is on the **group list**
+beside Duplicate, and the sub-page keeps one — two doors, **one `removeGroup()`**,
+for the reason `openRegistration()` is one function called by a family claiming a
+place and by an admin giving one. Two copies is two places the last-group guard,
+the dirty flag and the confirm can come apart. The sub-page's blank cell is gone:
+it has its own row, a heading naming the **topic** (*Ending this group*) rather
+than repeating the button, and an (i) saying what the server will refuse.
+
+The client's confirm is a **courtesy, not the guard**: it holds no registrations
+and cannot know whether anybody is in the group. It names the group, because its
+places, teachers, facts, timetable and calendar go with it.
+
+⚠ **AND ALL THREE CONTROLS ON THAT ROW ARE GLYPHS.** Asked in the same breath —
+*"I would avoid buttons with long text, so here would change it to icons"* — and
+*Duplicate · Remove this group · Open this group →* was most of a row spent on
+three phrases repeating down the list, on a list that is **scanned** for which
+group to work on. The word is not gone, only off screen: `aria-label`, a `data-tip`
+tooltip on hover **and** on keyboard focus, and `title` for a touch device with
+neither — the contract the queue's row controls already have.
+
+⚠ **SO THE GLYPH CONTROL IS A SHARED MODULE, `js/admin-icons.js`**, loaded by both
+admin pages the way `js/admin-help.js` and `js/admin-url.js` are, and the CSS was
+**lifted** out of `.queue .acts` to a plain `button.icon` / `button[data-tip]`
+rather than copied. Two copies is two tooltip contracts free to stop being true on
+one screen, and the one that stopped would be the one where an admin is looking at
+a bare picture of a bin. ⚠ `:not(.icon)` on `.queue .acts button` is load-bearing:
+the lifted rule is (0,1,1) against that rule's (0,2,1), so without the exclusion a
+glyph comes back as a 10px-padded pill with a 17px picture rattling inside it —
+and those rows still hold word buttons (*Give a place*, *Present*, *No-show*).
+
+⚠ **ONE GAP IS LEFT OPEN AND IS NOT AN OVERSIGHT.** A **waitlisted** record
+pointing at a removed group is orphaned too — `placeOpened(activityId, groupId)`
+will never match it again — and it does **not** block the removal, because nothing
+an admin can press would fix it: the roster's Move group control is drawn on live
+rows, and the queue's own table offers nothing that reassigns. A refusal naming a
+remedy that does not exist is the invite button labelled with a description, which
+is the mistake this whole section is about. It wants a control before it wants a
+rule.
+
 ### Translation reaches a group's name
 
 `LANG_SUBKEYS` merges a scalar sub-key of a **fact**. A group's name lives at
@@ -8532,6 +8648,14 @@ share image, Formspree wiring, domain) is done. Open items:
   the record — there is no control for it on the form and the API refuses to
   write it. A UI is the backlog item; see **The cards moved every time you
   published** for why it is safe to leave as data in the meantime.
+
+- **A waiting family whose group is removed is still orphaned silently.**
+  Removing a group is refused while anybody **holds a place** in it, and a
+  waitlisted record holds nothing — so it does not block the removal, and
+  afterwards `placeOpened(activityId, groupId)` never matches it again. It is left
+  open deliberately: no control anywhere reassigns a waiting row, so a refusal
+  would name a remedy that does not exist. It wants a control first. See
+  **A group could be deleted out from under the families in it**.
 
 - **Russian copy has never been reviewed by a native speaker** — the homepage,
   the About and activity pages, every string in `_account-email.js` and

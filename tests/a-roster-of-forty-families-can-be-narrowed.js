@@ -171,6 +171,9 @@ function boot(opts) {
     String: String, Number: Number, RegExp: RegExp, Promise: Promise, setTimeout: setTimeout,
     encodeURIComponent: encodeURIComponent, decodeURIComponent: decodeURIComponent
   });
+  // The glyph control is its own shared module now, run for real rather than
+  // stubbed — see runAdminIcons().
+  H.runAdminIcons(ctx);
   vm.runInContext(src, ctx, { filename: 'js/registrations-admin.js' });
   return dom;
 }
@@ -369,8 +372,15 @@ function choose(sel, value) {
 
   console.log('\n[and the tooltip answers a keyboard, not only a mouse]');
   const css2 = read('admin/admin.css');
-  const tip = css2.slice(css2.indexOf('.queue .acts button[data-tip]::after'),
+  // ⚠ THE SELECTOR IS NOT `.queue .acts` ANY MORE, and that is the fix rather
+  // than drift: the group list on the activities form needed the same glyph
+  // control — "I would avoid buttons with long text" — so the rule was LIFTED to
+  // `button[data-tip]` rather than copied, and two tooltip contracts free to stop
+  // being true on one screen is exactly what a copy would have been.
+  const tip = css2.slice(css2.indexOf('button[data-tip]::after'),
                          css2.indexOf('@media (prefers-reduced-motion'));
+  H.eq(css2.indexOf('.queue .acts button[data-tip]'), -1,
+    'and there is no per-screen copy of it left behind');
   H.ok(/:hover::after/.test(tip), 'it opens on hover');
   H.ok(/:focus-visible::after/.test(tip),
     '⚠ and on focus — a control only a mouse can explain is unreadable to ' +

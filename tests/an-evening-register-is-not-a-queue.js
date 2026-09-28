@@ -120,6 +120,9 @@ function boot(answerOver) {
     String: String, Number: Number, RegExp: RegExp, Promise: Promise, setTimeout: setTimeout,
     encodeURIComponent: encodeURIComponent, decodeURIComponent: decodeURIComponent
   });
+  // The glyph control is its own shared module now, run for real rather than
+  // stubbed — see runAdminIcons().
+  H.runAdminIcons(ctx);
   vm.runInContext(src, ctx, { filename: 'js/registrations-admin.js' });
   return dom;
 }

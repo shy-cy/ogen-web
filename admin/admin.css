@@ -389,9 +389,15 @@ h2 > button.help,h3 > button.help{vertical-align:2px;}
   font-size:13px; color:#5a5a54; flex:1 1 200px; font-variant-numeric:tabular-nums;
 }
 
-/* The group list's rows carry two buttons now — Duplicate and the way in — so
-   the name and the summary have to stop eating the width. Nothing is pushed to
-   an edge; the summary simply takes what is left. */
+/* ⚠ THE ROW'S CONTROLS ARE GLYPHS, FOR THE REASON THE QUEUE'S ARE. Three of them
+   now — Duplicate, Remove, and the way in — and "Duplicate · Remove this group ·
+   Open this group →" is most of a row spent on words that repeat down the list.
+   The shared `button.icon` rule above carries the shape and the tooltip; what is
+   here is only how they sit in this row.
+
+   Nothing is pushed to an edge, so there is nothing directional to get wrong;
+   the summary simply takes what is left. */
+.owner-row .owner-acts{ display:flex; gap:6px; flex:0 0 auto; }
 .owner-row .add-btn, .owner-row .del{ flex:0 0 auto; }
 
 /* A group's own page. It is a view swap rather than a second HTML page, so it
@@ -515,7 +521,13 @@ h2 > button.help,h3 > button.help{vertical-align:2px;}
 .queue select.group-move:disabled{opacity:.5;cursor:progress;}
 
 .queue .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
-.queue .acts button{
+/* ⚠ `:not(.icon)` IS LOAD-BEARING. The glyph treatment moved out of `.queue
+   .acts` so the group list could share it, and a lifted `button.icon` is (0,1,1)
+   against this rule's (0,2,1) — so without the exclusion this padding and this
+   border-radius would win and every glyph would come back as a 10px-padded pill
+   with a 17px picture rattling around in it. These rows still hold word buttons
+   — Give a place, Present, No-show — which is what this is for. */
+.queue .acts button:not(.icon){
   font-family:inherit;font-size:12px;font-weight:700;padding:5px 10px;border-radius:6px;
   border:1px solid #d7cfbb;background:#fff;cursor:pointer;white-space:nowrap;
 }
@@ -524,31 +536,43 @@ h2 > button.help,h3 > button.help{vertical-align:2px;}
 .queue .acts button.go{background:var(--olive);border-color:var(--olive);color:#fff;}
 .queue .acts button.no{border-color:#e0cfc8;color:var(--danger);}
 
-/* ---- the row's controls, as glyphs -----------------------------------------
-   Four labelled buttons wrapped to two lines on every row, so a table opened to
-   SCAN for the rows that need something doing was half as tall again as it had
-   to be, and the labels were the same four words repeated down the page.
+/* ---- a glyph control, anywhere in the admin ---------------------------------
+   The queue's row controls became glyphs first: four labelled buttons wrapped to
+   two lines on every row, so a table opened to SCAN for the rows that need
+   something doing was half as tall again as it had to be. The group list on the
+   activities form arrived at the same place from the other side — "I would avoid
+   buttons with long text, so here would change it to icons".
+
+   ⚠ SO THE RULE IS LIFTED OUT OF `.queue .acts` RATHER THAN COPIED INTO
+   `.owner-row`. Two copies is two tooltip contracts, free to stop being true on
+   one screen — and the one that stopped would be the one where an admin is
+   looking at a bare picture of a bin.
 
    ⚠ The word is not gone, only off screen: every one carries `aria-label`, a
    `data-tip` tooltip on hover AND on keyboard focus, and `title` for a touch
-   device that has neither. This admin has twice paid for a control nobody could
-   read — the invite button labelled with a description, and the (i) rule that
-   exists because a hint nobody can reach is a hint nobody has. */
-.queue .acts button.icon{
+   device that has neither. This admin has paid three times for a control nobody
+   could read — the invite button labelled with a description, the (i) rule that
+   exists because a hint nobody can reach is a hint nobody has, and a Remove
+   control sitting under a blank label on a group's sub-page. */
+button.icon{
   width:32px; height:32px; padding:0; display:grid; place-items:center;
-  border-radius:7px; position:relative;
+  font-family:inherit; border-radius:7px; position:relative; cursor:pointer;
+  border:1px solid #d7cfbb; background:#fff; color:var(--navy);
 }
-.queue .acts button.icon svg{ width:17px; height:17px; display:block; }
-/* The two that decide keep their colour; the two that open a panel do not. */
-.queue .acts button.icon.go{ background:var(--olive); border-color:var(--olive); color:#fff; }
-.queue .acts button.icon.no{ border-color:#e0cfc8; color:var(--danger); }
-.queue .acts button.icon.no:hover:not(:disabled){ background:var(--danger); border-color:var(--danger); color:#fff; }
+button.icon:hover:not(:disabled){ background:var(--stone); }
+button.icon:disabled{ opacity:.4; cursor:not-allowed; }
+button.icon:focus-visible{ outline:2px solid var(--terracotta); outline-offset:1px; }
+button.icon svg{ width:17px; height:17px; display:block; }
+/* The ones that DECIDE keep their colour; the ones that open a panel do not. */
+button.icon.go{ background:var(--olive); border-color:var(--olive); color:#fff; }
+button.icon.no{ border-color:#e0cfc8; color:var(--danger); }
+button.icon.no:hover:not(:disabled){ background:var(--danger); border-color:var(--danger); color:#fff; }
 
 /* The tooltip. Native `title` waits about a second and cannot be styled, and
-   this row is scanned rather than read — so the word arrives at once. It is
-   `position:absolute` against the button and the table is not clipped, so it
-   is not fighting an overflow the way the (i) popover had to. */
-.queue .acts button[data-tip]::after{
+   these rows are scanned rather than read — so the word arrives at once. It is
+   `position:absolute` against the button and neither table is clipped, so it is
+   not fighting an overflow the way the (i) popover had to. */
+button[data-tip]::after{
   content:attr(data-tip);
   position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%);
   background:var(--ink); color:#fff; font-size:11px; font-weight:600;
@@ -558,12 +582,12 @@ h2 > button.help,h3 > button.help{vertical-align:2px;}
   opacity:0; transition:opacity .12s ease; z-index:5;
 }
 /* ⚠ FOCUS AS WELL AS HOVER. A control only a mouse can explain is unreadable to
-   anybody tabbing through the queue. */
-.queue .acts button[data-tip]:hover::after,
-.queue .acts button[data-tip]:focus-visible::after{ opacity:1; }
-.queue .acts button[data-tip]:disabled::after{ opacity:0; }
+   anybody tabbing through the queue — or through the group list. */
+button[data-tip]:hover::after,
+button[data-tip]:focus-visible::after{ opacity:1; }
+button[data-tip]:disabled::after{ opacity:0; }
 @media (prefers-reduced-motion: reduce){
-  .queue .acts button[data-tip]::after{ transition:none; }
+  button[data-tip]::after{ transition:none; }
 }
 
 /* ---- the evenings on a drop-in --------------------------------------------

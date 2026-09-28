@@ -2259,20 +2259,35 @@
         'to pick between them.'));
 
     list.forEach(function (g) {
-      var open = el('button', { type: 'button', class: 'add-btn', text: 'Open this group \u2192',
-                                disabled: !canEditAll() || null });
-      open.addEventListener('click', function () { openGroupPage(g.groupId); });
-      // ⚠ DUPLICATE MINTS A FRESH ID. Reusing one would attach last term's
-      // registrations to a group nobody registered for — which is also why
-      // delete-and-recreate produces a new activityId.
-      var copy = el('button', { type: 'button', class: 'add-btn', text: 'Duplicate',
-                                disabled: !canEditAll() || null });
-      copy.addEventListener('click', function () { duplicateGroup(g.groupId, box); });
+      // ⚠ THE THREE CONTROLS ARE GLYPHS, and the whole word survives in the
+      // tooltip, the aria-label and the title — js/admin-icons.js carries the
+      // argument. "Duplicate · Remove this group · Open this group →" was most of
+      // a row spent on three phrases that repeat down the list, and the row is
+      // scanned for which group to work on rather than read.
+      var copy = window.AdminIcons.button('copy', 'Duplicate',
+        'a whole group as a starting point, with a fresh id and "(copy)" on the ' +
+        'name. The original keeps its registrations', null,
+        !canEditAll(), function () { duplicateGroup(g.groupId, box); });
+      // ⚠ AND REMOVE IS HERE, WHERE PEOPLE LOOK FOR IT. It existed only on the
+      // group's own sub-page, in a grid cell under a BLANK label — so it read as
+      // an orphaned button rather than as the control for the group whose page
+      // you were on, and the list where anybody would look for it offered
+      // Duplicate and the way in and nothing else. Reported as "is it true that
+      // there is no way to cancel/delete a sub-group?".
+      var remove = window.AdminIcons.button('remove', 'Remove this group',
+        severalGroups(list)
+          ? 'it goes when the activity is saved. Refused while anybody is still ' +
+            'registered to it \u2014 move them from the Roster first'
+          : 'an activity needs at least one group', 'no',
+        !canEditAll() || !severalGroups(list), function () { removeGroup(g.groupId, box); });
+      var open = window.AdminIcons.button('open', 'Open this group',
+        'its name, places, teachers, facts, timetable and calendar', null,
+        !canEditAll(), function () { openGroupPage(g.groupId); });
       box.appendChild(el('div', { class: 'item' }, [
         el('div', { class: 'owner-row' }, [
           el('span', { class: 'owner-name', text: list.length > 1 ? groupLabel(g) : (groupLabel(g) === 'Unnamed group' ? 'The class' : groupLabel(g)) }),
           el('span', { class: 'owner-when', text: groupSummary(g) }),
-          copy, open
+          el('div', { class: 'owner-acts' }, [copy, remove, open])
         ])
       ]));
     });
@@ -2286,6 +2301,46 @@
       drawGroups(box);
     });
     box.appendChild(add);
+  }
+
+  // An activity always keeps at least one group, so the last one cannot go —
+  // asked in one place rather than by each control, because two copies of that
+  // is one of them letting the list reach nought.
+  function severalGroups(list) { return (list || S.groups || []).length > 1; }
+
+  // ⚠ ONE REMOVAL, TWO DOORS. The list is where an admin looks for it and the
+  // sub-page is where they are standing when they decide a group is wrong, so
+  // both offer it — and both call THIS, for the reason openRegistration() is one
+  // function called by a family claiming a place and by an admin giving one. Two
+  // copies is two places the last-group guard, the dirty flag and the confirm can
+  // come apart, and the one that came apart would be the one that deleted a group
+  // somebody was registered to without asking.
+  //
+  // ⚠ IT IS A CONFIRM, because the group takes its name, its places, its
+  // teachers, its seven facts, its timetable and a calendar of a dozen dates with
+  // it — none of which is recoverable from this screen. It names the group, the
+  // way the calendar's "Clear all N dates" names its count.
+  //
+  // ⚠ AND IT IS NOT THE GUARD THAT MATTERS. Nothing here can know whether a
+  // family is registered to this group — the client holds no registrations — so
+  // the real refusal is the server's, in one string, warned about on saveDraft
+  // and refused at preview and publish. See groupRemovalProblems() in
+  // _registration.js. This is the courtesy; that is the rule.
+  function removeGroup(groupId, box) {
+    var g = groupById(groupId);
+    if (!g || !severalGroups()) return false;
+    var name = groupLabel(g);
+    if (!window.confirm('Remove ' + (name === 'Unnamed group' ? 'this group' : '\u201c' + name + '\u201d') +
+        '?\n\nIts places, teachers, facts, timetable and calendar go with it when ' +
+        'the activity is saved.\n\nIf anybody is still registered to it the save will ' +
+        'say so and refuse \u2014 move them to another group from the Roster first.')) {
+      return false;
+    }
+    S.groups = (S.groups || []).filter(function (x) { return x.groupId !== groupId; });
+    S.dirty = true;
+    if (S.ownerEdit && S.ownerEdit.groupId === groupId) S.ownerEdit = null;
+    if (box) drawGroups(box);
+    return true;
   }
 
   // ⚠ A WHOLE GROUP, COPIED AS A STARTING POINT. Two groups of one activity
@@ -2619,20 +2674,42 @@
                             disabled: !canEditAll() || null });
     cap.value = e.capacity == null ? '' : e.capacity;
     cap.addEventListener('input', function () { S.dirty = true; });
-    var remove = el('button', { type: 'button', class: 'del', text: 'Remove this group',
-                                disabled: !canEditAll() || !many || null,
-                                title: many ? null : 'An activity needs at least one group.' });
-    remove.addEventListener('click', function () {
-      S.groups = (S.groups || []).filter(function (g) { return g.groupId !== e.groupId; });
-      S.dirty = true;
-      S.ownerEdit = null;
-      closeOwnerPage();
-    });
     who.appendChild(el('div', { class: 'fact-grid' }, [
-      el('div', {}, [el('label', { for: GROUP_PREFIX + '-cap', text: 'Places in this group' }), cap]),
-      el('div', {}, [el('label', { text: ' ' }), remove])
+      el('div', {}, [el('label', { for: GROUP_PREFIX + '-cap', text: 'Places in this group' }), cap])
     ]));
     who.appendChild(teacherPicker(e));
+
+    // ⚠ IT WAS IN THE FACT GRID, UNDER A BLANK LABEL — `el('label', {text: '\u00a0'})`
+    // beside "Places in this group" — so the one control that ends a group read as
+    // an orphaned button in an empty cell rather than as the thing this page is
+    // about. That is the shape this admin already has a scar for: a control with
+    // no context of its own collects whatever somebody wanted to do next, which
+    // is how a note about DATES ended up in the group-size override box.
+    //
+    // It has its own row and its own heading now, and the heading names the TOPIC
+    // rather than repeating the button — a heading saying what the control beneath
+    // it says is the duplication the fact-group headings exist to forbid.
+    //
+    // ⚠ AND IT IS THE SAME REMOVAL THE LIST OFFERS, through removeGroup(), which
+    // is where the last-group guard and the confirm live. The rule that actually
+    // matters is the SERVER'S: this client holds no registrations and cannot know
+    // whether anybody is in the group.
+    var remove = el('button', { type: 'button', class: 'del', text: 'Remove this group',
+                                disabled: !canEditAll() || !severalGroups() || null,
+                                title: severalGroups() ? null
+                                     : 'An activity needs at least one group.' });
+    remove.addEventListener('click', function () {
+      if (removeGroup(e.groupId)) closeOwnerPage();
+    });
+    who.appendChild(el('div', { class: 'field-row' }, [
+      withHelp(el('div', { class: 'field-label', text: 'Ending this group' }),
+        'Everything on this page \u2014 the name, the places, the teachers, the facts, the ' +
+        'timetable and the calendar \u2014 goes with it when the activity is saved. It is ' +
+        'refused while anybody is still registered to the group: move them to another ' +
+        'group from the Roster first, then remove the empty one. An activity always keeps ' +
+        'at least one group, so the last one cannot be removed.'),
+      remove
+    ]));
     page.appendChild(who);
 
     // --- the facts this group answers for -----------------------------------

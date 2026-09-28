@@ -437,20 +437,38 @@ console.log('\n[a two-group activity survives a save]');
   };
   const buttons = (n, label) =>
     walk(n, (x) => x.tagName === 'BUTTON' && x.textContent.indexOf(label) !== -1);
+  // ⚠ A GLYPH CARRIES NO TEXT, so it is found by the word that DID survive.
+  const icons = (n, label) =>
+    walk(n, (x) => x.tagName === 'BUTTON' && x.getAttribute('aria-label') === label);
 
+  // ⚠ createElementNS, BECAUSE THE ROW'S CONTROLS ARE GLYPHS NOW. An <svg> made
+  // with createElement is an HTMLUnknownElement and draws nothing at all, so the
+  // shim answers the namespaced factory and records what it was given — and
+  // js/admin-icons.js is run FOR REAL rather than stubbed, or every assertion
+  // about the word surviving in aria-label, data-tip and title would be about a
+  // fake.
+  const nodeNS = (ns, tag) => {
+    const n = node(tag);
+    n.namespaceURI = ns;
+    return n;
+  };
   const drawCtx = {
-    document: { createElement: node },
+    document: { createElement: node, createElementNS: nodeNS },
     window: H.adminHelpWindow(node),
     DAY_NAMES: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
     canEditAll: () => true,
     openGroupPage: (id) => { drawCtx.opened = id; },
-    S: null, opened: null, exports: null
+    S: null, opened: null, exports: null, confirmed: true
   };
+  // Removing a group asks first, because its places, teachers, facts, timetable
+  // and calendar go with it. The answer is the harness's, so both can be driven.
+  drawCtx.window.confirm = (msg) => { drawCtx.asked = msg; return drawCtx.confirmed; };
   vm.createContext(drawCtx);
   vm.runInContext(elSrc + '\n' +
     ['withHelp', 'mintGroupId', 'groupById', 'groupLabel', 'liveDates', 'groupSummary',
-     'blankGroupFacts', 'drawGroups', 'duplicateGroup'].map(slice).join('\n') +
+     'blankGroupFacts', 'drawGroups', 'severalGroups', 'removeGroup', 'duplicateGroup'].map(slice).join('\n') +
     '\nexports = { drawGroups, groupSummary };', drawCtx);
+  H.runAdminIcons(drawCtx);
 
   const withSchema = { schema: { groupFacts: ['ages', 'schedule', 'duration'] }, dirty: false };
   const g = (id, name, cap, day) => ({
@@ -462,7 +480,7 @@ console.log('\n[a two-group activity survives a save]');
   drawCtx.S = Object.assign({ groups: [g('g-a', { he: '', en: '', ru: '' }, 20, 3)] }, withSchema);
   let box = node('div');
   drawCtx.exports.drawGroups(box);
-  H.eq(buttons(box, 'Open this group').length, 1, 'one group draws one way in');
+  H.eq(icons(box, 'Open this group').length, 1, 'one group draws one way in');
   // ⚠ READ OFF THE (i), NOT OFF THE PAGE. Every explanation in the admin is a
   // control now rather than a paragraph — see js/admin-help.js — so the words
   // live on the badge and the line on screen is the COUNT, which is the part
@@ -493,8 +511,8 @@ console.log('\n[a two-group activity survives a save]');
   H.ok(box.textContent.indexOf('2 groups') !== -1, 'the line on screen counts them');
   H.ok(helpText(box).indexOf('a family CHOOSES one when they register') !== -1,
     'and the (i) says that a family chooses');
-  H.eq(buttons(box, 'Duplicate').length, 2, 'and each one can be duplicated');
-  buttons(box, 'Duplicate')[0].click();
+  H.eq(icons(box, 'Duplicate').length, 2, 'and each one can be duplicated');
+  icons(box, 'Duplicate')[0].click();
   H.eq(drawCtx.S.groups.length, 3, 'duplicating adds a third');
   H.ok(drawCtx.S.groups[2].groupId !== 'g-a',
     '\u26a0 with a FRESH id \u2014 reusing one would attach the original\u2019s registrations to it');
@@ -509,7 +527,7 @@ console.log('\n[a two-group activity survives a save]');
   H.eq(drawCtx.S.groups[0].capacity, 7,
     '\u26a0 and a DEEP copy \u2014 a shared facts object would have two groups editing one calendar');
 
-  buttons(box, 'Open this group')[1].click();
+  icons(box, 'Open this group')[1].click();
   H.eq(drawCtx.opened, 'g-b', 'and each row opens its own group');
 
   H.done();

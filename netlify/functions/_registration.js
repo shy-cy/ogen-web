@@ -314,6 +314,86 @@ function hasRoom(report, groupId) {
   return report.left == null || report.left > 0;
 }
 
+// --- removing a group, while somebody is in it -------------------------------
+//
+// ⚠ A GROUP COULD BE DELETED OUT FROM UNDER THE FAMILIES REGISTERED TO IT.
+//
+// Asked as "is it true that there is no way to cancel/delete a sub-group?" —
+// and it was not true, which is how this was found. `Remove this group` existed
+// on the group's own sub-page, `mergeGroups()` takes the membership from a
+// full-access request, and the publish went through with **no error, no warning
+// and nothing in the fallout**: a 200, `changed: 0`, `told: 0`.
+//
+// Half of what follows is the freeze working. `frozen.groupName` keeps the
+// roster row and the family's own page honest — both still read "Advanced" —
+// so nothing a family had been told becomes wrong, which is exactly what the
+// freeze is for.
+//
+// ⚠ THE CAPACITY REPORT IS WHERE IT BITES. capacityReport() buckets by id: a
+// registration whose groupId matches no surviving group falls through the named
+// rows AND through the `unassigned` count, so it is counted in the activity
+// total and in NO row. A full class reads as empty — word for word the failure
+// this file already names in the other direction, where a pooled registration
+// carrying `groupId: null` had to be counted INTO the single group or a full
+// activity reported nought taken.
+//
+// And it is the one change an admin can make that reaches a live registration
+// while saying nothing. A moved cutoff is counted and emailed, a raised capacity
+// is counted and announced, a rewritten refund schedule is counted, a listing
+// change is counted. This was silent.
+//
+// ⚠ SO IT IS REFUSED, RATHER THAN RESOLVED. The two alternatives are both worse:
+// silently reassigning a family puts a child in a room nobody agreed to — under
+// the equal-hours rule the other group can meet on a different day, at a
+// different hour, in a different place, with different teachers — and leaving
+// them orphaned is the bug. The roster already has a **Move group** control, so
+// the admin's path is: move them, then remove the empty group. A warning on
+// saveDraft and a refusal at preview and publish, through one string, the way
+// every other rule on that form is said.
+//
+// PURE, and split in two on purpose. `removedGroupIds` costs nothing and is
+// asked first, so an ordinary save — a reworded summary, a new photograph —
+// reads no registrations at all. Only a save that actually drops a group pays
+// for the scan.
+
+function removedGroupIds(previousGroups, nextGroups) {
+  const keep = new Set((Array.isArray(nextGroups) ? nextGroups : [])
+    .map((g) => g && g.groupId).filter(Boolean));
+  return (Array.isArray(previousGroups) ? previousGroups : [])
+    .map((g) => g && g.groupId).filter(Boolean)
+    .filter((id) => !keep.has(id));
+}
+
+// The sentence an admin reads, per group that cannot go yet.
+//
+// ⚠ COUNTED WITH holdsASpot(), never the stored status — the same derived rule
+// capacity counts by. So a lapsed hold, a rejection, an expiry and a
+// cancellation all stop blocking the removal on exactly the schedule they stop
+// being a place, rather than on a list of statuses a seventh status would have
+// to be added to.
+//
+// ⚠ AND THE NAME COMES FROM THE GROUP BEING REMOVED, not from the frozen copy on
+// a registration: an admin who renamed the group this morning is looking at the
+// new name on the screen in front of them, and a refusal naming the old one
+// reads as being about some other group.
+function groupRemovalProblems(previousGroups, nextGroups, regs, now) {
+  const gone = new Set(removedGroupIds(previousGroups, nextGroups));
+  if (!gone.size) return [];
+  const rows = (Array.isArray(regs) ? regs : []).filter((r) => r && gone.has(r.groupId));
+  return (Array.isArray(previousGroups) ? previousGroups : [])
+    .filter((g) => g && gone.has(g.groupId))
+    .map((g) => {
+      const held = rows.filter((r) => r.groupId === g.groupId && holdsASpot(r, now)).length;
+      if (!held) return null;
+      const label = (g.name && (g.name.en || g.name.he || g.name.ru)) || g.groupId;
+      return label + ': ' + held + (held === 1 ? ' family is' : ' families are') +
+        ' still registered to this group, so it cannot be removed. Move ' +
+        (held === 1 ? 'them' : 'them all') + ' to another group from the Roster ' +
+        'first, then remove the empty group.';
+    })
+    .filter(Boolean);
+}
+
 // --- the age flag, and what auto-approve does with it ------------------------
 
 // Measured at the ACTIVITY'S START where there is one, not at submission. A
@@ -836,6 +916,7 @@ function transition(reg, { status, by, source, note, now }) {
 
 module.exports = {
   STATUSES, CANCEL_SOURCES, CURRENCY, key, CHARGED_STATUSES, LIVE_STATUSES,
+  removedGroupIds, groupRemovalProblems,
   CLAIM_HOURS, isWaiting,
   ACADEMIC_YEAR_STARTS,
   academicYearOf, feeYearOf, seriesOf, feeStandsOn, feeApplies, feeHeldByLiveTerm,

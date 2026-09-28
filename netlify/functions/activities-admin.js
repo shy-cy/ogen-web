@@ -318,7 +318,37 @@ async function mergeFor(record, incoming, session) {
   const series = SERIES.isLinkedTerm(merged)
     ? SERIES.applyFee(merged, await seriesCandidates())
     : { inherits: false };
-  return { merged, series, calendars };
+  const groupsInUse = await groupRemovalProblems(record, merged);
+  return { merged, series, calendars, groupsInUse };
+}
+
+// ⚠ REMOVING A GROUP SOMEBODY IS REGISTERED TO, REFUSED HERE RATHER THAN FOUND
+// AFTERWARDS.
+//
+// The rule and its sentence are in _registration.js, beside holdsASpot(), which
+// is what counts. What lives here is the one thing that module may not do: read
+// the registrations. It is in mergeFor() for the reason mergeFor() exists —
+// saveDraft, preview and publish all merge, and the one that forgot would be the
+// one where a group is deleted out from under a family.
+//
+// ⚠ THE PREVIOUS LIST IS THE STORED RECORD'S, never the request's. A hostile
+// client sending a short `groups` array is exactly the case being caught, so
+// asking the request what used to be there would let it answer "nothing was
+// removed" and delete whatever it liked.
+//
+// ⚠ AND IT READS ONLY WHEN IT CAN MATTER — the same discipline the series
+// candidate set follows one function up. No group dropped, no scan: an ordinary
+// save pays nothing for this.
+//
+// Required lazily: the registration store is not something a publish otherwise
+// touches, and a function has ten seconds.
+async function groupRemovalProblems(record, merged) {
+  if (!record || !record.activityId) return [];
+  const R = require('./_registration');
+  if (!R.removedGroupIds(record.groups, merged.groups).length) return [];
+  const store = require('./_registration-store');
+  const regs = await store.forActivity(record.activityId);
+  return R.groupRemovalProblems(record.groups, merged.groups, regs, Date.now());
 }
 
 // ⚠ A CUSTOM SCHEDULE'S CALENDAR IS FILLED IN AT SAVE TIME, and it is here
@@ -366,8 +396,12 @@ function fillCustomCalendars(activity) {
 // Thrown in the shape validate() throws, so the one channel the client already
 // reads for a refusal carries this one too.
 function refuse(message) {
-  const err = new Error(message);
-  err.validation = [message];
+  // One string or several. The group-removal check can name more than one group
+  // in a single save, and `validation` is the channel the client already draws a
+  // list from.
+  const all = Array.isArray(message) ? message : [message];
+  const err = new Error(all[0]);
+  err.validation = all;
   throw err;
 }
 
@@ -1167,11 +1201,12 @@ exports.handler = async (event) => {
 
       case 'preview': {
         const { record } = await currentRecord(String(body.activity && body.activity.slug || ''));
-        const { merged, series } = await mergeFor(record, body.activity || {}, session);
+        const { merged, series, groupsInUse } = await mergeFor(record, body.activity || {}, session);
         // Refused on preview exactly as at publish: a preview that renders a fee
         // publish would not is a preview that lies, which is the one thing
         // preview-matches-publish forbids.
         if (series.problem) refuse(series.problem);
+        if (groupsInUse.length) refuse(groupsInUse);
         const out = await generate(merged, { commit: false, session });
         return json(200, { ok: true, dryRun: true, ...out });
       }
@@ -1215,7 +1250,7 @@ exports.handler = async (event) => {
         const slug = String(incoming.slug || '');
         if (!SLUG_RE.test(slug)) return json(400, { error: 'Bad slug' });
         const { record } = await assertFresh(slug, body.baseUpdatedAt, { overwrite: body.overwrite });
-        const { merged: draftRecord, series, calendars } = await mergeFor(record, incoming, session);
+        const { merged: draftRecord, series, calendars, groupsInUse } = await mergeFor(record, incoming, session);
         const merged = stamp(draftRecord);
         merged.status = 'draft';
         await putDraft(merged);
@@ -1242,6 +1277,12 @@ exports.handler = async (event) => {
         // same string publish refuses with, so the two cannot drift into two
         // accounts of one rule.
         if (series.problem) warnings.push(series.problem);
+        // ⚠ AND A GROUP DROPPED OUT FROM UNDER A FAMILY IS SAID HERE TOO, in the
+        // same words the publish refuses with. A draft saves whatever is in it —
+        // it has no page and no registrations point at it — but an admin who has
+        // just deleted a group from the list has to find out now rather than
+        // several screens and one decision later.
+        groupsInUse.forEach((m) => warnings.push(m));
         // ⚠ NEVER A SILENT BACKGROUND ACTION. A calendar appearing on a record
         // because somebody pressed Save is a change they did not ask for, and an
         // admin who is not told cannot tell it from the calendar having been
@@ -1261,8 +1302,9 @@ exports.handler = async (event) => {
         if (!SLUG_RE.test(slug)) return json(400, { error: 'Bad slug' });
 
         const { record, overwritten } = await assertFresh(slug, body.baseUpdatedAt, { overwrite: body.overwrite });
-        const { merged: toPublish, series, calendars } = await mergeFor(record, incoming, session);
+        const { merged: toPublish, series, calendars, groupsInUse } = await mergeFor(record, incoming, session);
         if (series.problem) refuse(series.problem);
+        if (groupsInUse.length) refuse(groupsInUse);
         const merged = stamp(toPublish);
         if (merged.status === 'draft') {
           return json(400, { error: 'Set a status other than Draft to publish. Draft activities are never committed.' });
