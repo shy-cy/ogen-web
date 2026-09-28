@@ -5483,6 +5483,75 @@ else, surviving the sweep by living in the refusal table rather than on a screen
 It keeps its own **code**, because the two states are genuinely different to the
 client, and says one thing to the family, because they are not.
 
+#### ⚠ And the button was taken away, and the stylesheet put it back
+
+Reported from a phone, looking at the panel the section above describes doing
+everything right — the option marked `כבר רשום/ה`, the tinted block saying there
+is nothing to do here, the link to the registration they already have — with a
+live terracotta **Register** button underneath it: *"if the child is already
+registered, why is there a registration button?"*
+
+⚠ **THE CLIENT WAS RIGHT AND HAD BEEN ALL ALONG.** `syncWho()` does exactly what
+it says and what its test asserts: `go.setAttribute('hidden', 'hidden')`. The
+button carried the attribute on the live site. What put it back on screen was
+`shared.css`.
+
+`[hidden]{display:none}` is the **browser's** rule and lives in the
+**user-agent origin**, which loses to every author rule whatever its
+specificity. So `.btn-primary{display:inline-block}` — one line, written for the
+hero button years before any of this existed — quietly made that element
+**unhideable by the attribute whose entire meaning is "this is not relevant"**,
+everywhere on the site. Nothing errored, the DOM said hidden, and only the
+rendered page disagreed.
+
+⚠ **AND IT HAD BEEN PATCHED TWICE ALREADY, PER CLASS.** `.lang-menu` carried its
+own `[hidden]{display:none}` and so did `.activity-sticky`, each written the day
+that element first needed hiding, each correct, and neither of them a rule about
+anything but itself. Two patches for one trap is a **discipline**, which is the
+shape this file names every time it loses — and the third element to be hidden
+was the one nobody thought to patch. It was a button, on a screen about a child's
+place.
+
+So `[hidden]{ display:none !important; }` sits with the resets, both patches are
+**deleted** rather than left beside it, and the `!important` is the point rather
+than a shortcut: the global is at the top of the file, so every `display` in the
+1700 lines below it is a later declaration at equal specificity and would win on
+source order alone. `hidden` is not a style to be weighed against other styles.
+
+⚠ **AND THE SUITE FOR THE REPORTED BUG ASSERTED THE FIX AND PASSED THROUGH IT.**
+`a-form-offered-to-somebody-already-registered.js` checks the client contains
+`go.setAttribute('hidden', 'hidden')` — true, and true for every day the button
+was visible. Reading one side proves that side is self-consistent and can never
+prove the two agree, which is this project's oldest lesson about its own tests.
+So `a-button-that-was-told-to-go-away-and-did-not.js` matches no string: it
+**resolves the cascade** for the three elements this site actually hides — the
+way a browser does, importance then specificity then source order, with `@media`
+rules ordered by their real offset in the file rather than after the base ones —
+and asserts each computes to `display:none` hidden and to something else shown.
+⚠ A selector it cannot parse is a **failure** rather than a miss when it names one
+of the element's classes, or the check would be quietly under-approximating.
+Confirmed in real Chrome either way: the shipped stylesheet renders that button
+`inline-block` with `hidden` set, and the fixed one renders all three `none`.
+
+⚠ **WHERE THE STICKY BUTTON EARNS ITS PLACE, MEASURED.** Asked in the same
+message — *"in the registration page we should have a sticky button for register
+and also in the payment page for pay"* — and the answer is not the same for the
+two, so it is written down. The real client was driven through `tests/_dom.js`,
+serialised, and laid out in Chrome at 375×680:
+
+| screen | the button | page | |
+|---|---|---|---|
+| the **course** register panel | 606px | 1543px | **0.9 viewports** |
+| the **drop-in** register panel, ten evenings | 1264px | 2111px | 1.9 |
+| the **registration** page's Pay button | 1358px | 2926px | 2.0 |
+
+The course panel is a person select, a group select and a button; its control is
+at the fold already, and a fixed bar would cost 74px of viewport to save a scroll
+nobody makes. The other two are the activity page's problem at half the depth,
+and the drop-in one has the stronger case of the three: its button carries a
+**running total that changes as evenings are ticked**, so a fixed copy is live
+feedback on the choices being made above it rather than only a shortcut.
+
 ⚠ **AND THE REGISTER PANEL IS NOT ON THE DASHBOARD AT ALL.** It was, drawn from
 `?register=<slug>`, and sitting at the top of a page headed "My family" it read
 as the place registration lives — which is the thing the link above exists to

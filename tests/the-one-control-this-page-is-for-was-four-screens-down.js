@@ -52,8 +52,14 @@ console.log('[the bar has a rule at all]');
 H.ok(/\.activity-sticky\{/.test(code), '.activity-sticky is styled');
 H.ok(/class = 'activity-sticky'|className = 'activity-sticky'/.test(js),
   'and that is the class the script actually writes');
-H.ok(/\.activity-sticky\[hidden\]\{[^}]*display:none/.test(code.replace(/\s+/g, ' ').replace(/\{ /g, '{')),
-  'hidden means display:none — the attribute alone loses to display:block');
+// ⚠ AND `hidden` IS ANSWERED ONCE, FOR THE WHOLE STYLESHEET. This rule used to
+// carry its own `.activity-sticky[hidden]{display:none}`, as .lang-menu did —
+// two patches for one trap, which is a discipline, and the third case broke it:
+// the register panel's `.btn-primary{display:inline-block}` put a hidden
+// Register button back on screen for a family already registered. The global
+// is in a-button-that-was-told-to-go-away-and-did-not.js.
+H.ok(!/\.activity-sticky\[hidden\]/.test(code),
+  'no per-class patch left here — the global rule answers it');
 
 console.log('\n[one query, the one the grid already stacks in]');
 H.eq((css.match(/@media \(max-width:939px\)/g) || []).length, 1,

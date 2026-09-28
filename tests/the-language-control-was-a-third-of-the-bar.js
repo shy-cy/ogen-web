@@ -173,8 +173,12 @@ function boot(lang) {
   H.ok(/height:32px/.test(globe.replace(/\s/g, '')), 'square, so it sits in the row cleanly');
   const burgerH = /height:\s*32px/.test(rule('.hamburger'));
   H.ok(burgerH, 'and the hamburger is still 32px, so the two match by measurement');
-  H.ok(/\.lang-menu\[hidden\]\{\s*display:none/.test(cssCode.replace(/\s+/g, ' ').replace(/\{ /g, '{')),
-    'hidden means display:none — the attribute alone loses to display:flex');
+  // ⚠ ONE ANSWER FOR THE WHOLE STYLESHEET. This rule used to carry its own
+  // `.lang-menu[hidden]{display:none}`; so did .activity-sticky, and the third
+  // element to need it did not get one — see
+  // a-button-that-was-told-to-go-away-and-did-not.js.
+  H.ok(!/\.lang-menu\[hidden\]/.test(cssCode),
+    'no per-class patch left here — the global rule answers it');
 
   console.log('\n[nothing in the block is physical]');
   const from = cssCode.indexOf('.lang-pick{');

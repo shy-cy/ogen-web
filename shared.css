@@ -48,6 +48,25 @@ html[lang="en"] body, html[lang="ru"] body{ font-family: var(--font-latin); }
 a{ color:inherit; text-decoration:none; }
 img{ max-width:100%; }
 
+/* ⚠ `hidden` MEANS GONE, AND AN AUTHOR `display` SILENTLY BEAT IT.
+   The browser's own `[hidden]{display:none}` lives in the USER-AGENT origin,
+   which loses to every author rule whatever its specificity — so any element
+   this stylesheet gives a `display` to could not be hidden by the attribute at
+   all. It shipped: the register panel takes its Register button away for a
+   child who is already registered (`go.setAttribute('hidden','hidden')`), and
+   `.btn-primary{display:inline-block}` put it straight back, so a family read
+   "already registered for this activity" with a live Register button under it.
+   Nothing errored, the DOM said hidden, and only the rendered page disagreed.
+
+   It had already been patched twice per class — .lang-menu and
+   .activity-sticky both carried their own `[hidden]{display:none}` — which is
+   a discipline, and a discipline is exactly what the third case broke. One
+   rule, and `!important` is the point of it rather than a shortcut: `hidden`
+   is not a style to be weighed against other styles, it is a statement that
+   the element is not relevant, and nothing in this file should be able to
+   outrank it. */
+[hidden]{ display:none !important; }
+
 /* data-lang visibility — used by pages that inline all three languages
    (e.g. 404). Single-language pages (/, /en/, /ru/) don't need it. */
 [data-lang]{ display:none; }
@@ -308,7 +327,6 @@ html[lang="he"] .nav-signout svg{ transform:scaleX(-1); }
   background: var(--paper); border:1px solid var(--stone); border-radius:10px;
   padding:6px; box-shadow:0 10px 26px rgba(30,42,56,0.14);
 }
-.lang-menu[hidden]{ display:none; }
 .lang-menu button{
   text-align:start; font-size:15px; font-weight:600; color: var(--navy);
   background:none; border:none; padding:9px 12px; border-radius:7px; cursor:pointer;
@@ -1145,7 +1163,6 @@ html[lang="he"] .fact-card-head h2{ text-transform:none; letter-spacing:0; font-
     background: rgba(251,250,246,0.94); backdrop-filter: blur(6px);
     border-block-start:1px solid var(--stone);
   }
-  .activity-sticky[hidden]{ display:none; }
   /* Shorter than the one in the flow: this is a bar rather than a section, and
      the in-flow button's 14px is sized against the price card above it.
      10 + 26 + 21 line + 10 + 1 border = 74, which is --sticky-h. */
