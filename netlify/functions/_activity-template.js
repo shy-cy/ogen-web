@@ -284,11 +284,25 @@ ${alts}
 // (sanitiseRich() in activities-admin.js). That is the contract: escaping here
 // instead would print the tags at the reader.
 //
-// Records written before the editor existed hold plain text with blank lines
-// between paragraphs. They are recognised by NOT starting with a block tag, and
-// still converted the way they always were, so nothing had to be migrated and
-// an unedited activity reads exactly as it did.
-const RICH_START = /^\s*<(?:p|h[1-6]|ul|ol|li|blockquote|strong|em|u|s|b|i|a|br)[\s>/]/i;
+// ⚠ MARKUP ANYWHERE, NOT MARKUP AT THE FRONT. This asked whether the value
+// STARTED with a block tag, which is wrong for a shape that turns up constantly:
+// a pasted document whose first line is a bare title, then paragraphs. It read
+// that as plain text and escaped the whole thing, so the tags printed at the
+// reader.
+//
+// ⚠ AND IN THE ADMIN THE SAME GUESS WAS DESTRUCTIVE RATHER THAN COSMETIC,
+// which is the half worth remembering. Here a wrong guess is one bad page load
+// and the record is untouched; there the escaped text goes into Quill, comes
+// back out of `root.innerHTML` on save, and IS THE RECORD from then on. Three
+// published activities lost their English and Russian bodies to it that way,
+// and no later fix to a heuristic could have brought them back.
+//
+// So the question is "does this contain markup at all". A record written before
+// the editor holds plain text with blank lines and no tags, which still converts
+// exactly as it always did; anything holding a tag is passed through untouched,
+// which makes the escaping branch unreachable for anything there is to destroy.
+// The tag list is closed, so prose containing `5 < 10` is still prose.
+const RICH_MARKUP = /<\/?(?:p|h[1-6]|ul|ol|li|blockquote|strong|em|u|s|b|i|a|br)(?:\s[^>]*)?\/?>/i;
 
 // Markup down to a single line of readable text, for the places that take text
 // and not HTML: the meta description, og:description, the listing card blurb.
@@ -307,7 +321,7 @@ function plainText(value) {
 function richText(value) {
   const s = String(value || '').trim();
   if (!s) return '';
-  if (RICH_START.test(s)) return s;
+  if (RICH_MARKUP.test(s)) return s;
   return s.split(/\n\s*\n/)
     .map((p) => p.trim())
     .filter(Boolean)

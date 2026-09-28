@@ -87,12 +87,58 @@ function indexEntry(a) {
   };
 }
 
+// ⚠ ONE ORDER, AND UNTIL THIS THERE WERE THREE.
+//
+// Reported as "the placement of the activity cards keeps changing". It did, and
+// the cause is that the listing pages had NO SORT AT ALL — they rendered the set
+// in whatever order it arrived, and a publish hands that set over as
+// `others.concat([activity])`, so the activity you just published moved to the
+// END of the public listing. Measured on the live site: slug order, with
+// beit-midrash (published that morning) last.
+//
+// The index file was sorted by slug, the listing pages were sorted by nothing,
+// and the menu sorted by translated title — so the same six activities came out
+// in three different orders, one of which changed every time anybody pressed
+// Publish. None of the three was anybody's intended order, because nothing
+// anywhere stated one.
+//
+// `listingOrder` is that statement: a number on the record, ascending, and
+// everything without one after everything with one, then by slug so the answer
+// is total rather than merely mostly-decided. A new activity therefore lands at
+// the end predictably instead of wherever the reader happened to put it.
+//
+// ⚠ IT IS THE FILE'S ORDER THAT IS PUBLISHED, NOT THE NUMBER. The menu reads
+// activities-index.json and keeps the order it finds, so there is one answer
+// rather than a field every client re-implements a sort on — and `Array#sort`
+// is stable, which is what lets the menu group by status and still preserve it.
+//
+// ⚠ AND IT IS NOT WRITABLE THROUGH THE API YET, deliberately. There is no
+// control for it on the form, so nothing sends it; mergeByPermission() copies
+// the stored record and overwrites only the keys it names, so the value survives
+// every save by construction rather than by the client echoing it back. That is
+// the undrawn-field trap answered the one way that cannot be got wrong, and it
+// holds until the ordering UI is built. It is structure either way — one answer
+// for all three trees — so a Russian-only role could never have written it.
+// ⚠ A BLANK IS NOT A ZERO. `Number(null)` and `Number('')` are both 0, so the
+// obvious one-liner would sort every activity that has no order to the FRONT of
+// the listing — the opposite of what "no order yet" means, and invisible until
+// somebody publishes a new activity and finds it leading the page. Same trap
+// capacity has in the other direction, where a missing group size must read as
+// uncapped rather than as nought.
+const orderOf = (a) => {
+  const v = a ? a.listingOrder : null;
+  if (v === null || v === undefined || v === '') return Infinity;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : Infinity;
+};
+
+function inListingOrder(activities) {
+  return (activities || []).slice().sort((a, b) =>
+    orderOf(a) - orderOf(b) || String(a.slug).localeCompare(String(b.slug)));
+}
+
 function buildIndex(activities) {
-  return (activities || [])
-    .filter(isPublic)
-    .slice()
-    .sort((a, b) => String(a.slug).localeCompare(String(b.slug)))
-    .map(indexEntry);
+  return inListingOrder((activities || []).filter(isPublic)).map(indexEntry);
 }
 
 function urlEntry(loc, alts) {
@@ -162,7 +208,10 @@ function buildDerivedFiles(activities) {
   // ARE the shop window, and the menu is built from the index by a client that
   // applies the same filter — see js/nav.js. Two readers, one field, and the one
   // that resolves ids must not be the one that hides rows.
-  const listed = published.filter(LISTING.isListed);
+  // ⚠ IN THE SAME ORDER THE INDEX IS IN. This line used to hand the renderer
+  // the set exactly as it arrived, which is why the card you published last sat
+  // at the end of the public listing.
+  const listed = inListingOrder(published.filter(LISTING.isListed));
   LANGS.forEach((lang) => {
     files.push({
       path: indexFilePathFor(lang),
@@ -173,4 +222,5 @@ function buildDerivedFiles(activities) {
   return files;
 }
 
-module.exports = { PUBLIC_STATUSES, isPublic, buildIndex, buildSitemap, buildDerivedFiles, indexEntry };
+module.exports = { PUBLIC_STATUSES, isPublic, buildIndex, buildSitemap, buildDerivedFiles,
+                   indexEntry, inListingOrder };

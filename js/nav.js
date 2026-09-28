@@ -383,9 +383,15 @@
         });
         var open = mine.filter(function (a) { return OPEN.indexOf(a.status) !== -1; });
         if (!open.length) return;              // nothing to open an accordion onto
+        // ⚠ STATUS ONLY, AND THE FILE'S ORDER FOR THE REST. This used to fall
+        // back to the translated title, which made the menu a THIRD order
+        // alongside the index's and the listing page's — and one that differed
+        // between languages, so the Hebrew and English menus disagreed about
+        // which activity came second. `listingOrder` decides it once, in
+        // _activity-index.js, and activities-index.json is written in that
+        // order; Array#sort is stable, so grouping by status preserves it.
         open.sort(function (a, b) {
-          var d = OPEN.indexOf(a.status) - OPEN.indexOf(b.status);
-          return d || pickLang(a.title).localeCompare(pickLang(b.title), lang);
+          return OPEN.indexOf(a.status) - OPEN.indexOf(b.status);
         });
         var has = function (list) {
           return mine.some(function (a) { return list.indexOf(a.status) !== -1; });

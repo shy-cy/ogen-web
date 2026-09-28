@@ -2642,6 +2642,49 @@ markup wherever text is wanted — meta description, og:description, the listing
 blurb — or a search result reads `&lt;p&gt;במרכז עוגן…`; and a value that does
 **not** start with a block tag is treated as the plain text it is and escaped, so
 records written before the editor need no migration and read exactly as before.
+
+⚠ **AND THAT LAST RULE ASKED THE WRONG QUESTION, AND ATE THREE ACTIVITIES.**
+Reported as *"HTML in the admin area"* — the About editor printing `<p>` and
+`<strong>` as literal text — and it was live on the public site too: every
+visitor to `/en/activities/beit-midrash` was served `&lt;/strong&gt;` in the body
+copy.
+
+`RICH_START` tested whether a value **started** with a block tag. That is wrong
+for a shape which turns up constantly: a pasted document whose first line is a
+bare title, then paragraphs. All the damaged values have exactly that shape and
+every undamaged one begins `<h3>` or `<p>`, which is why it survived — the rule
+is right about the records it was written for and wrong about the next thing
+anybody pasted.
+
+⚠ **THE SERVER'S COPY OF THE GUESS IS COSMETIC AND THE CLIENT'S IS FATAL**, and
+that asymmetry is the thing to remember. In `_activity-template.js` a wrong guess
+prints tags at a reader for one page load and the record is untouched. In
+`js/activities-admin.js` the escaped text is loaded into Quill, comes back out of
+`root.innerHTML` on the next save, and **is the record** from then on. Three
+published activities lost their bodies in **eight language slots** that way, and
+no later fix to a heuristic could have brought them back — `beit-midrash.json`
+literally held `<p>The Bible, Big Questions…&lt;p&gt;We are proud…`.
+
+So the question is **"does this contain markup at all"**, which makes the
+escaping branch unreachable for anything there is to destroy. The tag list is
+closed, so prose containing `5 < 10` is still prose; a record written before the
+editor still has no tags and still becomes paragraphs. The regex is written
+twice — a browser cannot `require` a Netlify function — and a test pins the two
+character for character, as `MIN_PASSWORD` is pinned, **and asserts it is not
+anchored**, by shape rather than by matching the fix.
+
+The twelve damaged values were repaired by an **exact unescape**, each one
+checked reversible: re-running the old lossy conversion on the repair reproduces
+the damage byte for byte, so what is restored is what the admin actually typed
+rather than a reconstruction of it. The repaired bodies open with a **bare text
+node** — the title line as it was pasted — which renders and is not what the
+Hebrew does (`<h3>`); it is left as written rather than tidied, because undoing
+corruption and rewriting somebody's copy are different acts.
+
+⚠ **A stored `&lt;p&gt;` is the bug by definition**, since nobody types that, so
+the suite asserts it of every published record **and** of every generated page —
+the check that would have caught this on the day it shipped, where reading either
+side of the conversion proved only that side self-consistent.
 Without Quill the field falls back to the plain textarea, so a CDN outage costs
 formatting rather than the ability to edit. Meta title and meta description used
 to sit in the middle of the content fields, where they read as more body copy to
@@ -5323,6 +5366,55 @@ activity half commits to git and republishes live pages, which is an
 may work the queue but may not publish do exactly that, from a control saying it
 does something else. The scheduled function has no session at all, so there is
 nothing there for a permission to leak through. A test pins both call sites.
+
+### ⚠ The cards moved every time you published
+
+Reported as *"the placement of the activity cards keeps changing"*. It did, and
+the cause is that the listing pages had **no sort at all** — they rendered the
+set in whatever order it arrived, and `generate()` hands that set over as
+`others.concat([activity])`. So **the activity you just published moved to the
+end of the public listing.** Measured on the live site: slug order, with
+`beit-midrash` — published that morning — last.
+
+⚠ **AND THE SAME SIX ACTIVITIES CAME OUT IN THREE DIFFERENT ORDERS.**
+`activities-index.json` sorted by slug, the listing pages sorted by nothing, and
+`js/nav.js` sorted by **translated title** — so the Hebrew and English menus
+disagreed with each other as well as with the page. None of the three was
+anybody's intended order, because nothing anywhere stated one, and two of them
+were an accident of who read the records and in what order.
+
+`listingOrder` is that statement: a number on the record, ascending, everything
+without one after everything with one, then by **slug**, so the answer is total
+rather than merely mostly-decided and a new activity lands at the end
+predictably. `inListingOrder()` in `_activity-index.js` is the one comparator.
+
+⚠ **A BLANK IS NOT A ZERO.** `Number(null)` and `Number('')` are both `0`, so the
+obvious one-liner sorts every activity with no order to the **front** — the
+opposite of what "no order yet" means, invisible until somebody publishes a new
+activity and finds it leading the page. The same trap capacity has in the other
+direction, where a missing group size must read as uncapped and not as nought. A
+test found it.
+
+⚠ **IT IS THE FILE'S ORDER THAT IS PUBLISHED, NOT THE NUMBER.** The menu reads
+`activities-index.json` and **keeps** the order it finds, so there is one answer
+rather than a field every client re-implements a sort on. It still groups by
+status — what you can join now before what is only announced — and `Array#sort`
+is stable, so grouping preserves it. The title tiebreak is deleted rather than
+left below the status one: it was the whole of the third order.
+
+⚠ **AND IT IS NOT WRITABLE THROUGH THE API YET, deliberately.** There is no
+control for it on the form, so nothing sends it — and `mergeByPermission()`
+copies the stored record and overwrites only the keys it **names**, so the value
+survives every save by construction rather than by the client echoing it back.
+That is the undrawn-field trap answered the one way that cannot be got wrong, and
+it is the `activityId` precedent as a stopgap: a save naming `listingOrder` is
+accepted and the value ignored. It is structure either way, so a Russian-only
+role could never have reordered the Hebrew listing. **A UI for it is backlog.**
+
+The order the site ships in today is `hebrew4kids`, `bnei-mitzvah-2027`,
+`folk-dance`, `beit-midrash`, `intro-into-judaism`, `beit-midrash-ayeka`, set at
+10 to 60 so there is room to insert, and pinned by a test **on the real records**
+rather than on a fixture, because the intent is the data.
 
 ### The listing page grew group headings
 
@@ -8434,6 +8526,12 @@ into one, and converts the phone to full international format before sending.
 
 Site is live and launched. Everything that was once a pre-launch blocker (OG
 share image, Formspree wiring, domain) is done. Open items:
+
+- **No way to order the activities from the admin.** `listingOrder` decides the
+  listing pages, `activities-index.json` and the menu, and it is set by hand on
+  the record — there is no control for it on the form and the API refuses to
+  write it. A UI is the backlog item; see **The cards moved every time you
+  published** for why it is safe to leave as data in the meantime.
 
 - **Russian copy has never been reviewed by a native speaker** — the homepage,
   the About and activity pages, every string in `_account-email.js` and

@@ -190,7 +190,30 @@
     ['clean']
   ];
   var PLACEHOLDER = { he: 'כתבו כאן…', en: 'Write here…', ru: 'Напишите здесь…' };
-  var RICH_START = /^\s*<(?:p|h[1-6]|ul|ol|li|blockquote|strong|em|u|s|b|i|a|br)[\s>/]/i;
+  // ⚠ MARKUP ANYWHERE, NOT MARKUP AT THE FRONT, AND HERE IT WAS DESTRUCTIVE.
+  //
+  // This asked whether the value STARTED with a block tag, which is wrong for a
+  // shape that turns up constantly: a pasted document whose first line is a bare
+  // title, then paragraphs. It read that as plain text and escaped the whole
+  // thing — and because the escaped text goes into Quill and comes back out of
+  // `root.innerHTML` on the next save, THE ESCAPED FORM BECAME THE RECORD.
+  //
+  // ⚠ THAT IS WHY THIS COPY MATTERS MORE THAN THE SERVER'S. The same wrong
+  // guess in _activity-template.js is one bad page load and the record is
+  // untouched; here it is data loss, and no later fix to a heuristic can bring
+  // the words back. Three published activities lost their bodies to it in eight
+  // language slots, and it surfaced as `&lt;p&gt;` on the live site and as tags
+  // typed out in this editor — one cause, two symptoms.
+  //
+  // So the question is "does this contain markup at all". A record written
+  // before the editor holds plain text with blank lines and no tags, which still
+  // converts exactly as it always did; anything holding a tag is passed through
+  // untouched, which makes the escaping branch unreachable for anything there is
+  // to destroy. The tag list is closed, so prose containing `5 < 10` is prose.
+  //
+  // Written twice — a browser cannot require a Netlify function — so a test
+  // pins the two against each other, as MIN_PASSWORD is pinned.
+  var RICH_MARKUP = /<\/?(?:p|h[1-6]|ul|ol|li|blockquote|strong|em|u|s|b|i|a|br)(?:\s[^>]*)?\/?>/i;
 
   // Records written before the editor existed hold plain text with blank lines
   // between paragraphs. Nothing was migrated — they are converted on the way IN
@@ -198,7 +221,7 @@
   function toEditorHtml(value) {
     var text = String(value || '').trim();
     if (!text) return '';
-    if (RICH_START.test(text)) return text;
+    if (RICH_MARKUP.test(text)) return text;
     return text.split(/\n\s*\n/).map(function (p) { return p.trim(); }).filter(Boolean)
       .map(function (p) {
         return '<p>' + p.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
