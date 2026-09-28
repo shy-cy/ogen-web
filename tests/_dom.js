@@ -180,6 +180,18 @@ function makeDom(opts) {
           return;
         }
         const fns = n._handlers.click || [];
+        // ⚠ A SUBMIT BUTTON SUBMITS ITS FORM. That is the default action of a
+        // click on one, and it is the whole mechanism the sticky bar leans on:
+        // the pinned copy carries no handler of its own and calls real.click(),
+        // so there is one code path for booking and one for paying. Without
+        // this the shim would throw on a control a browser works perfectly.
+        if (!fns.length && n.tagName === 'BUTTON' &&
+            (n.attributes.type || 'submit') === 'submit') {
+          if (n.attributes.disabled != null) return;
+          let f = n.parentNode;
+          while (f && f.tagName !== 'FORM') f = f.parentNode;
+          if (f) return f.submit();
+        }
         if (!fns.length) throw new Error('clicked a ' + n.tagName + ' with no click handler');
         fns.forEach((f) => f({ preventDefault() {}, stopPropagation() {}, currentTarget: n, target: n }));
       },
@@ -225,6 +237,7 @@ function makeDom(opts) {
   });
 
   const store = {};
+  const eyes = [];
   const window = {
     location: { search: opts.search || '', href: opts.href || '/', hash: '' },
     // ⚠ IT UPDATES location.search, NOT ONLY href. js/member-account.js rewrites
@@ -246,6 +259,25 @@ function makeDom(opts) {
       removeItem: (k) => { delete store[k]; }
     },
     setTimeout: (fn, ms) => { listeners.push(fn); return 0; },
+    // ⚠ RECORDERS, NOT IMITATIONS. Neither of these can observe anything in a
+    // shim with no layout and no mutation events, and pretending otherwise
+    // would be the bad-imitation-of-a-browser this file exists not to become.
+    // What they buy is that the real code RUNS — and that a test can then say
+    // "the button scrolled out of view" or "the total changed" and read what
+    // the screen did about it, which is the half that cannot be read off the
+    // source. `window._eyes` is how a test reaches them.
+    IntersectionObserver: function (cb) {
+      const o = { kind: 'intersection', cb: cb, targets: [],
+                  observe(t) { o.targets.push(t); }, disconnect() { o.dead = true; } };
+      eyes.push(o);
+      return o;
+    },
+    MutationObserver: function (cb) {
+      const o = { kind: 'mutation', cb: cb, targets: [],
+                  observe(t) { o.targets.push(t); }, disconnect() { o.dead = true; } };
+      eyes.push(o);
+      return o;
+    },
     confirm: () => true,
     fetch: opts.fetch,
     document: null
@@ -280,7 +312,10 @@ function makeDom(opts) {
   document.body = node('body');
   window.document = document;
   return { window: window, document: document, mount: root, node: node,
-           byId: (id) => document.getElementById(id), _store: store };
+           byId: (id) => document.getElementById(id), _store: store,
+           // Every observer the script has made and not disconnected, so a test
+           // can fire one and read what the screen did.
+           eyes: (kind) => eyes.filter((o) => !o.dead && (!kind || o.kind === kind)) };
 }
 
 // Every node in a subtree, so an assertion can ask what the screen says without

@@ -1165,9 +1165,18 @@ html[lang="he"] .fact-card-head h2{ text-transform:none; letter-spacing:0; font-
   }
   /* Shorter than the one in the flow: this is a bar rather than a section, and
      the in-flow button's 14px is sized against the price card above it.
-     10 + 26 + 21 line + 10 + 1 border = 74, which is --sticky-h. */
+     10 + 26 + 21 line + 10 + 1 border = 74, which is --sticky-h.
+     ⚠ TWO CONTROLS, ONE RULE. The static activity page pins a .sidebar-cta and
+     the family area pins its .btn-primary — the drop-in register panel's
+     running total and the registration page's Pay button. Sizing them in two
+     rules would be the bar's own arithmetic written twice, and the height has
+     already been wrong once by 2px. `display:block; width:100%` belongs here
+     rather than on either button: filling the bar is a fact about the bar, and
+     .btn-primary is an inline-block pill everywhere else on the site. */
+  .activity-sticky .btn-primary,
   .activity-sticky .sidebar-cta{
-    box-sizing:border-box; height: calc(var(--sticky-h) - var(--sticky-pad) * 2 - 1px);
+    box-sizing:border-box; display:block; width:100%;
+    height: calc(var(--sticky-h) - var(--sticky-pad) * 2 - 1px);
     padding:0; font-size:16px; line-height: calc(var(--sticky-h) - var(--sticky-pad) * 2 - 1px);
   }
   /* The SAME token, or the footer ends up underneath the bar by whatever the

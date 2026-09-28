@@ -104,12 +104,17 @@ function parse(sel) {
 }
 
 function matches(sel, elCls, elTag, elHidden) {
-  const p = parse(sel);
+  // Only the LAST compound decides what a selector matches; everything before a
+  // combinator describes ancestors. `.activity-sticky .btn-primary` is a rule
+  // about the button inside the bar and says nothing about the bar itself.
+  const parts = sel.split(/\s*[>+~]\s*|\s+/).filter(Boolean);
+  const last = parts[parts.length - 1];
+  const p = parse(last);
   if (!p) {
     // ⚠ A selector this checker cannot read is only safe if it cannot reach the
     // element. If it names one of the element's classes, the check would be
     // under-approximating — which is the failure mode of a test, not a pass.
-    const touches = elCls.some((c) => sel.indexOf('.' + c) !== -1);
+    const touches = elCls.some((c) => last.indexOf('.' + c) !== -1);
     if (touches) throw new Error('cannot resolve a rule that reaches .' +
       elCls.join('.') + ': ' + sel);
     return false;
@@ -120,7 +125,23 @@ function matches(sel, elCls, elTag, elHidden) {
     if (a === '[hidden]') { if (!elHidden) return false; }
     else return false;
   }
+  // ⚠ The last compound matches, and there is an ancestor this checker cannot
+  // confirm. Guessing either way would make the answer wrong for a real rule,
+  // so it says so rather than approximating — the same reason the branch above
+  // throws instead of returning false.
+  if (parts.length > 1) throw new Error(
+    'cannot confirm the ancestors of a rule that matches .' + elCls.join('.') + ': ' + sel);
   return true;
+}
+
+// The whole selector's specificity, ancestors included.
+function specOf(sel) {
+  let spec = 0;
+  sel.split(/\s*[>+~]\s*|\s+/).filter(Boolean).forEach((part) => {
+    const p = parse(part);
+    if (p) spec += p.spec;
+  });
+  return { spec: spec };
 }
 
 function displayOf(elCls, elTag, elHidden, query) {
@@ -130,7 +151,7 @@ function displayOf(elCls, elTag, elHidden, query) {
     // the caller is asking about that width, and come later in the file.
     if (r.query !== null && r.query !== query) continue;
     if (!matches(r.sel, elCls, elTag, elHidden)) continue;
-    const p = parse(r.sel);
+    const p = specOf(r.sel);
     if (!best) { best = { r: r, spec: p.spec }; continue; }
     const winsOn = r.important !== best.r.important ? r.important
       : p.spec !== best.spec ? p.spec > best.spec
@@ -180,7 +201,7 @@ H.eq(global.value, 'none', 'and it says display:none');
 H.eq(global.important, true, '⚠ !important, because `hidden` is not a style to be weighed');
 
 const later = RULES.filter((r) => r.query === null && r.order > global.order &&
-  parse(r.sel) && parse(r.sel).spec >= 10 && r.value !== 'none' && !r.important);
+  specOf(r.sel).spec >= 10 && r.value !== 'none' && !r.important);
 H.ok(later.length > 0,
   later.length + ' rules below it would otherwise win on source order alone — '
   + 'first: ' + later[0].sel);

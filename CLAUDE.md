@@ -5533,24 +5533,79 @@ of the element's classes, or the check would be quietly under-approximating.
 Confirmed in real Chrome either way: the shipped stylesheet renders that button
 `inline-block` with `hidden` set, and the fixed one renders all three `none`.
 
-⚠ **WHERE THE STICKY BUTTON EARNS ITS PLACE, MEASURED.** Asked in the same
-message — *"in the registration page we should have a sticky button for register
-and also in the payment page for pay"* — and the answer is not the same for the
-two, so it is written down. The real client was driven through `tests/_dom.js`,
-serialised, and laid out in Chrome at 375×680:
+#### ⚠ The two controls the family area is for
+
+Asked in the same message as the bug above — *"in the registration page we
+should have a sticky button for register and also in the payment page for pay"*
+— and the answer is not the same for the two, so both are written down. The real
+client was driven through `tests/_dom.js`, serialised, and laid out in Chrome at
+375×680:
 
 | screen | the button | page | |
 |---|---|---|---|
-| the **course** register panel | 606px | 1543px | **0.9 viewports** |
-| the **drop-in** register panel, ten evenings | 1264px | 2111px | 1.9 |
-| the **registration** page's Pay button | 1358px | 2926px | 2.0 |
+| the **drop-in** register panel, ten evenings | 1264px | 2111px | **1.9 screens** |
+| the **registration** page's Pay button | 1358px | 2926px | **2.0 screens** |
+| the **course** register panel | 606px | 1543px | 0.9 screens |
 
-The course panel is a person select, a group select and a button; its control is
-at the fold already, and a fixed bar would cost 74px of viewport to save a scroll
-nobody makes. The other two are the activity page's problem at half the depth,
-and the drop-in one has the stronger case of the three: its button carries a
-**running total that changes as evenings are ticked**, so a fixed copy is live
-feedback on the choices being made above it rather than only a shortcut.
+⚠ **AND THE THIRD ONE DELIBERATELY GETS NONE.** It is a person select, a group
+select and a button; the control is at the fold already, so a bar there would
+cost 74px of viewport to save a scroll nobody makes. *Put it everywhere* is the
+version of this that turns a fix into furniture, and the measurement is what
+says which is which.
+
+⚠ **THE PINNED CONTROL IS THE SAME BUTTON, NOT A SECOND ONE.** The static
+activity page's bar is built from an href and a label **passed in**, which is
+right there because a link needs a target and deriving one twice is how `ctaUrl`
+went wrong twice. Nothing here has a target: what these buttons do is run a
+submit handler. So the copy carries **no behaviour of its own** — it calls
+`real.click()`, which is a click on a submit button, which submits the form — and
+there is one code path for booking and one for paying however the family reached
+it. That is stronger than the rule it replaces rather than an exception to it.
+
+⚠ **AND THE LABEL IS LIVE, WHICH THE STATIC PAGE'S NEVER IS.** The drop-in
+button **is** the running total — *Register and pay · €27.00* — recomputed every
+time an evening is ticked, and both buttons relabel to *Opening payment…* while
+Checkout opens. A copy built once from a string would be a fixed bar quoting a
+price the page has stopped charging, which is what the late-price row took three
+screens to stop doing. So it **mirrors**, through a `MutationObserver` rather
+than a call from each place that retotals: `retotal()` and `busy()` have several
+callers each, and the one that forgot would be silent.
+
+⚠ **A DISABLED COPY IS MIRRORED, NOT HIDDEN**, and `closed` is not the
+precedent it looks like. There the bar is never drawn at all, because that button
+can never become pressable and a dead control pinned to a viewport cannot even be
+scrolled away from. Here `disabled` means *you have not ticked an evening yet*,
+the fix is two inches above it, and the ordinary case arrives with the next date
+already ticked. Hiding on it would also take the bar out from under the finger
+that just pressed it, since submitting disables the button while Checkout opens.
+
+Three smaller rules:
+
+- **One bar, and it does not survive the screen it was drawn for.** It lives in
+  `#page`, outside the mount, so `clear(mount)` does not reach it — and
+  `renderActivity()` runs again after every booking, cancellation and payment.
+  `dropSticky()` is the first line of that function and disconnects both
+  observers, or the page accumulates bars watching detached buttons.
+- **One CSS rule sizes both controls.** The static page pins a `.sidebar-cta`
+  and this pins a `.btn-primary`; a second rule would be the bar's own arithmetic
+  written twice, and that height has already been wrong once by 2px.
+  `display:block; width:100%` belongs on the bar's rule rather than on either
+  button, because filling the bar is a fact about the bar.
+- **It fails open twice over**: no `IntersectionObserver` or no
+  `MutationObserver` means no bar and a page exactly as it was.
+
+⚠ **AND IT WAS VERIFIED IN A BROWSER, because the shim cannot see any of it.**
+`tests/_dom.js` gained both observers as **recorders** rather than imitations — a
+test fires one and reads what the screen did — which is what lets the suite
+execute the mirror, the show/hide and a press that runs all the way to Checkout.
+What a recorder can never prove is that a real browser delivers the callbacks at
+the right moment, and headless virtual time does not deliver them at all. Driven
+over CDP against real Chrome at 375×680: the bar is `block` with the real button
+1094px down, `none` the moment it scrolls into view, and ticking a second evening
+while the bar is up moves **both** labels from €7.00 to €14.00.
+
+The shim also learned that **clicking a submit button submits its form**, which
+is the default action a browser takes and the whole mechanism this leans on.
 
 ⚠ **AND THE REGISTER PANEL IS NOT ON THE DASHBOARD AT ALL.** It was, drawn from
 `?register=<slug>`, and sitting at the top of a page headed "My family" it read

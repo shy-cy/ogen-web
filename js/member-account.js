@@ -1058,6 +1058,89 @@
     return function () { btn.disabled = false; btn.textContent = was; };
   }
 
+  // ⚠ THE ONE CONTROL THIS SCREEN IS FOR, PINNED WHERE THE READER IS LOOKING.
+  //
+  // The activity page already learned this: its Register button sat 2651px into
+  // a 4342px page, so a family who had decided had to go back and find the
+  // control. The family area has the same shape twice, measured at 375x680 with
+  // the real client laid out in a browser:
+  //
+  //   the drop-in register panel, ten evenings   1264px of 2111px   1.9 screens
+  //   the registration page's Pay button         1358px of 2926px   2.0 screens
+  //
+  // and deliberately NOT a third time: the course register panel is a person
+  // select, a group select and a button, and its control is at the fold already
+  // — 606px of 1543px — so a bar there would cost 74px of viewport to save a
+  // scroll nobody makes.
+  //
+  // ⚠ IT IS THE SAME BUTTON, NOT A SECOND ONE, and that is the whole design.
+  // The static page's bar is built from the href and the label passed in, which
+  // is right there because a link needs a target and deriving one twice is how
+  // ctaUrl went wrong twice. Nothing here has a target: what these buttons do is
+  // run a submit handler. So the copy carries no behaviour of its own — it
+  // presses the real control — and there is exactly one code path for booking
+  // and one for paying however the family reached it.
+  //
+  // ⚠ AND THE LABEL IS LIVE, WHICH THE STATIC PAGE'S NEVER IS. The drop-in
+  // button IS the running total ("Register and pay · €27.00"), recomputed every
+  // time an evening is ticked, and both buttons relabel to "Opening payment…"
+  // while Checkout is being opened. A copy built once from a string would be a
+  // fixed bar quoting a price the page has stopped charging — which is the bug
+  // the late-price row was three screens of. So it MIRRORS: a MutationObserver
+  // rather than a call from each place that retotals, because retotal() and
+  // busy() have several callers each and the one that forgot would be silent.
+  var stickyBar = null, stickyEyes = [];
+
+  // Nothing from a screen this page has left. The bar lives in #page, outside
+  // the mount, so clear(mount) does not reach it — and renderActivity() runs
+  // again after every booking, cancellation and payment.
+  function dropSticky() {
+    stickyEyes.forEach(function (o) { if (o.disconnect) o.disconnect(); });
+    stickyEyes = [];
+    if (stickyBar && stickyBar.parentNode) stickyBar.parentNode.removeChild(stickyBar);
+    stickyBar = null;
+  }
+
+  function stickyPress(real) {
+    // Fails open in both directions: no bar, and the page is exactly as it was.
+    if (!real || !window.IntersectionObserver || !window.MutationObserver) return;
+    var copy = el('button', { type: 'button', class: 'btn-primary',
+                              onclick: function () { real.click(); } });
+    var bar = el('div', { class: 'activity-sticky', hidden: 'hidden' }, [copy]);
+    // ⚠ INSIDE #page, which is where direction lives — rule 2 puts `dir` only
+    // there, and a bar on <body> would be pinned to a wrapper that has none.
+    (document.getElementById('page') || document.body).appendChild(bar);
+    stickyBar = bar;
+
+    var mirror = function () {
+      copy.textContent = real.textContent;
+      copy.disabled = real.disabled;
+    };
+    mirror();
+
+    // ⚠ A DISABLED COPY IS MIRRORED, NOT HIDDEN, and the `closed` status is not
+    // the precedent it looks like. There the bar is never drawn at all, because
+    // that button can never become pressable and a dead control pinned to a
+    // viewport cannot even be scrolled away from. Here `disabled` means "you
+    // have not ticked an evening yet", the fix is two inches above it, and the
+    // ordinary case arrives with the next date already ticked. Hiding on it
+    // would also take the bar out from under the finger that just pressed it,
+    // since submitting disables the button while Checkout opens.
+    var mo = new window.MutationObserver(mirror);
+    mo.observe(real, { childList: true, characterData: true, subtree: true,
+                       attributes: true, attributeFilter: ['disabled'] });
+    stickyEyes.push(mo);
+
+    // ⚠ ONLY WHILE THE REAL ONE IS OFF SCREEN. Two solid terracotta pills at
+    // once is the pairing the credit block was rebuilt to avoid, and a copy of
+    // the primary CTA sitting over the primary CTA reads as two choices.
+    var io = new window.IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { bar.hidden = e.isIntersecting; });
+    }, { rootMargin: '0px 0px -24px 0px' });
+    io.observe(real);
+    stickyEyes.push(io);
+  }
+
   // A message that has to survive a redraw. say() writes into the notice the
   // current screen owns, and signing up REPLACES that screen — so the one thing
   // a new account needs to be told ("we have emailed you") was being written
@@ -2001,6 +2084,10 @@
                             disabled: true });
     var rows = [];
 
+    // The button carries the running total, so pinning it is live feedback on
+    // the evenings being ticked above it rather than only a shortcut.
+    stickyPress(go);
+
     who.addEventListener('change', load);
 
     var form = el('form', { onsubmit: function (e) {
@@ -2663,6 +2750,7 @@
   // registration's key. A slug would not do: `activitySlugAtSubmission` is audit
   // only, and following it after a rename opens the wrong record or none.
   function renderActivity() {
+    dropSticky();
     clear(mount);
     notice = el('div', {});
     var body = el('div', {});
@@ -3100,6 +3188,7 @@
 
     if (left > 0 && payable && !needsVerify) {
       var go = el('button', { type: 'submit', class: 'btn-primary', text: T.payNow });
+      stickyPress(go);
       var payForm = el('form', { class: 'acc-pay', onsubmit: function (e) {
         e.preventDefault();
         go.disabled = true;
