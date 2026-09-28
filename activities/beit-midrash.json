@@ -116,12 +116,12 @@
     }
   ],
   "sponsors": [],
-  "isoUpdated": "2026-09-28T08:14:32.543Z",
+  "isoUpdated": "2026-09-28T08:23:10.775Z",
   "isoCreated": "2026-09-20T07:57:58.547Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
   "activityId": "act-32b1222460c4f004",
-  "lastPublishedAt": "2026-09-28T08:14:32.543Z",
+  "lastPublishedAt": "2026-09-28T08:23:10.775Z",
   "groups": [
     {
       "groupId": "g-mu9hqxm1klzk",
@@ -140,27 +140,79 @@
         "schedule": {
           "frequency": "custom",
           "overrideText": {
-            "he": "",
-            "en": "",
-            "ru": ""
+            "he": "פעם בחודש, בימי ראשון",
+            "en": "Once a month, on Sundays",
+            "ru": "Раз в месяц, по воскресеньям"
           },
           "sessions": [
             {
               "day": 0,
-              "time": "18:00"
+              "time": "18:00",
+              "date": "2026-11-15"
+            },
+            {
+              "day": 0,
+              "time": "18:00",
+              "date": "2026-12-13"
+            },
+            {
+              "day": 0,
+              "time": "18:00",
+              "date": "2027-01-17"
+            },
+            {
+              "day": 0,
+              "time": "18:00",
+              "date": "2027-02-14"
+            },
+            {
+              "day": 0,
+              "time": "18:00",
+              "date": "2027-03-14"
+            },
+            {
+              "day": 0,
+              "time": "18:00",
+              "date": "2027-04-11"
             }
           ]
         },
         "duration": {
-          "startDate": "",
-          "endDate": "",
+          "startDate": "2026-11-01",
+          "endDate": "2027-04-30",
           "sessionCount": 6,
           "sessionMinutes": 90,
-          "sessionDates": []
+          "sessionDates": [
+            {
+              "date": "2026-11-15",
+              "status": "scheduled"
+            },
+            {
+              "date": "2026-12-13",
+              "status": "scheduled"
+            },
+            {
+              "date": "2027-01-17",
+              "status": "scheduled"
+            },
+            {
+              "date": "2027-02-14",
+              "status": "scheduled"
+            },
+            {
+              "date": "2027-03-14",
+              "status": "scheduled"
+            },
+            {
+              "date": "2027-04-11",
+              "status": "scheduled"
+            }
+          ]
         },
         "instructionLanguage": {
           "codes": [
-            "he"
+            "he",
+            "en"
           ],
           "text": {
             "he": "",
