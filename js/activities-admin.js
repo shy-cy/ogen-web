@@ -296,11 +296,29 @@
     return runs.length ? runs : [{ text: '', bold: false }];
   }
 
-  // `#` is the shallowest a body goes, and anything past `###` lands on h4
-  // rather than being refused: a deeper level is a real thing to write and the
-  // page has nowhere to put it, so it is clamped exactly as sanitiseRich()
-  // clamps h5 and h6.
-  function mdTag(hashes) { return 'h' + Math.min(hashes + 1, 4); }
+  // ⚠ THE DOCUMENT'S OWN TOP LEVEL BECOMES THE BODY'S TOP LEVEL, which is h2 —
+  // RELATIVE to what was pasted, not a count of hashes.
+  //
+  // Counting hashes was the obvious rule and it cannot produce the shape this
+  // site actually publishes. Every document that arrives here opens with a
+  // `# Title`, because that is what a generated Markdown document looks like,
+  // and the page already carries that title in .page-header. Under `#`→h2 the
+  // sections land on h3 and the subsections on h4, one level deeper than the
+  // Hebrew and English bodies of the very same activity — and deleting the title
+  // line does not fix it, because `##` still maps to h3. Measured on
+  // bnei-mitzvah-2027: HE and EN are 4×h2 + 8×h3, and the Russian would have been
+  // 1×h2 + 4×h3 + 8×h4.
+  //
+  // Relative, the same document with its title line removed is 4×h2 + 8×h3 —
+  // the other two languages exactly. With the title kept it is h2/h3/h4, which
+  // is the honest rendering of a document that genuinely has three tiers.
+  //
+  // `base` is the shallowest marker in the paste. Anything past the third tier
+  // lands on h4 rather than being refused: a deeper level is a real thing to
+  // write and the page has nowhere to put it, so it is clamped exactly as
+  // sanitiseRich() clamps h5 and h6. And a level the writer disagrees with is
+  // now one click on the toolbar, which is what makes a rule here affordable.
+  function mdTag(hashes, base) { return 'h' + Math.min(2 + (hashes - base), 4); }
 
   // Returns an array of blocks, or null meaning "this is not Markdown, leave it
   // to Quill" — which is today's behaviour exactly, and is what every paste that
@@ -319,6 +337,12 @@
     // plain-text path is correct for that and is left alone.
     if (!heads.length && !bullets && !MD_BOLD.test(src)) return null;
     if (heads.some(function (l) { return l.trim().length > MD_HEAD_MAX; })) return null;
+    // The shallowest marker in this paste, which becomes h2. Computed once over
+    // the whole document rather than per line, or two sections written with
+    // different depths would each think they were the top.
+    var base = heads.reduce(function (n, l) {
+      return Math.min(n, MD_HEAD.exec(l)[1].length);
+    }, 6);
 
     var out = [];
     var i = 0;
@@ -329,10 +353,9 @@
       // toolbar offered one level, sanitiseRich() allowed h2 and h3, and
       // .activity-main styled only h2 — three constraints that agreed, and
       // between them flattened a document's whole hierarchy on the way in. All
-      // three have moved, so `#` is h2, `##` is h3, and `###` or deeper is h4,
-      // which is the floor the other two now share.
+      // three have moved. See mdTag() for why the mapping is relative.
       if (h) {
-        out.push({ tag: mdTag(h[1].length), runs: mdRuns(h[2].trim()) });
+        out.push({ tag: mdTag(h[1].length, base), runs: mdRuns(h[2].trim()) });
         i += 1;
         continue;
       }

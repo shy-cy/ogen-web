@@ -115,15 +115,34 @@ H.eq(shape(md('# Title')), 'h2:Title', 'a heading');
 // each other and threw away the hierarchy of every document pasted in. All three
 // moved together, so the mapping is asserted here AND the three things it
 // depends on are asserted below, or this quietly becomes a lie again.
-H.eq(shape(md('## Section')), 'h3:Section', '`##` is one level down');
-H.eq(shape(md('### Deep')), 'h4:Deep', 'and `###` one more');
-H.eq(shape(md('#### Deeper')), 'h4:Deeper',
+H.eq(shape(md('# A\n\n## B\n\n### C')), 'h2:A / h3:B / h4:C',
+  'and a whole document keeps its shape, three tiers deep');
+
+// ⚠ THE MAPPING IS RELATIVE: the SHALLOWEST marker in the paste becomes h2.
+// Counting hashes was the obvious rule and cannot produce the shape this site
+// publishes — every generated document opens with a `# Title` the page already
+// carries in .page-header, so `#`→h2 puts the sections on h3 and the subsections
+// on h4, one level deeper than the same activity's other two languages. Measured
+// on bnei-mitzvah-2027: HE and EN are 4×h2 + 8×h3.
+H.eq(shape(md('## A\n\n### x\n\n## B')), 'h2:A / h3:x / h2:B',
+  '⚠ a document with no `#` starts at h2 anyway — which is what makes deleting ' +
+  'the redundant title line produce the other languages\' shape exactly');
+H.eq(shape(md('### Only')), 'h2:Only',
+  'and one written entirely at `###` is still a document with a top level');
+H.eq(shape(md('#### Deeper\n\n##### Under it')), 'h2:Deeper / h3:Under it',
+  'the depth between levels is what is kept, never the marker count');
+
+// ⚠ AND THE BASE IS THE WHOLE DOCUMENT'S, not each line's. Computed per line,
+// every heading would be its own top level and the hierarchy would flatten again
+// by a different route.
+H.eq(shape(md('## A\n\n### x\n\n### y\n\n## B')), 'h2:A / h3:x / h3:y / h2:B',
+  'two sections at the same depth stay at the same level');
+
+H.eq(shape(md('# a\n\n## b\n\n### c\n\n#### d\n\n###### f')),
+  'h2:a / h3:b / h4:c / h4:d / h4:f',
   '⚠ AND h4 IS THE FLOOR rather than a refusal — a deeper level is a real thing ' +
   'to write and the page has nowhere to put it, so it is clamped exactly as ' +
   'sanitiseRich() clamps h5 and h6');
-H.eq(shape(md('###### Six')), 'h4:Six', 'six hashes land on the floor too');
-H.eq(shape(md('# A\n\n## B\n\n### C')), 'h2:A / h3:B / h4:C',
-  'and a whole document keeps its shape');
 H.eq(md('#NoSpace'), null, 'a hash with no space after it is not a heading');
 H.eq(shape(md('# T\n\nbody')), 'h2:T / p:body', 'a heading and a paragraph');
 H.eq(shape(md('# T\n\n- a\n- b')), 'h2:T / li:a / li:b', 'bullets');
@@ -142,7 +161,7 @@ H.eq(shape(md('# T\n\nline one\nline two')), 'h2:T / p:line one line two',
   'a wrapped paragraph is rejoined');
 H.eq(shape(md('# T\n\none\n\n\n\ntwo')), 'h2:T / p:one / p:two',
   'and any number of blank lines is one break');
-H.eq(shape(md('  ## Indented')), 'h3:Indented', 'up to three spaces of indent is still a marker');
+H.eq(shape(md('  ## Indented')), 'h2:Indented', 'up to three spaces of indent is still a marker');
 
 console.log('\n[⚠ and what it refuses, which is the half that matters]');
 H.eq(md(''), null, 'nothing');
@@ -242,7 +261,7 @@ const levels = (text) => dctx.out.mdDelta(dctx.out.mdBlocks(text)).ops
 H.eq(levels('# A\n\nbody\n\n## B\n\n### C\n\n- x'), 'h2 p h3 h4 bullet',
   '⚠ THE DELTA CARRIES THREE DIFFERENT HEADER LEVELS — the thing the old ' +
   'source-matching assertion could never have seen');
-H.eq(levels('#### D\n\n###### F'), 'h4 h4', 'and clamps at four');
+H.eq(levels('# a\n\n## b\n\n### c\n\n#### d'), 'h2 h3 h4 h4', 'and clamps at four');
 H.ok(/bold: true/.test(delta), 'and so is bold');
 H.ok(/q\.getLength\(\) <= 1/.test(caller),
   '⚠ an EMPTY editor is setContents\'d rather than inserted into, or Quill\'s own ' +
@@ -258,7 +277,8 @@ const { sanitiseRich } = require(H.fnPath('_sanitise-rich'));
 // ⚠ THE TAGS COME FROM mdTag ITSELF, not from a fixture somebody typed. The
 // hardcoded version held only an h2, so when the converter learned h3 and h4 it
 // went on passing while h4 was still being stripped to bare text on save.
-const produced = [1, 2, 3, 4, 5, 6].map((n) => dctx.out.mdBlocks('#'.repeat(n) + ' X')[0].tag);
+const produced = dctx.out.mdBlocks(
+  [1, 2, 3, 4, 5, 6].map((n) => '#'.repeat(n) + ' X').join('\n\n')).map((b) => b.tag);
 H.eq(produced.join(','), 'h2,h3,h4,h4,h4,h4', 'the converter produces exactly these');
 const fromEditor = produced.filter((t, i) => produced.indexOf(t) === i)
   .map((t) => '<' + t + '>З</' + t + '>').join('') +

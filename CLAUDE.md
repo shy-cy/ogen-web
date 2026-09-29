@@ -2830,9 +2830,22 @@ none of it.
 THREE HAVE SINCE MOVED.** `sanitiseRich()` allowed `h2` and `h3` and nothing else;
 `.activity-main` styled **only** `h2`; and `[{ header: 2 }]` was the one heading
 the toolbar offered. So `#` to `######` had nothing to map onto and the hierarchy
-of every pasted document was flattened on the way in. `#` is `h2`, `##` is `h3`
-and `###` or deeper is `h4` now — see **A heading was silently demoted to prose**
-below for what had to change underneath it.
+of every pasted document was flattened on the way in.
+
+⚠ **THE MAPPING IS RELATIVE: the SHALLOWEST marker in the paste becomes `h2`**,
+each level below it steps down one, and `h4` is the floor. Counting hashes was
+the obvious rule and cannot produce the shape this site publishes — every
+generated document opens with a `# Title` that the page already carries in
+`.page-header`, so `#`→`h2` puts the sections on `h3` and the subsections on
+`h4`, **one level deeper than the same activity's other two languages**, and
+deleting the title line does not fix it because `##` still lands on `h3`.
+Measured on `bnei-mitzvah-2027`: Hebrew and English are 4×`h2` + 8×`h3`, and the
+Russian would have been 1×`h2` + 4×`h3` + 8×`h4`. Relative, that same document
+with its redundant title line removed is the other two languages exactly. The
+base is computed over the **whole** document rather than per line, or every
+heading is its own top level and the hierarchy flattens again by another route.
+See **A heading was silently demoted to prose** below for what had to change
+underneath it.
 
 ⚠ **AND THE INTERESTING HALF IS WHAT IT REFUSES.** The reported paste had lost
 its line breaks before reaching the clipboard: thousands of characters on one line
