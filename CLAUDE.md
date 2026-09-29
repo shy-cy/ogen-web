@@ -9060,19 +9060,37 @@ share image, Formspree wiring, domain) is done. Open items:
   entry — so a rehearsal can be run on the live site without a real card being
   charged, and test credit can never settle a real class. See **Test-mode
   payments** and **Who can find it**.
-- ⚠ **The TEST Stripe pair is not set yet.** `STRIPE_TEST_SECRET_KEY` and
-  `STRIPE_TEST_WEBHOOK_SECRET` have to be set with `netlify env:set`, and the
-  test-mode webhook endpoint has to be created in **Stripe's test mode** pointing
-  at `/api/stripe-webhook-test` — its signing secret cannot exist before the
-  endpoint does. Until both are set, an activity whose listing is `test` fails
-  loudly on its first payment attempt rather than quietly charging a real card,
-  which is the intended failure. Remember an env change does not reach deployed
-  functions until the next deploy.
-- **Rotate the Netlify token.** It was pasted into a chat transcript during
-  setup. ⚠ The **GitHub half is done**: the PAT expired on 27 Sep 2026 and took
-  the family area, the Roster and the CMS down with it, and the replacement
-  minted that day is a fresh secret the transcript never saw. See **A dead
-  `GITHUB_TOKEN` looks like a broken family area**.
+- **The TEST Stripe pair is set, and the second endpoint is registered.**
+  Verified against Stripe on 29 Sep 2026 rather than assumed: `GET
+  /v1/webhook_endpoints` in **test** mode lists
+  `https://www.ogen.cy/api/stripe-webhook-test` as `enabled`, and in **live**
+  mode `https://www.ogen.cy/api/stripe-webhook`. Both subscribe to
+  `checkout.session.completed` and nothing else, which is exactly the one event
+  `stripe-webhook.js` reads — so the narrower subscription is correct rather than
+  a gap, and the sister project's extra `checkout.session.expired` is its own
+  business. ⚠ Note both keys live on the **shared** account, which is why
+  `isOurs()` and the `ogen_mode` tag matter in test mode exactly as in live mode.
+  ⚠ **What has NOT been exercised is a test-mode payment end to end.** The
+  configuration is in place; nobody has yet taken a rehearsal registration on a
+  `test` activity through Checkout with a test card and watched the webhook
+  settle the record. That is the step that would prove the pair rather than the
+  presence of its parts.
+- ⚠ **ROTATE EVERY SECRET. On 29 Sep 2026 `netlify env:list --plain` was run
+  in an assistant session and printed all of them into that transcript** — an
+  attempt to list only the NAMES that did not account for the `KEY=value` format
+  having no space to split on. Exposed: `GITHUB_TOKEN`, `NETLIFY_BLOBS_TOKEN`,
+  `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET`, `STRIPE_SECRET_KEY`,
+  `STRIPE_TEST_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_TEST_WEBHOOK_SECRET`
+  and `ADMIN_PASSWORD`. The live Stripe key is the one that matters most: it can
+  move real money on a **shared** account, so rolling it is Shirat HaYam's
+  business too. `netlify env:list` **without** `--plain` masks values; use that,
+  or `netlify env:list --json | jq keys`, and never `--plain` for a listing.
+  Remember an env change does not reach deployed functions until the next
+  deploy. This supersedes the older "rotate the Netlify token" item, which was
+  about a setup transcript. ⚠ The **GitHub PAT was already rotated once**: it
+  expired on 27 Sep 2026 and took the family area, the Roster and the CMS down
+  with it — see **A dead `GITHUB_TOKEN` looks like a broken family area** — and
+  the replacement is now exposed too.
 - **`ADMIN_PASSWORD` is still set** and does nothing: it is the bootstrap
   password, refused from the moment one admin account exists. A live credential
   with no remaining job is one more thing to leak, so unset it.
