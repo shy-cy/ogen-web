@@ -17,7 +17,26 @@
 // other field. Both destinations render this markup UNESCAPED, so anything not
 // on this list would run.
 const RICH_TAGS = ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 's',
-                   'h2', 'h3', 'ul', 'ol', 'li', 'a', 'blockquote'];
+                   'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'a', 'blockquote'];
+
+// ⚠ A HEADING IS NEVER SILENTLY DEMOTED TO PROSE.
+//
+// h1 and h4 used to be off the list, and an unlisted tag is STRIPPED WITH ITS
+// TEXT KEPT — which is right for a <span> and wrong for a heading: the words
+// survive as a bare text node and the page renders somebody's section title as
+// an ordinary sentence. It is the shape of damage this file already met once,
+// where three activities lost their bodies to a guess, and it is invisible in
+// the editor because the editor shows the heading right up until Save.
+//
+// Nearly every document pasted in here opens with a `# Title`, which Quill
+// converts to a real <h1>, so that was the commonest heading on the clipboard
+// and the one certain to be thrown away.
+//
+// So headings are CLAMPED into the range the page can render rather than
+// filtered. h1 becomes h2 — rule 3 allows exactly one h1 per page and the page
+// already has it, in .page-header — and h5/h6 become h4, which is the deepest
+// level .activity-main styles. A level is lost; a heading never is.
+const HEADING_AS = { h1: 'h2', h2: 'h2', h3: 'h3', h4: 'h4', h5: 'h4', h6: 'h4' };
 
 function sanitiseRich(value) {
   let html = String(value == null ? '' : value);
@@ -28,7 +47,9 @@ function sanitiseRich(value) {
   // tag like <a href="data:text/html,<script>"> ends at the wrong character and
   // leaks the rest as text.
   html = html.replace(/<\/?([a-z0-9]+)((?:"[^"]*"|'[^']*'|[^>"'])*)>/gi, (whole, tag, attrs) => {
-    const name = tag.toLowerCase();
+    // Clamped before the allowlist is asked, so the closing tag is renamed with
+    // the opening one and the two cannot come apart.
+    const name = HEADING_AS[tag.toLowerCase()] || tag.toLowerCase();
     const closing = whole.charAt(1) === '/';
     if (RICH_TAGS.indexOf(name) === -1) return '';   // strip the tag, keep its text
     if (closing) return '</' + name + '>';
@@ -48,4 +69,4 @@ function sanitiseRich(value) {
   return html.trim();
 }
 
-module.exports = { sanitiseRich, RICH_TAGS };
+module.exports = { sanitiseRich, RICH_TAGS, HEADING_AS };

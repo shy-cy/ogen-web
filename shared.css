@@ -803,6 +803,15 @@ html[lang="en"] .page-header h1, html[lang="ru"] .page-header h1{ font-weight:80
 .fact-row{ grid-area:row; display:flex; flex-wrap:wrap; gap:16px 24px; align-items:stretch; }
 .fact-row > *{ flex:1 1 320px; min-width:0; }
 .activity-main h2{ font-size:22px; font-weight:700; color: var(--navy); margin:28px 0 12px; }
+/* ⚠ h3 WAS USED BY FIVE PUBLISHED ACTIVITIES AND STYLED BY NOTHING. Twenty-nine
+   of them, live, rendering at the browser's default size and colour in the
+   middle of designed copy — a class nobody styled is a layout nobody designed,
+   which this stylesheet has already paid for once. h4 arrives with them because
+   the editor now offers it and sanitiseRich() clamps h5/h6 down to it, so it is
+   the deepest level a body can hold. One rule each, and the three sizes step
+   down together: put them in a media query separately and the ladder breaks. */
+.activity-main h3{ font-size:18px; font-weight:700; color: var(--navy); margin:24px 0 10px; }
+.activity-main h4{ font-size:16px; font-weight:700; color: var(--navy); margin:20px 0 8px; }
 .activity-main > *:first-child{ margin-top:0; }
 .activity-main p{ font-size:16px; color:#3f3f3a; margin-bottom:16px; }
 .faq-item{ margin-bottom:16px; }

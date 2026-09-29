@@ -360,6 +360,14 @@ h2 > button.help,h3 > button.help{vertical-align:2px;}
 }
 .quill-wrap .ql-container.ql-snow{ border:none; font-family:inherit; font-size:14px; color:var(--ink); }
 .quill-wrap .ql-editor{ min-height:140px; line-height:1.65; }
+/* ⚠ THE EDITOR SHOWS THE THREE LEVELS AS THREE LEVELS. The toolbar offers H2,
+   H3 and H4, and without this Quill's own stylesheet draws them at sizes of its
+   choosing — so a writer picks a level and cannot see which one they got. Same
+   relative ladder as .activity-main in shared.css, one step smaller because the
+   editor box is narrower than the page. */
+.quill-wrap .ql-editor h2{ font-size:19px; font-weight:700; color:var(--navy); margin:18px 0 8px; }
+.quill-wrap .ql-editor h3{ font-size:16px; font-weight:700; color:var(--navy); margin:16px 0 7px; }
+.quill-wrap .ql-editor h4{ font-size:14.5px; font-weight:700; color:var(--navy); margin:14px 0 6px; }
 .quill-wrap .ql-editor.ql-blank::before{ color:#a8a49a; font-style:normal; }
 /* The toolbar keeps its own direction so the buttons stay in one order in all
    three editors; only the typing area flips. */

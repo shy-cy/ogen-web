@@ -61,6 +61,7 @@ const EMAIL_STYLE = {
   p: 'margin:0 0 14px;',
   h2: 'font-size:17px;margin:20px 0 10px;',
   h3: 'font-size:15px;margin:18px 0 8px;',
+  h4: 'font-size:14px;margin:16px 0 7px;',
   ul: 'margin:0 0 14px;padding-inline-start:22px;',
   ol: 'margin:0 0 14px;padding-inline-start:22px;',
   li: 'margin:0 0 4px;',

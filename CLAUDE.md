@@ -2826,13 +2826,13 @@ on text that is not stored yet, Ctrl-Z undoes it, and a `#` at the start of a re
 stored sentence is never seen by any of this. A test asserts `toEditorHtml` calls
 none of it.
 
-⚠ **EVERY HEADING LEVEL BECOMES `<h2>`, AND THREE CONSTRAINTS AGREE.**
-`sanitiseRich()` allows `h2` and `h3` and nothing else, so `#` to `######` cannot
-map one-to-one onto anything; `.activity-main` styles **only** `h2`, so a pasted
-`h3` would land on the page at the browser's default size — the *a class nobody
-styled is a layout nobody designed* trap, one stylesheet over; and `[{ header: 2 }]`
-is the only heading this toolbar offers, so a pasted heading and a hand-made one
-have to be one tag or a body ends up with two heading conventions.
+⚠ **EVERY HEADING LEVEL BECAME `<h2>`, AND THREE CONSTRAINTS AGREED — AND ALL
+THREE HAVE SINCE MOVED.** `sanitiseRich()` allowed `h2` and `h3` and nothing else;
+`.activity-main` styled **only** `h2`; and `[{ header: 2 }]` was the one heading
+the toolbar offered. So `#` to `######` had nothing to map onto and the hierarchy
+of every pasted document was flattened on the way in. `#` is `h2`, `##` is `h3`
+and `###` or deeper is `h4` now — see **A heading was silently demoted to prose**
+below for what had to change underneath it.
 
 ⚠ **AND THE INTERESTING HALF IS WHAT IT REFUSES.** The reported paste had lost
 its line breaks before reaching the clipboard: thousands of characters on one line
@@ -2876,6 +2876,78 @@ to be wrapped when it was copied.
 
 **Ordered lists are deliberately not converted.** Four things were asked for and
 four are built; `1.` stays literal, which is visible rather than silent.
+
+#### ⚠ A heading was silently demoted to prose
+
+Asked for as *"we also need to add options for H3 and H4 in the wysiwyg"*, with a
+screenshot of the Russian About editor holding a properly formatted document — a
+title, a section, a subsection — pasted from a **rendered** ChatGPT reply, so the
+clipboard carried real `text/html` and Quill converted it natively into `<h1>`,
+`<h2>` and `<h3>`. Which is the working path, and it was about to be eaten.
+
+⚠ **AN UNLISTED TAG IS STRIPPED WITH ITS TEXT KEPT**, which is right for a
+`<span>` and is silent destruction for a heading: the words survive as a bare
+text node and the page publishes somebody's section title as an ordinary
+sentence. Measured against the real function before anything changed:
+
+```
+h1 -> "Взросление, поиск себя"      (the tag, gone)
+h4 -> "Подраздел"                   (the tag, gone)
+```
+
+Nearly every document pasted into this editor opens with a `# Title`, which is an
+`<h1>` on the clipboard — so that was the commonest heading of all and the one
+certain to be thrown away. Invisible in the editor, because the editor shows it
+correctly right up until Save. Same family as the leading-tag guess that ate
+three bodies: **what is on screen and what is stored are two different values,
+and only the second one is the record.**
+
+⚠ **AND THE SECOND HALF WAS ALREADY LIVE AND HAD NOTHING TO DO WITH THE PASTE.**
+`.activity-main` styled only `h2`, while **five** published activities carried
+**twenty-nine** `<h3>` headings between them — every one rendering at the
+browser's default size and colour in the middle of designed copy. *A class nobody
+styled is a layout nobody designed*, which this stylesheet had already paid for
+once. It had been written down as a known gap and left; the toolbar request is
+what made it worth fixing, and it is the larger of the two bugs.
+
+⚠ **SO HEADINGS ARE CLAMPED, NOT FILTERED.** `HEADING_AS` in
+`_sanitise-rich.js` maps `h1 → h2` — rule 3 allows exactly one `<h1>` per page and
+`.page-header` already has it — and `h5`/`h6` → `h4`, the deepest level the page
+styles. **A level is lost; a heading never is.** The clamp is applied before the
+allowlist is consulted, so the closing tag is renamed with the opening one and
+the two cannot come apart.
+
+Four things had to move together, and a test asserts each against the others:
+
+| | |
+|---|---|
+| `_sanitise-rich.js` | `h4` on the allowlist, `h1`/`h5`/`h6` clamped onto it |
+| `shared.css` | one `.activity-main h3` rule and one `h4` rule, sizes descending |
+| `admin/admin.css` | the editor draws the same three levels, in the same order |
+| `RICH_TOOLBAR` | `H2`, `H3`, `H4` — and deliberately not `H1` |
+
+⚠ **THE TOOLBAR AND THE ALLOWLIST ARE PINNED AGAINST EACH OTHER.** A level a
+writer can press and the server then clamps is this bug again with a button added
+to it, so the test reads the levels **off the toolbar** and puts each one through
+`sanitiseRich()` rather than listing them twice.
+
+⚠ **AND THE EDITOR HAS TO SHOW THE DIFFERENCE.** Without a rule Quill draws the
+three at sizes of its own choosing, so a writer picks a level and cannot see
+which one they got — a toolbar offering a distinction nobody can perceive is
+worse than not offering it. The editor's ladder is the page's, one step smaller
+because the box is narrower, and the test asserts both descend.
+
+⚠ **`_email-shell.js` GAINED `h4` IN THE SAME PASS**, because `sanitiseRich()`
+has a second caller: the rejection draft, whose markup reaches an inbox with no
+stylesheet. A level the shell does not know renders at the mail client's default
+in the middle of ours.
+
+**One thing is deliberately left alone.** The template puts `<h2>${L.about}</h2>`
+above the body, so a body's own `h2` is a *sibling* of the About heading rather
+than a child of it. That outline has been the site's convention since the first
+activity was written, every published record is built on it, and correcting it
+would mean rewriting the level of every heading in every body to fix something no
+reader can see. The ladder starts at `h2` for that reason and not by oversight.
 
 #### ⚠ And then a publish emptied one, and nothing said a word
 

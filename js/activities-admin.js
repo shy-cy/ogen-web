@@ -184,7 +184,13 @@
   // because the server sanitises it to a fixed tag allowlist on every save.
   var RICH_TOOLBAR = [
     ['bold', 'italic', 'underline'],
-    [{ header: 2 }],
+    // ⚠ THREE LEVELS, BECAUSE THE PAGE HAS THREE. It offered H2 alone, so every
+    // heading a writer made was the same level as the "About this activity"
+    // heading the template puts above the body — and a pasted document with
+    // sections and subsections had nowhere to put the second tier. h4 is the
+    // floor: sanitiseRich() clamps h5 and h6 onto it and .activity-main styles
+    // no deeper.
+    [{ header: 2 }, { header: 3 }, { header: 4 }],
     [{ list: 'bullet' }, { list: 'ordered' }],
     ['link'],
     ['clean']
@@ -290,6 +296,12 @@
     return runs.length ? runs : [{ text: '', bold: false }];
   }
 
+  // `#` is the shallowest a body goes, and anything past `###` lands on h4
+  // rather than being refused: a deeper level is a real thing to write and the
+  // page has nowhere to put it, so it is clamped exactly as sanitiseRich()
+  // clamps h5 and h6.
+  function mdTag(hashes) { return 'h' + Math.min(hashes + 1, 4); }
+
   // Returns an array of blocks, or null meaning "this is not Markdown, leave it
   // to Quill" — which is today's behaviour exactly, and is what every paste that
   // is not Markdown has to keep getting.
@@ -313,7 +325,17 @@
     while (i < lines.length) {
       if (!lines[i].trim()) { i += 1; continue; }
       var h = MD_HEAD.exec(lines[i]);
-      if (h) { out.push({ tag: 'h2', runs: mdRuns(h[2].trim()) }); i += 1; continue; }
+      // ⚠ THE LEVEL IS KEPT. Every heading used to become an h2, because the
+      // toolbar offered one level, sanitiseRich() allowed h2 and h3, and
+      // .activity-main styled only h2 — three constraints that agreed, and
+      // between them flattened a document's whole hierarchy on the way in. All
+      // three have moved, so `#` is h2, `##` is h3, and `###` or deeper is h4,
+      // which is the floor the other two now share.
+      if (h) {
+        out.push({ tag: mdTag(h[1].length), runs: mdRuns(h[2].trim()) });
+        i += 1;
+        continue;
+      }
       if (MD_BULLET.test(lines[i])) {
         out.push({ tag: 'li', runs: mdRuns(MD_BULLET.exec(lines[i])[1].trim()) });
         i += 1;
@@ -352,7 +374,7 @@
       b.runs.forEach(function (r) {
         if (r.text) d.insert(r.text, r.bold ? { bold: true } : {});
       });
-      d.insert('\n', b.tag === 'h2' ? { header: 2 }
+      d.insert('\n', /^h[234]$/.test(b.tag) ? { header: Number(b.tag.slice(1)) }
                     : b.tag === 'li' ? { list: 'bullet' } : {});
     });
     return d;

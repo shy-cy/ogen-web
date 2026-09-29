@@ -101,18 +101,29 @@ const slice = (name) => {
 const vars = ui.slice(ui.indexOf('  var MD_HEAD ='), ui.indexOf('  function mdRuns'));
 const ctx = { out: null };
 vm.createContext(ctx);
-vm.runInContext(vars + slice('mdRuns') + slice('mdBlocks') +
+vm.runInContext(vars + slice('mdTag') + slice('mdRuns') + slice('mdBlocks') +
   '\nout = { mdBlocks: mdBlocks, mdRuns: mdRuns, MD_HEAD_MAX: MD_HEAD_MAX };', ctx);
 const md = ctx.out.mdBlocks;
 const shape = (blocks) => (blocks || []).map((b) =>
   b.tag + ':' + b.runs.map((r) => (r.bold ? '*' : '') + r.text).join('|')).join(' / ');
 
 H.eq(shape(md('# Title')), 'h2:Title', 'a heading');
-H.eq(shape(md('### Deep')), 'h2:Deep',
-  '⚠ AND EVERY LEVEL IS THE SAME TAG. sanitiseRich allows h2 and h3 and nothing ' +
-  'else, .activity-main styles ONLY h2, and [{header:2}] is the one heading the ' +
-  'toolbar offers — so a pasted heading and a hand-made one have to be one thing');
-H.eq(shape(md('###### Six')), 'h2:Six', 'six hashes too');
+
+// ⚠ THE LEVEL SURVIVES THE PASTE, WHERE IT USED TO BE FLATTENED. Every heading
+// became an h2, because the toolbar offered one level, sanitiseRich() allowed h2
+// and h3, and .activity-main styled only h2 — three constraints that agreed with
+// each other and threw away the hierarchy of every document pasted in. All three
+// moved together, so the mapping is asserted here AND the three things it
+// depends on are asserted below, or this quietly becomes a lie again.
+H.eq(shape(md('## Section')), 'h3:Section', '`##` is one level down');
+H.eq(shape(md('### Deep')), 'h4:Deep', 'and `###` one more');
+H.eq(shape(md('#### Deeper')), 'h4:Deeper',
+  '⚠ AND h4 IS THE FLOOR rather than a refusal — a deeper level is a real thing ' +
+  'to write and the page has nowhere to put it, so it is clamped exactly as ' +
+  'sanitiseRich() clamps h5 and h6');
+H.eq(shape(md('###### Six')), 'h4:Six', 'six hashes land on the floor too');
+H.eq(shape(md('# A\n\n## B\n\n### C')), 'h2:A / h3:B / h4:C',
+  'and a whole document keeps its shape');
 H.eq(md('#NoSpace'), null, 'a hash with no space after it is not a heading');
 H.eq(shape(md('# T\n\nbody')), 'h2:T / p:body', 'a heading and a paragraph');
 H.eq(shape(md('# T\n\n- a\n- b')), 'h2:T / li:a / li:b', 'bullets');
@@ -131,7 +142,7 @@ H.eq(shape(md('# T\n\nline one\nline two')), 'h2:T / p:line one line two',
   'a wrapped paragraph is rejoined');
 H.eq(shape(md('# T\n\none\n\n\n\ntwo')), 'h2:T / p:one / p:two',
   'and any number of blank lines is one break');
-H.eq(shape(md('  ## Indented')), 'h2:Indented', 'up to three spaces of indent is still a marker');
+H.eq(shape(md('  ## Indented')), 'h3:Indented', 'up to three spaces of indent is still a marker');
 
 console.log('\n[⚠ and what it refuses, which is the half that matters]');
 H.eq(md(''), null, 'nothing');
@@ -208,8 +219,30 @@ H.eq(code.indexOf('dangerouslyPasteHTML'), -1,
   'source by MEASURING them — and invented an empty paragraph between every <p> ' +
   'and the <h2> after it. Read out of a browser: `<p>a</p><h2>B</h2>` converts ' +
   'to `a\\n\\n` plus the heading');
-H.ok(/header: 2/.test(delta) && /list: 'bullet'/.test(delta),
+H.ok(/header:/.test(delta) && /list: 'bullet'/.test(delta),
   'the block attributes are named outright');
+
+// ⚠ AND THE DELTA IS EXECUTED, not read. This assertion used to match the
+// literal `header: 2` in the source — which was true, and was also exactly the
+// flattening that threw away every pasted document's hierarchy, so the check
+// agreed with the bug. A stub Delta records what the function actually inserts.
+function FakeDelta() { this.ops = []; }
+FakeDelta.prototype.insert = function (text, attrs) {
+  this.ops.push({ text: text, attrs: attrs || {} });
+  return this;
+};
+const dctx = vm.createContext({ window: { Quill: { import: () => FakeDelta } } });
+vm.runInContext(vars + slice('mdTag') + slice('mdRuns') + slice('mdBlocks') + slice('mdDelta') +
+  '\nout = { mdBlocks: mdBlocks, mdDelta: mdDelta };', dctx);
+const levels = (text) => dctx.out.mdDelta(dctx.out.mdBlocks(text)).ops
+  .filter((o) => o.text === '\n')
+  .map((o) => (o.attrs.header ? 'h' + o.attrs.header
+             : o.attrs.list ? o.attrs.list : 'p')).join(' ');
+
+H.eq(levels('# A\n\nbody\n\n## B\n\n### C\n\n- x'), 'h2 p h3 h4 bullet',
+  '⚠ THE DELTA CARRIES THREE DIFFERENT HEADER LEVELS — the thing the old ' +
+  'source-matching assertion could never have seen');
+H.eq(levels('#### D\n\n###### F'), 'h4 h4', 'and clamps at four');
 H.ok(/bold: true/.test(delta), 'and so is bold');
 H.ok(/q\.getLength\(\) <= 1/.test(caller),
   '⚠ an EMPTY editor is setContents\'d rather than inserted into, or Quill\'s own ' +
@@ -222,7 +255,14 @@ H.ok(/q\.getText\(range\.index - 1, 1\) === '\\n'/.test(caller),
 
 console.log('\n[the pasted markup survives the server untouched]');
 const { sanitiseRich } = require(H.fnPath('_sanitise-rich'));
-const fromEditor = '<h2>Заголовок</h2><p>Текст <strong>жирный</strong>.</p><ul><li>раз</li><li>два</li></ul>';
+// ⚠ THE TAGS COME FROM mdTag ITSELF, not from a fixture somebody typed. The
+// hardcoded version held only an h2, so when the converter learned h3 and h4 it
+// went on passing while h4 was still being stripped to bare text on save.
+const produced = [1, 2, 3, 4, 5, 6].map((n) => dctx.out.mdBlocks('#'.repeat(n) + ' X')[0].tag);
+H.eq(produced.join(','), 'h2,h3,h4,h4,h4,h4', 'the converter produces exactly these');
+const fromEditor = produced.filter((t, i) => produced.indexOf(t) === i)
+  .map((t) => '<' + t + '>З</' + t + '>').join('') +
+  '<p>Текст <strong>жирный</strong>.</p><ul><li>раз</li><li>два</li></ul>';
 H.eq(sanitiseRich(fromEditor), fromEditor,
   'every tag this can produce is on the allowlist, so nothing is stripped on save');
 
