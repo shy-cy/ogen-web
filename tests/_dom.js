@@ -239,7 +239,8 @@ function makeDom(opts) {
   const store = {};
   const eyes = [];
   const window = {
-    location: { search: opts.search || '', href: opts.href || '/', hash: '' },
+    location: { search: opts.search || '', href: opts.href || '/', hash: '',
+                pathname: opts.pathname || '/' },
     // ⚠ IT UPDATES location.search, NOT ONLY href. js/member-account.js rewrites
     // the query and then redraws, reading param() back out — so a replaceState
     // that moved href alone would leave the redraw looking at the OLD query and

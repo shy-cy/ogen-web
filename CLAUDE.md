@@ -2702,6 +2702,9 @@ admin/index.html, admin/activities.html, admin/registrations.html,
 admin/users.html, admin/admin.css
 js/admin-session.js, js/activities-admin.js, js/registrations-admin.js,
 js/repeatable-items.js
+js/admin-help.js, js/admin-url.js, js/admin-icons.js, js/admin-collapse.js
+                       the four shared admin controls: the (i), the selection in
+                       the URL, the row glyphs, and opening/closing a panel
 js/image-optimize.js   resizes + re-encodes every upload IN THE BROWSER
 ```
 
@@ -2962,6 +2965,53 @@ activity was written, every published record is built on it, and correcting it
 would mean rewriting the level of every heading in every body to fix something no
 reader can see. The ladder starts at `h2` for that reason and not by oversight.
 
+#### ⚠ And then the two new buttons were invisible, and the strip scrolled away
+
+Two faults on the same strip, reported in one breath from the About editor: *"I
+cannot see H3 and H4"*, and *"when you scroll down the wysiwyg editor the menu
+disappears."*
+
+⚠ **QUILL 1.3.7 SHIPS HEADING ICONS FOR 1 AND 2 AND NOTHING ELSE.** Its icon map
+is literally `header:{1:…,2:…}`, and a toolbar button whose value is not in it is
+left with an **empty `innerHTML`** — so the levels the section above added arrived
+as two blank squares between H2 and the list buttons. Present, clickable, drawing
+nothing, with nothing erroring. That is worse than not offering them: a writer who
+cannot see a control does not know the level exists, and one who hits the gap by
+accident cannot tell what happened.
+
+⚠ **SO ALL THREE ARE WORDS, BUILT FROM THE BUTTON'S OWN `value`.** `content:'H'
+attr(value)` in **one** rule, with Quill's own H2 icon hidden so the three read
+alike. A rule per level is a rule that is right for the levels somebody wrote out
+and silently missing for the next one — which is the bug, with Quill in the role
+of the author — so a test asserts no selector in `admin.css` names a level, and
+takes the levels off `RICH_TOOLBAR` rather than listing them. Drawing two more
+icons in Quill's style was the other answer: a matched pair of hand-drawn paths
+in exchange for nothing a reader gains.
+
+⚠ **AND `overflow:hidden` ON `.quill-wrap` IS WHAT MADE THE STICKY TOOLBAR
+IMPOSSIBLE.** It was there to clip the toolbar to the wrapper's rounded corners —
+which the toolbar's own `border-radius` already does — and `overflow:hidden`
+makes a box a **scroll container**, so a sticky child sticks within *that* box,
+which never scrolls. Adding `position:sticky` on its own would have changed
+nothing at all, with nothing to point at. The two cannot both be there, which is
+the same shape as `height:auto` and `aspect-ratio` on the card image: one
+declaration silently disabling another.
+
+It sticks inside its **own** wrapper, so each language's toolbar arrives with that
+language's box and leaves with it, rather than one bar hovering over three editors
+claiming to act on all of them. ⚠ The offset is **`--stick-top`**, the height of
+the admin bar, for the reason `--nav-h` is a token on the public side: the sidebar
+has sat under that bar at 70px since this screen was built, the toolbar arrived
+needing the same number, and a second literal is one of the two moving while
+nothing errors and the other sits under the chrome. A test asserts nothing else
+sticks to a literal top.
+
+⚠ **AND IT WAS VERIFIED IN A BROWSER, because none of it is visible to the
+stylesheet.** Driven over CDP against real Chrome at 1280×900: H2, H3 and H4 each
+render their word in 28px, pressing H3 makes an `<h3>` and pressing it again
+makes a `<p>` back, and after scrolling 663px the toolbar sits at **70** with the
+admin bar's own bottom at 54.
+
 #### ⚠ And then a publish emptied one, and nothing said a word
 
 Reported as *"I refreshed and lost the HE copy"*, looking at an empty Hebrew
@@ -3135,6 +3185,57 @@ reaching a `label` or `.field-label` through `>` must reach it through
 again, opens a second, sends Escape, clicks elsewhere, clicks inside — because
 reading the source proves the source is self-consistent and can never prove that
 pressing it shows the words.
+
+### ⚠ A form eleven panels long, with nothing to fold
+
+Asked for from the screen it is about: *"the whole activity area is becoming very
+long — I think it would be good if we have +/- to open/close sections, so areas we
+completed or don't need, we can hide them."* Eleven panels, most of them written
+once and left alone, and the one being worked on several screens below the fold.
+
+`js/admin-collapse.js` is the control, loaded the way `js/admin-help.js`,
+`js/admin-url.js` and `js/admin-icons.js` are — the heading becomes a button
+spanning the row, with `+` and `−` as asked for.
+
+⚠ **IT HIDES WITH A CLASS AND NOTHING ELSE, AND THAT IS THE WHOLE SAFETY
+ARGUMENT.** A closed panel's fields are still in the document — still built, still
+holding the ids `readForm()` walks on save. Collapsing by emptying a container, or
+by detaching one, is the **undrawn-field trap** this project keeps meeting, and
+here it would mean closing a section and then publishing it away with nobody
+having typed anything. The group sub-page settled the same question the same way
+and said so (*"hidden rather than detached, because every editor on them holds
+live nodes and ids that the read-back walks on save"*); this does not even hide,
+it paints. A test closes a panel and then goes looking for the field inside it,
+and the module is asserted **by shape** to reach for no `removeChild`, no
+`innerHTML` and no `hidden`.
+
+⚠ **THE HEADING NEVER CLOSES WITH THE PANEL.** That is what makes a closed form
+readable rather than merely shorter: eleven titles in a column is a table of
+contents. It is also what keeps a publish refusal actionable — the message names a
+field in a panel that is shut, and the panel is one click from it rather than
+gone. Nothing here expands anything on its own, for the same reason: a control
+that undoes what somebody just did is worse than a scroll. `:not(h2)` rather than
+a list of what to hide, so a panel that grows a fourth child next year closes with
+the rest of them.
+
+⚠ **AND THE (i) IS A SIBLING OF THE TOGGLE, NEVER INSIDE IT.** A button inside a
+button is not markup a browser keeps, and asking what a panel means must not close
+the panel — the pairing `js/admin-help.js` already `preventDefault`s beside a
+checkbox's own label, answered here structurally instead. **One** line does it:
+everything in the heading moves into the toggle and the badge is then appended
+back to the heading, which both lifts it out and lands it *after* the toggle
+whichever of the two scripts wired first. Two rules that had to agree was the
+alternative, and the redundant one survived a bite-check, which is how it was
+found.
+
+**State is `localStorage`, keyed by page and panel**, because this is a view
+preference rather than a piece of work. Not the URL: the URL on these screens
+carries the activity you are editing, which is a thing to send another admin, and
+nobody wants to be sent somebody else's folded-up form. It fails open — no
+storage, or a key whose heading has been reworded, means the panel is open.
+
+**The preview panel opts out**, with `data-no-collapse`, because it is shown by
+its own button and one that opened folded would read as one that failed.
 
 ### ⚠ A reload lands back on the activity you were on
 

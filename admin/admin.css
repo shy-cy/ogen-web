@@ -7,6 +7,12 @@
   --navy:#1B3E52; --paper:#FBFAF6; --stone:#EEE7D8; --ink:#1B3E52;
   --muted:#9a9a94; --danger:#8a3220; --ok:#4a5a3a;
   --font:'Mulish',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  /* How far down the page the sticky admin bar reaches. TWO rules key off it —
+     the sidebar and the editor toolbar — and the second arrived as a literal 70
+     copied from the first, which is the shape --nav-h exists to stop on the
+     public side: one of the two moves and nothing errors, the other just sits
+     under the bar. */
+  --stick-top:70px;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 html{background:#f4f2ec;}
@@ -30,12 +36,53 @@ a{color:var(--terracotta);}
 
 .wrap{max-width:1500px;margin:0 auto;padding:20px;}
 .layout{display:flex;gap:20px;align-items:flex-start;}
-.sidebar{flex:0 0 250px;position:sticky;top:70px;}
+.sidebar{flex:0 0 250px;position:sticky;top:var(--stick-top);}
 .main{flex:1;min-width:0;}
 
 .panel{background:#fff;border:1px solid #e3ded1;border-radius:10px;padding:18px;margin-bottom:18px;}
 .panel > h2{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;
-  color:var(--terracotta);margin-bottom:14px;}
+  color:var(--terracotta);margin-bottom:14px;display:flex;align-items:center;}
+
+/* ---------- opening and closing a panel ---------- */
+/* Reported as the form being very long: "areas we completed or don't need, we
+   can hide them". Eleven panels, most of them filled in once and left alone, and
+   the one being worked on several screens down.
+
+   ⚠ IT IS CSS, AND THAT IS THE WHOLE SAFETY ARGUMENT. A closed panel's fields
+   are still in the document — still built, still holding their ids, still read
+   back by readForm() on save. Collapsing by emptying a container, or by
+   detaching it, is the undrawn-field trap this codebase keeps meeting, and here
+   it would mean closing a section and then publishing it away. The group
+   sub-page already made this call for the same reason ("hidden rather than
+   detached, because every editor on them holds live nodes"), by hiding; this
+   does not even do that.
+
+   The HEADING never hides. That is what makes a closed form readable rather than
+   merely shorter: eleven titles in a column is a table of contents, and a
+   refusal naming a field in a panel you cannot see is still one click from it.
+
+   :not(h2) rather than a list of what to hide, so a panel that grows a fourth
+   child next year closes with the rest of them. */
+.panel.is-collapsed > *:not(h2){ display:none; }
+/* The heading's own bottom margin is spacing between it and a body that is no
+   longer there; left in, eleven closed panels carry 154px of nothing. */
+.panel.is-collapsed > h2{ margin-bottom:0; }
+.panel-toggle{
+  flex:1; min-width:0; display:flex; align-items:center; gap:8px;
+  appearance:none; background:none; border:none; padding:0; margin:0;
+  cursor:pointer; text-align:start;
+  font:inherit; color:inherit; text-transform:inherit; letter-spacing:inherit;
+}
+.panel-toggle:focus-visible{ outline:2px solid var(--terracotta); outline-offset:3px; }
+.panel-toggle:hover{ color:var(--navy); }
+/* + and - as asked for, in a box wide enough for both, or the title shifts a
+   pixel every time a panel opens. */
+.panel-toggle::before{
+  content:'\2212'; flex:none; width:15px; text-align:center;
+  font-size:14px; line-height:1; color:var(--muted);
+}
+.panel.is-collapsed .panel-toggle::before{ content:'+'; }
+.panel-toggle .panel-toggle-text{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
 /* ---------- activity picker ---------- */
 .picker{list-style:none;display:flex;flex-direction:column;gap:2px;max-height:60vh;overflow:auto;}
@@ -352,11 +399,29 @@ h2 > button.help,h3 > button.help{vertical-align:2px;}
    paragraph at a time; side by side it was three narrow columns of prose. */
 .rich-stack{ display:flex; flex-direction:column; gap:16px; }
 .rich-lang label{ display:block; margin-bottom:6px; }
-.quill-wrap{ border:1px solid #eee7d8; border-radius:8px; overflow:hidden; background:#fff; }
+/* ⚠ NO `overflow:hidden` HERE, AND ITS ABSENCE IS LOAD-BEARING. It was here to
+   clip the toolbar to the wrapper's rounded corners — which the toolbar's own
+   border-radius below already does — and it silently made the sticky toolbar
+   impossible: `overflow:hidden` makes a box a scroll container, and a sticky
+   child sticks within the nearest one. That box never scrolls, so the toolbar
+   never stuck, with nothing erroring and nothing to point at. The two
+   declarations cannot both be here. */
+.quill-wrap{ border:1px solid #eee7d8; border-radius:8px; background:#fff; }
 .quill-wrap:focus-within{ border-color:var(--olive); }
+/* ⚠ THE TOOLBAR FOLLOWS THE TEXT DOWN. Reported plainly: "when you scroll down
+   the wysiwyg editor the menu disappears". A body runs to several screens, so
+   the controls for formatting it were reliably off the top by the time there was
+   anything to format — and making a heading meant scrolling up, losing the
+   selection, and scrolling back.
+
+   It sticks inside its OWN wrapper, so each language's toolbar arrives with that
+   language's box and leaves with it, rather than one bar hovering over three
+   editors claiming to act on all of them. `--stick-top` is the admin bar's
+   height, the one the sidebar already sits under. */
 .quill-wrap .ql-toolbar.ql-snow{
   border:none; border-bottom:1px solid #eee7d8; background:var(--stone);
   border-radius:8px 8px 0 0; padding:6px 8px;
+  position:sticky; top:var(--stick-top); z-index:10;
 }
 .quill-wrap .ql-container.ql-snow{ border:none; font-family:inherit; font-size:14px; color:var(--ink); }
 .quill-wrap .ql-editor{ min-height:140px; line-height:1.65; }
@@ -368,6 +433,26 @@ h2 > button.help,h3 > button.help{vertical-align:2px;}
 .quill-wrap .ql-editor h2{ font-size:19px; font-weight:700; color:var(--navy); margin:18px 0 8px; }
 .quill-wrap .ql-editor h3{ font-size:16px; font-weight:700; color:var(--navy); margin:16px 0 7px; }
 .quill-wrap .ql-editor h4{ font-size:14.5px; font-weight:700; color:var(--navy); margin:14px 0 6px; }
+/* ⚠ QUILL 1.3.7 SHIPS HEADING ICONS FOR 1 AND 2 AND NOTHING ELSE. Its icon map
+   is literally `header:{1:…,2:…}`, and a toolbar button whose value is not in it
+   is left with an EMPTY innerHTML — so adding H3 and H4 added two blank squares
+   between H2 and the list buttons. Reported as "I cannot see H3 and H4": the
+   controls were there, were clickable, and drew nothing at all.
+
+   So all three are WORDS, built from the button's own value rather than from a
+   rule per level — one declaration covers every level the toolbar offers, and a
+   fifth would need no CSS. The alternative was drawing two more icons in Quill's
+   style to sit beside its two, which is a matched pair of hand-drawn paths in
+   exchange for nothing a reader gains. */
+.quill-wrap .ql-toolbar button.ql-header{ width:auto; min-width:28px; }
+.quill-wrap .ql-toolbar button.ql-header svg{ display:none; }
+.quill-wrap .ql-toolbar button.ql-header::before{
+  content:'H' attr(value);
+  display:block; line-height:18px; text-align:center;
+  font:800 12px/18px var(--font); letter-spacing:.02em;
+}
+.quill-wrap .ql-toolbar button.ql-header:hover::before,
+.quill-wrap .ql-toolbar button.ql-header.ql-active::before{ color:#06c; }
 .quill-wrap .ql-editor.ql-blank::before{ color:#a8a49a; font-style:normal; }
 /* The toolbar keeps its own direction so the buttons stay in one order in all
    three editors; only the typing area flips. */
