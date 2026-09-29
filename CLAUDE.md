@@ -9070,11 +9070,18 @@ share image, Formspree wiring, domain) is done. Open items:
   a gap, and the sister project's extra `checkout.session.expired` is its own
   business. ⚠ Note both keys live on the **shared** account, which is why
   `isOurs()` and the `ogen_mode` tag matter in test mode exactly as in live mode.
-  ⚠ **What has NOT been exercised is a test-mode payment end to end.** The
-  configuration is in place; nobody has yet taken a rehearsal registration on a
-  `test` activity through Checkout with a test card and watched the webhook
-  settle the record. That is the step that would prove the pair rather than the
-  presence of its parts.
+  **And it has been exercised end to end, many times.** Reported by the person
+  who ran it and then verified against Stripe on 29 Sep 2026 rather than taken
+  on trust: the test-mode account holds **38 Checkout sessions tagged
+  `organization: ogen`, 25 of them `complete` and `paid`**, the newest on 27 Sep.
+  Their metadata covers all three purchase shapes — a registration, a set of
+  evenings (`session_dates` with its `session_amounts` breakdown) and a bundle —
+  so the webhook's three settle paths have each run on a real card in test mode.
+  The ledger agrees from the other side: it carries entries stamped
+  `mode: "test"`, which only a record frozen as a rehearsal can produce.
+  ⚠ Note only the **newest** sessions carry `ogen_mode`; the tag was added after
+  most of those rehearsals, so an older session without it is history rather than
+  a gap.
 - ⚠ **ROTATE EVERY SECRET. On 29 Sep 2026 `netlify env:list --plain` was run
   in an assistant session and printed all of them into that transcript** — an
   attempt to list only the NAMES that did not account for the `KEY=value` format
