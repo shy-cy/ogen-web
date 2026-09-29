@@ -1606,6 +1606,20 @@ divided by an empty list. It was recorded here as a data gap rather than a code
 one, on the grounds that pressing **Generate** fixes it. That was the wrong
 reading and is the subject of the section below.
 
+⚠ **ALL THREE CARRY A CALENDAR NOW, and two of them needed a HUMAN rather than
+the fix.** Re-checked against the published records on 29 Sep 2026:
+`beit-midrash-ayeka` holds 9 dates, `intro-into-judaism` 24 and `beit-midrash` 6.
+`autoFill()` built the first two the moment each was re-published, which is the
+section below working. **`beit-midrash` could not be**: its rows were
+`{day: 0, time: '18:00'}` — a weekday and no date — so there was nothing to read
+and it correctly got no calendar, exactly as the first rule below promises. It
+has one because somebody went in and typed the six dates. That is the honest
+division of labour and worth keeping: the save fills a blank calendar from dates
+that **exist**, and it will never invent one from a pattern nobody wrote down.
+`intro-into-judaism`'s stray `2021-05-05` is also gone from its run, so
+`strayDates()` reported it and a person fixed it — which is the whole design:
+it names what looks wrong and corrects nothing.
+
 ### ⚠ Generating the calendar was a button, and nothing said pressing it was compulsory
 
 Reported as the bug it is: *"activities using a custom schedule can be saved with
