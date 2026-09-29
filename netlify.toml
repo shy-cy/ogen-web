@@ -201,6 +201,40 @@
   [headers.values]
     X-Robots-Tag = "noindex, nofollow"
 
+# ⚠ THE LISTING PAGE IS SERVED, NOT REDIRECTED TO.
+#
+# /activities is a DIRECTORY on disk and a FILE everywhere else: the homepage
+# hero button, the #offer banner, the nav's Activities link, the family area's
+# "See all activities", every activity page's breadcrumb, the canonical tag and
+# the sitemap all say `/activities` with no trailing slash. Netlify's pretty-URL
+# handling answered that with a 301 to `/activities/`, so the site's most-pressed
+# control cost a whole extra round trip before the page it points at began
+# loading — measured at 0.56s to follow against 0.28s for the page alone, which
+# roughly doubles it.
+#
+# A rewrite rather than a redirect, so the URL stays the one everything already
+# publishes. The alternative was adding a trailing slash in eleven places and
+# regenerating the canonical and the sitemap to match, which is the same journey
+# with more places to get it wrong — and it would make the public URL of the
+# listing differ in shape from /about, /account and /privacy, which are files.
+#
+# ⚠ These must stay BELOW /api/* and /pay and ABOVE the catch-all 404: the first
+# matching rule wins, so under the 404 they would never be reached.
+[[redirects]]
+  from = "/activities"
+  to = "/activities/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/en/activities"
+  to = "/en/activities/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/ru/activities"
+  to = "/ru/activities/index.html"
+  status = 200
+
 # Serve the localized 404 for unknown paths.
 [[redirects]]
   from = "/*"

@@ -3528,6 +3528,44 @@ flattens an animated GIF, never rasterises an SVG, and honours EXIF orientation
 so a phone photo isn't drawn sideways. Publishing also deletes images the
 record has stopped pointing at, since changing format changes the filename.
 
+### ⚠ The most-pressed button paid for a redirect
+
+Reported as the site being slow, and found by measuring rather than by reading:
+following `/activities` cost **0.56s** against **0.28s** for the page on its own.
+The hop roughly doubled the time to the listing — which is where the hero button
+goes, and the `#offer` banner, and the nav's Activities entry.
+
+⚠ **`/activities` IS A DIRECTORY ON DISK AND A FILE EVERYWHERE ELSE.** Every
+published reference spells it without a trailing slash — the two homepage buttons
+in each tree, `js/nav.js`, the family area's *See all activities*, every activity
+page's breadcrumb through `indexPathFor()`, the **canonical tag** and the
+**sitemap** — and `pretty_urls` answered that with a 301 to `/activities/`. So
+the page told a crawler its address was one thing and the server said another,
+which makes it an SEO fault as well as a slow one.
+
+It is a **rewrite** now (`status = 200`) rather than a redirect, so the URL stays
+the one everything already publishes. Adding a trailing slash in eleven places and
+regenerating the canonical and the sitemap to match was the other answer: the same
+journey with more places to get it wrong, and it would make the listing's public
+URL differ in shape from `/about`, `/account` and `/privacy`, which are files.
+
+⚠ **THE RULES SIT BELOW `/api/*` AND `/pay` AND ABOVE THE CATCH-ALL 404**, and
+the order is the behaviour: the first match wins, so under the 404 they would
+never run, and above the function routes one of them could shadow an endpoint. A
+test reads the rules in file order and asserts both bounds — and asserts the
+**pair**, because a rewrite for a path nothing links to is dead config and a
+slashless link with no rewrite is the 301 back again.
+
+**What this did NOT turn out to be.** Measured first and worth writing down so it
+is not re-investigated: the static pages answer in ~0.26s warm through
+Cloudflare, `shared.css` is a Cloudflare `HIT` at ~0.05s, every same-origin asset
+lands in 50-60ms, and `/api/*` answers its refusal paths in ~0.46s with no 520s.
+Netlify's own CDN is honouring `s-maxage=60` (`age:` climbs on repeat requests).
+HTML is still `cf-cache-status: DYNAMIC` — Cloudflare caches by extension and
+HTML is not in that set — and that remains **not worth a Cloudflare Cache Rule**,
+for the reason recorded above: it is a dashboard setting outside this repository,
+and the origin is already fast enough that the rule would buy little.
+
 ### ⚠ A list is read together, not one blob at a time
 
 Reported as *"the website is slow, especially the family section"*. Measured
