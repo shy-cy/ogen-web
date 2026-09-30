@@ -220,20 +220,34 @@
 #
 # ⚠ These must stay BELOW /api/* and /pay and ABOVE the catch-all 404: the first
 # matching rule wins, so under the 404 they would never be reached.
+#
+# ⚠ AND `force = true` IS THE WHOLE FIX. Without it these three rules are
+# DECLARED AND NEVER RUN: a Netlify redirect is only consulted when nothing in
+# the publish tree matches the request, and `activities/` matches — so the
+# directory-index normalisation answers first with its 301 and the rule below it
+# is dead config. Shipped without it once, and the site went on redirecting with
+# every rule sitting correctly in the file, because a test can read this file and
+# can never make Netlify honour it. The shape is visible elsewhere on the site
+# and is what gave it away: /about is `about.html` and answers 200, /account has
+# BOTH `account.html` and `account/` and answers 200, and /activities has only
+# the directory. `force` is what lets a rule win against a static match.
 [[redirects]]
   from = "/activities"
   to = "/activities/index.html"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/en/activities"
   to = "/en/activities/index.html"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/ru/activities"
   to = "/ru/activities/index.html"
   status = 200
+  force = true
 
 # Serve the localized 404 for unknown paths.
 [[redirects]]

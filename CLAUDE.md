@@ -3563,6 +3563,29 @@ regenerating the canonical and the sitemap to match was the other answer: the sa
 journey with more places to get it wrong, and it would make the listing's public
 URL differ in shape from `/about`, `/account` and `/privacy`, which are files.
 
+⚠ **AND `force = true` IS WHAT MAKES ANY OF IT RUN — IT SHIPPED ONCE WITHOUT IT
+AND CHANGED NOTHING.** A Netlify redirect is consulted only when **nothing in the
+publish tree matches** the request. `activities/` is a directory in the tree, so
+the directory-index normalisation answers first with the very 301 these rules
+exist to remove, and the rules below it were dead config. Measured after that
+deploy went live: still `301`, all three trees, with every rule sitting correctly
+in the file.
+
+The shape was already on the site and is what gave it away — `/about` is
+`about.html` and answers 200, `/account` has **both** `account.html` and
+`account/` and answers 200, and `/activities` has only the directory. `force` is
+what lets a rule win against a static match. Verified on a **draft deploy**
+before going near production: 200 on all three with it, 301 without, the 404
+fallback and every other path unchanged.
+
+⚠ **AND THE TEST PASSED THROUGH THE WHOLE THING.** It asserted the rules exist,
+are rewrites, and sit in the right order — all true, and all true of a deploy that
+went on redirecting. Reading a config file proves the file says what it says and
+can **never** prove the CDN honours it, which is this project's oldest lesson
+about its own tests arriving in the one place it cannot be closed by reading
+harder: the assertion is `force === true`, and the property itself was checked in
+a browser against a real deploy.
+
 ⚠ **THE RULES SIT BELOW `/api/*` AND `/pay` AND ABOVE THE CATCH-ALL 404**, and
 the order is the behaviour: the first match wins, so under the 404 they would
 never run, and above the function routes one of them could shadow an endpoint. A

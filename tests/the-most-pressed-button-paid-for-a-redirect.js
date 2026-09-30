@@ -67,7 +67,8 @@ toml.replace(/\[\[redirects\]\]([\s\S]*?)(?=\n\[|\s*$)/g, (_, body) => {
   const from = (body.match(/from\s*=\s*"([^"]+)"/) || [])[1];
   const status = Number((body.match(/status\s*=\s*(\d+)/) || [])[1]);
   const to = (body.match(/to\s*=\s*"([^"]+)"/) || [])[1];
-  if (from) rules.push({ from, to, status });
+  const force = /force\s*=\s*true/.test(body);
+  if (from) rules.push({ from, to, status, force });
   return '';
 });
 H.ok(rules.length >= 5, 'netlify.toml declares ' + rules.length + ' redirect rules');
@@ -78,6 +79,16 @@ TREES.forEach(([lang, base]) => {
   H.ok(i !== -1, base + '/activities has a rule');
   H.eq(rules[i].status, 200, 'and it is a rewrite, not a redirect');
   H.eq(rules[i].to, base + '/activities/index.html', 'serving the listing directly');
+  // ⚠ WITHOUT `force` THE RULE IS DECLARED AND NEVER RUNS, which is how this
+  // shipped once and changed nothing. A Netlify redirect is only consulted when
+  // NOTHING in the publish tree matches the request — and `activities/` is a
+  // directory in the tree, so the directory-index normalisation answers first
+  // with the very 301 this rule exists to remove. Every other assertion in this
+  // file passed for a deploy that still redirected, because reading the config
+  // proves the config says what it says and can never make the CDN honour it.
+  // Verified on a draft deploy: 200 with `force`, 301 without.
+  H.eq(rules[i].force, true,
+    base + '/activities is FORCED, or the static directory match wins and the rule is dead config');
 });
 
 // ⚠ THE ORDERING IS THE WHOLE THING. The first matching rule wins, so below the
