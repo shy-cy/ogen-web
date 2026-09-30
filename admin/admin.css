@@ -849,3 +849,57 @@ textarea.modal-editor{ padding:9px 11px; border:1px solid #E4DFD3; resize:vertic
   opacity:.65; font-variant-numeric:tabular-nums;
 }
 .char-count.is-over{ color:#8a3220; opacity:1; font-weight:700; }
+
+/* ---- the term calendar -----------------------------------------------------
+   Every live activity's sessions in one chronological list. A LIST rather than
+   a month grid, and deliberately: the job here is spotting two classes at one
+   hour, which is reading DOWN a column of times on one date — a grid puts each
+   day in a small box and hides exactly that. Same argument the Roster is a table
+   where the rest of the admin is cards.
+
+   ⚠ A clash is marked on the DATE and on each row that is in it, not on the date
+   alone: a day can hold three sessions of which two collide, and colouring the
+   whole day says all three are wrong. --danger is the same red the Roster keeps
+   for over capacity and for cancelling, and nothing else here uses it. */
+.cal-month{
+  font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;
+  color:var(--terracotta);margin:22px 0 8px;padding-bottom:5px;border-bottom:1px solid #eee7d8;
+}
+.cal-month:first-child{margin-top:0;}
+.cal-day{display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #f2ede0;}
+.cal-day:last-child{border-bottom:none;}
+.cal-day.is-past{opacity:.45;}
+.cal-date{
+  flex:0 0 96px;font-size:13px;font-weight:700;line-height:1.35;
+  font-variant-numeric:tabular-nums;
+}
+.cal-date small{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
+.cal-day.is-clash .cal-date{color:var(--danger);}
+.cal-rows{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:5px;}
+.cal-row{display:flex;gap:12px;align-items:baseline;font-size:13px;}
+.cal-row.is-clash{
+  background:#fdf0ee;border-inline-start:3px solid var(--danger);
+  padding:3px 8px;border-radius:0 5px 5px 0;margin-inline-start:-11px;
+}
+.cal-time{
+  flex:0 0 104px;font-variant-numeric:tabular-nums;font-weight:700;
+}
+.cal-time.is-vague{font-weight:400;color:var(--muted);}
+.cal-what{flex:1 1 auto;min-width:0;}
+.cal-what b{font-weight:700;}
+.cal-group{color:var(--muted);}
+.cal-where{flex:0 0 auto;color:var(--muted);font-size:12px;}
+
+/* The clash list above the calendar. Not .conflict — that is the optimistic-lock
+   panel and carries its own heading and buttons; this states findings. */
+.cal-clashes{display:flex;flex-direction:column;gap:10px;}
+.cal-clash{border:1px solid #e8c9c1;background:#fdf6f4;border-radius:8px;padding:10px 13px;}
+.cal-clash-head{
+  font-size:12.5px;font-weight:800;color:var(--danger);margin-bottom:5px;
+  font-variant-numeric:tabular-nums;
+}
+.cal-clash-side{font-size:13px;line-height:1.5;}
+.cal-clash-side .cal-time{display:inline-block;flex:none;}
+.cal-none{font-size:13px;color:var(--muted);}
+.cal-controls{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:14px;font-size:13px;}
+.cal-controls label{display:flex;gap:7px;align-items:center;cursor:pointer;font-weight:700;}

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ogen admin · Calendar</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+
+<div class="admin-bar">
+  <h1>Ogen admin</h1>
+  <a href="/admin/activities.html" style="color:#fff;font-size:12.5px;font-weight:700;opacity:.8;">Activities</a>
+  <a href="/admin/calendar.html" style="color:#fff;font-size:12.5px;font-weight:700;">Calendar</a>
+  <a href="/admin/registrations.html" style="color:#fff;font-size:12.5px;font-weight:700;opacity:.8;">Roster</a>
+  <a href="/admin/families.html" style="color:#fff;font-size:12.5px;font-weight:700;opacity:.8;">Families</a>
+  <a href="/admin/users.html" style="color:#fff;font-size:12.5px;font-weight:700;opacity:.8;">Admins</a>
+  <span class="spacer"></span>
+  <span class="who" id="who"></span>
+  <button type="button" id="logout">Sign out</button>
+</div>
+
+<div class="wrap" id="app" hidden>
+  <div id="no-access" class="msg err" hidden></div>
+
+  <div id="tool">
+    <div class="panel" id="clash-panel" hidden>
+      <h2 data-hint="Two sessions clash when the later one begins before the earlier one ends. Only the earlier session's length is needed to know that, so a missing length on the later one rules nothing out. A session with no time at all is never reported as clashing, because there is nothing to compare.">Clashes</h2>
+      <div class="cal-clashes" id="clashes"></div>
+    </div>
+
+    <div class="panel">
+      <h2 data-hint="Every session of every live activity, from the published records. Drafts are not here: a draft has no page and nobody turns up to it, so its dates are a proposal rather than a booking. Rehearsals are not here either. Dates you excluded on an activity's calendar are left out, exactly as they are left out of the published session table.">Full calendar</h2>
+      <div class="cal-controls">
+        <label><input type="checkbox" id="hide-past" checked> Hide dates that have passed</label>
+        <span class="cal-none" id="counts"></span>
+      </div>
+      <div id="calendar"></div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/admin-session.js"></script>
+<script src="/js/admin-help.js"></script>
+<script src="/js/admin-calendar.js"></script>
+</body>
+</html>

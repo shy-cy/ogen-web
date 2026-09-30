@@ -109,6 +109,7 @@ const ROBOTS = ['index', 'noindex'];
 // everything derived from it — the payment mode, the robots meta, what the
 // listing pages and sitemap keep — live in _activity-listing.js.
 const LST = require('./_activity-listing');
+const CAL = require('./_activity-calendar');
 
 const FIELD_SCHEMA = {
   simple: [
@@ -1269,6 +1270,22 @@ exports.handler = async (event) => {
           ok: true,
           activities: Array.from(bySlug.values()).sort((a, b) => a.slug.localeCompare(b.slug))
         });
+      }
+
+      // Every live activity's timetable on one screen, and which sessions
+      // collide. Read-only and behind `access` rather than `publish`: seeing
+      // when classes meet is not editing one, so a Content Editor — who may
+      // already open every activity and read its calendar one form at a time —
+      // can see them together.
+      //
+      // ⚠ IT IS THE PUBLISHED SET, NOT THE DRAFTS. A draft has no page, no
+      // registrations and nobody turning up, so its dates are a proposal rather
+      // than a booking, and mixing them in would report clashes against classes
+      // that do not exist. allPublished() is also the one read here that is
+      // already paid for everywhere else in this file.
+      case 'calendar': {
+        const published = await allPublished();
+        return json(200, Object.assign({ ok: true }, CAL.report(published)));
       }
 
       case 'load': {

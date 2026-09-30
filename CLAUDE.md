@@ -2690,6 +2690,8 @@ netlify/functions/
   _activity-listing.js   who can find an activity — listed | unlisted | test — and
                          which of the two Stripe configurations its payments run
                          through. Requires nothing; PURE
+  _activity-calendar.js  every live activity's sessions on one timeline, and
+                         which of them collide; no store, no clock; PURE
   _credit.js             what a cancellation credits; reads one registration and
                          one timestamp, and nothing else; PURE
   _family-errors.js      every refusal a family can be shown, in three
@@ -2719,6 +2721,7 @@ js/repeatable-items.js
 js/admin-help.js, js/admin-url.js, js/admin-icons.js, js/admin-collapse.js
                        the four shared admin controls: the (i), the selection in
                        the URL, the row glyphs, and opening/closing a panel
+js/admin-calendar.js   the term calendar screen; derives nothing, draws the report
 js/image-optimize.js   resizes + re-encodes every upload IN THE BROWSER
 ```
 
@@ -3250,6 +3253,80 @@ storage, or a key whose heading has been reworded, means the panel is open.
 
 **The preview panel opts out**, with `data-no-collapse`, because it is shown by
 its own button and one that opened folded would read as one that failed.
+
+### ⚠ Two classes at one hour, and no screen could show it
+
+Asked for plainly: *"can we have a full calendar, for all live activities, so we
+can see what dates might collide."*
+
+⚠ **EVERY FORM IN THIS ADMIN DRAWS ONE ACTIVITY.** So a timetable that reads
+perfectly on its own form can put a class at the same hour as another class, in
+the same town, and nothing anywhere would say so — the same shape as the two
+facts that printed a structured list and a restatement of it underneath, the
+yearly fee a series typed once per term, and the recompute notice that compared a
+date against nothing. **It is the PAIR that is wrong**, and only a view holding
+both halves can see one.
+
+It found four the moment it existed, on the live records: `beit-midrash` and the
+Russian/English `bnei-mitzvah-2027` group both meet at **18:00 in Limassol on
+2027-01-17, 02-21 and 03-21**, and `intro-into-judaism` runs to 21:00 on
+**2026-12-09**, the night `folk-dance` starts at 20:30.
+
+`_activity-calendar.js` is the rule and is **pure** — no store, no GitHub, no
+clock — read by one `calendar` action on `activities-admin.js` and drawn by
+`/admin/calendar.html`. Behind **`access`** rather than `publish`: seeing when
+classes meet is not editing one, and a Content Editor may already read every
+calendar one form at a time.
+
+⚠ **ONLY THE EARLIER SESSION'S LENGTH IS NEEDED, and the first version asked for
+both.** Two sessions collide when the later one **begins before the earlier one
+ends** — so a missing length on the *later* one rules nothing out. Measured on the
+real records, the crude rule called **seven** pairs "cannot say" when six of them
+provably do not overlap and the seventh provably does: `folk-dance` has no
+`sessionMinutes`, and that alone was enough to hide a real 30-minute collision
+behind six false ones. The genuinely unknowable shape is the other one, a missing
+length on the **earlier** session, and it is reported as its own verdict rather
+than as a clash.
+
+Four smaller rules carry it:
+
+- ⚠ **A REHEARSAL OCCUPIES NO ROOM.** `test` is left out rather than marked, or
+  every real clash is read past a wall of noise from `test1..test12`. ⚠ But
+  `unlisted` is **in**: it is a real class with the advertising switched off, and
+  it needs a room like any other — the distinction the three-state `listing`
+  select exists for.
+- **It is the published set, never the drafts.** A draft has no page and nobody
+  turning up, so its dates are a proposal; reporting them would clash live classes
+  against activities that do not exist.
+- **An excluded date is not a session**, through `calendarFor()` — the same reader
+  the published session table and `freezeCancellation()` already use, so the list
+  is exactly the evenings somebody turns up to.
+- ⚠ **A time nobody can pin down is `null`, never a guess.** A custom schedule can
+  name a different hour per date; a row naming *this* date wins, and rows that
+  disagree with none naming it yield no time at all. A clash report is read as a
+  statement of fact, and an hour a session may not be at is worse than no hour —
+  the rule the listing card already follows when it drops a schedule tag two
+  groups cannot share. A session with no time is never reported as clashing.
+
+**The mark is on the rows in the clash, not on the day.** A date holding three
+sessions of which two collide must mark two; colouring the whole day says all
+three are wrong.
+
+⚠ **AND THE SCREEN IS EXECUTED, not read.** The suite runs the real client over
+the real report and reads back what it drew — 68 rows, 55 day blocks, 8 marked
+rows against 4 clashes. ⚠ **Twice**, and the second time is the part a bite-check
+forced: the live data has clashes and every one of its dates is still ahead, so
+*"the clash panel is hidden when empty"* and *"the checkbox is wired"* both passed
+with the code reverted. A second, synthetic report reaches those two branches.
+
+**What it cannot answer yet, and neither is an oversight.** A **teacher** double
+booking is not derivable — `teacherIds` are minted **per activity**, so the same
+person teaching two activities has two different ids, and matching `{he,en,ru}`
+name bags across records would be a guess. A **room** clash is not either: every
+group's public `location` is `לימסול`, and the members-only `address` is blank or
+a placeholder on four of the six. Both become answerable when the data does, and
+the report is shaped so they can be added beside the time check rather than
+replacing it.
 
 ### ⚠ A reload lands back on the activity you were on
 
