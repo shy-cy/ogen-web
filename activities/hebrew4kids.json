@@ -46,7 +46,7 @@
     },
     "price": {
       "registrationFee": 50,
-      "fullPrice": 330,
+      "fullPrice": 300,
       "termUnit": "semester",
       "termLabel": {
         "he": "",
@@ -101,11 +101,11 @@
       "logo": "/images/activities/hebrew4kids-sponsors-spo-mtd1o2lk-3-a52febae.png"
     }
   ],
-  "isoUpdated": "2026-09-29T04:33:04.169Z",
+  "isoUpdated": "2026-09-30T08:49:33.866Z",
   "isoCreated": "2026-08-28T14:55:38.930Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
-  "lastPublishedAt": "2026-09-29T04:33:04.169Z",
+  "lastPublishedAt": "2026-09-30T08:49:33.866Z",
   "factVisibility": {
     "ages": "public",
     "schedule": "public",
@@ -178,8 +178,8 @@
         },
         "duration": {
           "startDate": "2026-10-14",
-          "endDate": "2026-12-23",
-          "sessionCount": 11,
+          "endDate": "2026-12-19",
+          "sessionCount": 10,
           "sessionMinutes": 90,
           "sessionDates": [
             {
@@ -220,10 +220,6 @@
             },
             {
               "date": "2026-12-16",
-              "status": "scheduled"
-            },
-            {
-              "date": "2026-12-23",
               "status": "scheduled"
             }
           ],
