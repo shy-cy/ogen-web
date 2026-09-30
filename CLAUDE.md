@@ -3276,6 +3276,33 @@ see. **Every** month is rendered; `js/calendar.js` opens on the current one,
 because the browser is the only thing here that legitimately knows the date. A
 test renders each language twice and compares.
 
+⚠ **A THREE-MONTH WINDOW WAS ASKED FOR, AGREED, AND THEN DROPPED ON A
+MEASUREMENT.** The design proposal offered "the next three months — enough to be
+useful, short enough not to bloat three pages", and that second clause is the
+whole of the argument for it. Measured, it is not true: `calendar.html` is 36KB
+raw and **2.5KB gzipped** (2.7KB for the Russian, the largest of the three),
+which is *lighter than a single activity page*
+(`activities/hebrew4kids.html` is 4.1KB) and about a fifteenth of the
+`shared.css` every page already loads (38.5KB). Trimming thirteen months to
+three saves roughly **1KB over the wire**.
+
+⚠ **AND THE DECISIVE HALF IS THAT THE PAGE IS COMMITTED TO GIT AND REGENERATES
+ONLY ON PUBLISH.** "The next three months" is a claim about when the file was
+built, not about when it is read — so a page written in September still offers
+October to December in January, and nothing regenerates it until somebody
+publishes an unrelated activity. It would be **wrong for every reader after its
+window passed**, silently, which is the same shape as the listing pages deciding
+display from a date rather than from the declared status. Every month is correct
+whenever it is read.
+
+Nobody sees thirteen months anyway: `js/calendar.js` draws one. The full list is
+*exactly* the no-JS fallback, and completeness is worth more than 1KB in the one
+rendering nobody can page through. The clock is the lesser cost and still a real
+one — it breaks `preview-matches-publish` whenever a preview and a publish
+straddle midnight, which is rare, mysterious, and this project's own most
+expensive class of bug — and it would make every publish rewrite all three
+calendar pages even when no session moved.
+
 ⚠ **AND THE DATA RIDES WITH THE PAGE**, in a `<script type="application/json">`
 block, the shape the activity page already uses for its credits. No second
 request, no 404 path, no half-loaded state — and `activities-index.json` stays
@@ -4700,6 +4727,88 @@ on a message whose entire subject is that the cancellation terms have **changed*
 which cannot be headed without naming them. **A heading about the terms is not a
 copy of the terms.** It now builds every sentence `termsFor()` can produce, in all
 three languages, and asserts none of them appears in the file — 54 today.
+
+#### ⚠ Nothing re-prices a registration, and one had to be
+
+A family registered for `hebrew4kids` at **08:46 on 30 Sep 2026**, minutes before
+the activity was re-published from eleven sessions at €330 to ten at €300. Their
+frozen block therefore said **€380 and eleven sessions** about a course that costs
+€350 and runs ten, and nothing had been paid.
+
+Every piece behaved exactly as written. The freeze is what stops a March price
+edit rewriting a January agreement, and the section above says which two fields a
+publish may propagate and why it is only those. So the record was **right by the
+rules and wrong about the world**, which is the one combination no rule can fix.
+
+⚠ **AND THERE IS NO MECHANISM. All three candidates were checked:**
+
+| | |
+|---|---|
+| an admin action | none writes `owedCents` or `frozen.price`. Twenty-three actions on `admin-registrations.js`; the money ones are `recordPayment`, `applyCredit`, `adjustCredit` |
+| a publish | `reterm()` / `writeClosing()` carry the fee date and the closing boundary, never a price |
+| `openRegistration()` | re-freezes at today's price — and returns `already: true` when `holdsASpot()` is true, which an `approved` record is |
+
+⚠ **THE DOCUMENTED WORKAROUND IS THE WRONG TOOL, AND THAT IS THE PART WORTH
+KEEPING.** `adjustCredit` €30 then `applyCredit` fixes the charge and breaks the
+record. `owedCents` stays 38000 and `paidCents` becomes 3000, so `dueCents()`
+charges the right €350 — and then **`creditFor()` credits a share of what was
+PAID**. After the card clears, `paidCents` is 38000, so cancelling before the
+first session credits **€380 against €350 actually handed over**, and €165
+against €150 in the 50% step. Plus a fabricated credit line in an append-only
+ledger to account for, and a cost card telling the family the price is €380. It
+is the right answer to a different question: compensating a figure, not
+correcting one.
+
+So it was a direct store write, and **what made that safe is narrow and is the
+precondition rather than the correction's size**: `paidCents` was **0**. There was
+no money taken for the new figure to contradict. Three fields, every reader
+enumerated first:
+
+- **`payment.owedCents` 38000 → 35000.** Never recomputed after submission —
+  `owedCentsFor()` is called only in `newRegistration()` — so the stored figure is
+  the only one, read by `_checkout.js` (both doors), `_spend-credit.js`, the
+  webhook's settlement test, `admin-family.js`'s unlink debts, the family's cost
+  card and the roster's cell and payment filter.
+- **`frozen.price.fullPrice` 330 → 300.** Post-freeze it has exactly **one**
+  reader, the family's cost-card payload. `creditFor()` never reads it at all.
+- ⚠ **`frozen.cancellation.sessionStartsAt` eleven → ten**, dropping 23 Dec —
+  **and not for the arithmetic.** The tiers are flat, so the prorated denominator
+  is unused and only `starts[0]` matters. But `basisFor()` writes `sessionsTotal`
+  into the ledger `basis`, so a cancellation would have recorded "of 11 sessions"
+  for a course that ran ten — a wrong figure in the one record written to explain
+  a number to a family months later.
+
+⚠ **THE CHECK THAT MADE IT VERIFIABLE RATHER THAN PLAUSIBLE:** after the edit the
+frozen block is **byte-identical to what `freezeCancellation()` produces for that
+activity today** — the same ten instants, the same tiers, the same fee cutoff.
+Nothing was invented and nothing drifted. The first session is unchanged, so the
+`'start'` boundary did not move. And it touches no cutoff field, so
+`cutoffFieldsMoved()` is unaffected and the next publish behaves exactly as it
+would have, with no spurious terms-changed email.
+
+**It is recorded on the record itself.** A `history` entry (`action:
+'price-corrected'`) naming both figures and the reason, and `isoUpdated` bumped —
+so an admin holding it open gets a 409, which is the optimistic lock working. The
+untouched record was backed up **outside the repository**, because the frozen
+block holds a minor's name and date of birth and a copy in the tree would be
+committed and published. There is deliberately **no `ogen-admin-audit` entry**:
+there was no admin session behind the write, and a synthetic line naming one
+would be worse than none.
+
+Verified after the write, through the real modules against the stored record:
+Checkout and the emailed `/pay` link charge €350.00, a €350 payment settles to
+`paid`, and cancelling credits €350.00 / €150.00 / €0.00 across the three bands
+with a `basis` of ten sessions.
+
+⚠ **THE REAL FIX IS A CONTROL, AND THIS IS NOT IT.** A hand write is available
+exactly once per accident and only while nothing has been paid. Two shapes are
+worth having: a publish that **counts live registrations on a changed price** the
+way `olderSchedules()` counts a changed refund schedule, so the admin who moves a
+price is told how many families hold the old one; and an admin action that
+re-prices an unpaid registration through `freezeCancellation()` rather than by
+hand. Until then, a price edit on an activity somebody has already registered for
+is a silent divergence, and the only thing that finds it is somebody reading two
+cards on one screen.
 
 **`expiresAt` is stamped at submission**, with `expiryDays` and `expirySource`
 beside it. Computing `submittedAt + N` on read would make every change
@@ -9215,6 +9324,18 @@ share image, Formspree wiring, domain) is done. Open items:
   the record — there is no control for it on the form and the API refuses to
   write it. A UI is the backlog item; see **The cards moved every time you
   published** for why it is safe to leave as data in the meantime.
+
+- **No control re-prices a registration, and a price edit on an activity somebody
+  has already registered for says nothing.** The terms are frozen at submission and
+  a publish propagates only the two cutoff dates, both deliberately — so a changed
+  price leaves the family holding the old one with no screen naming it. It has
+  happened once, on `hebrew4kids`, and was corrected by a direct store write while
+  nothing had been paid: see **Nothing re-prices a registration, and one had to be**
+  for what made that safe and why `adjustCredit` is the wrong tool. Two things are
+  wanted — a publish that **counts** live registrations on a changed price, the way
+  `olderSchedules()` counts a changed refund schedule, and an admin action that
+  re-prices an **unpaid** registration through `freezeCancellation()`. A paid one
+  is not re-priceable and should not become so.
 
 - **A waiting family whose group is removed is still orphaned silently.**
   Removing a group is refused while anybody **holds a place** in it, and a
