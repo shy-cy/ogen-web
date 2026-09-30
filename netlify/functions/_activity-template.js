@@ -145,6 +145,18 @@ const CORNERS = ['tl', 'tr', 'bl', 'br'];
 // record can't preview with blank rows and publish with filled ones.
 const FALLBACK = { he: ['he'], en: ['en', 'he'], ru: ['ru', 'en', 'he'] };
 
+// /calendar, /en/calendar, /ru/calendar — a FILE at the root of each tree, like
+// /about and /privacy.
+//
+// ⚠ DELIBERATELY NOT /activities/calendar. SLUG_RE allows `calendar`, so an
+// admin creating an activity with that slug would generate activities/calendar.html
+// and silently overwrite this page. A top-level route removes the collision
+// instead of adding a reserved-word list somebody has to remember — and, being a
+// file rather than a directory, it answers 200 without the redirect hop the
+// listing page needed a forced rewrite to avoid.
+const calendarPathFor = (lang) => (lang === 'he' ? '/calendar' : '/' + lang + '/calendar');
+const calendarFilePathFor = (lang) => (lang === 'he' ? 'calendar.html' : lang + '/calendar.html');
+
 const LABELS = {
   he: {
     dir: 'rtl', sep: '&#8592;', home: 'בית', activities: 'פעילויות',
@@ -162,6 +174,12 @@ const LABELS = {
     chooseGroup: 'בוחרים קבוצה בהרשמה', chooseShort: 'בוחרים בהרשמה',
     indexTitle: 'הפעילויות שלנו', indexLead: 'מה אפשר למצוא במרכז עוגן',
     indexEmpty: 'בקרוב נפרסם כאן את הפעילויות.', more: 'לפרטים',
+    calTitle: 'לוח פעילויות', calLead: 'מתי כל פעילות נפגשת, חודש אחר חודש.',
+    calEmpty: 'אין מפגשים מתוכננים כרגע.',
+    calAll: 'לכל הפעילויות', calPrev: 'החודש הקודם', calNext: 'החודש הבא',
+    calSessions: 'מפגשים',
+    calMonths: ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'],
+    calDays: ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'],
     indexOpen: 'פתוח להרשמה', indexRunning: 'פעיל', indexArchived: 'ארכיון'
   },
   en: {
@@ -177,6 +195,12 @@ const LABELS = {
     chooseGroup: 'Choose your group when you register', chooseShort: 'choose at registration',
     indexTitle: 'Our activities', indexLead: 'What you can find at Ogen Center',
     indexEmpty: 'Activities will be published here soon.', more: 'Details',
+    calTitle: "What's on", calLead: 'When each activity meets, month by month.',
+    calEmpty: 'No sessions are scheduled at the moment.',
+    calAll: 'All activities', calPrev: 'Previous month', calNext: 'Next month',
+    calSessions: 'sessions',
+    calMonths: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+    calDays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
     indexOpen: 'Open for registration', indexRunning: 'Currently Running', indexArchived: 'Archived'
   },
   ru: {
@@ -190,6 +214,12 @@ const LABELS = {
     gParticipants: 'Для кого', gSchedule: 'Когда и где', gPrice: 'Цена', gCredits: 'Педагоги и партнёры',
     indexTitle: 'Наши занятия', indexLead: 'Что можно найти в центре Оген',
     indexEmpty: 'Занятия скоро появятся здесь.', more: 'Подробнее',
+    calTitle: 'Расписание', calLead: 'Когда проходит каждое занятие, месяц за месяцем.',
+    calEmpty: 'Пока нет запланированных занятий.',
+    calAll: 'Все занятия', calPrev: 'Предыдущий месяц', calNext: 'Следующий месяц',
+    calSessions: 'занятий',
+    calMonths: ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'],
+    calDays: ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'],
     indexOpen: 'Открыта запись', indexRunning: 'Активные', indexArchived: 'Архив'
   }
 };
@@ -833,10 +863,127 @@ ${cards}
 `;
 }
 
+// The public month calendar: every live activity's sessions on one page, per
+// language. See the notes in _activity-calendar.js for who is IN this list and
+// who is deliberately not.
+//
+// ⚠ IT ASKS NO CLOCK, and that is load-bearing rather than tidy. The page is a
+// build artifact and preview-matches-publish asserts the previewed HTML is
+// byte-identical to the committed file — so a page that embedded "today", or
+// sliced a window around it, could differ between a preview at 23:59 and a
+// publish at 00:01 and break that check for no reason anybody could see. Every
+// month is rendered; the BROWSER decides which one to open on, because the
+// browser is the only thing here that legitimately knows the date.
+//
+// ⚠ AND THE DATA IS EMBEDDED, NOT FETCHED. The same shape the activity page
+// already uses for its credits block: the page carries exactly what it needs,
+// so there is no second request, no 404 path and no half-loaded state. It also
+// keeps activities-index.json out of it — that file is the slug-to-id lookup
+// js/nav.js pulls on every first menu open, and session arrays have no business
+// making it bigger.
+function renderCalendarPage(rows, lang) {
+  const L = LABELS[lang];
+  const list = (rows || []).slice().sort((a, b) =>
+    a.date < b.date ? -1 : a.date > b.date ? 1 :
+    (a.time || '~') < (b.time || '~') ? -1 : (a.time || '~') > (b.time || '~') ? 1 : 0);
+
+  // UTC deliberately: these are plain calendar dates with no instant attached,
+  // and building them in local time would shift the month for anybody west of
+  // Greenwich and file a session under the wrong heading.
+  const monthOf = (iso) => iso.slice(0, 7);
+  const monthName = (iso) => {
+    const d = new Date(iso + 'T00:00:00Z');
+    return L.calMonths[d.getUTCMonth()] + ' ' + d.getUTCFullYear();
+  };
+  const dayNum = (iso) => String(Number(iso.slice(8, 10)));
+
+  const months = [];
+  const byMonth = {};
+  list.forEach((r) => {
+    const m = monthOf(r.date);
+    if (!byMonth[m]) { byMonth[m] = []; months.push(m); }
+    byMonth[m].push(r);
+  });
+
+  // The static list. Real content, indexable, and the whole page when there is
+  // no JavaScript — the same fail-open rule the hamburger's Activities group
+  // follows, where the worst outcome is the page the site would have had anyway.
+  const sections = !months.length
+    ? `  <p class="cal-empty">${esc(L.calEmpty)}</p>`
+    : months.map((m) => {
+      const days = [];
+      const seen = {};
+      byMonth[m].forEach((r) => {
+        if (!seen[r.date]) { seen[r.date] = []; days.push(r.date); }
+        seen[r.date].push(r);
+      });
+      return `  <section class="cal-month-block">
+    <h2>${esc(monthName(m + '-01'))}</h2>
+    <ol class="cal-days">
+${days.map((d) => `      <li class="cal-day-row">
+        <span class="cal-day-num">${esc(dayNum(d))}</span>
+        <ul class="cal-day-list">
+${seen[d].map((r) => `          <li>
+            <span class="cal-at">${esc(r.time || '')}</span>
+            <a href="${esc(r.href)}">${esc(r.title)}</a>${r.price ? `
+            <span class="cal-cost">${esc(r.price)}</span>` : ''}
+          </li>`).join('\n')}
+        </ul>
+      </li>`).join('\n')}
+    </ol>
+  </section>`;
+    }).join('\n');
+
+  return `${head({
+    lang,
+    title: L.calTitle + L.suffix,
+    description: L.calLead,
+    canonical: calendarPathFor(lang),
+    alternates: LANGS.map((l) => ({ lang: l, path: calendarPathFor(l) })),
+    image: '/images/og-image.jpg',
+    robots: 'index, follow'
+  })}
+<body>
+<div id="page" dir="${L.dir}">
+${GENERATED_NOTE('activities/*.json')}
+
+<div class="page-header" data-motif="wave" data-corner="tr">
+  <nav class="breadcrumb" aria-label="${esc(L.calTitle)}">
+    <a href="${homeFor(lang)}">${L.home}</a><span class="sep">${L.sep}</span>${esc(L.calTitle)}
+  </nav>
+  <h1>${esc(L.calTitle)}</h1>
+</div>
+
+<div class="cal-page">
+  <p class="cal-lead">${esc(L.calLead)}</p>
+  <p class="cal-all"><a href="${indexPathFor(lang)}">${esc(L.calAll)}</a></p>
+  <script type="application/json" id="calendar-data">${JSON.stringify({
+    lang,
+    months: L.calMonths,
+    days: L.calDays,
+    labels: { prev: L.calPrev, next: L.calNext, empty: L.calEmpty, sessions: L.calSessions },
+    sessions: list
+  }).replace(/</g, '\\u003c')}</script>
+  <div id="cal-static">
+${sections}
+  </div>
+</div>
+
+<script src="/js/nav.js"></script>
+<script src="/js/footer.js"></script>
+<script src="/js/motifs.js"></script>
+<script src="/js/calendar.js"></script>
+</div>
+</body>
+</html>
+`;
+}
+
 module.exports = {
   SUMMARY_CHARS, SITE, LANGS, STATUSES, OPEN_STATUSES, RUNNING_STATUSES, ARCHIVED_STATUSES, STATUS_GROUPS,
   MOTIFS, CORNERS, LABELS, FALLBACK,
   esc, pick, has, langsPresent, plainText,
   pathFor, filePathFor, indexPathFor, indexFilePathFor, homeFor,
-  renderActivityPage, renderActivitiesIndexPage
+  renderActivityPage, renderActivitiesIndexPage,
+  calendarPathFor, calendarFilePathFor, renderCalendarPage
 };

@@ -27,10 +27,28 @@ const REHEARSAL = 'test';
 // published set this is built from has never contained one.
 const RUNNING = ['open', 'closed', 'waitlist', 'announcement'];
 
-function isLive(activity) {
+// ⚠ WHO APPEARS DEPENDS ON WHO IS LOOKING, and this is the one place that
+// decides it. The admin screen and the public page are not the same question:
+//
+//   admin   an activity that occupies a room. `unlisted` IS one — a real class
+//           with the advertising switched off — so it must be there, or a room
+//           clash against it is invisible on the only screen that could show it.
+//   public  an activity somebody is invited to. `unlisted` is deliberately off
+//           the listing, out of the hamburger and out of sitemap.xml, so putting
+//           it on a public what's-on page would undo precisely what that state
+//           exists for.
+//
+// An audience rather than a second copy of the rule, and the public half REUSES
+// `listing.isListed` — the same predicate buildDerivedFiles() already applies to
+// the three shop-window pages — so a fourth listing state cannot mean one thing
+// on the listing and another here.
+const AUDIENCES = ['admin', 'public'];
+
+function isLive(activity, audience) {
   if (!activity) return false;
-  if (listing.listingOf(activity) === REHEARSAL) return false;
-  return RUNNING.indexOf(String(activity.status)) !== -1;
+  if (RUNNING.indexOf(String(activity.status)) === -1) return false;
+  if (audience === 'public') return listing.isListed(activity);
+  return listing.listingOf(activity) !== REHEARSAL;
 }
 
 const HHMM = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -79,9 +97,9 @@ function pickText(bag) {
 // so an EXCLUDED date never appears — the same rule freezeCancellation() and the
 // published session table already follow, and it is what keeps this list exactly
 // the set of evenings somebody turns up to.
-function timetable(activities) {
+function timetable(activities, audience) {
   const out = [];
-  (activities || []).filter(isLive).forEach((activity) => {
+  (activities || []).filter((a) => isLive(a, audience)).forEach((activity) => {
     groups.groupList(activity).forEach((group) => {
       const gid = group.groupId;
       const schedule = groups.scheduleFor(activity, gid) || {};
@@ -168,15 +186,15 @@ function clashedDates(list) {
   return Object.keys(seen).sort();
 }
 
-function report(activities) {
-  const sessions = timetable(activities);
+function report(activities, audience) {
+  const sessions = timetable(activities, audience);
   const found = clashes(sessions);
   return {
     sessions,
     clashes: found,
     clashedDates: clashedDates(found),
     counts: {
-      activities: (activities || []).filter(isLive).length,
+      activities: (activities || []).filter((a) => isLive(a, audience)).length,
       sessions: sessions.length,
       dates: Object.keys(sessions.reduce((m, s) => (m[s.date] = 1, m), {})).length,
       clashes: found.length,
@@ -186,7 +204,7 @@ function report(activities) {
 }
 
 module.exports = {
-  RUNNING, REHEARSAL,
+  RUNNING, REHEARSAL, AUDIENCES,
   isLive, minutesOf, hhmm, timeFor,
   timetable, collide, clashes, clashedDates, report,
   _internal: { pickText },

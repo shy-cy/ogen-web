@@ -8,8 +8,11 @@
 
 const {
   LANGS, langsPresent, pick, pathFor, indexPathFor, indexFilePathFor,
-  renderActivitiesIndexPage, SITE
+  renderActivitiesIndexPage, SITE,
+  calendarPathFor, calendarFilePathFor, renderCalendarPage
 } = require('./_activity-template');
+const CAL = require('./_activity-calendar');
+const FACTS = require('./_activity-facts');
 // Which of the three listing states this activity is in, and what that tells a
 // crawler. One function, so the meta tag and the sitemap cannot disagree.
 const LISTING = require('./_activity-listing');
@@ -156,6 +159,13 @@ function buildSitemap(activities) {
   const listingAlts = { he: indexPathFor('he'), en: indexPathFor('en'), ru: indexPathFor('ru') };
   blocks.push('  <!-- Activities listing -->');
   LANGS.forEach((l) => blocks.push(urlEntry(indexPathFor(l), listingAlts)));
+  // The calendar is a real page about real activities and is worth indexing.
+  // A MAP KEYED BY LANGUAGE, the shape urlEntry() reads — it does Object.keys()
+  // over this, so an array of {lang, path} yields hreflang="0" and an href of
+  // "[object Object]". Caught by generating the file and reading it, not by the
+  // suite, which is why the sitemap is now asserted on its rendered output.
+  const calAlts = { he: calendarPathFor('he'), en: calendarPathFor('en'), ru: calendarPathFor('ru') };
+  LANGS.forEach((l) => blocks.push(urlEntry(calendarPathFor(l), calAlts)));
 
   // A noindex activity is still published and still listed on the site — that
   // flag is an instruction to search engines, not to visitors. But it must not
@@ -190,6 +200,50 @@ ${blocks.join('\n')}
 }
 
 // The full set of derived files, given the complete list of activities.
+
+// One row per session, per language, ready for the page to print. Built here
+// rather than in the template because the price comes from _activity-facts.js
+// and the template is handed finished strings everywhere else.
+//
+// ⚠ THE AUDIENCE IS `public`, so an `unlisted` activity is absent — it is off
+// the listing, out of the hamburger and out of sitemap.xml, and a what's-on page
+// listing it would undo exactly that. The admin's own calendar passes `admin`
+// and sees it, because a real class occupies a real room.
+//
+// ⚠ ONE price figure, and it is the one the listing card already picks: the term
+// price, or the per-session price on a drop-in. Never the registration fee and
+// never per-lesson — the same rule, read from the same builder, so a card and a
+// calendar row cannot quote an activity differently.
+function calendarRows(activities, lang) {
+  const bySlug = {};
+  (activities || []).forEach((a) => { bySlug[a.slug] = a; });
+  return CAL.timetable(activities, 'public')
+    .filter((s) => {
+      const a = bySlug[s.slug];
+      return a && langsPresent(a).indexOf(lang) !== -1;
+    })
+    .map((s) => {
+      const a = bySlug[s.slug];
+      const row = (FACTS.factPriceRows(a, lang) || [])
+        .filter((r) => r.key === 'term' || r.key === 'perSession')[0];
+      return {
+        date: s.date,
+        time: s.time || '',
+        endsAt: s.endsAt || '',
+        slug: s.slug,
+        title: pick(a.title, lang),
+        href: pathFor(s.slug, lang),
+        type: s.type,
+        price: row ? row.value : '',
+        // The GENERAL area only. The exact address is members-only and is
+        // filtered by isPubliclyVisible() everywhere else; a public grid naming
+        // where a child will be at 16:00 next Tuesday is the worst place on the
+        // site to leak it, so it is never read here at all.
+        where: pick(s.location, lang) || ''
+      };
+    });
+}
+
 function buildDerivedFiles(activities) {
   const index = buildIndex(activities);
   const files = [
@@ -218,9 +272,17 @@ function buildDerivedFiles(activities) {
       content: renderActivitiesIndexPage(listed, lang),
       encoding: 'utf-8'
     });
+    // The month calendar, built from the SAME published set. It filters to
+    // `listed` itself, through _activity-calendar.js, rather than being handed
+    // the narrowed list — one predicate, in the module that owns it.
+    files.push({
+      path: calendarFilePathFor(lang),
+      content: renderCalendarPage(calendarRows(published, lang), lang),
+      encoding: 'utf-8'
+    });
   });
   return files;
 }
 
-module.exports = { PUBLIC_STATUSES, isPublic, buildIndex, buildSitemap, buildDerivedFiles,
+module.exports = { PUBLIC_STATUSES, isPublic, buildIndex, buildSitemap, buildDerivedFiles, calendarRows,
                    indexEntry, inListingOrder };

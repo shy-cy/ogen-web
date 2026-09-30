@@ -2059,3 +2059,93 @@ td .acc-actions{ gap:14px; }
 }
 .checkin-err{ color: var(--danger); font-weight:700; margin:12px 0 0; text-align:center; }
 .checkin-foot{ text-align:center; margin-top:10px; font-size:14px; }
+
+/* ---------- the month calendar (/calendar) --------------------------------
+   Two states of one page. The server renders `.cal-static` — every session as a
+   real list, indexable and complete — and js/calendar.js replaces it with a
+   grid. Both are styled, because the static one is the whole page whenever the
+   script does not run, and a fallback nobody styled is a layout nobody designed.
+
+   ⚠ NOT ONE PHYSICAL INSET IN THIS BLOCK. The grid is CSS grid and everything
+   else is flex with logical properties, so the Hebrew month runs right-to-left
+   with no per-language override — rule 2. The month controls are WORDS rather
+   than chevrons for the same reason: a caret is directional and would need
+   mirroring, which is the trap the hamburger's own chevron fell into. */
+.cal-page{max-width:900px;margin-inline:auto;padding:0 22px 60px;}
+.cal-lead{font-size:16px;color:var(--muted);margin-bottom:6px;}
+.cal-all{margin-bottom:26px;}
+.cal-all a{color:var(--terracotta);font-weight:700;font-size:14.5px;}
+.cal-empty{font-size:15px;color:var(--muted);padding:30px 0;}
+
+/* the grid */
+.cal-grid-wrap{display:block;}
+.cal-nav{display:flex;align-items:center;gap:14px;margin-bottom:14px;}
+.cal-title{flex:1 1 auto;text-align:center;font-size:19px;font-weight:800;margin:0;}
+.cal-step{
+  font:700 13px/1 var(--font);color:var(--ink);background:var(--paper);
+  border:1px solid var(--stone);border-radius:999px;padding:9px 16px;cursor:pointer;
+}
+.cal-step:hover{background:var(--stone);}
+.cal-step:focus-visible{outline:2px solid var(--terracotta);outline-offset:2px;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
+.cal-dow{
+  font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--muted);text-align:center;padding-bottom:6px;
+}
+.cal-pad{display:block;}
+.cal-cell{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+  min-height:58px;padding:6px 2px;border:1px solid transparent;border-radius:9px;
+  background:none;font:inherit;color:var(--muted);cursor:default;
+}
+.cal-cell.has-sessions{background:var(--paper);border-color:var(--stone);color:var(--ink);cursor:pointer;}
+.cal-cell.has-sessions:hover{border-color:var(--camel);}
+.cal-cell.is-on{background:var(--terracotta);border-color:var(--terracotta);color:#fff;}
+.cal-cell:focus-visible{outline:2px solid var(--terracotta);outline-offset:2px;}
+.cal-n{font-size:14.5px;font-weight:700;font-variant-numeric:tabular-nums;}
+.cal-dots{display:flex;gap:3px;}
+.cal-dot{width:5px;height:5px;border-radius:50%;background:var(--olive);}
+.cal-cell.is-on .cal-dot{background:#fff;}
+
+/* the day underneath the grid */
+.cal-detail{margin-top:24px;}
+.cal-detail-head{font-size:15px;font-weight:800;margin-bottom:10px;}
+.cal-detail-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px;}
+.cal-detail-list li{
+  display:flex;flex-wrap:wrap;align-items:baseline;gap:12px;
+  padding:11px 14px;background:var(--paper);border:1px solid var(--stone);border-radius:9px;
+}
+.cal-detail-list a{font-weight:700;color:var(--ink);}
+.cal-detail-list a:hover{color:var(--terracotta);}
+.cal-at{
+  flex:0 0 auto;font-weight:700;font-variant-numeric:tabular-nums;
+  font-size:13.5px;color:var(--navy);
+}
+.cal-where{font-size:12.5px;color:var(--muted);}
+/* --camel-ink, not --camel: the warm tokens are backgrounds and fail as
+   foregrounds, which this stylesheet has already paid for twice. */
+.cal-cost{margin-inline-start:auto;font-size:13.5px;font-weight:700;color:var(--camel-ink);}
+
+/* the static list, which is the whole page with no JavaScript */
+.cal-month-block{margin-bottom:30px;}
+.cal-month-block h2{
+  font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--terracotta);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--stone);
+}
+.cal-days{list-style:none;margin:0;padding:0;}
+.cal-day-row{display:flex;gap:16px;padding:9px 0;border-bottom:1px solid #f0ebdd;}
+.cal-day-row:last-child{border-bottom:none;}
+.cal-day-num{
+  flex:0 0 34px;font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--navy);
+}
+.cal-day-list{list-style:none;margin:0;padding:0;flex:1 1 auto;min-width:0;}
+.cal-day-list li{display:flex;flex-wrap:wrap;gap:11px;align-items:baseline;padding:2px 0;}
+.cal-day-list a{font-weight:700;color:var(--ink);}
+.cal-day-list a:hover{color:var(--terracotta);}
+
+@media (max-width:600px){
+  .cal-page{padding:0 16px 46px;}
+  .cal-cell{min-height:48px;}
+  .cal-n{font-size:13px;}
+  .cal-cost{margin-inline-start:0;}
+}

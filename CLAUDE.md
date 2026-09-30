@@ -25,6 +25,8 @@ Three parallel language trees. Hebrew is the default and lives at the root.
 | `/about` | `about.html` | `he` | `rtl` |
 | `/en/about` | `en/about.html` | `en` | `ltr` |
 | `/ru/about` | `ru/about.html` | `ru` | `ltr` |
+| `/calendar` | `calendar.html` | `he` | `rtl` |
+| `/en/calendar`, `/ru/calendar` | `{en,ru}/calendar.html` | | |
 | `/activities` | `activities/index.html` | `he` | `rtl` |
 | `/en/activities`, `/ru/activities` | `{en,ru}/activities/index.html` | | |
 | `/activities/<slug>` | `activities/<slug>.html` | `he` | `rtl` |
@@ -3253,6 +3255,80 @@ storage, or a key whose heading has been reworded, means the panel is open.
 
 **The preview panel opts out**, with `data-no-collapse`, because it is shown by
 its own button and one that opened folded would read as one that failed.
+
+### The public month calendar
+
+`/calendar`, `/en/calendar`, `/ru/calendar` — every live activity's sessions,
+month by month, for families rather than for staff.
+
+⚠ **IT IS A FILE AT THE ROOT OF EACH TREE, NOT `/activities/calendar`.**
+`SLUG_RE` allows `calendar`, so an admin creating an activity with that slug
+would generate `activities/calendar.html` and **silently overwrite this page**. A
+top-level route removes the collision instead of adding a reserved-word list
+somebody has to remember — and, being a file rather than a directory, it answers
+200 without the redirect hop the listing page needed a forced rewrite to escape.
+
+⚠ **THE PAGE ASKS NO CLOCK, AND THE BROWSER DECIDES THE MONTH.** It is a build
+artifact and `preview-matches-publish` asserts byte-identity, so a page that
+embedded "today" — or sliced a window around it — could differ between a preview
+at 23:59 and a publish at 00:01, breaking that check for a reason nobody could
+see. **Every** month is rendered; `js/calendar.js` opens on the current one,
+because the browser is the only thing here that legitimately knows the date. A
+test renders each language twice and compares.
+
+⚠ **AND THE DATA RIDES WITH THE PAGE**, in a `<script type="application/json">`
+block, the shape the activity page already uses for its credits. No second
+request, no 404 path, no half-loaded state — and `activities-index.json` stays
+out of it, because that file is the slug-to-id lookup `js/nav.js` pulls on every
+first menu open and session arrays have no business making it bigger. ⚠ `<` is
+escaped to `\u003c` in the block, or a title containing `</script>` ends it early
+and the rest is parsed as markup; the test renders exactly such a title, because
+no real one contains a `<` and asserting it of the live data passes either way —
+which a bite-check proved by surviving.
+
+⚠ **`unlisted` IS ON THE ADMIN CALENDAR AND NOT ON THIS ONE**, and that is the
+whole reason `_activity-calendar.js` takes an **audience** rather than growing a
+second copy of the rule. An unlisted class occupies a real room, so a room clash
+against it must be visible to staff; it is also deliberately off the listing, out
+of the hamburger and out of `sitemap.xml`, so advertising it here would undo
+exactly what that state exists for. The public half reuses `listing.isListed` —
+the same predicate `buildDerivedFiles()` already applies to the three shop-window
+pages. ⚠ No `unlisted` activity exists in the repository today, so both audiences
+agree on the real data and a reverted rule passes on it; the suite carries
+fixtures for that reason.
+
+**The exact address is never read.** Public `location` only. A grid naming where
+a child will be at 16:00 next Tuesday is the worst place on the site to leak the
+one fact that field exists to protect, so `calendarRows()` does not reach for it
+at all rather than filtering it afterwards.
+
+**One price figure, and it is the listing card's.** The `term` row, or
+`perSession` on a drop-in — never the fee, never per-lesson — read from the same
+`factPriceRows()` the card reads, so a card and a calendar row cannot quote one
+activity two ways.
+
+#### ⚠ The month grid was built and never drawn
+
+The first version built the grid, appended it, replaced the server-rendered list
+with it — and **never called `draw()`**. So the page rendered an empty month
+under a blank heading, with the real content it had just destroyed. Nothing
+threw. Every function was correct alone, and reading the file showed a `draw()`
+defined and a `draw()` called. It was found by **executing the client**, which is
+the only thing that could have found it.
+
+⚠ **AND THE FIX IS AN ORDERING, WHICH NO RENDERED RESULT CAN CHECK.** Drawing
+after the list is cleared produces an identical DOM whenever nothing throws — a
+bite-check survived on exactly that — so the assertion is on the **source order**:
+`draw()` must appear before the destructive write. That is what makes the
+fail-open promise at the top of the file true, rather than a comment: a throw
+anywhere leaves the served list exactly as it was. Three failure paths are
+executed — no data block, unparseable JSON, an empty session list — and each must
+leave the served markup untouched.
+
+**The month controls are words, not chevrons.** A caret is directional and this
+page renders in two directions; words need no mirroring and no per-language
+override — the trap the hamburger's own chevron fell into. There is not one
+physical inset in the calendar CSS, and a test asserts it.
 
 ### ⚠ Two classes at one hour, and no screen could show it
 

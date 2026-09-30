@@ -41,15 +41,18 @@
     he: { about:'אודות', activities:'פעילויות', contact:'צור קשר', menu:'תפריט', alt:'עוגן',
           account:'אזור המשפחה', signIn:'כניסה / הרשמה', signOut:'יציאה',
           seeAll:'לכל הפעילויות', running:'פעיל', archived:'ארכיון',
-          soon:'בקרוב', waitlist:'רשימת המתנה', language:'שפה' },
+          soon:'בקרוב', waitlist:'רשימת המתנה', language:'שפה',
+          calendar:'לוח פעילויות' },
     en: { about:'About', activities:'Activities', contact:'Contact', menu:'Menu', alt:'Ogen',
           account:'My family', signIn:'Sign in / Register', signOut:'Sign out',
           seeAll:'See all activities', running:'Currently Running', archived:'Archived',
-          soon:'Coming soon', waitlist:'Waiting list', language:'Language' },
+          soon:'Coming soon', waitlist:'Waiting list', language:'Language',
+          calendar:"What's on" },
     ru: { about:'О нас', activities:'Занятия', contact:'Контакты', menu:'Меню', alt:'Оген',
           account:'Моя семья', signIn:'Вход / Регистрация', signOut:'Выйти',
           seeAll:'Все занятия', running:'Активные', archived:'Архив',
-          soon:'Скоро', waitlist:'Лист ожидания', language:'Язык' }
+          soon:'Скоро', waitlist:'Лист ожидания', language:'Язык',
+          calendar:'Расписание' }
   }[lang];
 
   const navHTML = `
@@ -91,6 +94,7 @@
 <div class="mobile-menu" id="mobile-menu">
   <a href="${home}#about" onclick="toggleMenu()">${L.about}</a>
   <div id="activities-slot"><a href="${base}/activities" onclick="toggleMenu()">${L.activities}</a></div>
+  <a href="${base}/calendar" onclick="toggleMenu()">${L.calendar}</a>
   <a href="${home}#contact" onclick="toggleMenu()">${L.contact}</a>
   <a href="${base}/account" onclick="toggleMenu()" class="menu-account">${L.account}</a>
 </div>`;
