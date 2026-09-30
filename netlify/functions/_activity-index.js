@@ -12,7 +12,6 @@ const {
   calendarPathFor, calendarFilePathFor, renderCalendarPage
 } = require('./_activity-template');
 const CAL = require('./_activity-calendar');
-const FACTS = require('./_activity-facts');
 // Which of the three listing states this activity is in, and what that tells a
 // crawler. One function, so the meta tag and the sitemap cannot disagree.
 const LISTING = require('./_activity-listing');
@@ -210,10 +209,13 @@ ${blocks.join('\n')}
 // listing it would undo exactly that. The admin's own calendar passes `admin`
 // and sees it, because a real class occupies a real room.
 //
-// ⚠ ONE price figure, and it is the one the listing card already picks: the term
-// price, or the per-session price on a drop-in. Never the registration fee and
-// never per-lesson — the same rule, read from the same builder, so a card and a
-// calendar row cannot quote an activity differently.
+// ⚠ NO PRICE, ANYWHERE ON THIS PAGE, and it is a decision rather than an
+// omission. A calendar answers WHEN; the activity page answers what it costs,
+// and the listing card already carries the one comparable figure. Printing a
+// term price on one row beside a per-session price on the next invites exactly
+// the comparison the price card was rebuilt to stop making — €300 next to €7
+// reads as one being cheap, when they buy different things. A reader who wants
+// the cost is one tap from the page that explains it properly.
 function calendarRows(activities, lang) {
   const bySlug = {};
   (activities || []).forEach((a) => { bySlug[a.slug] = a; });
@@ -224,8 +226,6 @@ function calendarRows(activities, lang) {
     })
     .map((s) => {
       const a = bySlug[s.slug];
-      const row = (FACTS.factPriceRows(a, lang) || [])
-        .filter((r) => r.key === 'term' || r.key === 'perSession')[0];
       return {
         date: s.date,
         time: s.time || '',
@@ -234,7 +234,6 @@ function calendarRows(activities, lang) {
         title: pick(a.title, lang),
         href: pathFor(s.slug, lang),
         type: s.type,
-        price: row ? row.value : '',
         // The GENERAL area only. The exact address is members-only and is
         // filtered by isPubliclyVisible() everywhere else; a public grid naming
         // where a child will be at 16:00 next Tuesday is the worst place on the

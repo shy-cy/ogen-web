@@ -188,6 +188,25 @@ console.log('\n[a title that would end the data block early]');
   H.ok(page.indexOf('<img src=x>') === -1, 'and nothing of it reaches the page as markup');
 })();
 
+// ⚠ NO PRICE ON THIS PAGE, asserted rather than assumed. A calendar answers
+// WHEN; printing a term price on one row beside a per-session price on the next
+// invites the comparison the price card was rebuilt to stop making. Checked on
+// the rendered page AND on the embedded data, because a figure that reaches the
+// JSON is a figure a later edit can print.
+console.log('\n[a calendar answers when, not what it costs]');
+LANGS.forEach((lang) => {
+  const page = pageFor(lang);
+  const rows = IDX.calendarRows(records, lang);
+  H.ok(rows.length > 0, lang + ': there are rows to check');
+  rows.forEach((r) => H.eq(r.price, undefined, lang + ': no row carries a price'));
+  const raw = (page.match(/id="calendar-data">([\s\S]*?)<\/script>/) || [])[1];
+  H.ok(raw.indexOf('"price"') === -1, lang + ': and none reaches the embedded data');
+  // The currency symbol every price row on this site renders with.
+  H.ok(page.indexOf('\u20ac') === -1, lang + ': no euro sign anywhere on the page');
+  H.ok(page.indexOf('cal-cost') === -1, lang + ': and no price slot is drawn');
+});
+H.ok(read('js/calendar.js').indexOf('price') === -1, 'the client never reads a price either');
+
 console.log('\n[generated, in the sitemap, and in the menu]');
 
 const files = IDX.buildDerivedFiles(records);

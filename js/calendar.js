@@ -98,7 +98,6 @@
       a.href = s.href;
       li.appendChild(a);
       if (s.where) li.appendChild(el('span', 'cal-where', s.where));
-      if (s.price) li.appendChild(el('span', 'cal-cost', s.price));
       ul.appendChild(li);
     });
     dayPanel.appendChild(ul);

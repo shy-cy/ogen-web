@@ -3302,10 +3302,15 @@ a child will be at 16:00 next Tuesday is the worst place on the site to leak the
 one fact that field exists to protect, so `calendarRows()` does not reach for it
 at all rather than filtering it afterwards.
 
-**One price figure, and it is the listing card's.** The `term` row, or
-`perSession` on a drop-in — never the fee, never per-lesson — read from the same
-`factPriceRows()` the card reads, so a card and a calendar row cannot quote one
-activity two ways.
+⚠ **NO PRICE, ANYWHERE ON THIS PAGE.** It carried one for a release — the
+listing card's figure, the `term` row or `perSession` on a drop-in — and it is
+gone by decision. **A calendar answers WHEN.** A term price on one row beside a
+per-session price on the next invites exactly the comparison the price card was
+rebuilt to stop making: €300 against €7 reads as one being cheap, when they buy
+different things, and a grid is scanned rather than read. The activity page
+explains the cost properly and is one tap away. The check is on the rendered page
+**and** on the embedded data, because a figure that reaches the JSON is a figure
+a later edit can print.
 
 #### ⚠ The month grid was built and never drawn
 

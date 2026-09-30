@@ -925,8 +925,7 @@ ${days.map((d) => `      <li class="cal-day-row">
         <ul class="cal-day-list">
 ${seen[d].map((r) => `          <li>
             <span class="cal-at">${esc(r.time || '')}</span>
-            <a href="${esc(r.href)}">${esc(r.title)}</a>${r.price ? `
-            <span class="cal-cost">${esc(r.price)}</span>` : ''}
+            <a href="${esc(r.href)}">${esc(r.title)}</a>
           </li>`).join('\n')}
         </ul>
       </li>`).join('\n')}

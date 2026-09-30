@@ -2122,9 +2122,6 @@ td .acc-actions{ gap:14px; }
   font-size:13.5px;color:var(--navy);
 }
 .cal-where{font-size:12.5px;color:var(--muted);}
-/* --camel-ink, not --camel: the warm tokens are backgrounds and fail as
-   foregrounds, which this stylesheet has already paid for twice. */
-.cal-cost{margin-inline-start:auto;font-size:13.5px;font-weight:700;color:var(--camel-ink);}
 
 /* the static list, which is the whole page with no JavaScript */
 .cal-month-block{margin-bottom:30px;}
@@ -2147,5 +2144,4 @@ td .acc-actions{ gap:14px; }
   .cal-page{padding:0 16px 46px;}
   .cal-cell{min-height:48px;}
   .cal-n{font-size:13px;}
-  .cal-cost{margin-inline-start:0;}
 }
