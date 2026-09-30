@@ -113,12 +113,12 @@
     }
   ],
   "sponsors": [],
-  "isoUpdated": "2026-09-27T13:43:52.870Z",
+  "isoUpdated": "2026-09-30T08:12:58.827Z",
   "isoCreated": "2026-09-18T15:36:40.995Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
   "activityId": "act-a17993ff6a2b4f4f",
-  "lastPublishedAt": "2026-09-27T13:43:52.870Z",
+  "lastPublishedAt": "2026-09-30T08:12:58.827Z",
   "groups": [
     {
       "groupId": "g-default",
@@ -137,9 +137,9 @@
         "schedule": {
           "frequency": "biweekly",
           "overrideText": {
-            "he": "",
-            "en": "",
-            "ru": ""
+            "he": "ימי רביעי, פעם בשבועיים",
+            "en": "Wednesdays, once in 2 weeks",
+            "ru": "По средам, раз в месяц"
           },
           "sessions": [
             {
