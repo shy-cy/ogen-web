@@ -113,12 +113,12 @@
     }
   ],
   "sponsors": [],
-  "isoUpdated": "2026-09-30T08:12:58.827Z",
+  "isoUpdated": "2026-09-30T08:15:03.161Z",
   "isoCreated": "2026-09-18T15:36:40.995Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
   "activityId": "act-a17993ff6a2b4f4f",
-  "lastPublishedAt": "2026-09-30T08:12:58.827Z",
+  "lastPublishedAt": "2026-09-30T08:15:03.161Z",
   "groups": [
     {
       "groupId": "g-default",
@@ -151,8 +151,8 @@
         "duration": {
           "startDate": "2026-10-14",
           "endDate": "2026-12-23",
-          "sessionCount": null,
-          "sessionMinutes": null,
+          "sessionCount": 6,
+          "sessionMinutes": 90,
           "sessionDates": [
             {
               "date": "2026-10-14",
