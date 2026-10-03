@@ -188,6 +188,48 @@ function scheduleFor(activity, groupId) {
   return factsOf(activity).schedule || {};
 }
 
+// The hour one dated session actually starts at.
+//
+// Lifted here from _activity-calendar.js, which re-exports it, so the rule has
+// ONE implementation. It used to be the clash report's alone; the session table
+// now prints a time per row and a second resolution would be a second answer to
+// "when does this meeting start" — free to disagree with the one money is frozen
+// against.
+//
+// A schedule's rows carry the hour and MAY DISAGREE, because a custom schedule
+// can name a different one per date. So a row naming THIS date wins, and the
+// common hour is the fallback for a weekly schedule, whose single row names no
+// date at all.
+//
+// ⚠ Returns null when the rows disagree and none names this date, rather than
+// picking the first. An hour this session may not be at is worse than no hour —
+// the same rule the listing card follows when it drops a schedule tag two groups
+// cannot share, and the reason a blank cell in the session table is correct.
+function timeFor(schedule, date) {
+  const rows = (schedule && schedule.sessions) || [];
+  const dated = rows.filter((r) => r && r.date === date && r.time);
+  if (dated.length) return dated[0].time;
+  const times = [];
+  rows.forEach((r) => { if (r && r.time && times.indexOf(r.time) === -1) times.push(r.time); });
+  return times.length === 1 ? times[0] : null;
+}
+
+// The hour a GROUP meets at when every one of its sessions agrees on one, and ''
+// when they do not. Same rule as timeFor() with no date to privilege, and ''
+// rather than null because every caller puts it straight into a sentence.
+//
+// ⚠ This is NOT consulted by formatSchedule(). A free-text override replaces
+// the computed line OUTRIGHT and nothing is appended to it: an admin who wants
+// the hour in that sentence types it there, and several have. This answers the
+// screens that show a time as a FIELD rather than inside prose — the group
+// picker, where the hour is what a family chooses by.
+function sharedTime(activity, groupId) {
+  const rows = (scheduleFor(activity, groupId).sessions) || [];
+  const times = [];
+  rows.forEach((r) => { if (r && r.time && times.indexOf(r.time) === -1) times.push(r.time); });
+  return times.length === 1 ? times[0] : '';
+}
+
 // The duration FACT for a group. Same discipline as calendarFor: a forgotten
 // argument on a multi-group activity throws rather than answering for one group.
 function durationFor(activity, groupId) {
@@ -379,7 +421,7 @@ module.exports = {
   ANY, GROUP_FACTS, ACTIVITY_FACTS, isGroupFact,
   groupList, groupById, offersAChoice, soleGroup, resolveGroup,
   factFor, factAcross,
-  calendarFor, scheduleFor, durationFor, sessionCountOf, unionDates,
+  calendarFor, scheduleFor, timeFor, sharedTime, durationFor, sessionCountOf, unionDates,
   totalMinutesOfGroup, pricingDuration,
   teachersFor, totalCapacity,
   validateGroups,

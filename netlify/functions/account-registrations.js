@@ -228,6 +228,20 @@ function activityView(activity, report, lang) {
           name: g.name,
           label: facts.namedGroupLine({ name: g.name, capacity: g.capacity }, lang || 'he'),
           capacity: g.capacity,
+          // ⚠ THE HOUR THIS GROUP MEETS AT, ON THE OPTION, because the hour is
+          // what a family chooses by. groupChoice() lists a fact only when the
+          // groups DISAGREE on it — right for the public page's groups section,
+          // where repeating an agreed fact under every name buries the one line
+          // somebody is comparing, and wrong here: a select is a choice, and the
+          // time is part of what is being chosen whether or not the other group
+          // happens to share it.
+          //
+          // sharedTime() rather than the schedule line, deliberately. A free-text
+          // override replaces that line outright and carries no hour unless an
+          // admin typed one, which is the behaviour they asked to keep — so the
+          // picker reads the stored rows instead and is unaffected by the words.
+          // '' when the group's own sessions disagree about the hour.
+          time: groups.sharedTime(activity, g.groupId),
           left: g.left,
           full: g.left != null && g.left <= 0,
           cancellationTerms: (t.per.filter((x) => x.groupId === g.groupId)[0] || {}).lines || null
@@ -1629,6 +1643,27 @@ exports.handler = async (event) => {
         // simply nothing current to say about when and where.
         const report = activity ? R.capacityReport(activity, await store.forActivity(reg.activityId)) : null;
         const L = LABELS[lang] || LABELS.he;
+
+        // ⚠ THIS FAMILY'S OWN GROUP'S DATES, and the hour it meets at.
+        //
+        // It read `activity.facts.duration` — the ACTIVITY's duration fact, which
+        // has been EMPTY on every record since the seven facts moved onto the
+        // group. So this table rendered NO ROWS AT ALL, on every registration
+        // page, on every activity, with nothing erroring: sessionRows() was handed
+        // {} and honestly returned []. The line directly below it gets this right
+        // and always has, which is the tell — `reg.groupId` was threaded through
+        // the facts and missed here.
+        //
+        // `null` rather than `undefined`, deliberately: undefined THROWS on a
+        // multi-group activity, and a registration taken while the activity was
+        // still pooled genuinely carries no group. null reads the union there,
+        // which is the documented honest answer — and in exactly that case no
+        // schedule is passed, so the hour cells are empty rather than quietly
+        // showing the first group's time against the second group's dates.
+        const myGroup = activity ? (reg.groupId || null) : null;
+        const mySchedule = activity && (myGroup || !groups.offersAChoice(activity))
+          ? groups.scheduleFor(activity, myGroup)
+          : null;
         return json(200, {
           ok: true,
           registration: regRow(reg, participant, lang, activity, siblings),
@@ -1677,7 +1712,8 @@ exports.handler = async (event) => {
             // and the course fee once a semester, so their sum is a figure
             // nobody is ever billed.
             priceRows: facts.factPriceRows(activity, lang),
-            sessionRows: facts.sessionRows((activity.facts || {}).duration, lang)
+            sessionRows: facts.sessionRows(
+              { sessionDates: groups.calendarFor(activity, myGroup) }, lang, mySchedule)
           }) : null,
           // ⚠ EVERYTHING THIS SCREEN NEEDS, IN ONE CALL.
           //

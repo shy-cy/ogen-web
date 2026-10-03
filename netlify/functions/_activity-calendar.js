@@ -68,23 +68,11 @@ function hhmm(mins) {
   return String(h).padStart(2, '0') + ':' + String(mins % 60).padStart(2, '0');
 }
 
-// The time a group meets at. A schedule's rows carry it; they may disagree (a
-// custom schedule can name a different hour per date), so a row matching THIS
-// date wins and the common time is the fallback.
-//
-// ⚠ Returns null when the rows disagree and none names this date, rather than
-// picking the first. A clash report is read as a statement of fact, and an hour
-// this session may not actually be at is worse than no hour at all — the same
-// rule the listing card follows when it drops a schedule tag two groups cannot
-// share.
-function timeFor(schedule, date) {
-  const rows = (schedule && schedule.sessions) || [];
-  const dated = rows.filter((r) => r && r.date === date && r.time);
-  if (dated.length) return dated[0].time;
-  const times = [];
-  rows.forEach((r) => { if (r && r.time && times.indexOf(r.time) === -1) times.push(r.time); });
-  return times.length === 1 ? times[0] : null;
-}
+// The hour one dated session starts at. LIFTED into _activity-groups.js — the
+// module that requires nothing — and re-exported here unchanged, so the session
+// table and this report cannot answer "when does this meeting start" differently.
+// The rule and its reasoning live beside scheduleFor(), which produces its input.
+const timeFor = groups.timeFor;
 
 function pickText(bag) {
   if (bag == null) return '';

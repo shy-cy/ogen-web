@@ -1769,6 +1769,127 @@ the rows, because the date range is already on the page as the duration fact;
 the exception is a term spanning two calendar
 years, where a bare "6 January" is ambiguous.
 
+#### ⚠ The hour was in the record and on no screen
+
+Reported as *"there is no time shown for the activities"*, and it was true of
+**five of the six** published activities while every one of them stored an hour.
+
+`schedule.overrideText` replaces the computed schedule line **outright** — which
+is what it is for, and that line was the only place the page had ever stated a
+time. So `folk-dance` (20:30), both `bnei-mitzvah-2027` groups (18:00, 16:00),
+`beit-midrash` (18:00) and `beit-midrash-ayeka` (19:30) each published a "When"
+row with no hour in it. `intro-into-judaism` shows one **only because somebody
+typed it into the override by hand**, so that activity stores it twice and the
+copies can drift. `hebrew4kids` is the one with no override, and the one that
+worked. Nothing was broken; a control was doing its job and taking the hour with
+it, which is the group-size override publishing *"Group size: Dates will be
+announced soon"* one fact over.
+
+⚠ **APPENDING THE STORED HOUR TO THE OVERRIDE WAS PROPOSED, AND DECLINED.** It
+would have repaired the "When" row and the listing card together, from one place,
+because both read `sidebarRows()`. It was turned down on the grounds that the
+field is free text and must stay free text — *"if I want the time shown in that
+summary line, I'll include it myself as part of the text I type, as I've already
+done on some activities."* So `formatSchedule()` is untouched, and the cost is
+written down rather than discovered later: **the listing card carries no hour on
+those five either**, and gains one only when an admin types it.
+
+**The hour went where it is a field rather than prose: the session table, per
+row.** That is also the only place it can be *right* — a custom schedule may name
+a different hour per date, which no summary line can say.
+
+- ⚠ **ONE RESOLVER, AND IT MOVED TO REACH BOTH READERS.** `timeFor(schedule,
+  date)` was the clash report's alone. The table now prints an hour per row, and
+  a second resolution would be a second answer to *when does this meeting start* —
+  free to disagree with the instant money is frozen against. It is lifted into
+  `_activity-groups.js`, the module that requires nothing, beside the
+  `scheduleFor()` that produces its input, and `_activity-calendar.js`
+  **re-exports** it so nothing that imported it from there had to change — the
+  same move `sanitiseRich()` made.
+- ⚠ **AN EMPTY CELL IS CORRECT AND IS NOT A GAP.** A row naming *this* date wins,
+  one hour shared by every row is the fallback, and rows that disagree with none
+  naming this date yield **nothing** rather than the first. `beit-midrash-ayeka`
+  depends on both halves: one of its nine rows carries no hour at all and
+  correctly inherits the 19:30 the other eight agree on.
+- ⚠ **AND IT CHANGED WHAT "THE GROUPS ARE THE SAME" MEANS.** `sessionTables()`
+  collapses to one untitled table when every group's rows are identical. The hour
+  is now in those rows, so two groups meeting on the **same dates at different
+  hours** no longer merge — they were being published as one table that was right
+  for at most one of them.
+
+#### ⚠ One table per group is one tab per group
+
+`bnei-mitzvah-2027` published two captioned tables stacked, twelve dated rows, and
+a family belongs to exactly one of them. Asked for as tabs, named by group.
+
+⚠ **EVERY MECHANISM THAT SHOWS ONE PANEL IS A MECHANISM THAT HIDES THE REST**,
+and two of the three obvious shapes hide a group's dates from somebody for good:
+a **server-rendered** strip is a row of dead buttons when the script does not run,
+and rendering **only the selected panel** hides the other group from a reader with
+no JavaScript and from a crawler. So the markup ships complete and stacked and
+`js/activity.js` rearranges it — the served page is the product and the tabs are
+an improvement on it, which is `js/calendar.js`'s rule exactly.
+
+- ⚠ **A THROW LEAVES EVERY PANEL VISIBLE**, because nothing is hidden until the
+  strip that reveals it again is on the page. Asserted on **source order**, since
+  no rendered result can see it: a run that does not throw builds an identical DOM
+  either way, which is how the month grid shipped built and never drawn. Verified
+  in real Chrome both ways — the script absent, and the block throwing — with both
+  tables, both captions and all twelve rows readable.
+- **The caption splits in two.** Stacked, a `.session-heading` names the band once
+  and each table is captioned with its group; as tabs, the strip carries those
+  names and CSS hides the captions. One statement of each fact in both renderings.
+- ⚠ **A BROWSER DOES NOT FLIP `ArrowLeft` IN A RIGHT-TO-LEFT PAGE.** The second
+  tab is physically to the *left* in Hebrew, so the arrows are mapped off the
+  computed `direction` — the one piece of this site's RTL handling a stylesheet
+  cannot answer. Measured in Chrome in both directions. Everything else is logical
+  properties and there is not one physical inset in the block; the selected marker
+  is **navy, not terracotta**, because it says which table you are reading and
+  terracotta is reserved for the one thing on the page you can press.
+- A real tab control — `role="tablist"`, roving `tabindex`, Home/End, visible
+  focus — and `type="button"`, which is the trap the admin's (i) badge already met
+  beside a `<label>`.
+
+#### ⚠ And the family's own session table had no rows at all
+
+`/account/activity` built them from `facts.sessionRows((activity.facts ||
+{}).duration, lang)` — the **activity's** duration fact, which has been empty on
+every record since the seven facts moved onto the group. So `sessionRows()` was
+handed `{}` and honestly returned `[]`, and that table rendered **nothing, on
+every activity, on every family's page**, with nothing erroring. The line
+*directly above it* threads `reg.groupId` through correctly and always has, which
+is the tell: one call site was missed in that migration, the same shape as the
+recompute notice that compared a real date against an empty string.
+
+⚠ **AND THE SUITE THAT DRAWS THAT SCREEN WATCHED IT HAPPEN.** It feeds the client
+a **hand-written** payload carrying one session row — so it proved the client
+renders rows it is given and could never prove the server gives it any. Reading
+each side proves that side is self-consistent, which is this project's oldest
+lesson about its own tests. The new suite drives the real handler.
+
+`null` rather than `undefined` for the group, deliberately: `calendarFor()`
+**throws** on `undefined` for a multi-group activity, and a registration taken
+while the activity was pooled genuinely carries no group. `null` reads the union
+there — and in exactly that case **no schedule is passed**, so the hour cells are
+empty rather than quietly showing the first group's time against another group's
+dates.
+
+#### The group picker states each group's hour
+
+⚠ **`groupChoice()` LISTS A FACT ONLY WHEN THE GROUPS DISAGREE ON IT**, which is
+right for the public page's groups section — repeating an agreed fact under every
+name makes two identical lists and buries the one line a reader is comparing — and
+**wrong for the select**. A select is a choice, and under the equal-hours rule the
+hour is part of what is being chosen whether or not the other group happens to
+share it. So the option carries it unconditionally, beside the places count that
+moved there for the same reason: *name, then when, then whether there is room.*
+
+It reads `sharedTime()` — the group's own stored rows — rather than the schedule
+line, so the words an admin typed into an override cannot take it away. Pinned on
+**both** sides: the client suite proves an option renders the hour it is handed,
+and the server suite proves the handler hands it one. Either alone is two halves
+that can disagree in writing, which is how a link format and its test did.
+
 ### ⚠ A group is the unit
 
 An activity **WAS** the thing that had an age range, a teacher, a room and a

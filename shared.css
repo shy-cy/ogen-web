@@ -793,6 +793,58 @@ html[lang="en"] .page-header h1, html[lang="ru"] .page-header h1{ font-weight:80
   .session-split{ columns:2; column-gap:44px; }
   .session-split .session-table{ break-inside:avoid; }
 }
+/* The hour each session starts at. Tabular so the column lines up the way the
+   session numbers already do, and nowrap because "16:00" breaking across two
+   lines in a narrow column is the one thing a time must never do. An EMPTY cell
+   is correct and deliberate: timeFor() returns null when a group's rows disagree
+   and none names that date, and a guessed hour is worse than none. */
+.session-table td:last-child{ font-variant-numeric:tabular-nums; white-space:nowrap; }
+
+/* ONE TABLE PER GROUP, AS TABS.
+
+   The markup is served stacked — a heading, then a table per group captioned
+   with that group's name — and js/activity.js rearranges it. So every rule here
+   is written twice over: once for what is served, and once for what the script
+   makes of it. With no JavaScript nothing below .has-tabs applies and the band
+   renders exactly as it did before tabs existed.
+
+   ⚠ NOT ONE PHYSICAL INSET, and the underline is not an exception. The rule this
+   file keeps is about the INLINE axis, which flips between Hebrew and the other
+   two; a line under the selected tab is on the BLOCK axis and means the same
+   thing in all three, which is the same reasoning that keeps the hamburger's
+   chevron physical. It is spelled logically anyway, so the file holds one
+   convention rather than one convention and an explained exception. */
+.session-heading{
+  font-weight:700; color:var(--ink); margin:0 0 12px; font-size:.95rem;
+}
+.session-tabs{
+  display:flex; flex-wrap:wrap; gap:4px 18px;
+  margin-block-end:16px; border-block-end:1px solid var(--stone);
+}
+.session-tabs button{
+  appearance:none; background:none; border:0; cursor:pointer; font:inherit;
+  font-weight:600; font-size:.9rem; color:var(--olive);
+  padding-block:6px 9px; padding-inline:2px;
+  /* Sits ON the strip's own hairline rather than above it, so the selected
+     marker and the rule are one line rather than two a pixel apart. */
+  margin-block-end:-1px;
+  border-block-end:2px solid transparent;
+}
+/* Olive 6.25:1 on paper, navy 10.82:1 — computed against the ground the letters
+   actually sit on. NOT terracotta: this is a marker saying which table you are
+   looking at, and terracotta is reserved for the one thing on the page you can
+   act on. The same reason the nav chip's signed-in initial is olive. */
+.session-tabs button[aria-selected="true"]{
+  color:var(--navy); border-block-end-color:var(--navy);
+}
+.session-tabs button:hover{ color:var(--navy); }
+.session-tabs button:focus-visible{ outline:2px solid var(--navy); outline-offset:2px; }
+/* A panel avoids breaking for the reason its table already does: two groups in
+   a two-column band belong one per column, not snaked across the pair. */
+.session-panel{ break-inside:avoid; }
+/* As tabs the strip carries the group names, so the captions would say each one
+   twice. Stacked, they are the only thing naming a table and they stay. */
+.session-split.has-tabs .session-table caption{ display:none; }
 /* The two cards a reader scans first.
 
    They WRAP rather than switching on a viewport breakpoint: side by side while
@@ -1929,6 +1981,11 @@ td .acc-actions{ gap:14px; }
 }
 .acc-table tr:last-child td{ border-block-end:0; }
 .acc-table .is-num{ text-align:end; font-variant-numeric:tabular-nums; white-space:nowrap; }
+/* The hour a session starts at. Tabular and nowrap like .is-num, and deliberately
+   NOT end-aligned: it reads as part of the date beside it rather than as a figure
+   in a money column. A class the client sets must have a rule here — an unstyled
+   name is a layout nobody designed, which this file has already paid for once. */
+.acc-table .is-time{ font-variant-numeric:tabular-nums; white-space:nowrap; }
 /* The late-price explanation, in the evenings table as well as in the picker.
    Same class and same treatment on purpose — one sentence about one figure, so
    the two screens cannot drift into two looks for it. All it needs here is to

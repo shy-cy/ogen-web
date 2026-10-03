@@ -64,10 +64,69 @@ LANGS.forEach((lang) => {
 
 // The numbering follows from that, rather than being a rule of its own.
 const enTable = tableOf(render(withGap, 'en'));
-H.ok(/<tr><td>1<\/td><td>Wednesday<\/td><td>14 October<\/td><\/tr>/.test(enTable),
+H.ok(/<tr><td>1<\/td><td>Wednesday<\/td><td>14 October<\/td><td>16:00<\/td><\/tr>/.test(enTable),
   'session 1 is the first meeting');
-H.ok(/<tr><td>2<\/td><td>Wednesday<\/td><td>28 October<\/td><\/tr>/.test(enTable),
+H.ok(/<tr><td>2<\/td><td>Wednesday<\/td><td>28 October<\/td><td>16:00<\/td><\/tr>/.test(enTable),
   'and session 2 is the NEXT one that happens, not the one that was skipped');
+
+// ---------------------------------------------------------------------------
+console.log('\n[the hour is a COLUMN, because the override would not carry it]');
+//
+// Five of the six published activities replace the schedule sentence with
+// free-text words, and that line is the only place the page ever stated an hour
+// — so the time vanished from every one of them while sitting in the record the
+// whole time. It was reported as "there is no time shown for the activities".
+//
+// ⚠ AND THE FIX IS NOT TO APPEND IT TO THE OVERRIDE. That was proposed and
+// declined: the override is free text and stays free text, so an admin who wants
+// the hour in that sentence types it there, as intro-into-judaism's does. The
+// hour belongs in the table, per row, where it is a field rather than prose.
+const TIME_COL = { he: 'שעה', en: 'Time', ru: 'Время' };
+LANGS.forEach((lang) => {
+  const table = tableOf(render(withGap, lang));
+  H.ok(table.indexOf('<th scope="col">' + TIME_COL[lang] + '</th>') !== -1,
+    lang + ': the table has a Time column, headed in this language');
+  H.eq((table.match(/<td>16:00<\/td>/g) || []).length, 2,
+    lang + ': and every row carries the hour that session starts at');
+});
+
+// ⚠ AN HOUR NOBODY CAN PIN DOWN IS AN EMPTY CELL, NEVER A GUESS. A custom
+// schedule may name a different hour per date; rows that disagree with none
+// naming THIS date yield nothing, which is the same answer the clash report
+// gives and the reason it never reports a timeless session as colliding. Live
+// data depends on it: beit-midrash-ayeka carries a session whose own row has no
+// hour at all.
+const vague = F.course();
+F.groupFacts(vague).schedule = { frequency: 'custom', sessions: [
+  { day: 3, time: '16:00', date: '2026-10-14' },
+  { day: 3, time: '18:00', date: '2026-10-21' }
+] };
+F.groupFacts(vague).duration.sessionDates = [
+  { date: '2026-10-14', status: 'scheduled' },
+  { date: '2026-10-21', status: 'scheduled' },
+  { date: '2026-10-28', status: 'scheduled' }
+];
+const vagueTable = tableOf(render(vague, 'en'));
+H.ok(/<td>14 October<\/td><td>16:00<\/td>/.test(vagueTable),
+  'a date whose own row names an hour gets that hour');
+H.ok(/<td>21 October<\/td><td>18:00<\/td>/.test(vagueTable),
+  'and a different date with a different hour gets its own, not the first');
+H.ok(/<td>28 October<\/td><td><\/td>/.test(vagueTable),
+  'a date no row names, where the rows disagree, gets an EMPTY cell rather than a guess');
+
+// The reverse, and it is what the live record needs: one hour across every row
+// is the fallback for a date nobody named, so a blank row inherits it.
+const oneHour = F.course();
+F.groupFacts(oneHour).schedule = { frequency: 'custom', sessions: [
+  { day: 3, time: '19:30', date: '2026-10-14' },
+  { day: 3, time: '', date: '2026-10-21' }
+] };
+F.groupFacts(oneHour).duration.sessionDates = [
+  { date: '2026-10-14', status: 'scheduled' },
+  { date: '2026-10-21', status: 'scheduled' }
+];
+H.eq((tableOf(render(oneHour, 'en')).match(/<td>19:30<\/td>/g) || []).length, 2,
+  'a row left blank takes the one hour every other row agrees on');
 
 console.log('\n[the same list the credit arithmetic divides by]');
 // Stated as an equality rather than trusted: the page's row count and the

@@ -1872,12 +1872,21 @@
         // uses to choose, and it now says of each group both things at once:
         // which have room, and how much.
         var room = g.full ? T.groupFull : g.left != null ? placesLeft(g.left) : null;
+        // ⚠ AND THE HOUR IS ON IT FOR THE SAME REASON THE ROOM IS. Under the
+        // equal-hours rule two groups can meet at different times, and which
+        // hour a child can actually come to is as much of the choice as whether
+        // there is a place. It comes from the group's own stored sessions, not
+        // from the schedule sentence, which an override may have replaced with
+        // words carrying no time at all.
+        var parts = [g.label];
+        if (g.time) parts.push(g.time);
+        if (room) parts.push(room);
         groupSel.appendChild(el('option', {
           // ⚠ NOT `registerFull`, which says the ACTIVITY is full. That string
           // sat on a group row directly under a line counting the places still
           // free, which is two statements on one screen contradicting each
           // other. This names what is full and what pressing it will do.
-          value: g.groupId, text: g.label + (room ? ' — ' + room : '')
+          value: g.groupId, text: parts.join(' — ')
         }));
       });
     }
@@ -3263,7 +3272,11 @@
       table.appendChild(el('tr', {}, [
         el('td', { text: row.label }),
         el('td', { text: row.day }),
-        el('td', { text: row.date })
+        el('td', { text: row.date }),
+        // The hour THIS session starts at, from the same resolver the published
+        // table and the clash report read. Empty when the group's rows disagree
+        // and none names this date — a guessed hour is worse than none.
+        el('td', { class: 'is-time', text: row.time || '' })
       ]));
     });
     return el('div', { class: 'acc-scroll' }, [table]);

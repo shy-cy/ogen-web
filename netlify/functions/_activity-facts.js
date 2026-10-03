@@ -112,9 +112,9 @@ const MONTH_OF = { he: 'של החודש', en: 'of each month', ru: 'каждог
 // lessons with dates, in a table, that is always the form, and "Даты занятий"
 // reads as general information still to be detailed.
 const SESSION_TABLE = {
-  he: { caption: 'מועדי המפגשים', row: 'מפגש', cols: ['מפגש', 'יום', 'תאריך'] },
-  en: { caption: 'Session dates', row: 'Session', cols: ['Session', 'Day', 'Date'] },
-  ru: { caption: 'Расписание занятий', row: 'Занятие', cols: ['Занятие', 'День', 'Дата'] }
+  he: { caption: 'מועדי המפגשים', row: 'מפגש', cols: ['מפגש', 'יום', 'תאריך', 'שעה'] },
+  en: { caption: 'Session dates', row: 'Session', cols: ['Session', 'Day', 'Date', 'Time'] },
+  ru: { caption: 'Расписание занятий', row: 'Занятие', cols: ['Занятие', 'День', 'Дата', 'Время'] }
 };
 
 const MONTHS = {
@@ -519,14 +519,21 @@ function scheduleText(activity, lang) {
 function sessionTables(activity, lang) {
   const list = groups.groupList(activity);
   if (!list.length) {
-    const rows = sessionRows(((activity && activity.facts) || {}).duration || {}, lang);
+    const af = (activity && activity.facts) || {};
+    const rows = sessionRows(af.duration || {}, lang, af.schedule);
     return rows.length ? [{ groupId: null, title: null, rows: rows }] : [];
   }
 
   const tables = list.map((g) => ({
     groupId: g.groupId,
     title: pick(g.name, lang) || null,
-    rows: sessionRows({ sessionDates: groups.calendarFor(activity, g.groupId) }, lang)
+    // The group's OWN schedule, so the hour in each row is the hour that group
+    // meets at. ⚠ It also changes what "the groups are the same" means below:
+    // two groups meeting on identical dates at 18:00 and 16:00 now differ, and
+    // are correctly drawn as two tables rather than merged into one that is
+    // right for at most one of them.
+    rows: sessionRows({ sessionDates: groups.calendarFor(activity, g.groupId) }, lang,
+                      groups.scheduleFor(activity, g.groupId))
   }));
 
   // ⚠ ONE UNTITLED TABLE WHEN THE GROUPS MEET ON THE SAME DATES, which is every
@@ -547,7 +554,13 @@ function sessionTables(activity, lang) {
 // One row per session that actually happens. Excluded dates are not rendered as
 // "no class" rows, they are simply absent: the exclusion is an admin concept
 // from end to end, and a reader has no use for a meeting that is not happening.
-function sessionRows(f, lang) {
+// ⚠ `schedule` IS A THIRD ARGUMENT AND ITS ABSENCE MEANS "no hour to print",
+// never "look one up". The dates live on the duration fact and the hour lives on
+// the schedule fact, so a caller holding only the first can honestly render the
+// table it has always rendered. Passed, each row carries the hour THAT DATE
+// starts at, through groups.timeFor() — the one resolver, so the table, the
+// clash report and the instant money is frozen against cannot disagree.
+function sessionRows(f, lang, schedule) {
   const rows = Array.isArray(f && f.sessionDates) ? f.sessionDates : [];
   const names = (DAYS[lang] || DAYS.en).one;
   const months = MONTHS[lang] || MONTHS.en;
@@ -558,8 +571,13 @@ function sessionRows(f, lang) {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(r.date);
     if (!m) return;
     const day = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay();
+    // '' rather than a guess when the rows disagree and none names this date.
+    // beit-midrash-ayeka has a session whose own row carries no hour at all, and
+    // an empty cell is the honest rendering of one — the same reason the clash
+    // report never reports a timeless session as colliding.
+    const time = schedule ? (groups.timeFor(schedule, r.date) || '') : '';
     out.push({ n: out.length + 1, label: `${label} ${out.length + 1}`, day: names[day],
-               date: dayAndMonth(r.date, lang), year: m[1] });
+               date: dayAndMonth(r.date, lang), time: time, year: m[1] });
   });
   // No year in the rows, because the date range is already on the page two
   // blocks up as the duration fact, and a second place to print the same two

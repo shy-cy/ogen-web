@@ -10,6 +10,10 @@
 //      activity can have one teacher or five without touching the template.
 //   3. OPTIONAL FIELDS. A [data-optional] block with no content is REMOVED
 //      from the DOM, so an unused field leaves no empty heading behind.
+//   4. SESSION TABS. An activity whose groups keep DIFFERENT timetables serves
+//      one table per group, stacked. This turns them into tabs — and only ever
+//      enhances what was served, so a failure leaves every group's dates on the
+//      page rather than hiding one.
 //
 // The `open` CTA now points at the family area carrying this activity's slug,
 // rather than at the contact section. That fallback existed because there was
@@ -241,4 +245,101 @@
     const hasMedia = clone.querySelector('img,svg,video');
     if (!hasMedia && !clone.textContent.trim()) block.remove();
   });
+
+  // --- 4. one table per group becomes one tab per group ------------------
+  //
+  // ⚠ IT REARRANGES WHAT WAS SERVED AND BUILDS NO CONTENT OF ITS OWN.
+  //
+  // Every group's table is already in the HTML, captioned with that group's
+  // name, under one "Session dates" heading — which is exactly how this page
+  // rendered before tabs existed. So the whole of the fail-open promise is that
+  // a throw anywhere in here leaves that rendering untouched: nothing is hidden
+  // until the strip that reveals it again has been built and attached. The
+  // alternative — a server-rendered tab strip — is a row of dead buttons when
+  // this script does not run, and rendering only the selected panel hides one
+  // group's dates from a reader with no JavaScript and from a crawler.
+  //
+  // The same discipline js/calendar.js follows, and for the same reason: the
+  // served markup is the product, and this is an improvement on it.
+  try {
+    const split = root.querySelector('[data-session-tabs]');
+    const panels = split
+      ? Array.prototype.slice.call(split.querySelectorAll('.session-panel'))
+      : [];
+    // One panel is one group, which is not a choice — the same rule the register
+    // panel applies to the group select.
+    if (panels.length > 1) {
+      const heading = root.querySelector('.session-heading');
+      const strip = document.createElement('div');
+      strip.className = 'session-tabs';
+      strip.setAttribute('role', 'tablist');
+      // Labelled by the band's own heading rather than a string this file would
+      // have to carry in three languages.
+      if (heading) {
+        if (!heading.id) heading.id = 'session-heading';
+        strip.setAttribute('aria-labelledby', heading.id);
+      }
+
+      const tabs = panels.map(function(panel, i) {
+        const tab = document.createElement('button');
+        tab.type = 'button';            // ⚠ or it submits any form it lands in
+        tab.id = 'session-tab-' + i;
+        tab.setAttribute('role', 'tab');
+        tab.textContent = panel.getAttribute('data-session-title') || '';
+        panel.id = panel.id || 'session-panel-' + i;
+        panel.setAttribute('role', 'tabpanel');
+        panel.setAttribute('aria-labelledby', tab.id);
+        // Focusable, because a panel holding a long table is something a
+        // keyboard user scrolls.
+        panel.setAttribute('tabindex', '0');
+        tab.setAttribute('aria-controls', panel.id);
+        strip.appendChild(tab);
+        return tab;
+      });
+
+      const select = function(i, focus) {
+        tabs.forEach(function(tab, n) {
+          const on = n === i;
+          tab.setAttribute('aria-selected', on ? 'true' : 'false');
+          // Roving tabindex: one stop for the whole strip, arrows move within
+          // it. Every tab in the tab order would make a two-group activity two
+          // extra stops between the article and the table.
+          tab.tabIndex = on ? 0 : -1;
+          if (on && focus) tab.focus();
+          panels[n].hidden = !on;
+        });
+      };
+
+      strip.addEventListener('click', function(e) {
+        const i = tabs.indexOf(e.target);
+        if (i !== -1) select(i, false);
+      });
+
+      strip.addEventListener('keydown', function(e) {
+        const i = tabs.indexOf(e.target);
+        if (i === -1) return;
+        // ⚠ ARROWS FOLLOW WHAT IS ON SCREEN, NOT THE ARRAY. A browser does not
+        // flip ArrowLeft in a right-to-left page, so in Hebrew the LEFT arrow has
+        // to move FORWARD through the tabs or the strip works backwards — the one
+        // place in this site's RTL handling that a stylesheet cannot answer.
+        const rtl = getComputedStyle(strip).direction === 'rtl';
+        let next = null;
+        if (e.key === 'ArrowRight') next = i + (rtl ? -1 : 1);
+        else if (e.key === 'ArrowLeft') next = i + (rtl ? 1 : -1);
+        else if (e.key === 'Home') next = 0;
+        else if (e.key === 'End') next = tabs.length - 1;
+        else return;
+        e.preventDefault();
+        select((next + tabs.length) % tabs.length, true);
+      });
+
+      // Attached BEFORE anything is hidden, so the only state this can leave
+      // behind is every panel visible.
+      split.parentNode.insertBefore(strip, split);
+      split.classList.add('has-tabs');
+      select(0, false);
+    }
+  } catch (err) {
+    console.warn('[activity] session tabs not built:', err);
+  }
 })();

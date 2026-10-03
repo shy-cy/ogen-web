@@ -565,18 +565,37 @@ ${JSON.stringify(credits, null, 2)}
   // contents.
   const tables = sessionTables(activity, lang);
   const T = SESSION_TABLE[lang] || SESSION_TABLE.en;
+  // ⚠ MORE THAN ONE TABLE MEANS MORE THAN ONE GROUP, AND IT SHIPS AS PANELS.
+  //
+  // js/activity.js turns these into tabs. The whole of the markup is served
+  // either way: with no JavaScript a reader gets every group's table, stacked
+  // and captioned by group, which is exactly what this page rendered before tabs
+  // existed. A server-rendered tab strip would be a row of dead buttons when the
+  // script does not run, and building only the selected panel would hide one
+  // group's dates from a reader and from a crawler.
+  //
+  // The caption is split in two for the same reason. Stacked, "Session dates"
+  // heads the band once and each table is captioned with its group's name; as
+  // tabs, the strip carries those names and the captions are hidden by CSS. One
+  // statement of each fact in both renderings, and no duplication in either.
+  const tabbed = tables.length > 1;
+  const row = (r) => `              <tr><td>${esc(String(r.n))}</td><td>${esc(r.day)}</td>` +
+    `<td>${esc(r.date)}</td><td>${esc(r.time || '')}</td></tr>`;
   const oneTable = (t) => `          <table class="session-table">
-            <caption>${esc(t.title ? `${T.caption} · ${t.title}` : T.caption)}</caption>
+            <caption>${esc(tabbed ? (t.title || T.caption) : (t.title ? `${T.caption} · ${t.title}` : T.caption))}</caption>
             <thead><tr>${T.cols.map((c) => `<th scope="col">${esc(c)}</th>`).join('')}</tr></thead>
             <tbody>
-${t.rows.map((r) => `              <tr><td>${esc(String(r.n))}</td><td>${esc(r.day)}</td><td>${esc(r.date)}</td></tr>`).join('\n')}
+${t.rows.map(row).join('\n')}
             </tbody>
           </table>`;
+  const panel = (t) => `        <section class="session-panel" data-session-title="${esc(t.title || T.caption)}">
+${oneTable(t)}
+        </section>`;
   const sessionsBand = tables.length
     ? `    <div class="activity-sessions">
       <div class="fact-card session-columns" data-group="sessions">
-        <div class="session-split">
-${tables.map(oneTable).join('\n')}
+${tabbed ? `        <p class="session-heading">${esc(T.caption)}</p>\n` : ''}        <div class="session-split"${tabbed ? ' data-session-tabs' : ''}>
+${tables.map(tabbed ? panel : oneTable).join('\n')}
         </div>
       </div>
     </div>

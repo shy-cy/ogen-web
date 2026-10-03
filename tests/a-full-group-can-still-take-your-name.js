@@ -68,9 +68,11 @@ const TWO_GROUPS = {
   capacity: 4, taken: 2, left: 2, full: false,
   groups: [
     { groupId: 'g-1', name: { en: 'Test 1' }, label: 'Test 1, up to 2 students',
-      capacity: 2, left: 2, full: false, cancellationTerms: ['Group one terms.'] },
+      capacity: 2, left: 2, full: false, time: '16:00',
+      cancellationTerms: ['Group one terms.'] },
     { groupId: 'g-2', name: { en: 'Test 2' }, label: 'Test 2, up to 2 students',
-      capacity: 2, left: 0, full: true, cancellationTerms: ['Group two terms.'] }
+      capacity: 2, left: 0, full: true, time: '18:00',
+      cancellationTerms: ['Group two terms.'] }
   ]
 };
 // One group and no choice: `full` IS the activity's answer here, and the old
@@ -159,6 +161,24 @@ const shown = (dom, cls) => D.byClass(dom.mount, cls)
     'the full group says so on its own row');
   H.ok(!/this activity is full/i.test(dom.mount.textContent),
     '⚠ and NOTHING on the screen claims the activity is full — it is not');
+
+  // ⚠ AND THE HOUR IS ON THE OPTION, FOR THE REASON THE ROOM IS.
+  //
+  // Under the equal-hours rule two groups can meet at different times, so which
+  // hour a child can actually come to is as much of the choice as whether there
+  // is a place — and the select is the one control a family chooses with. The
+  // activity page's "When" line cannot answer it: a free-text override replaces
+  // that line outright and carries no hour unless an admin typed one, which is
+  // the behaviour that was asked for. So the picker reads the group's own stored
+  // sessions instead, and is unaffected by the words.
+  const text = (o) => o.attributes.text || o._text || '';
+  H.ok(text(opts[0]).indexOf('16:00') !== -1, 'the first group states its own hour');
+  H.ok(text(opts[1]).indexOf('18:00') !== -1, 'and the second states a DIFFERENT one');
+  H.ok(text(opts[0]).indexOf('18:00') === -1,
+    '⚠ neither carries the other\'s — a plausible wrong hour is the thing this screen must not print');
+  // Name, then hour, then room: who it is, when it meets, whether there is space.
+  H.ok(/Test 1.*16:00.*left/i.test(text(opts[0])),
+    'in the order a family reads it: which group, when, and whether there is room');
 
   // ⚠ AND THE ACTIVITY-WIDE COUNT IS GONE FROM THIS SCREEN.
   //
