@@ -396,7 +396,7 @@ exports.handler = async (event) => {
           emailed = next.status === 'approved'
             ? await mail.sendApproved(next, account,
                                       (activity.registration || {}).sessionCancelHours,
-                                      facts.whereFor(activity, next.groupId))
+                                      facts.whereFor(activity, next.groupId), null, activity)
             : await mail.sendReceived(next, account,
                                       (activity.registration || {}).sessionCancelHours,
                                       facts.whereFor(activity, next.groupId));
@@ -484,7 +484,7 @@ exports.handler = async (event) => {
             emailed = status === 'approved'
               ? await mail.sendApproved(reg2, account,
                                         act2 ? (act2.registration || {}).sessionCancelHours : null,
-                                        act2 ? facts.whereFor(act2, reg2.groupId) : null)
+                                        act2 ? facts.whereFor(act2, reg2.groupId) : null, null, act2)
               : await mail.sendRejected(reg2, account, override);
           }
           out.payload.emailed = emailed;
@@ -1043,10 +1043,13 @@ exports.handler = async (event) => {
         // the per-evening window on a drop-in, which belongs to each evening
         // rather than to the registration.
         const activity = await published(body.slug);
+        // ⚠ THE INVITE IS REBUILT TOO, so a resend carries the NEXT session rather
+        // than the one that was next a month ago — the same reason the whole
+        // message is rebuilt rather than re-delivered.
         const emailed = await mail.sendApproved(reg, account,
           activity ? (activity.registration || {}).sessionCancelHours : null,
           activity ? facts.whereFor(activity, reg.groupId) : null,
-          session.email);
+          session.email, activity);
         await recordAudit(session, 'registrations.resendApproval',
           body.participantId + '__' + body.activityId, emailed ? 'ok' : 'failed',
           { detail: reg.frozen.participantName + ' \u00b7 ' + account.email });

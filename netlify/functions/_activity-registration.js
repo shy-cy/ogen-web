@@ -275,6 +275,16 @@ function normaliseRegistration(raw, type) {
 
   const out = {
     autoApprove: r.autoApprove === true,
+    // ⚠ ON UNLESS SWITCHED OFF, AND `=== false` RATHER THAN A TRUTHY TEST.
+    //
+    // Every record in the repository predates this field, so a truthy default
+    // would ship a feature that mails nobody on every existing class — which is
+    // indistinguishable from one that is broken, and would be found by a family
+    // asking why they were never reminded. The direction every other blank in
+    // this system takes. It is a BOOLEAN with two states rather than a cutoff's
+    // three: there is nothing to compute a default from, so "not configured" and
+    // "on" are genuinely the same answer.
+    sessionReminders: r.sessionReminders !== false,
     pendingExpiryDays: positiveInt(r.pendingExpiryDays),
     registrationFeeCutoffDate: cutoff(r.registrationFeeCutoffDate),
     // ⚠ `mode` AND `cancellationCutoffDate` ARE NOT WRITTEN BACK. tiersOf()
@@ -724,7 +734,13 @@ const FIELDS = [
             'advance. Leave it blank and nothing is shown anywhere.' },
     { key: 'sessionCancelHours', kind: 'days', types: ['dropin'], unit: 'hours',
       label: 'A session can be cancelled up to',
-      hint: 'Before it starts. Leave blank to allow cancelling right up to the start time.' }
+      hint: 'Before it starts. Leave blank to allow cancelling right up to the start time.' },
+    { key: 'sessionReminders', kind: 'check',
+      label: 'Email a reminder before each session',
+      hint: 'Sent the day before, to every guardian, with a calendar file for that session. ' +
+            'A long course means one a week — switch it off for an activity where that is ' +
+            'noise rather than help. A family can also stop them for themselves, from their ' +
+            'own page or from any reminder. Off here stops them for everybody on this activity.' }
   ];
 
 // Does this type draw this field?

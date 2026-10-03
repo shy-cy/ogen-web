@@ -74,6 +74,14 @@ const TEMPLATES = {
   // has since been given a place would read it as having lost one.
   'registration-waiting': { label: 'On the waiting list', resend: false },
   'registration-place-open': { label: 'A place has opened', resend: false },
+  // ⚠ THE ONLY REPEATING MESSAGE IN THIS TABLE, and the one the file's opening
+  // note was written for: "a payment reminder is the opposite — repeating it is
+  // the entire point." It is NOT resendable by hand, and that is a judgement
+  // about WHEN rather than about the copy: the resend control re-runs a sender
+  // against the record as it stands, and by the time an admin presses it the
+  // session it names may already have happened. A family who missed one is
+  // better served by the next one, which is at most a week away.
+  'session-reminder': { label: 'Session reminder', resend: false },
   // Not resendable: a second copy of "the group has changed" reads as a second
   // move, and the family would go looking for a third group.
   'registration-moved': { label: 'Group changed', resend: false },

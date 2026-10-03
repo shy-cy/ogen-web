@@ -29,6 +29,8 @@ const credit = require('./_credit');
 const ledger = require('./_credit-ledger');
 const spend = require('./_spend-credit');
 const LST = require('./_activity-listing');
+const prefs = require('./_reminder-store');
+const REM = require('./_reminders');
 const { cancelAndCredit, cancelOneSession } = require('./_registration-cancel');
 const attendance = require('./_session-attendance');
 const B = require('./_bundle');
@@ -1626,6 +1628,34 @@ exports.handler = async (event) => {
         });
       }
 
+      // ⚠ STOPPING THE REMINDERS IS NOT CANCELLING ANYTHING, and the two must
+      // not be confused on the one screen that carries both. This writes a
+      // preference about EMAIL — no place is given up, no money moves, nothing is
+      // frozen or credited — which is why it is its own action rather than a flag
+      // on cancel, and why the client draws it at the foot beside the terms
+      // rather than next to the control that ends a registration.
+      //
+      // Scoped to this account and this activity, by construction: both come
+      // from the session and the registration we just authorised, never from the
+      // request, so there is no parameter a hostile client could widen.
+      case 'setReminders': {
+        const participant = await mustGuard(body.participantId);
+        if (!participant) return no(404, 'no-such-participant');
+        const reg = await store.getRegistration(body.participantId, body.activityId);
+        if (!reg) return no(404, 'no-such-registration');
+        // ⚠ ENGLISH, AND NOT THROUGH no(). A missing boolean means the client is
+        // broken or somebody is calling the API by hand — the same class as
+        // `Unknown action` and `Body must be JSON`, which this file deliberately
+        // leaves untranslated: a message for a reader who does not exist is three
+        // languages of maintenance behind a screen nobody sees. Anything a FAMILY
+        // can reach goes through no().
+        if (body.off !== true && body.off !== false) {
+          return json(400, { error: 'Bad request' });
+        }
+        await prefs.setOff(me.accountId, reg.activityId, body.off, 'guardian');
+        return json(200, { ok: true, remindersOff: body.off });
+      }
+
       case 'registration': {
         const participant = await mustGuard(body.participantId);
         if (!participant) return no(404, 'no-such-participant');
@@ -1660,6 +1690,13 @@ exports.handler = async (event) => {
         // which is the documented honest answer — and in exactly that case no
         // schedule is passed, so the hour cells are empty rather than quietly
         // showing the first group's time against the second group's dates.
+        // ⚠ THE SWITCH IS THIS ACCOUNT'S, NOT THIS REGISTRATION'S. The
+        // registration key is participant + activity, so a family with two
+        // children in one class would have to switch the reminders off twice —
+        // and the second registration would go on mailing them about a session
+        // they had already silenced. One email per account per session means one
+        // switch per account per course. See _reminder-store.js.
+        const remindersOff = await prefs.isOff(me.accountId, reg.activityId);
         const myGroup = activity ? (reg.groupId || null) : null;
         const mySchedule = activity && (myGroup || !groups.offersAChoice(activity))
           ? groups.scheduleFor(activity, myGroup)
@@ -1667,6 +1704,7 @@ exports.handler = async (event) => {
         return json(200, {
           ok: true,
           registration: regRow(reg, participant, lang, activity, siblings),
+          remindersOff: remindersOff,
           activity: activity ? Object.assign(activityView(activity, report, lang), {
             // THE SAME ROWS THE PUBLIC PAGE SHOWS, from the one place a fact
             // becomes text. isPubliclyVisible() keeps its exact current meaning
@@ -1713,7 +1751,11 @@ exports.handler = async (event) => {
             // nobody is ever billed.
             priceRows: facts.factPriceRows(activity, lang),
             sessionRows: facts.sessionRows(
-              { sessionDates: groups.calendarFor(activity, myGroup) }, lang, mySchedule)
+              { sessionDates: groups.calendarFor(activity, myGroup) }, lang, mySchedule),
+            // Whether this activity sends them at all. Off here means the switch
+            // below is about nothing, so the client does not draw it: a control
+            // that cannot change what happens is worse than none.
+            remindersSent: REM.remindersOn(activity)
           }) : null,
           // ⚠ EVERYTHING THIS SCREEN NEEDS, IN ONE CALL.
           //
@@ -1794,7 +1836,7 @@ exports.handler = async (event) => {
         // Best effort, and after the write. An email that fails must not undo a
         // registration that succeeded.
         if (R.isWaiting(reg)) await mail.sendWaiting(reg, me, null);
-        else if (reg.status === 'approved') await mail.sendApproved(reg, me, (activity.registration || {}).sessionCancelHours, facts.whereFor(activity, reg.groupId));
+        else if (reg.status === 'approved') await mail.sendApproved(reg, me, (activity.registration || {}).sessionCancelHours, facts.whereFor(activity, reg.groupId), null, activity);
         else await mail.sendReceived(reg, me, (activity.registration || {}).sessionCancelHours, facts.whereFor(activity, reg.groupId));
         return json(200, { ok: true, registration: reg, waiting: R.isWaiting(reg) });
       }

@@ -28,6 +28,7 @@ const terms = require('./_cancellation-terms');
 // registration page, and two copies of a label is two labels.
 const FACTS = require('./_activity-facts');
 const LST = require('./_activity-listing');
+const REM = require('./_reminders');
 
 const titleOf = (reg, l) => pick(((reg && reg.frozen) || {}).activityTitle, l) || '';
 const childOf = (reg) => ((reg && reg.frozen) || {}).participantName || '';
@@ -838,6 +839,99 @@ function approvedMessage(reg, account, payUrl, creditCents, sessionCancelHours, 
 // The body is returned as the MARKUP the shell would have rendered, so what the
 // editor opens on is what would have been sent — not a plain-text
 // approximation that silently loses its paragraphs on the way back.
+// ---- a reminder, the day before one session -------------------------------
+//
+// ⚠ THE ONLY MESSAGE HERE THAT REPEATS. Everything else in this table fires
+// because something happened once — a place given, a payment taken, a refusal.
+// This one goes out before every session of a course, which on
+// intro-into-judaism is twenty-four times to one family over a year. Two things
+// follow from that and both are in the copy: it is SHORT, because the twentieth
+// one is read in two seconds; and it carries a way to stop it, which no other
+// message here needs.
+//
+// It does NOT carry the cancellation terms. Those ride on the two messages that
+// mean "you are in", where somebody is deciding; a reminder is a note about
+// Tuesday, and small print under it twenty-four times is noise that teaches a
+// family to stop reading the foot of our emails.
+const REMINDER = {
+  he: {
+    subject: (act, when) => `תזכורת: ${act} · מחר, ${when}`,
+    heading: 'תזכורת למפגש',
+    and: 'ו',
+    body: (who, act, many) => many
+      ? `${who} משתתפים מחר ב${act}.`
+      : `${who} משתתף/ת מחר ב${act}.`,
+    when: (when) => `<strong>מתי:</strong> מחר, ${when}`,
+    group: (name) => `<strong>קבוצה:</strong> ${name}`,
+    ics: 'מצורף קובץ ליומן עם המפגש הזה.',
+    button: 'לעמוד ההרשמה',
+    off: (href) => `לא רוצים תזכורות לפעילות הזו? <a href="${href}">אפשר להפסיק אותן כאן</a>. הודעות אחרות ופעילויות אחרות לא ייפגעו.`
+  },
+  en: {
+    subject: (act, when) => `Reminder: ${act} · tomorrow, ${when}`,
+    heading: 'A session tomorrow',
+    and: 'and',
+    body: (who, act, many) => `${who} ${many ? 'have' : 'has'} ${act} tomorrow.`,
+    when: (when) => `<strong>When:</strong> tomorrow, ${when}`,
+    group: (name) => `<strong>Group:</strong> ${name}`,
+    ics: 'A calendar file for this session is attached.',
+    button: 'Open the registration page',
+    off: (href) => `Don\u2019t want reminders for this activity? <a href="${href}">Turn them off here</a>. Other messages, and other activities, are not affected.`
+  },
+  ru: {
+    subject: (act, when) => `Напоминание: ${act} · завтра, ${when}`,
+    heading: 'Занятие завтра',
+    and: 'и',
+    body: (who, act) => `У ${who} завтра — ${act}.`,
+    when: (when) => `<strong>Когда:</strong> завтра, ${when}`,
+    group: (name) => `<strong>Группа:</strong> ${name}`,
+    ics: 'К письму приложен файл для календаря.',
+    button: 'Открыть страницу записи',
+    off: (href) => `Не нужны напоминания об этом занятии? <a href="${href}">Отключить здесь</a>. Другие письма и другие занятия это не затронет.`
+  }
+};
+
+// ⚠ `who` IS A LIST, because two children of one account can be in one class.
+// Both guardians are written to and each gets ONE message per session, so a
+// family with two in the same course must read both names in it rather than two
+// near-identical emails — or one email naming one child while the other sits
+// unmentioned in a class they are also in tomorrow.
+//
+// Everything variable is a PARAMETER, so this stays runnable in three languages
+// with no store: `when`, the group name, the address bag, the unsubscribe URL
+// and the attachment all arrive from the caller, exactly as payUrl does.
+function reminderMessage(reg, account, opts) {
+  const o = opts || {};
+  const l = lang(((account || {}).profile || {}).preferredLanguage);
+  const T = REMINDER[l];
+  const act = titleOf(reg, l);
+  const names = (o.names && o.names.length ? o.names : [childOf(reg)]).filter(Boolean);
+  // ⚠ THE CONJUNCTION IS THE LANGUAGE'S, and in Hebrew it is a PREFIX glued to
+  // the word after it — the same rule that made stripping a restated language
+  // list harder than splitting on whitespace. A '+' here would read as a form
+  // field rather than as a sentence about two children.
+  const who = names.length > 1
+    ? names.slice(0, -1).join(', ') + ' ' + T.and + (l === 'he' ? '' : ' ') +
+      names[names.length - 1]
+    : (names[0] || '');
+
+  const lines = [esc(T.body(who, act, names.length > 1)), T.when(esc(o.when || ''))];
+  // Only when there IS a choice. Naming the group on a one-group activity
+  // describes a structure the family has never been shown.
+  if (o.groupName) lines.push(T.group(esc(o.groupName)));
+  const place = whereLine(o.where, l);
+  if (place) lines.push(place);
+  if (o.hasIcs) lines.push(esc(T.ics));
+
+  const footnote = o.unsubscribeUrl
+    ? '<span style="font-size:13px;color:#6B705C;">' + T.off(esc(o.unsubscribeUrl)) + '</span>'
+    : '';
+  const html = shell(l, T.heading, lines,
+    { href: registrationHref(reg, l, ''), label: T.button }, footnote);
+  return { to: account.email, subject: T.subject(act, o.when || ''),
+           html: html, text: strip(html) };
+}
+
 function rejectedDraft(reg, account) {
   const l = lang(((account || {}).profile || {}).preferredLanguage);
   const T = REJECTED[l];
@@ -1098,12 +1192,100 @@ async function heldBy(account, mode) {
 // family whose room has moved gets the new room, the terms are the block frozen
 // on the record today, and the pay link is fresh — a resend of a month-old
 // message is not a month-old message.
-const sendApproved = (reg, account, sessionCancelHours, where, by) =>
-  email.settle('registration-approved', account.email, async () =>
-    email.send(approvedMessage(reg, account, await payUrlFor(reg, account),
-                               await heldBy(account, LST.modeOfRecord(reg)),
-                               sessionCancelHours, where),
-      as('registration-approved', account, reg, by)));
+// ⚠ AND IT CARRIES A CALENDAR FILE FOR THE NEXT SESSION, not for the whole
+// course. A ten-VEVENT file is ten entries a family deletes one by one if they
+// drop out, it goes stale as a block the first time a date moves, and
+// METHOD:PUBLISH has no way to withdraw any of them. One event, plus a reminder
+// before each session, means a calendar is never more than one meeting wrong.
+//
+// `activity` is optional and its absence is not an error: a caller that has not
+// got one sends exactly what it sent before. So does an activity whose calendar
+// is empty, whose course is over, or whose hour cannot be pinned down — the same
+// discipline payUrlFor() follows by returning null rather than shipping a dead
+// button.
+const sendApproved = (reg, account, sessionCancelHours, where, by, activity) =>
+  email.settle('registration-approved', account.email, async () => {
+    const msg = approvedMessage(reg, account, await payUrlFor(reg, account),
+                                await heldBy(account, LST.modeOfRecord(reg)),
+                                sessionCancelHours, where);
+    const l = lang(((account || {}).profile || {}).preferredLanguage);
+    const next = activity && REM.remindersOn(activity)
+      ? REM.nextSessionFrom(activity, reg.groupId || null, Date.now()) : null;
+    const ics = next ? sessionIcs(activity, next, l) : null;
+    if (ics) msg.attachments = [ics];
+    return email.send(msg, as('registration-approved', account, reg, by));
+  });
+
+// The calendar file for ONE session, in one language. The one builder, so the
+// invite that rides on an approval and the one on a reminder are the SAME event
+// — same UID, so a family's calendar updates its entry instead of growing a
+// second one for the same meeting, which is the whole reason buildIcs() now
+// emits a SEQUENCE.
+//
+// ⚠ THE LINK IS THE ACTIVITY'S LIVE SLUG, never frozen.activitySlugAtSubmission.
+// That is audit data, and following it after a rename opens the wrong page or
+// none — the bug placeOpenMessage() already had. The point of putting a URL in
+// a calendar entry is that a family can check the current schedule from it six
+// months later.
+function sessionIcs(activity, session, l) {
+  if (!activity || !session || session.startsAt == null) return null;
+  const url = pathFor(l, '/activities/' + activity.slug);
+  const where = FACTS.whereFor(activity, session.groupId);
+  const addr = String(((where || {}).address || {})[l] || '').trim();
+  const ev = REM.sessionEvent(activity, session, {
+    summary: pick(activity.title, l),
+    location: addr || undefined,
+    // In the description as well as URL: several calendar clients show one and
+    // not the other, and a family tapping through to the page is the point.
+    description: url,
+    url: url
+  });
+  if (!ev) return null;
+  return email.icsAttachment([ev], {
+    filename: 'ogen-' + activity.slug + '-' + session.date + '.ics'
+  });
+}
+
+// ⚠ THE ATTACHMENT IS A PARAMETER, like payUrl and the address bag, so the
+// builder opens no store and the message table stays runnable in three
+// languages with nothing behind it. The caller is the pass that already has the
+// activity, the group's calendar and the hour in hand.
+const sendReminder = (reg, account, opts) =>
+  email.settle('session-reminder', account.email, () => {
+    const msg = reminderMessage(reg, account, opts);
+    if (opts && opts.ics) msg.attachments = [opts.ics];
+    return email.send(msg, as('session-reminder', account, reg));
+  });
+
+// ⚠ A REMINDER THAT WAS NOT SENT IS TOLD TO A PERSON, not left in a log.
+//
+// The pass refuses to send late, which is the right call — "your class is
+// tomorrow" arriving on the morning of the class is a worse message than none.
+// But refusing only helps if somebody finds out, so that they can ring the
+// family instead. A run result in a function log is not somebody finding out.
+//
+// English only and to the admin address, like every other internal notice here:
+// it is a staff message, and translating it three ways is three languages of
+// maintenance behind a screen no family sees.
+const sendRemindersMissed = (missed, deferred) =>
+  email.settle('reminders-missed', 'admin', () => {
+    const rows = (missed || []).map((m) =>
+      '<li>' + esc(m.slug) + ' — ' + esc(m.date) + '</li>').join('');
+    const extra = deferred
+      ? '<p>' + deferred + ' further reminders were over the per-run cap and ' +
+        'will go out on the next pass.</p>' : '';
+    return email.send({
+      to: email.adminRecipients(),
+      subject: 'Ogen: ' + (missed || []).length + ' session reminder(s) were NOT sent',
+      html: '<p>These sessions are <b>today</b> and the reminder for them never ' +
+            'went out — the nightly pass did not run, or could not reach them in ' +
+            'time. They are deliberately not being sent late.</p><ul>' + rows +
+            '</ul>' + extra +
+            '<p>If these families need telling, it has to be by hand.</p>',
+      text: 'Session reminders NOT sent for: ' +
+            (missed || []).map((m) => m.slug + ' ' + m.date).join(', ')
+    });
+  });
 
 const sendRejected = (reg, account, override) =>
   email.settle('registration-rejected', account.email, () =>
@@ -1165,6 +1347,7 @@ const sendPaid = (reg, account, paidCents, outstandingCents) =>
 module.exports = {
   payUrlFor,
   sendReceived, sendApproved, sendRejected, sendExpired, sendCancelled,
+  sendReminder, reminderMessage, sendRemindersMissed, sessionIcs,
   sendWaiting, sendPlaceOpen, sendMoved, sendTermsChanged, sendSessionCancelled,
   receivedMessage, approvedMessage, rejectedMessage, expiredMessage, rejectedDraft,
   cancelledMessage, cancelledDraft, waitingMessage, placeOpenMessage,

@@ -2117,6 +2117,57 @@ td .acc-actions{ gap:14px; }
 .checkin-err{ color: var(--danger); font-weight:700; margin:12px 0 0; text-align:center; }
 .checkin-foot{ text-align:center; margin-top:10px; font-size:14px; }
 
+/* THE REMINDER SWITCH, /reminders. Its own block rather than the check-in page's
+   classes: the two pages share a shape (a standalone card reached from outside
+   the site, with its own language toggle) and nothing else, and naming a
+   preferences screen "checkin" would be a label claiming something untrue, which
+   this stylesheet already paid for once with a `ghost` class that had no rule.
+   Logical properties throughout, so one block reads correctly in all three. */
+.rem-wrap{
+  max-width:520px; margin-inline:auto; padding:34px 18px 60px;
+  display:flex; flex-direction:column; gap:18px;
+}
+.rem-logo{ display:block; height:auto; margin-inline:auto; }
+/* direction:ltr for the reason .nav-right is: the language control keeps ONE
+   place and one order whatever is on screen, because the reader who needs it
+   most is the one who cannot read what is currently there. */
+.rem-langs{ direction:ltr; display:flex; gap:8px; justify-content:center; }
+.rem-lang{
+  appearance:none; cursor:pointer; font:inherit; font-size:14px; font-weight:600;
+  padding:6px 14px; border-radius:999px;
+  border:1px solid var(--stone); background:var(--paper); color:var(--olive);
+}
+.rem-lang.is-on{ background:var(--navy); color:var(--paper); border-color:var(--navy); }
+.rem-lang:focus-visible{ outline:2px solid var(--navy); outline-offset:2px; }
+.rem-card{
+  background:var(--paper); border:1px solid var(--stone); border-radius:14px;
+  padding:26px 22px; display:flex; flex-direction:column; gap:14px; text-align:center;
+}
+.rem-h{ font-size:21px; margin:0; color:var(--ink); }
+.rem-note{ color:var(--olive); margin:0; font-size:15px; line-height:1.55; }
+.rem-what{ font-weight:700; color:var(--navy); font-size:17px; margin:0; }
+.rem-err{ color:var(--danger); font-weight:700; margin:0; }
+.rem-done{ color:var(--olive); font-weight:700; margin:0; }
+
+/* THE REMINDER SWITCH ON A FAMILY'S OWN REGISTRATION PAGE.
+
+   ⚠ QUIET ON PURPOSE, AND NOWHERE NEAR THE CANCEL LINK. This screen carries one
+   control that ends a child's place and one that stops an email, and the whole
+   risk is somebody reading the second as the first. So it is small print with a
+   plain link in it — not a panel, which on this site means something has
+   happened or is about to go wrong, and not a pill, which means press me. The
+   hairline above separates it from the terms without announcing itself. */
+.acc-remind{
+  margin-block-start:22px; padding-block-start:16px;
+  border-block-start:1px solid var(--stone);
+  display:flex; flex-direction:column; gap:6px; align-items:flex-start;
+}
+.acc-remind-state{ margin:0; font-size:14px; color:var(--ink); }
+/* --camel-ink rather than --camel: that token is 2.30:1 on paper and is a
+   background chosen to sit under white text, which this file has already been
+   caught by twice. */
+.acc-remind-only{ margin:0; font-size:13px; color:var(--camel-ink); line-height:1.5; }
+
 /* ---------- the month calendar (/calendar) --------------------------------
    Two states of one page. The server renders `.cal-static` — every session as a
    real list, indexable and complete — and js/calendar.js replaces it with a

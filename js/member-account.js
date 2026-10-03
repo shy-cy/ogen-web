@@ -155,6 +155,13 @@
               + 'נעדכן אתכם במייל ברגע שאפשר.',
       payNeedsVerify: 'כדי לשלם, יש לאשר את כתובת האימייל. הקישור לאישור נמצא בעמוד החשבון.',
       registerNeedsVerify: 'לפני ההרשמה צריך לאשר את כתובת הדוא״ל. שלחנו לכם קישור — אם הוא לא הגיע:',
+      remindOn: 'שולחים לכם תזכורת במייל יום לפני כל מפגש.',
+      remindOff: 'התזכורות לפעילות הזו כבויות.',
+      remindTurnOff: 'הפסקת התזכורות',
+      remindTurnOn: 'הפעלת התזכורות מחדש',
+      remindStopped: 'התזכורות הופסקו.',
+      remindStarted: 'התזכורות הופעלו מחדש.',
+      remindOnly: 'ההגדרה הזו נוגעת לפעילות הזו בלבד. ההרשמה עצמה, הודעות אחרות ופעילויות אחרות לא ייפגעו.',
       sessionsTitle: 'המפגשים', dateCol: 'תאריך', statusCol: 'סטטוס',
       book: 'הרשמה למפגש', cancelSession: 'ביטול מפגש',
       cancelSessionConfirm: 'לבטל את המפגש הזה?',
@@ -360,6 +367,13 @@
               + 'will open here. We\u2019ll email you the moment it does.',
       payNeedsVerify: 'To pay, please confirm your email address. The link to resend it is on your account page.',
       registerNeedsVerify: 'Please confirm your email address before registering. We have sent you a link — if it has not arrived:',
+      remindOn: 'We email you a reminder the day before each session.',
+      remindOff: 'Reminders are switched off for this activity.',
+      remindTurnOff: 'Stop these reminders',
+      remindTurnOn: 'Turn these reminders back on',
+      remindStopped: 'Reminders stopped.',
+      remindStarted: 'Reminders turned back on.',
+      remindOnly: 'This setting covers this activity only. The registration itself, other messages and other activities are not affected.',
       sessionsTitle: 'Sessions', dateCol: 'Date', statusCol: 'Status',
       book: 'Book', cancelSession: 'Cancel this session',
       cancelSessionConfirm: 'Cancel this session?',
@@ -554,6 +568,13 @@
               + 'Напишем вам, как только всё будет готово.',
       payNeedsVerify: 'Чтобы оплатить, подтвердите адрес электронной почты. Ссылка для повторной отправки — на странице аккаунта.',
       registerNeedsVerify: 'Подтвердите адрес эл. почты перед записью. Мы отправили вам ссылку — если она не пришла:',
+      remindOn: 'Мы присылаем напоминание за день до каждого занятия.',
+      remindOff: 'Напоминания для этого занятия отключены.',
+      remindTurnOff: 'Отключить напоминания',
+      remindTurnOn: 'Включить напоминания снова',
+      remindStopped: 'Напоминания отключены.',
+      remindStarted: 'Напоминания снова включены.',
+      remindOnly: 'Эта настройка касается только этого занятия. Сама запись, другие письма и другие занятия это не затронет.',
       sessionsTitle: 'Занятия', dateCol: 'Дата', statusCol: 'Статус',
       book: 'Записаться', cancelSession: 'Отменить занятие',
       cancelSessionConfirm: 'Отменить это занятие?',
@@ -2877,6 +2898,46 @@
               });
             } })
         ]));
+      }
+
+      // ⚠ STOPPING THE REMINDERS IS NOT GIVING UP A PLACE, and this screen is the
+      // one place both controls appear. So it is kept AWAY from the cancel link,
+      // after the terms rather than beside the action that ends a registration;
+      // it is a quiet link rather than a button, because nothing here is an
+      // action the page exists for; and every word in it is about EMAIL — a
+      // control at the foot of this page saying "stop" could otherwise be read
+      // as stopping the class.
+      //
+      // Drawn only when there is something to stop: an approved registration on
+      // an activity that actually sends them. On a `pending` one there are no
+      // reminders yet, and on an activity with the switch off a family would be
+      // offered a control that changes nothing.
+      if (r.status === 'approved' && act && act.remindersSent) {
+        var remOff = res.data.remindersOff === true;
+        var remWrap = el('div', { class: 'acc-remind' });
+        var redrawRem = function () {
+          remWrap.innerHTML = '';
+          remWrap.appendChild(el('p', { class: 'acc-remind-state',
+            text: remOff ? T.remindOff : T.remindOn }));
+          remWrap.appendChild(el('button', {
+            type: 'button', class: 'acc-link',
+            text: remOff ? T.remindTurnOn : T.remindTurnOff,
+            onclick: function () {
+              post(REGS, { action: 'setReminders', participantId: r.participantId,
+                           activityId: r.activityId, off: !remOff })
+                .then(function (c) {
+                  if (!c.ok) return say('err', failure(c));
+                  remOff = c.remindersOff === true;
+                  redrawRem();
+                  say('ok', remOff ? T.remindStopped : T.remindStarted);
+                });
+            } }));
+          // Said every time, because "this one class" is the whole promise and a
+          // family about to press it is deciding exactly that question.
+          remWrap.appendChild(el('p', { class: 'acc-remind-only', text: T.remindOnly }));
+        };
+        redrawRem();
+        body.appendChild(remWrap);
       }
     });
   }

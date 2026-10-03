@@ -254,6 +254,15 @@ function buildIcs(events, opts) {
       'DTEND:' + formatIcsDate(r.end || r.start),
       'SUMMARY:' + escapeIcs(r.summary)
     ];
+    // ⚠ A CALENDAR ONLY UPDATES AN EVENT IT ALREADY HAS IF THE SEQUENCE RISES.
+    //
+    // Same UID and no SEQUENCE means a second file for the same meeting is
+    // ignored, or kept as a duplicate, depending on the client — so a session
+    // whose time moved would reach a family as a message their calendar quietly
+    // declines to act on. It is omitted rather than defaulted to 0 when the
+    // caller has nothing to say, because a bare 0 on every send is the same
+    // silence with more bytes.
+    if (r.sequence != null) lines.splice(2, 0, 'SEQUENCE:' + Math.max(0, Math.floor(r.sequence)));
     if (r.location) lines.push('LOCATION:' + escapeIcs(r.location));
     if (r.description) lines.push('DESCRIPTION:' + escapeIcs(r.description));
     if (r.url) lines.push('URL:' + escapeIcs(r.url));

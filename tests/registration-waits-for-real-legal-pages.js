@@ -117,7 +117,8 @@ const NAME_RE = /^_?(member|account|participant|guardian|registration)/i;
 // what it is failing to see. The list is the thing that has to be complete, not
 // the count of signals.
 const PEOPLE_STORES = 'accounts|participants|guardian-links|guardian-invites|registrations|' +
-  'member-sessions|member-tokens|session-attendance|bundles|checkin-tokens|pay-links|account-credits';
+  'member-sessions|member-tokens|session-attendance|bundles|checkin-tokens|pay-links|account-credits|' +
+  'reminders|reminder-links';
 const STORE_RE = new RegExp(
   '(?:requireStore|optionalStore)\\(\\s*[\'"](?:' + PEOPLE_STORES + ')[\'"]' +
   '|=\\s*[\'"](?:' + PEOPLE_STORES + ')[\'"]\\s*;');

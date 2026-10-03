@@ -8473,6 +8473,230 @@ asserted the function *exists* (`/async function createBundleCheckout/`) and
 nothing executed it, so an undeclared identifier in its body was invisible. The
 payment-mode suite executes a bundle Checkout now.
 
+## Session reminders, and a calendar file with each one (Phase 9)
+
+```
+netlify/functions/
+  _reminders.js        which session to remind about, and the event that goes
+                       with it; no store, no clock, no GitHub; PURE
+  _reminder-store.js   ogen-reminders; `sent-` marks and `off-` opt-outs
+  _reminder-link.js    ogen-reminder-links; the unsubscribe token, its own store
+  reminders.js         /api/reminders — no session at all
+reminders.html, js/reminders.js   one page, three languages
+```
+
+**The day before every session, to every guardian, with an .ics for that
+session.** `buildIcs()` and `icsAttachment()` had been written, tested and
+exported since the email infrastructure landed, and **nothing had ever called
+them** — the pure bundle module's shape again, one service over.
+
+⚠ **IT IS THE FIRST THING THIS SITE SENDS ON A SCHEDULE, AND THE SCALE IS THE
+DESIGN CONSTRAINT.** Every other message fires because something happened once.
+This one goes out before each session: ten times on `hebrew4kids`, **twenty-four
+on `intro-into-judaism`**, to one family, over a year. Two things follow and both
+are in the copy — it is short, because the twentieth is read in two seconds, and
+it carries a way to stop it, which nothing else here needs. It also does **not**
+carry the cancellation terms: those ride on the two messages that mean *you are
+in*, where somebody is deciding, and small print under a note about Tuesday
+twenty-four times teaches a family to stop reading the foot of our emails.
+
+### ⚠ The one job on that schedule that is load-bearing
+
+`run()` says its jobs *"share a schedule rather than a subject: each writes down
+something that has already become true, and neither is load-bearing."* Releasing
+a lapsed hold, completing a finished activity and repairing a bundle are all
+repairs: a missed night costs nothing and tomorrow finds the same work. **A
+reminder has a deadline.** Miss the night and the class happens and nobody was
+told. Three rules exist only because of that:
+
+- ⚠ **IT NEVER SENDS LATE.** A session that should have been reminded about
+  yesterday is **not** mailed today — *"your class is tomorrow"* arriving on the
+  morning of the class is not a late message, it is a wrong one. It is skipped,
+  named in the run result, and **emailed to the admin address**, because a run
+  result in a function log is not somebody finding out. A catch-up window was
+  designed and deliberately rejected in favour of this.
+- ⚠ **THE MARK IS WRITTEN BEFORE THE SEND**, which inverts `_email.js`'s own
+  *send first, log second*. That rule is right where the log is a record of what
+  happened; here the mark is what stops the loop. A mark with no send costs one
+  reminder and is reported. A send with no mark costs a duplicate **every night
+  until the session passes**, because the pass runs again tomorrow and finds
+  nothing saying it already went. The recoverable direction wins, the same way the
+  ledger is written before the registration.
+- ⚠ **IT COUNTS WHAT WENT, NOT WHAT WAS ATTEMPTED.** `settle()` swallows a failed
+  send and answers `false` — correct, because mail must never take down the thing
+  it accompanies — so a counter that incremented regardless would report a clean
+  run on a night when every message bounced off a misconfigured sender. **A test
+  caught exactly that**, by installing a transport and finding `sent: 2` with an
+  empty outbox.
+
+**"The day before", not "24 hours before".** The pass runs once at 06:00 UTC,
+which is 08:00 or 09:00 in Nicosia — so a 19:30 class gets about 34 hours and a
+09:00 class about 24. Exact-hour precision needs an hourly function and lands
+some reminders at three in the morning; the .ics carries the real time anyway.
+
+**Bounded, because the function is not.** `SEND_TIMEOUT_MS` is 6 seconds and a
+function has ten, so a roster mailed one at a time is how this job runs out of
+time and silently reminds half a class. Sends go out **concurrently, capped at
+8** — the `readMany()` discipline — with a **hard cap of 60 per run**, the
+remainder left unmarked for the next night and **named** in the result. A silent
+cap is a feature that stops working at scale with nothing saying so.
+
+### Who is written to
+
+⚠ **BOTH GUARDIANS, NOT THE ONE WHO REGISTERED.** A participant can have two, the
+link store exists precisely so that is representable, and the parent doing
+Tuesday's lift is not reliably the one who filled the form in.
+
+⚠ **AND ONE MESSAGE PER ACCOUNT, NOT PER CHILD.** Two children of one family in
+one class is one email naming both — `נועה וארי`, with the conjunction glued on
+as Hebrew requires and the verb agreeing in English. Two near-identical messages,
+twenty-four times, is what teaches a family to filter us.
+
+⚠ **`approved` ONLY, NOT `holdsASpot()`.** A `pending` family has no place to turn
+up to. It is the same single-status list `isPayable()` reads, for the same reason.
+
+**The unit differs by type and the rule does not:** *remind whoever is expected at
+this session.* On a course that is an approved registration; on a drop-in it is a
+**booked** evening, so a family who has not booked tomorrow hears nothing — which
+is right, they are not coming. ⚠ A registration with **no group** matches any of
+them, the rule `placeOpened()` already follows: those were taken while the
+activity was pooled and `calendarFor()` reads them the union.
+
+**An excluded date is not a session**, through `calendarFor()` — so "skip a
+cancelled session" needed no rule of its own.
+
+### ⚠ The UID is the session's NUMBER, not its date
+
+A calendar updates an event in place only when a later file carries the **same
+UID** and a **higher SEQUENCE**. `buildIcs()` emitted no `SEQUENCE` at all, so a
+second file for one meeting was ignored or kept as a duplicate depending on the
+client — and keying the UID by date means a session that **moves** arrives as a
+second event with the old one left sitting there, which is the one thing a
+reschedule notice must not do.
+
+The number is the position in the group's list of sessions that are happening,
+which is exactly what the published table prints as *Session 3* and what a family
+already calls it. **The honest limit:** remove a session mid-term and everything
+after it renumbers, so those events update to the following date and the last one
+is left behind with nothing to cancel it. `METHOD:PUBLISH` cannot withdraw an
+event, so that is a property of the format rather than of this choice — a
+date-keyed UID has the same hole *and* loses the reschedule.
+
+`SEQUENCE` is minutes since the epoch of the record's `isoUpdated`: monotonic, an
+integer, and a **superset** of "this session moved". A calendar handed an
+identical event with a higher sequence changes nothing it displays, so erring wide
+is free; erring narrow means a moved class that never reaches anybody's calendar.
+
+⚠ **ONE BUILDER FOR BOTH.** `sessionIcs()` is what the approval invite and the
+reminder both call, so the two carry the same UID and a family's calendar updates
+its entry instead of growing a second one for the same meeting.
+
+### The invite on approval is the NEXT session, not session 1
+
+A family who joins in week four is not coming to week one, and an invite for a
+meeting that already happened is worse than none — it is the first thing in their
+calendar from us and it is wrong. Measured from the session's **start**, so a
+19:30 class is still "next" at 18:00 on the day.
+
+⚠ **NO SESSION AHEAD MEANS NO ATTACHMENT**, and the approval sends exactly as it
+did before: an activity with no calendar (`beit-midrash` was in that state for
+months), one already over, one whose hour cannot be pinned down. The same
+discipline `payUrlFor()` follows by returning null rather than shipping a dead
+button. A **resend** rebuilds it, so it carries the session that is next now
+rather than the one that was next a month ago.
+
+⚠ **ONE EVENT, NOT THE WHOLE COURSE.** A ten-VEVENT file is ten entries a family
+deletes one by one if they drop out, and it goes stale as a block the first time
+a date moves. One event plus a reminder before each session means a calendar is
+never more than one meeting wrong.
+
+### Three ways to stop them, and what each one covers
+
+| | scope | where |
+|---|---|---|
+| `registration.sessionReminders` | the whole **activity**, everybody on it | the admin's Registration panel |
+| the family's own switch | one **account**, one **activity** | `/account/activity`, at the foot |
+| the unsubscribe link | the same, from an inbox | `/reminders?t=…` |
+
+⚠ **ABSENT MEANS ON, IN ALL THREE.** Every record in the repository predates this
+field, so a truthy default would ship a feature that mails nobody on every
+existing class — indistinguishable from one that is broken, and found by a family
+asking why they were never reminded.
+
+⚠ **THE FAMILY'S SWITCH IS KEYED BY ACCOUNT AND ACTIVITY, NOT BY REGISTRATION.**
+The registration key is participant + activity, so a family with two children in
+one course would have to switch the reminders off **twice** — and the second
+registration would go on mailing them about a session they had already silenced.
+One email per account per session means one switch per account per course. It is
+also why turning them back on writes `off: false` rather than deleting the key: an
+admin looking at a family who say they get no reminders needs to see that they
+switched them off and back on, and a deleted key says nothing ever happened.
+
+⚠ **AND IT IS KEPT AWAY FROM THE CANCEL LINK.** That page carries one control
+that ends a child's place and one that stops an email, and the whole risk is
+somebody reading the second as the first. So it sits after the terms rather than
+beside the action that ends a registration, it is a quiet link rather than a
+button, and every word in it is about **email**. It is drawn only when there is
+something to stop — an approved registration on an activity that actually sends
+them — because a control that cannot change what happens is worse than none.
+
+### ⚠ The unsubscribe link, and why a GET cannot act
+
+`/reminders?t=<token>`, no session: an unsubscribe a family cannot use without
+first remembering a password is an unsubscribe that does not work.
+
+⚠ **MAIL SCANNERS FETCH EVERY URL IN A MESSAGE** before a person has opened it —
+this project already has that scar, where a link *"followed twice, by a person and
+then by a mail scanner"* had to keep working. A one-click GET here would switch a
+family's reminders off because their employer's spam filter looked at the email,
+and they would never find out, because the only evidence is the absence of
+messages. So **reading the link only ever reports state**, and changing it takes a
+POST behind a button somebody pressed. The page then offers the reverse, so an
+accidental press costs one press to undo.
+
+⚠ **THE SCOPE IS STRUCTURAL, NOT CHECKED.** The record names exactly one
+`activityId` and the handler derives the one key it writes from that record —
+there is no parameter saying which class, no list, and no path that could reach
+another activity, another account or another kind of email. *"It must not
+unsubscribe them from anything else"* is therefore not a rule anybody has to keep.
+Same property that lets `_checkout.js` be reachable with no session: it computes
+the amount itself rather than taking one.
+
+**Its own store**, for the reason `_pay-link.js` gives at length: a token filed
+beside tokens that mean something else is one forgotten argument away from being
+redeemable as one of them.
+
+⚠ **ONE TOKEN PER (ACCOUNT, ACTIVITY), NOT PER MESSAGE** — the opposite of the pay
+link, and for the opposite reason. The pay link mints per message so a re-send
+does not kill the copy already in an inbox; this one rides on **every** reminder,
+twenty-four times over a year, and a token per message would be twenty-four live
+secrets for one switch, all equivalent and none revocable without finding the
+rest. Not single-use and no expiry: a course runs a year, following it twice must
+be idempotent, and a family who changes their mind needs the same link back.
+
+**What a token discloses, in full:** whether the reminders are on, the activity's
+title, and the language the email was written in. No address, no name, no date of
+birth, no balance, no other class — asserted field by field, because the link is a
+bearer secret in an inbox that gets forwarded. A missing `off` is refused rather
+than read as "unsubscribe": the safe reading of silence.
+
+**One page, three languages**, for the reason `/checkin` is one page: the link has
+already been sent and lives where it cannot be corrected. The toggle **re-renders
+in place** rather than navigating, because dropping the query string here turns a
+working unsubscribe into a dead link — a bug this codebase has shipped once, on
+exactly this kind of page.
+
+### Not built
+
+**A reschedule does not yet send a fresh invite.** The foundation is in — a stable
+UID across the approval invite and every reminder, and a `SEQUENCE` that rises
+whenever the record is saved — so when a publish moves a session the next
+reminder's file updates the family's existing entry rather than adding a second.
+What is missing is the publish-time trigger that sends one **immediately**, beside
+the terms-changed and capacity fallout in `_registration-fallout.js`. Until then a
+moved session reaches a calendar the day before it happens rather than the day it
+moves.
+
 ## The emailed payment link
 
 `/pay?t=<token>` — a link in a payment email that opens Stripe Checkout with no

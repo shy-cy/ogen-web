@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>תזכורות · מרכז עוגן</title>
+
+<!-- THE REMINDER SWITCH. Reached only from the link at the foot of a reminder
+     email, and deliberately noindex and absent from sitemap.xml.
+
+     ⚠ ONE PAGE, THREE LANGUAGES, for the reason /checkin is one page: the link
+     has already been sent, it lives in an inbox where it cannot be corrected,
+     and the language it was written in travels in the query string beside the
+     token. Switching language re-renders IN PLACE rather than navigating —
+     dropping the query here would turn a working unsubscribe into a dead link,
+     which is a bug this codebase has already shipped once on exactly this kind
+     of page.
+
+     No nav and no footer. This is one switch, reached from an email, usually on
+     a phone; a site menu is a way to leave the only screen that matters. -->
+<meta name="robots" content="noindex, nofollow">
+
+<link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/images/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/images/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared.css">
+</head>
+<body>
+<div id="page" dir="rtl">
+
+<div class="rem-wrap">
+  <img class="rem-logo" src="/images/logos/logo-he.svg" alt="מרכז עוגן" width="180" height="60">
+  <div class="rem-langs" id="rem-langs"></div>
+  <div id="rem-mount"></div>
+</div>
+
+<script src="/js/reminders.js"></script>
+</div>
+</body>
+</html>
