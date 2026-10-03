@@ -171,4 +171,25 @@ H.ok(block.indexOf('--terracotta') === -1,
   '⚠ the selected tab is NOT terracotta: it marks which table you are reading, and terracotta is reserved for the one thing on the page you can act on');
 H.ok(/focus-visible/.test(block), 'and keyboard focus is visible');
 
+// ⚠ A ROW OF WORDS IS NOT A CONTROL. The strip was two bare labels with a 2px
+// rule under the selected one, and it was reported as unclear — two long group
+// names four pixels apart read as one run-on line, and the only thing saying
+// either could be PRESSED was a marker a reader has to already know how to read.
+// What replaced it is a segmented control, and these are the three properties
+// that make it one rather than the three declarations that happen to do it
+// today.
+const selected = (block.match(/aria-selected="true"\]\{([^}]*)\}/) || ['', ''])[1];
+H.ok(/background/.test(selected),
+  '⚠ the chosen tab is a GROUND, not a line: figure against ground is what reads as chosen before a word is');
+const strip = (block.match(/\.session-tabs\{([^}]*)\}/) || ['', ''])[1];
+H.ok(/background/.test(strip),
+  'and the set sits in a track — what says these belong together and that one of them is on');
+H.ok(/inline-flex/.test(strip),
+  'which hugs its labels rather than spanning the band: a track as wide as the card with two chips at one end is the detachment that made this unclear');
+// Solid fill plus a FULL pill is the one shape this page reserves for the thing
+// you can act on, and a row of pills under the session table would be several of
+// them. 999px is how this stylesheet spells that everywhere it means it.
+H.ok(!/border-radius:\s*(999|9999|50)/.test(block),
+  '⚠ and it does not borrow the CTA\'s shape — a ground plus a FULL pill is reserved for the one thing on the page you can press');
+
 H.done();

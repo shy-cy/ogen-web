@@ -230,9 +230,31 @@ H.ok(/columns:2/.test(css.slice(css.indexOf('@container (min-width:520px)'))),
   'two columns when there is room');
 // Reading order down each column. A sequence read across a pair would put
 // session 2 beside session 1 and break the one thing the table is for.
-const splitRule = css.slice(css.indexOf('.session-split{'), css.indexOf('}', css.indexOf('.session-split{')));
-H.ok(/columns:\s*2/.test(splitRule) && !/display:\s*grid|display:\s*flex/.test(splitRule),
+const colsAt = css.indexOf('columns:2', css.indexOf('@container (min-width:520px)'));
+const colsOpen = css.lastIndexOf('{', colsAt);
+const colsSel = css.slice(
+  Math.max(css.lastIndexOf('}', colsOpen), css.lastIndexOf('{', colsOpen - 1),
+           css.lastIndexOf('*/', colsOpen)) + 1, colsOpen)
+  .replace('*/', '').trim();
+const colsRule = css.slice(colsAt, css.indexOf('}', colsAt));
+H.ok(/^\.session-split/.test(colsSel) && !/display:\s*grid|display:\s*flex/.test(colsRule),
   'and it is CSS columns rather than a grid or flex, so 1-6 runs DOWN the first column');
+
+// ⚠ TWO COLUMNS NEED TWO THINGS TO PUT IN THEM, and for a long time there was
+// never more than one. `columns:2` and `break-inside:avoid` on the table are one
+// declaration disabling the other — a single table cannot break, so it took
+// column one and left column two empty. Measured in real Chrome at 1280px: 481px
+// of table in a 1006px band on EVERY activity in the repository, the 24-row
+// intro-into-judaism included, which is the exact list the split exists to
+// shorten. Nothing errored and only the rendered page knew. Asserted on the
+// SELECTOR rather than on the fix, so a rule that goes back to applying to every
+// split fails here however it is spelled.
+H.ok(/:has\(/.test(colsSel),
+  'and it asks whether there are two children at all — one table is not a two-column flow');
+H.ok(/:not\(\.has-tabs\)/.test(colsSel),
+  'and never as tabs, where exactly one panel is on screen by construction');
+H.ok(/\.session-split \.session-table\{[^}]*break-inside:avoid/.test(css),
+  'a table still never splits: Chrome does not repeat a thead across columns, so the second one would be unlabelled values');
 
 console.log('\n[a table, semantically, not a stack of divs]');
 LANGS.forEach((lang) => {

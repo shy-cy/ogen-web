@@ -1850,6 +1850,72 @@ an improvement on it, which is `js/calendar.js`'s rule exactly.
   focus — and `type="button"`, which is the trap the admin's (i) badge already met
   beside a `<label>`.
 
+##### ⚠ And a row of words is not a control
+
+Reported from the published page: *"the tabs aren't clear in the design"*. They
+were two bare labels, four pixels apart, with a 2px rule under the selected one
+— so two long group names (*"דוברי עברית ואנגלית - עם דורית"*) read as one
+run-on line, and the only thing saying either could be **pressed** was a marker
+a reader has to already know how to read. A tab indistinguishable from a heading
+is a tab nobody presses, which is the invite button labelled with a description
+arriving on a public page.
+
+It is a **segmented control** now, and the **track** is what does the work: a
+tinted box bounding the set says these belong together and that one of them is
+chosen, before a word has been read. The chosen one is a raised `--paper` chip on
+it — figure against ground rather than a line along an edge, which also retires
+the one thing in the old rule that had to be argued about, since a ground has no
+side to be on.
+
+- ⚠ **IT BORROWS THE STATUS BADGE'S VOCABULARY, NOT THE CTA'S** — a small radius,
+  a quiet edge, dark text. Solid fill plus a **full pill** is the one shape this
+  page reserves for the thing you can act on, and a row of pills under the session
+  table would be several of them. What tells it apart from the badge, which uses
+  that vocabulary to say the **opposite**, is that it is a set of adjacent choices
+  in a track with one lit: not a shape anything static takes.
+- **It hugs its labels rather than spanning the band**, and wraps to a chip per
+  row on a phone, which is what a segmented control looks like there. Measured at
+  360-1440px: one panel visible at every width and no horizontal page scroll.
+- Olive is **5.30:1 on the track** and navy 10.82:1 on the chip — computed against
+  the ground the letters actually sit on, which is two different grounds here.
+- The test asserts the **properties**, not the declarations: the chosen tab is a
+  ground, the set sits in a track, the strip is content-sized, and nothing in the
+  block takes a full pill. All four bite-checked.
+
+#### ⚠ And the two-column split had never once happened
+
+Found while fixing the tabs above, and it was live on **every activity on the
+site**. `.session-split` carried `columns:2` and `.session-table` carried
+`break-inside:avoid` — one declaration silently disabling the other, since a
+single unbreakable table cannot fill two columns. It took column one and left
+column two **empty**.
+
+Measured in real Chrome at 1280px rather than argued about: **481px of table in a
+1006px band**, identically on `hebrew4kids`, `beit-midrash` and the 24-row
+`intro-into-judaism` — which is the exact list the comment beside the rule says
+the split exists to shorten (*"a thin ribbon of text in a lot of space"*). The
+rule described a rendering the page has never had. Same family as `height:auto`
+against `aspect-ratio` on the card image and `overflow:hidden` against the sticky
+toolbar: nothing errors, and only the rendered page knows.
+
+⚠ **AS TABS IT WAS HALF OF WHY THEY READ AS UNCLEAR.** The strip spanned the
+whole band and the table it controls spanned half of it, so the control and its
+content read as unrelated things.
+
+⚠ **FRAGMENTING THE TABLE INSTEAD WAS MEASURED AND REJECTED.** With
+`break-inside` back to `auto` the rows really do flow into both columns — and
+Chrome does **not** repeat a `<thead>` across them, so the second column came out
+as a column of unlabelled values. So the split is for two **tables**, which is
+the stacked no-JS rendering of a multi-group activity, and one table simply takes
+the band: `.session-split:not(.has-tabs):has(> * + *)`. Capping the table to its
+content instead was drawn and rejected too — 480px of table leaves 570px of
+nothing inside a card still drawn as a bordered box, which reads as a rendering
+fault, where a table whose own rules run the width of the card reads as a table.
+
+A browser without `:has()` drops the rule and gets the single-column fallback,
+which is what this degrades to anyway. The test asserts the **selector**, so a
+rule that goes back to applying to every split fails however it is spelled.
+
 #### ⚠ And the family's own session table had no rows at all
 
 `/account/activity` built them from `facts.sessionRows((activity.facts ||

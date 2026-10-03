@@ -789,8 +789,36 @@ html[lang="en"] .page-header h1, html[lang="ru"] .page-header h1{ font-weight:80
    Snaking across a pair would put session 2 beside session 1 and break the one
    thing the table is for. */
 .session-columns{ container-type:inline-size; }
+/* ⚠ TWO COLUMNS ONLY WHEN THERE ARE TWO THINGS TO PUT IN THEM, and for a long
+   time there never were. `columns:2` and `break-inside:avoid` on the table are
+   one declaration silently disabling the other — a single table cannot break,
+   so it took column one and left column two empty. Measured in Chrome at a
+   1280px viewport: 481px of table in a 1006px band on EVERY activity on the
+   site, the 24-row intro-into-judaism included, which is the exact list the
+   split was written to shorten. The same pairing as height:auto against
+   aspect-ratio on the card image, and as overflow:hidden against the sticky
+   toolbar: nothing errors, and only the rendered page knows.
+
+   As tabs it is worse than sparse. The strip spanned the whole band and the
+   table it controls spanned half of it, so the one thing naming the table and
+   the table itself read as unrelated — half of why the tabs were reported as
+   unclear.
+
+   ⚠ FRAGMENTING THE TABLE INSTEAD WAS MEASURED AND REJECTED. With break-inside
+   back to auto the rows do flow into both columns, and Chrome does NOT repeat
+   the thead: the second column came out as a column of unlabelled values. So
+   the split is for two TABLES — the stacked no-JS rendering of a multi-group
+   activity — and one table simply takes the band. Capping it to its content
+   instead was drawn and rejected: 480px of table leaves 570px of nothing
+   inside a card that is still drawn as a bordered box, which reads as a
+   rendering fault, where a table whose own rules run the width of the card
+   reads as a table.
+
+   `:has(> * + *)` is two or more children in BOTH renderings, which is tables
+   stacked and panels tabbed; a browser without :has() drops the rule and gets
+   the single-column fallback, which is the rendering this degrades to anyway. */
 @container (min-width:520px){
-  .session-split{ columns:2; column-gap:44px; }
+  .session-split:not(.has-tabs):has(> * + *){ columns:2; column-gap:44px; }
   .session-split .session-table{ break-inside:avoid; }
 }
 /* The hour each session starts at. Tabular so the column lines up the way the
@@ -808,37 +836,69 @@ html[lang="en"] .page-header h1, html[lang="ru"] .page-header h1{ font-weight:80
    makes of it. With no JavaScript nothing below .has-tabs applies and the band
    renders exactly as it did before tabs existed.
 
-   ⚠ NOT ONE PHYSICAL INSET, and the underline is not an exception. The rule this
-   file keeps is about the INLINE axis, which flips between Hebrew and the other
-   two; a line under the selected tab is on the BLOCK axis and means the same
-   thing in all three, which is the same reasoning that keeps the hamburger's
-   chevron physical. It is spelled logically anyway, so the file holds one
-   convention rather than one convention and an explained exception. */
+   ⚠ NOT ONE PHYSICAL INSET. Everything below is symmetric or logical, so the
+   strip reads the same way in all three languages with no per-language
+   override — and the selected marker is a GROUND rather than a line along one
+   edge, which removes the one thing in the old rule that had to be argued
+   about at all. */
 .session-heading{
   font-weight:700; color:var(--ink); margin:0 0 12px; font-size:.95rem;
 }
+/* ⚠ A ROW OF WORDS IS NOT A CONTROL.
+
+   The strip was two bare labels with a 2px rule under the selected one, laid
+   across the whole band. Reported as unclear, and it was: two long group names
+   four pixels apart read as one run-on line, and the only thing saying either
+   could be PRESSED was a marker a reader has to already know how to read. A
+   tab that is indistinguishable from a heading is a tab nobody presses, which
+   is this admin's own invite-button-labelled-with-a-description one page over.
+
+   It is a segmented control now, and the TRACK is what does the work: a tinted
+   box bounding the set says these belong together and that one of them is
+   chosen, before a word has been read. The chosen one is a raised --paper chip
+   on it — the figure/ground relationship doing the saying rather than a line.
+
+   ⚠ IT BORROWS THE STATUS BADGE'S VOCABULARY, NOT THE CTA'S. Small radius, a
+   quiet edge, dark text. Solid brand fill plus a FULL pill is the one shape
+   this page reserves for the thing you can act on, and a row of pills under
+   the session table would be several of them. What tells this apart from the
+   badge — which uses that vocabulary to say the opposite — is that it is a set
+   of adjacent choices in a track with one lit, which is not a shape anything
+   static takes.
+
+   ⚠ AND IT HUGS ITS LABELS RATHER THAN FILLING THE BAND. A track as wide as
+   the card with two chips at one end is exactly the detachment the measure
+   above fixes, arriving one element higher up. */
 .session-tabs{
-  display:flex; flex-wrap:wrap; gap:4px 18px;
-  margin-block-end:16px; border-block-end:1px solid var(--stone);
+  display:inline-flex; flex-wrap:wrap; gap:4px; max-width:100%;
+  margin-block-end:18px; padding:4px; border-radius:12px;
+  background:var(--stone);
 }
 .session-tabs button{
   appearance:none; background:none; border:0; cursor:pointer; font:inherit;
   font-weight:600; font-size:.9rem; color:var(--olive);
-  padding-block:6px 9px; padding-inline:2px;
-  /* Sits ON the strip's own hairline rather than above it, so the selected
-     marker and the rule are one line rather than two a pixel apart. */
-  margin-block-end:-1px;
-  border-block-end:2px solid transparent;
+  padding:7px 15px; border-radius:8px; flex:1 1 auto;
+  /* Wrapped, each row's chips share it out, which is what a segmented control
+     looks like on a phone. On one line they are already their own width. */
+  text-align:center;
+  transition:background-color .12s ease, color .12s ease;
 }
-/* Olive 6.25:1 on paper, navy 10.82:1 — computed against the ground the letters
-   actually sit on. NOT terracotta: this is a marker saying which table you are
-   looking at, and terracotta is reserved for the one thing on the page you can
-   act on. The same reason the nav chip's signed-in initial is olive. */
+/* Olive is 5.30:1 on the track and navy 10.82:1 on the chip — computed against
+   the ground the letters actually sit on, which is two different grounds here.
+   NOT terracotta: this says which table you are looking at, and terracotta is
+   reserved for the one thing on the page you can act on. The same reason the
+   nav chip's signed-in initial is olive. */
 .session-tabs button[aria-selected="true"]{
-  color:var(--navy); border-block-end-color:var(--navy);
+  color:var(--navy); background:var(--paper);
+  box-shadow:0 1px 2px rgba(27,62,82,.10), 0 0 0 1px rgba(27,62,82,.05);
 }
-.session-tabs button:hover{ color:var(--navy); }
+/* Only the ones that would change something: a hover state on the chip already
+   under the pointer says it is pressable when pressing it does nothing. */
+.session-tabs button[aria-selected="false"]:hover{
+  color:var(--navy); background:rgba(251,250,246,.6);
+}
 .session-tabs button:focus-visible{ outline:2px solid var(--navy); outline-offset:2px; }
+@media (prefers-reduced-motion: reduce){ .session-tabs button{ transition:none; } }
 /* A panel avoids breaking for the reason its table already does: two groups in
    a two-column band belong one per column, not snaked across the pair. */
 .session-panel{ break-inside:avoid; }
