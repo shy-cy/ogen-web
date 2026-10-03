@@ -76,6 +76,8 @@ const REG = require('./_activity-registration');
 const R = require('./_registration');
 const credit = require('./_credit');
 const LISTING = require('./_activity-listing');
+const REM = require('./_reminders');
+const facts = require('./_activity-facts');
 
 const same = (a, b) => String(a === undefined ? null : a) === String(b === undefined ? null : b);
 
@@ -285,6 +287,116 @@ async function applyCutoffChange(activity, previous, regs, opts) {
   return out;
 }
 
+// ⚠ 3. A SESSION THAT MOVES REACHES THE CALENDAR THE DAY IT MOVES.
+//
+// The foundation was already here and it was the WHEN that was missing. The UID
+// is stable across the approval invite and every reminder, and buildIcs() raises
+// a SEQUENCE whenever the record is saved — so a moved session has always
+// reached a family's calendar correctly, on the evening before the class. A
+// family who had rearranged a Tuesday found out on the Monday, and anybody who
+// looked at their calendar in between read a date we already knew was wrong.
+//
+// Nothing is written to any record here, which is what makes this the simplest
+// of the three halves: the calendar is the activity's and the family holds a
+// copy of it, so there is no frozen block to re-term and no capacity to re-count.
+// It is a message and an attachment.
+const MOVED_CAP = 40;
+
+// Everyone who should hear that a session moved, as one entry per ACCOUNT with
+// every move that concerns them.
+//
+// ⚠ THE RECIPIENTS ARE LOOKED UP ON THE OLD DATE, which matters for exactly one
+// shape and matters completely there. On a course a registration is not dated,
+// so old and new are the same question. On a drop-in a booking is keyed by the
+// evening — `att-<pid>__<aid>__<date>` — so the people to tell are booked on the
+// date that is going AWAY, and asking about the new one finds an empty evening
+// and tells nobody, silently, in the one case where somebody is about to turn up
+// on the wrong day.
+//
+// ⚠ ONE EMAIL PER ACCOUNT, NOT PER GROUP. A household with two children in two
+// groups of one activity is one family reading one schedule, and two near
+// identical messages about one publish is what teaches them to filter us — the
+// same rule the reminder keeps for two children in one class. The group line is
+// then dropped when their moves span more than one, because a name that is right
+// for at most half of what is listed under it is worse than no name: the listing
+// card drops its schedule tag for the same reason.
+async function movedRecipients(activity, moves, sweep) {
+  const byAccount = new Map();
+  const seen = new Map();
+  const dropin = (activity && activity.type) === 'dropin';
+  for (const m of moves) {
+    // Memoised: a course asks once per group, a drop-in once per evening, and
+    // neither asks twice for an answer it already has.
+    const key = dropin ? m.groupId + '__' + m.was.date : String(m.groupId);
+    if (!seen.has(key)) {
+      seen.set(key, await sweep.peopleFor(activity,
+        { date: m.was.date, groupId: m.groupId }));
+    }
+    for (const person of seen.get(key)) {
+      const got = byAccount.get(person.accountId) ||
+        { person: person, moves: [], names: [], groupIds: [] };
+      got.moves.push(m);
+      person.names.forEach((n) => { if (got.names.indexOf(n) === -1) got.names.push(n); });
+      if (got.groupIds.indexOf(m.groupId) === -1) got.groupIds.push(m.groupId);
+      byAccount.set(person.accountId, got);
+    }
+  }
+  // Stable order, so a run is reproducible and a test can read it back.
+  return Array.from(byAccount.values())
+    .sort((a, b) => String(a.person.accountId).localeCompare(String(b.person.accountId)));
+}
+
+async function announceMovedSessions(activity, previous, opts) {
+  const out = { moved: 0, told: 0, deferred: 0, failed: [] };
+  const now = (opts && opts.now) != null ? opts.now : Date.now();
+  // ⚠ THE ACTIVITY-LEVEL SWITCH GOVERNS THIS AND THE FAMILY'S OWN DOES NOT.
+  // Switched off, this activity has never put an entry in anybody's calendar, so
+  // there is nothing of ours to correct. A FAMILY who turned their reminders off
+  // asked not to be told about classes they already know about; a class moving is
+  // not that, and the unsubscribe link promises in three languages that other
+  // messages are unaffected. A rehearsal reminds nobody, as everywhere else.
+  if (!REM.isLive(activity) || !REM.remindersOn(activity)) return out;
+  const moves = REM.movedSessions(previous, activity, now);
+  if (!moves.length) return out;
+  out.moved = moves.length;
+
+  // ⚠ REQUIRED LAZILY, inside the one branch that can need it, for the reason
+  // this whole module is required lazily from the publish: it pulls in the
+  // attendance store, the guardian store and the bundle reconciler, and an
+  // ordinary publish needs none of them.
+  const sweep = require('./_registration-sweep');
+  const people = await movedRecipients(activity, moves, sweep);
+  const capped = people.slice(0, MOVED_CAP);
+  out.deferred = people.length - capped.length;
+
+  await sweep.mapCapped(capped, 8, async (p) => {
+    try {
+      const account = await accounts.getAccount(p.person.accountId);
+      if (!account || !account.email) return;
+      const l = ((account.profile || {}).preferredLanguage) || 'he';
+      const sessions = p.moves.map((m) => m.session);
+      const ics = mail.sessionsIcs(activity, sessions, l);
+      const one = p.groupIds.length === 1 && groups.offersAChoice(activity)
+        ? facts.pick(p.moves[0].groupName, l) : '';
+      const ok = await mail.sendSessionsMoved(p.person.reg, account, {
+        names: p.names.slice().sort(),
+        moves: mail.movesFor(p.moves, l),
+        groupName: one,
+        hasIcs: !!ics,
+        ics: ics
+      });
+      if (ok) out.told++;
+      else out.failed.push(p.person.accountId + ': send-failed');
+    } catch (err) {
+      out.failed.push(p.person.accountId + ': ' + ((err && err.message) || String(err)));
+    }
+  });
+  // ⚠ AN OVERFLOW IS NAMED, never silently dropped. Unlike the nightly pass this
+  // does not run again tomorrow — a publish happens once — so a family past the
+  // cap is a family nobody tells unless an admin reads this and writes to them.
+  return out;
+}
+
 async function announceNewRoom(activity, previous, regs, opts) {
   const out = { groups: [], told: 0, failed: [] };
   const now = (opts && opts.now) != null ? opts.now : Date.now();
@@ -318,7 +430,13 @@ async function afterPublish(activity, previous, opts) {
   // propagate is a choice nobody can see.
   const needsShape = scheduleShapeMoved(previous, activity);
   const needsMode = paymentModeMoved(previous, activity);
-  if (!needsTerms && !needsRoom && !needsShape && !needsMode) return null;
+  // ⚠ PURE, SO IT IS THE PRE-CHECK AS WELL AS THE ANSWER. Comparing two
+  // calendars opens no store, so a publish that moved nothing — a reworded
+  // summary, a new photograph — pays an array walk and no read at all, which is
+  // the discipline roomOpenedPossible() and the series candidate set both follow.
+  const movedNow = (opts && opts.now) != null ? opts.now : Date.now();
+  const needsSessions = REM.movedSessions(previous, activity, movedNow).length > 0;
+  if (!needsTerms && !needsRoom && !needsShape && !needsMode && !needsSessions) return null;
   const regs = await store.forActivity(activity.activityId);
   const terms = await applyCutoffChange(activity, previous, regs, opts);
   // Counted AFTER the dates have been carried across, off the records as they now
@@ -327,6 +445,10 @@ async function afterPublish(activity, previous, opts) {
   return {
     terms: terms,
     room: await announceNewRoom(activity, previous, regs, opts),
+    sessions: needsSessions
+      ? await announceMovedSessions(activity, previous,
+          Object.assign({}, opts, { now: movedNow }))
+      : null,
     schedule: needsShape ? { older: olderSchedules(activity, fresh) } : null,
     mode: needsMode
       ? { from: LISTING.paymentModeOf(previous), to: LISTING.paymentModeOf(activity),
@@ -349,7 +471,7 @@ function roomOpenedPossible(previous, activity) {
 
 module.exports = {
   afterPublish, paymentModeMoved, onOldMode,
-  applyCutoffChange, announceNewRoom,
+  applyCutoffChange, announceNewRoom, announceMovedSessions, movedRecipients, MOVED_CAP,
   storedCutoffs, cutoffFieldsMoved, roomOpened, roomOpenedPossible, reterm,
   shapeKey, scheduleShapeMoved, olderSchedules, writeClosing
 };

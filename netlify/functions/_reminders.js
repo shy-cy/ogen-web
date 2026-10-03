@@ -99,27 +99,29 @@ function sequenceOf(activity) {
   return isNaN(t) ? 0 : Math.floor(t / 60000);
 }
 
-// Every session every group of this activity meets on, on one date.
+// Every session ONE group meets on, numbered the way the published table numbers
+// them.
 //
 // Read through calendarFor(), so an EXCLUDED date is simply not here — which is
 // how "skip a cancelled session" is answered without a rule of its own, and the
-// same reader the published table and freezeCancellation() already use.
-function sessionsOn(activity, dateISO) {
-  if (!activity || !dateISO) return [];
-  const out = [];
-  groups.groupList(activity).forEach((g) => {
-    const happening = groups.calendarFor(activity, g.groupId)
-      .filter((r) => r && r.date && r.status !== 'excluded');
-    const i = happening.map((r) => r.date).indexOf(dateISO);
-    if (i === -1) return;
-    const schedule = groups.scheduleFor(activity, g.groupId);
-    const time = groups.timeFor(schedule, dateISO);
-    const minutes = (groups.durationFor(activity, g.groupId) || {}).sessionMinutes;
-    const start = time ? credit.resolveLocal(dateISO, time, TZ) : null;
-    out.push({
-      groupId: g.groupId,
-      groupName: g.name || null,
-      date: dateISO,
+// same reader the published table and freezeCancellation() already use. It is
+// also what makes the index mean what the UID needs it to mean: the position
+// among the meetings that are actually happening.
+function sessionsFor(activity, groupId) {
+  if (!activity) return [];
+  const happening = groups.calendarFor(activity, groupId)
+    .filter((r) => r && r.date && r.status !== 'excluded');
+  const schedule = groups.scheduleFor(activity, groupId);
+  const minutes = (groups.durationFor(activity, groupId) || {}).sessionMinutes;
+  const name = (groups.groupList(activity)
+    .filter((g) => g.groupId === groupId)[0] || {}).name || null;
+  return happening.map((r, i) => {
+    const time = groups.timeFor(schedule, r.date);
+    const start = time ? credit.resolveLocal(r.date, time, TZ) : null;
+    return {
+      groupId: groupId,
+      groupName: name,
+      date: r.date,
       index: i + 1,                 // what the published table calls it
       time: time || '',
       startsAt: start,
@@ -129,7 +131,21 @@ function sessionsOn(activity, dateISO) {
       // the cheaper error, and sessionMinutes is set on every real activity.
       endsAt: start == null ? null : start + ((minutes > 0 ? minutes : 60) * 60000),
       minutesKnown: minutes > 0
-    });
+    };
+  });
+}
+
+// Every session every group of this activity meets on, on one date. One
+// definition of what a session IS, asked a different way — the index a reminder
+// prints and the index a moved-session notice compares against must be the same
+// number, or the UID they build is not the same UID.
+function sessionsOn(activity, dateISO) {
+  if (!activity || !dateISO) return [];
+  const out = [];
+  groups.groupList(activity).forEach((g) => {
+    sessionsFor(activity, g.groupId)
+      .filter((s) => s.date === dateISO)
+      .forEach((s) => out.push(s));
   });
   return out;
 }
@@ -176,8 +192,68 @@ function nextSessionFrom(activity, groupId, at) {
   return null;
 }
 
+// ⚠ WHICH SESSIONS THIS PUBLISH MOVED, AND IT IS THE INSTANT THAT MOVED RATHER
+// THAN THE DATE.
+//
+// A family's calendar holds an entry per UID, and the UID is the session's
+// NUMBER. So the question "did session 3 move" is "does the third meeting of
+// this group begin at a different moment than it did before" — which is one
+// comparison covering every way it can happen:
+//
+//   · the date was edited;
+//   · the HOUR was edited, which moves the meeting without moving the date and
+//     which a date comparison would miss entirely;
+//   · a date was excluded or added, which renumbers everything after it, so each
+//     later entry really does now point at a different meeting.
+//
+// That last one is the honest cost of numbering rather than dating the UID, and
+// it is already written down beside uidFor(): one exclusion mid-term genuinely
+// does change every later entry, and the final one is left behind with nothing
+// able to withdraw it. Reporting fewer than really moved would leave a family
+// holding entries we know to be wrong.
+//
+// ⚠ COMPARED PER GROUP, BY groupId, NEVER BY POSITION — the rule mergeGroups()
+// already keeps. Reordering the list would otherwise read as every session of
+// both groups moving at once.
+//
+// Three things are deliberately NOT reported:
+//
+//   · a group that did not exist before. Nothing can have moved for people who
+//     could not have registered for it, and every one of its sessions would come
+//     back as a change;
+//   · a session whose new start cannot be resolved. An event with no start is not
+//     an event, the same reason nextSessionFrom() returns null for one;
+//   · anything in the PAST, measured on the new start. Nobody needs a corrected
+//     calendar entry for last Tuesday, and `at` is the caller's to pass for the
+//     reason this whole file takes its clock from outside.
+//
+// A session whose OLD start was unknown and whose new one is not IS reported:
+// the meeting did not exist in anybody's calendar and now does.
+function movedSessions(previous, activity, at) {
+  if (!previous || !activity) return [];
+  const when = at == null ? 0 : at;
+  const before = {};
+  groups.groupList(previous).forEach((g) => {
+    before[g.groupId] = sessionsFor(previous, g.groupId);
+  });
+  const out = [];
+  groups.groupList(activity).forEach((g) => {
+    const was = before[g.groupId];
+    if (!was) return;                       // a group nobody could have joined
+    sessionsFor(activity, g.groupId).forEach((s) => {
+      if (s.startsAt == null || s.startsAt < when) return;
+      const old = was[s.index - 1];
+      if (!old) return;                     // a session added past the old end
+      if (old.startsAt === s.startsAt) return;
+      out.push({ groupId: g.groupId, groupName: s.groupName, session: s,
+                 was: { date: old.date, time: old.time, startsAt: old.startsAt } });
+    });
+  });
+  return out;
+}
+
 module.exports = {
   TZ, RUNNING,
-  isLive, remindersOn, localDate, uidFor, sequenceOf, sessionsOn, sessionEvent,
-  nextSessionFrom
+  isLive, remindersOn, localDate, uidFor, sequenceOf,
+  sessionsFor, sessionsOn, sessionEvent, nextSessionFrom, movedSessions
 };

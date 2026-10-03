@@ -1144,6 +1144,16 @@ function falloutAudit(fallout) {
   // people's terms.
   if (fallout.schedule) bits.push((fallout.schedule.older || 0) + ' on an older refund schedule');
   if (r.groups && r.groups.length) bits.push(r.told + ' told of ' + r.groups.length + ' reopened group(s)');
+  // A moved session reaches a family's calendar the day it moves rather than the
+  // evening before the class. In the audit line for the reason the re-termed
+  // count is: it is what this publish did to people, and the trail is where
+  // somebody looks a month later asking when a date changed.
+  const sx = fallout.sessions;
+  if (sx && sx.moved) {
+    bits.push(sx.moved + ' session(s) moved, ' + sx.told + ' famil' +
+              (sx.told === 1 ? 'y' : 'ies') + ' sent a calendar update' +
+              (sx.deferred ? ', ' + sx.deferred + ' OVER THE CAP AND NOT TOLD' : ''));
+  }
   // Which Stripe configuration this activity's payments run through from now on,
   // and how many families keep the one they were sold under. Nothing was rewritten
   // — that is the freeze — so this is the audit line saying what the publish did
@@ -1153,7 +1163,8 @@ function falloutAudit(fallout) {
               (fallout.mode.kept ? ', ' + fallout.mode.kept + ' registration(s) keep ' +
                                    fallout.mode.from : ''));
   }
-  (t.failed || []).concat(r.failed || []).forEach((f) => bits.push('FAILED ' + f));
+  (t.failed || []).concat(r.failed || [])
+    .concat((sx || {}).failed || []).forEach((f) => bits.push('FAILED ' + f));
   return bits.length ? bits.join(' · ') : null;
 }
 

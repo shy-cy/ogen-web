@@ -510,4 +510,13 @@ async function run(now) {
 }
 
 module.exports = { run, runRegistrations, completeFinishedActivities, reconcileBundles,
-                   remindUpcomingSessions, REMIND_CAP };
+                   remindUpcomingSessions, REMIND_CAP,
+                   // ⚠ EXPORTED FOR THE PUBLISH, NOT FOR CONVENIENCE. "Who is
+                   // expected at this session" is one rule — an approved
+                   // registration on a course, a booked evening on a drop-in,
+                   // both guardians, one entry per account — and a publish that
+                   // tells families their session has moved has to reach exactly
+                   // the same people the reminder would. A second copy of it in
+                   // _registration-fallout.js is two answers to one question,
+                   // free to disagree the first time a status is added.
+                   peopleFor, mapCapped };

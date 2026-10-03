@@ -8752,16 +8752,90 @@ in place** rather than navigating, because dropping the query string here turns 
 working unsubscribe into a dead link — a bug this codebase has shipped once, on
 exactly this kind of page.
 
+### ⚠ A moved session reaches the calendar the day it moves
+
+The foundation was already here and what was missing was the **when**. The UID is
+stable across the approval invite and every reminder — keyed by the session's
+number precisely so a session that moves updates an entry in place — and
+`buildIcs()` raises a `SEQUENCE` whenever the record is saved. So the correction
+has always been correct and has always gone out with the **day-before reminder**:
+a family who had rearranged a Tuesday found out on the Monday, and anybody who
+opened their calendar in between read a date we already knew was wrong.
+
+It is the third half of `_registration-fallout.js`, beside the changed cutoff and
+the reopened group, and it is the simplest of the three: **nothing is written to
+any record.** The calendar is the activity's and the family holds a copy of it, so
+there is no frozen block to re-term and no capacity to re-count. It is a message
+and an attachment.
+
+⚠ **WHAT COUNTS AS A MOVE IS THE INSTANT, NOT THE DATE.** `movedSessions()`
+compares, per group and per index, the moment the meeting begins — which is one
+comparison covering every way it can happen:
+
+- a **date** was edited;
+- the **hour** was edited, which moves the meeting without moving the date and
+  which a date comparison would miss entirely;
+- a date was **excluded or added**, which renumbers everything after it, so each
+  later entry really does now point at a different meeting.
+
+That last one is the honest cost of numbering rather than dating the UID, written
+down beside `uidFor()` since it was chosen: one exclusion mid-term genuinely does
+change every later entry, and the final one is left behind with nothing able to
+withdraw it. Reporting fewer would leave a family holding entries we know to be
+wrong.
+
+⚠ **AND IT IS PURE, SO IT IS THE PRE-CHECK AS WELL AS THE ANSWER.** Comparing two
+calendars opens no store, so a publish that moved nothing — a reworded summary, a
+new photograph — pays an array walk and no read at all. Asserted by counting the
+fake store's reads, the same discipline `roomOpenedPossible()` follows.
+
+Four rules carry the rest:
+
+- ⚠ **ONE RULE FOR WHO IS EXPECTED, NOT TWO.** `peopleFor()` is **exported from
+  `_registration-sweep.js`** and called from the publish rather than written
+  again: an approved registration on a course, a **booked evening** on a drop-in,
+  both guardians, one entry per account. A second copy is two answers to one
+  question, free to disagree the first time a status is added.
+- ⚠ **ON A DROP-IN THE RECIPIENTS ARE LOOKED UP ON THE DATE THAT IS GOING AWAY.**
+  A booking is keyed by evening — `att-<pid>__<aid>__<date>` — so the people to
+  tell are booked on the date that is **disappearing**, and asking about the new
+  one finds an empty evening and tells nobody, silently, in the one case where
+  somebody is about to turn up on the wrong day. A source-level check can see
+  which date is passed and can never see what that costs, so the suite executes
+  it with a real booking.
+- ⚠ **ONE EMAIL PER ACCOUNT AND ONE FILE**, however many sessions moved. The rule
+  beside `sendApproved()` — one event, never the whole course — is about an invite
+  **creating** entries and it stands; this is the other case, where every event
+  carries the UID of an entry the family already holds. A file per session would
+  be several emails about one edit. The group line is dropped when a household's
+  moves span more than one group, the rule the listing card already follows.
+- ⚠ **THE FAMILY'S OWN REMINDER SWITCH DOES NOT SILENCE IT.** That switch says
+  *do not tell me about classes I already know about*; a class **moving** is not
+  that, and the unsubscribe copy promises in three languages that other messages
+  are unaffected. The **activity-level** switch does silence it, because with it
+  off this activity has never put an entry in anybody's calendar and there is
+  nothing of ours to correct. A rehearsal tells nobody, as everywhere else.
+
+⚠ **NEITHER AN ARROW NOR A DASH BETWEEN THE TWO DATES.** *"13 March → 20 March"*
+is a directional glyph on a site that renders the same sentence in two
+directions — the trap the hamburger's chevron and the calendar's month controls
+were both rebuilt out of. Each language says *was* / `במקום` / `ранее` in its own
+words and the order never has to flip.
+
+⚠ **AND THE CAP IS NAMED RATHER THAN SILENT.** `MOVED_CAP` is 40 accounts per
+publish, because `SEND_TIMEOUT_MS` is 6 seconds and a function has ten. Unlike the
+nightly pass this does **not** run again tomorrow — a publish happens once — so a
+family past the cap is a family nobody tells unless an admin reads the notice,
+which therefore says so and colours the whole thing as a failure.
+
 ### Not built
 
-**A reschedule does not yet send a fresh invite.** The foundation is in — a stable
-UID across the approval invite and every reminder, and a `SEQUENCE` that rises
-whenever the record is saved — so when a publish moves a session the next
-reminder's file updates the family's existing entry rather than adding a second.
-What is missing is the publish-time trigger that sends one **immediately**, beside
-the terms-changed and capacity fallout in `_registration-fallout.js`. Until then a
-moved session reaches a calendar the day before it happens rather than the day it
-moves.
+**A moved session's stranded drop-in booking.** A booking's key carries its date,
+so moving a drop-in evening leaves `att-…__<old date>` pointing at a date the
+calendar no longer holds. The family is now told their evening moved, which is the
+half this closes; the record itself is not migrated, and nothing counts or names
+the strandings. That is a pre-existing hole rather than one this introduced, and
+the fix is a migration rather than a message.
 
 ## The emailed payment link
 
@@ -9755,6 +9829,16 @@ share image, Formspree wiring, domain) is done. Open items:
   open deliberately: no control anywhere reassigns a waiting row, so a refusal
   would name a remedy that does not exist. It wants a control first. See
   **A group could be deleted out from under the families in it**.
+
+- ⚠ **Every email's PLAIN-TEXT alternative has `&amp;` in its links.** `strip()`
+  takes the markup out of the HTML body and does not decode entities, so a link
+  built by `registrationHref()` — `?p=…&a=…`, escaped to `&amp;` for the href —
+  reaches the text part as `?p=…&amp;a=…`. A client rendering the text part sends
+  the reader to a page whose second query key is `amp;a`, so the activity never
+  resolves. It is pre-existing, it affects every message carrying a two-parameter
+  link, and most clients render the HTML part — which is why nobody has reported
+  it. The fix is one decode in `strip()` plus a test asserting no `&amp;` survives
+  into any message's `text`.
 
 - ⚠ **Nine suites are dated rather than clocked, and will fail on their own.**
   `_credit.js` never asks what time it is, so the clock arrives from whichever

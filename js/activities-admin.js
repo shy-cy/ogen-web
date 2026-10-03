@@ -3720,7 +3720,8 @@
   function falloutBad(f) {
     if (!f) return false;
     if (f.error) return true;
-    return !!(((f.terms || {}).failed || []).length || ((f.room || {}).failed || []).length);
+    return !!(((f.terms || {}).failed || []).length || ((f.room || {}).failed || []).length ||
+              ((f.sessions || {}).failed || []).length || ((f.sessions || {}).deferred || 0));
   }
 
   function falloutLine(f) {
@@ -3740,6 +3741,26 @@
       out.push('⚠ ' + t.changed + ' registration' + (t.changed === 1 ? '' : 's') +
         ' now follow' + (t.changed === 1 ? 's' : '') + ' the new cutoff dates, and ' +
         t.emailed + ' famil' + (t.emailed === 1 ? 'y has' : 'ies have') + ' been emailed.');
+    }
+    // ⚠ WHAT MOVED IN THE CALENDAR, AND WHO WAS TOLD. This is the one half of the
+    // fallout that writes nothing to any record — the calendar is the activity's
+    // and the family holds a copy — so the count of messages IS the whole of what
+    // happened, and an admin who is not given it has no way to know whether the
+    // people turning up on the old day have heard.
+    var sx = f.sessions || {};
+    if (sx.moved) {
+      out.push('⚠ ' + sx.moved + ' session' + (sx.moved === 1 ? '' : 's') +
+        ' moved, and ' + sx.told + ' famil' + (sx.told === 1 ? 'y has' : 'ies have') +
+        ' been sent a calendar file that updates ' +
+        (sx.moved === 1 ? 'it' : 'them') + ' where they already have ' +
+        (sx.moved === 1 ? 'it' : 'them') + '.');
+      if (sx.deferred) {
+        out.push('⚠ ' + sx.deferred + ' further famil' + (sx.deferred === 1 ? 'y was' : 'ies were') +
+          ' over the per-publish cap and have NOT been told. A publish happens once, ' +
+          'so nothing will pick them up later — they need telling by hand.');
+      }
+    } else if (f.sessions) {
+      out.push('Session dates moved, and nobody is registered to be told.');
     }
     // ⚠ WHO IS STILL ON THE OLD SCHEDULE. The percentages are frozen terms and a
     // publish deliberately does not rewrite them — which, said nowhere, is a

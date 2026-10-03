@@ -94,7 +94,14 @@ const TEMPLATES = {
   // One evening, taken off a family's list by an admin. Not resendable: it
   // names a date and a figure, and a second copy a fortnight later reads as a
   // second evening cancelled — the family would go looking for which one.
-  'session-cancelled': { label: 'Session cancelled', resend: false }
+  'session-cancelled': { label: 'Session cancelled', resend: false },
+  // Sessions moved by a publish, with a calendar file that updates the entries a
+  // family already holds. ⚠ NOT resendable, and for the reason a group move is
+  // not: it says "this moved from X to Y", and a second copy a fortnight later
+  // reads as a second move — the family would go looking for a third date. The
+  // calendar file is also rebuilt from the record as it stands, so a resend of an
+  // old message would carry today's dates under yesterday's sentence.
+  'session-moved': { label: 'Session dates moved', resend: false }
 };
 
 function templateLabel(t) { return (TEMPLATES[t] && TEMPLATES[t].label) || String(t || 'Email'); }

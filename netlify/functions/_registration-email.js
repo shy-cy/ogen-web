@@ -932,6 +932,124 @@ function reminderMessage(reg, account, opts) {
            html: html, text: strip(html) };
 }
 
+// ---- a session moved, said the day it moves --------------------------------
+//
+// ⚠ THE REMINDER ALREADY CARRIED THE CORRECTION, AND IT CARRIED IT TOO LATE.
+//
+// The UID is stable across the approval invite and every reminder, and buildIcs()
+// raises a SEQUENCE whenever the record is saved, so a moved session has always
+// reached a family's calendar correctly — on the evening before the class. A
+// family who rearranged their week around a Tuesday found out on the Monday, and
+// anyone who looked at their calendar in between read a date we already knew was
+// wrong. That is the whole gap this message closes: not what reaches the
+// calendar, but when.
+//
+// It is SHORT, like the reminder and for a different reason. The reminder is
+// short because it repeats; this is short because it has exactly one thing to
+// say, and the one thing is a list of dates.
+//
+// ⚠ IT IS NOT A REMINDER AND IS NOT SILENCED BY THE REMINDER SWITCH A FAMILY
+// SETS. That switch says "do not tell me about classes I already know about";
+// this says a class they signed up for is at a different time. The sentence under
+// the unsubscribe link promises that other messages are not affected, and this is
+// another message. The ACTIVITY-level switch does govern it, because that one
+// means this activity sends no calendar mail at all — so there are no entries of
+// ours in anybody's calendar for this to be updating.
+const SESSION_MOVED = {
+  he: {
+    subject: (act, many) => many ? `עדכון מועדים: ${act}` : `שינוי במועד: ${act}`,
+    heading: (many) => many ? 'שינוי במועדי המפגשים' : 'שינוי במועד המפגש',
+    and: 'ו',
+    body: (who, act, manyPeople, many) =>
+      `${who} ${manyPeople ? 'רשומים' : 'רשום/ה'} ל${act}. ` +
+      (many ? 'המועדים הבאים השתנו:' : 'המועד הבא השתנה:'),
+    moved: (n, now, was) => `<strong>מפגש ${n}:</strong> ${now} (במקום ${was})`,
+    group: (name) => `<strong>קבוצה:</strong> ${name}`,
+    ics: (many) => many
+      ? 'קובץ היומן המצורף מעדכן את המפגשים האלה ביומן שלכם.'
+      : 'קובץ היומן המצורף מעדכן את המפגש הזה ביומן שלכם.',
+    button: 'לעמוד ההרשמה'
+  },
+  en: {
+    subject: (act, many) => many ? `Schedule change: ${act}` : `A session has moved: ${act}`,
+    heading: (many) => many ? 'Some sessions have moved' : 'A session has moved',
+    and: 'and',
+    body: (who, act, manyPeople, many) =>
+      `${who} ${manyPeople ? 'are' : 'is'} registered for ${act}. ` +
+      (many ? 'These sessions have moved:' : 'This session has moved:'),
+    moved: (n, now, was) => `<strong>Session ${n}:</strong> ${now} (was ${was})`,
+    group: (name) => `<strong>Group:</strong> ${name}`,
+    ics: (many) => `The attached calendar file updates ${many ? 'these sessions' : 'this session'} in your calendar.`,
+    button: 'Open the registration page'
+  },
+  ru: {
+    subject: (act, many) => many ? `Изменение расписания: ${act}` : `Занятие перенесено: ${act}`,
+    heading: (many) => many ? 'Занятия перенесены' : 'Занятие перенесено',
+    and: 'и',
+    body: (who, act, manyPeople, many) =>
+      `${who} ${manyPeople ? 'записаны' : 'записан(а)'} на ${act}. ` +
+      (many ? 'Эти занятия перенесены:' : 'Это занятие перенесено:'),
+    moved: (n, now, was) => `<strong>Занятие ${n}:</strong> ${now} (ранее ${was})`,
+    group: (name) => `<strong>Группа:</strong> ${name}`,
+    ics: (many) => `Приложенный файл обновит ${many ? 'эти занятия' : 'это занятие'} в вашем календаре.`,
+    button: 'Открыть страницу записи'
+  }
+};
+
+// ⚠ NEITHER AN ARROW NOR A DASH BETWEEN THE TWO DATES. "13 March → 20 March" is
+// a directional glyph on a site that renders the same sentence in two
+// directions, which is the trap the hamburger's chevron and the calendar's month
+// controls were both rebuilt out of. Each language says "was" in its own words
+// and the order never has to flip.
+//
+// Everything variable is a PARAMETER, like payUrl and the ICS attachment, so
+// this stays runnable in three languages with no store behind it.
+function sessionsMovedMessage(reg, account, opts) {
+  const o = opts || {};
+  const l = lang(((account || {}).profile || {}).preferredLanguage);
+  const T = SESSION_MOVED[l];
+  const act = titleOf(reg, l);
+  const rows = o.moves || [];
+  const many = rows.length > 1;
+
+  const names = (o.names && o.names.length ? o.names : [childOf(reg)]).filter(Boolean);
+  // The conjunction is the language's, and in Hebrew it is a prefix glued to the
+  // word after it — the same rule reminderMessage() keeps.
+  const who = names.length > 1
+    ? names.slice(0, -1).join(', ') + ' ' + T.and + (l === 'he' ? '' : ' ') +
+      names[names.length - 1]
+    : (names[0] || '');
+
+  const lines = [esc(T.body(who, act, names.length > 1, many))];
+  rows.forEach((m) => lines.push(T.moved(esc(String(m.index)), esc(m.now), esc(m.was))));
+  // Only when there is a choice to have made, the rule the reminder follows:
+  // naming the group on a one-group activity describes a structure the family
+  // has never been shown.
+  if (o.groupName) lines.push(T.group(esc(o.groupName)));
+  if (o.hasIcs) lines.push(esc(T.ics(many)));
+
+  // ⚠ NO `#pay`. Every other message about a live registration is partly about
+  // money and scrolls to the cost card; this one is about when, and the facts
+  // are at the top of that page. The same call the group-move message makes.
+  const html = shell(l, T.heading(many), lines,
+    { href: registrationHref(reg, l, ''), label: T.button });
+  return { to: account.email, subject: T.subject(act, many),
+           html: html, text: strip(html) };
+}
+
+// ⚠ THE DATES ARE FORMATTED HERE, not by the caller, because dayAndMonth() is
+// this file's own formatter and a publish assembling "20 March, 18:00" would be
+// a second date grammar in a third place. `moves` arrives as sessions; what
+// goes into the sentence is words.
+function movesFor(moves, l) {
+  const when = (date, time) => [dayAndMonth(date, l), time].filter(Boolean).join(', ');
+  return (moves || []).map((m) => ({
+    index: m.session.index,
+    now: when(m.session.date, m.session.time),
+    was: when(m.was.date, m.was.time)
+  }));
+}
+
 function rejectedDraft(reg, account) {
   const l = lang(((account || {}).profile || {}).preferredLanguage);
   const T = REJECTED[l];
@@ -1228,21 +1346,39 @@ const sendApproved = (reg, account, sessionCancelHours, where, by, activity) =>
 // a calendar entry is that a family can check the current schedule from it six
 // months later.
 function sessionIcs(activity, session, l) {
-  if (!activity || !session || session.startsAt == null) return null;
+  return sessionsIcs(activity, [session], l);
+}
+
+// ⚠ AND THE SAME BUILDER TAKES SEVERAL, because a publish that moves a session
+// can move more than one.
+//
+// The rule beside sendApproved() — one event, never the whole course — is about
+// an invite CREATING entries, and it stands: ten VEVENTs on an approval is ten
+// things to delete one by one. This is the other case. The entries already exist
+// in the family's calendar, every one of these carries the UID of an entry they
+// already hold, and a file per session would be several emails about one edit.
+// One file, one message, and the calendar applies all of it at once.
+function sessionsIcs(activity, sessions, l) {
+  const rows = (sessions || []).filter((x) => x && x.startsAt != null);
+  if (!activity || !rows.length) return null;
   const url = pathFor(l, '/activities/' + activity.slug);
-  const where = FACTS.whereFor(activity, session.groupId);
-  const addr = String(((where || {}).address || {})[l] || '').trim();
-  const ev = REM.sessionEvent(activity, session, {
-    summary: pick(activity.title, l),
-    location: addr || undefined,
-    // In the description as well as URL: several calendar clients show one and
-    // not the other, and a family tapping through to the page is the point.
-    description: url,
-    url: url
-  });
-  if (!ev) return null;
-  return email.icsAttachment([ev], {
-    filename: 'ogen-' + activity.slug + '-' + session.date + '.ics'
+  const evs = rows.map((session) => {
+    // Per session, because two groups under the equal-hours rule can be in
+    // different rooms — so the address is the GROUP's and not the activity's.
+    const where = FACTS.whereFor(activity, session.groupId);
+    const addr = String(((where || {}).address || {})[l] || '').trim();
+    return REM.sessionEvent(activity, session, {
+      summary: pick(activity.title, l),
+      location: addr || undefined,
+      // In the description as well as URL: several calendar clients show one and
+      // not the other, and a family tapping through to the page is the point.
+      description: url,
+      url: url
+    });
+  }).filter(Boolean);
+  if (!evs.length) return null;
+  return email.icsAttachment(evs, {
+    filename: 'ogen-' + activity.slug + '-' + rows[0].date + '.ics'
   });
 }
 
@@ -1255,6 +1391,15 @@ const sendReminder = (reg, account, opts) =>
     const msg = reminderMessage(reg, account, opts);
     if (opts && opts.ics) msg.attachments = [opts.ics];
     return email.send(msg, as('session-reminder', account, reg));
+  });
+
+// Same shape, and settle() for the same reason: the publish is in git by the
+// time this runs and a mail failure may not take it back.
+const sendSessionsMoved = (reg, account, opts) =>
+  email.settle('session-moved', account.email, () => {
+    const msg = sessionsMovedMessage(reg, account, opts);
+    if (opts && opts.ics) msg.attachments = [opts.ics];
+    return email.send(msg, as('session-moved', account, reg));
   });
 
 // ⚠ A REMINDER THAT WAS NOT SENT IS TOLD TO A PERSON, not left in a log.
@@ -1347,7 +1492,8 @@ const sendPaid = (reg, account, paidCents, outstandingCents) =>
 module.exports = {
   payUrlFor,
   sendReceived, sendApproved, sendRejected, sendExpired, sendCancelled,
-  sendReminder, reminderMessage, sendRemindersMissed, sessionIcs,
+  sendReminder, reminderMessage, sendRemindersMissed, sessionIcs, sessionsIcs,
+  sendSessionsMoved, sessionsMovedMessage, movesFor,
   sendWaiting, sendPlaceOpen, sendMoved, sendTermsChanged, sendSessionCancelled,
   receivedMessage, approvedMessage, rejectedMessage, expiredMessage, rejectedDraft,
   cancelledMessage, cancelledDraft, waitingMessage, placeOpenMessage,
