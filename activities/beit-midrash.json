@@ -113,12 +113,12 @@
     }
   ],
   "sponsors": [],
-  "isoUpdated": "2026-09-28T14:51:53.880Z",
+  "isoUpdated": "2026-10-03T07:58:54.055Z",
   "isoCreated": "2026-09-20T07:57:58.547Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
   "activityId": "act-32b1222460c4f004",
-  "lastPublishedAt": "2026-09-28T14:51:53.880Z",
+  "lastPublishedAt": "2026-10-03T07:58:54.055Z",
   "groups": [
     {
       "groupId": "g-mu9hqxm1klzk",
@@ -137,9 +137,9 @@
         "schedule": {
           "frequency": "custom",
           "overrideText": {
-            "he": "פעם בחודש, בימי ראשון",
-            "en": "Once a month, on Sundays",
-            "ru": "Раз в месяц, по воскресеньям"
+            "he": "פעם בחודש, בימי ראשון, 18:00 בערב",
+            "en": "Once a month, on Sundays at 18:00",
+            "ru": "Раз в месяц, по воскресеньям в 18:00"
           },
           "sessions": [
             {
@@ -234,11 +234,11 @@
         },
         "address": {
           "text": {
-            "he": "",
-            "en": "",
-            "ru": ""
+            "he": "PASYSY - Anastasi Sioukri, Limassol, Lemesos 3035, Cyprus",
+            "en": "PASYSY - Anastasi Sioukri, Limassol, Lemesos 3035, Cyprus",
+            "ru": "PASYSY - Anastasi Sioukri, Limassol, Lemesos 3035, Cyprus"
           },
-          "mapUrl": ""
+          "mapUrl": "https://maps.app.goo.gl/66NBScZDP1BxtJAL9"
         }
       }
     }
