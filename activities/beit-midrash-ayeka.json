@@ -107,9 +107,9 @@
         "schedule": {
           "frequency": "custom",
           "overrideText": {
-            "he": "פעם בחודש, בימי חמישי",
-            "en": "Once a month, on Thursdays",
-            "ru": "Раз в месяц, по четвергам"
+            "he": "פעם בחודש, בימי חמישי ב- 19:30",
+            "en": "Once a month, on Thursdays at 19:30",
+            "ru": "Раз в месяц, по четвергам в 19:30"
           },
           "sessions": [
             {
@@ -230,11 +230,11 @@
         },
         "address": {
           "text": {
-            "he": "",
-            "en": "",
-            "ru": ""
+            "he": "PASYSY - Anastasi Sioukri, Limassol, Lemesos 3035, Cyprus",
+            "en": "PASYSY - Anastasi Sioukri, Limassol, Lemesos 3035, Cyprus",
+            "ru": "PASYSY - Anastasi Sioukri, Limassol, Lemesos 3035, Cyprus"
           },
-          "mapUrl": ""
+          "mapUrl": "https://maps.app.goo.gl/66NBScZDP1BxtJAL9"
         }
       }
     }
@@ -273,11 +273,11 @@
       "logo": "/images/activities/beit-midrash-ayeka-sponsors-spo-mui750np-1-8bde512a.jpg"
     }
   ],
-  "isoUpdated": "2026-09-29T12:35:21.140Z",
+  "isoUpdated": "2026-10-03T08:00:28.279Z",
   "isoCreated": "2026-09-26T09:03:08.149Z",
   "lastEditedBy": "michal@ogen.cy",
   "lastEditedByName": "Michal",
   "activityId": "act-933879f776409a9f",
-  "lastPublishedAt": "2026-09-29T12:35:21.140Z",
+  "lastPublishedAt": "2026-10-03T08:00:28.279Z",
   "listing": "listed"
 }
