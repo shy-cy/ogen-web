@@ -88,6 +88,40 @@ function setClosing(C, date) {
 (async () => {
   const blobs = H.makeBlobs();
   const course = F.course({ slug: 'term', activityId: 'act-0000000000000x01' });
+
+  // ⚠ THE CALENDAR IS RELATIVE TO THE CLOCK, NOT WRITTEN DOWN, AND THAT IS NOT
+  // TIDINESS.
+  //
+  // _credit.js never asks what time it is — that is its contract — so the clock
+  // arrives from the handler this suite drives, which is the REAL one. The
+  // shared fixture's term starts on a fixed date, and `registrationFeeCutoffDate`
+  // is null, so the fee's deadline resolves to that start minus fourteen days.
+  // The day real time crossed it, this suite started reading €280 where it
+  // expects €330 and finding one `fee-closed` line where it expects none —
+  // every figure correct, and the only thing stale being the sentence the test
+  // had written down about them. It is the stopped-clock version of the
+  // half-migrated record: nothing is broken, and the test is the last thing to
+  // find out.
+  //
+  // A date further in the future only moves the day it happens. So the term is
+  // always sixty days out from whenever the suite runs, which puts the fee's
+  // cutoff (start minus fourteen) about six weeks ahead and the first session
+  // well past it — the state this suite is ABOUT, which is a term paid for
+  // before it begins. Every date the suite wants in the PAST it still writes
+  // down as 2020-01-01, because those are saying "long gone" rather than
+  // standing anywhere near a boundary.
+  const DAY = 86400000;
+  const isoDay = (ms) => new Date(ms).toISOString().slice(0, 10);
+  const first = Date.now() + 60 * DAY;
+  const DATES = [];
+  for (let i = 0; i < 10; i++) DATES.push(isoDay(first + i * 7 * DAY));
+  F.setGroupFacts(course, {
+    duration: {
+      startDate: DATES[0], endDate: DATES[DATES.length - 1],
+      sessionDates: DATES.map((d) => ({ date: d, status: 'scheduled' }))
+    }
+  });
+
   const github = H.makeGithub({ 'activities/term.json': JSON.stringify(course) });
 
   const mods = H.loadWithStubs({

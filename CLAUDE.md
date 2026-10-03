@@ -9756,6 +9756,28 @@ share image, Formspree wiring, domain) is done. Open items:
   would name a remedy that does not exist. It wants a control first. See
   **A group could be deleted out from under the families in it**.
 
+- ⚠ **Nine suites are dated rather than clocked, and will fail on their own.**
+  `_credit.js` never asks what time it is, so the clock arrives from whichever
+  handler a suite drives — the real one — while `tests/_fixtures.js` writes its
+  term down as starting **2026-10-14** and its drop-in as **2026-10-06**. Real
+  time has now gone past both. The first casualty was
+  `a-dialog-about-money-must-not-be-backwards.js`, whose fixture's fee cutoff
+  (start minus fourteen days) quietly moved into the past: it read €280 where it
+  expects €330, every figure correct and only the sentence the test had written
+  down about them stale. That one is fixed by building its calendar sixty days
+  out from whenever it runs, and it now passes a year ahead. Measured by running
+  the whole suite under a shifted clock: **nine more fail at +90 days** —
+  `a-cancellation-says-so-and-says-what-it-credits`, `a-code-on-a-wall-opens-one-evening`,
+  `a-deadline-nobody-was-told-about`, `a-drop-in-is-paid-one-evening-at-a-time`,
+  `a-figure-that-does-not-explain-itself`, `a-full-activity-can-still-take-your-name`,
+  `a-full-evening-can-still-take-your-name`, `a-ledger-is-appended-to-never-rewritten`
+  and `an-evening-is-the-unit-on-a-drop-in`. Most of them book an **evening**,
+  which `validate()` correctly refuses once its date has passed. The fix is the
+  same one — a calendar relative to the run — and the reason it has not been
+  applied to the shared fixtures is blast radius: about thirty suites name those
+  dates literally. A stopped clock in a test is the half-migrated record wearing
+  a different hat: nothing is broken, and the test is the last thing to find out.
+
 - **Russian copy has never been reviewed by a native speaker** — the homepage,
   the About and activity pages, every string in `_account-email.js` and
   `_registration-email.js`, and now the ~76 refusals in `_family-errors.js`.
